@@ -624,6 +624,32 @@ describe('trunks operations', () => {
     ).rejects.toMatchObject({ status: 422 });
   });
 
+  it('accepts a password holding brackets, `;`, `=`, `>` or a backslash, and refuses a NUL, on create and update', async () => {
+    const db = await makeTestDb();
+    const { trunk } = await createTrunk(db, {
+      name: 'Provider E',
+      authMode: 'registration',
+      username: 'bob',
+      password: '[pass];w=rd>\\'
+    });
+    await expect(
+      runOperation(
+        db,
+        'trunks.update',
+        { id: trunk.id, password: ']=>;[' },
+        asRun()
+      )
+    ).resolves.toBeDefined();
+    await expect(
+      runOperation(
+        db,
+        'trunks.update',
+        { id: trunk.id, password: 'sec\u0000ret' },
+        asRun()
+      )
+    ).rejects.toMatchObject({ status: 422 });
+  });
+
   it('refuses an explicit username on update for a trunk whose auth carries no credentials', async () => {
     const db = await makeTestDb();
     const { trunk } = await createTrunk(db, { authMode: 'ip' });

@@ -1,36 +1,9 @@
 import { describe, expect, test } from 'vitest';
 
+import { configValues, parseAsteriskConfig } from '#testing/asteriskConfig.js';
+
 import { render } from './render.js';
 import type { RenderInput, Trunk } from './shared.js';
-
-/**
- * The value Asterisk's config parser (main/config.c) reads from `<key> = <value>` in `conf`:
- * the line is cut at the first `;` not preceded by a backslash, an escaped `\;` loses its
- * backslash, and the value is trimmed.
- */
-function parsedValues(conf: string, key: string): string[] {
-  return conf
-    .split('\n')
-    .filter(line => line.startsWith(`${key} = `))
-    .map(line => {
-      let value = line.slice(key.length + 3);
-      let from = 0;
-      for (;;) {
-        const index = value.indexOf(';', from);
-        if (index === -1) {
-          break;
-        }
-        if (index > from && value[index - 1] === '\\') {
-          value = value.slice(0, index - 1) + value.slice(index);
-          from = index;
-        } else {
-          value = value.slice(0, index);
-          break;
-        }
-      }
-      return value.trim();
-    });
-}
 
 const registrationTrunk: Trunk = {
   id: 't1',
@@ -88,21 +61,21 @@ describe('renderTrunksConf escaping', () => {
   test('a password with a semicolon reaches Asterisk whole', () => {
     const conf = renderTrunk(registrationTrunk);
     expect(conf).toContain('password = ab\\;cd\\\\;ef');
-    expect(parsedValues(conf, 'password')).toEqual(['ab;cd\\;ef']);
+    expect(configValues(conf, 'password')).toEqual(['ab;cd\\;ef']);
   });
 
   test('a username with a semicolon reaches Asterisk whole, in auth and in client_uri', () => {
     const conf = renderTrunk(registrationTrunk);
-    expect(parsedValues(conf, 'username')).toEqual(['acct;4711']);
-    expect(parsedValues(conf, 'client_uri')).toEqual([
+    expect(configValues(conf, 'username')).toEqual(['acct;4711']);
+    expect(configValues(conf, 'client_uri')).toEqual([
       'sip:acct;4711@sip.provider-a.example'
     ]);
-    expect(parsedValues(conf, 'contact_user')).toEqual(['acct;4711']);
+    expect(configValues(conf, 'contact_user')).toEqual(['acct;4711']);
   });
 
   test('outbound proxy URI parameters survive into every outbound_proxy line', () => {
     const conf = renderTrunk(registrationTrunk);
-    expect(parsedValues(conf, 'outbound_proxy')).toEqual([
+    expect(configValues(conf, 'outbound_proxy')).toEqual([
       'sip:sbc.provider-a.example;lr;transport=udp',
       'sip:sbc.provider-a.example;lr;transport=udp',
       'sip:sbc.provider-a.example;lr;transport=udp'
@@ -124,34 +97,53 @@ describe('renderTrunksConf escaping', () => {
       ...registrationTrunk,
       outboundProxy: 'sips:sbc.provider-a.example:5061;transport=tls'
     });
-    expect(parsedValues(conf, 'outbound_proxy')).toEqual([
+    expect(configValues(conf, 'outbound_proxy')).toEqual([
       'sips:sbc.provider-a.example:5061;transport=tls;lr',
       'sips:sbc.provider-a.example:5061;transport=tls;lr',
       'sips:sbc.provider-a.example:5061;transport=tls;lr'
     ]);
   });
+
+  // `[` opens a category only at the start of a line, `;` is escaped, a line splits at its
+  // first `=`, and `>` counts only right after that `=`: none of them, at either end of the
+  // value or inside it, changes what Asterisk reads.
+  test.each(['[', ']', '[x]', ';', '=', '>', '=>', '\\', '\\;', '#', '"'])(
+    'a password holding %s reads back whole, in the one auth section',
+    special => {
+      const password = `${special}pa${special}ss${special}`;
+      const conf = renderTrunk({ ...registrationTrunk, password });
+      expect(configValues(conf, 'password')).toEqual([password]);
+      expect(
+        parseAsteriskConfig(conf).filter(category =>
+          category.variables.some(
+            ([name, value]) => name === 'type' && value === 'auth'
+          )
+        )
+      ).toHaveLength(1);
+    }
+  );
 });
 
 describe('renderTrunksConf registration retries', () => {
   test('every failure, a 403 or a rejected challenge included, retries at register_retry_s, indefinitely', () => {
     const conf = renderTrunk({ ...registrationTrunk, registerRetryS: 45 });
-    expect(parsedValues(conf, 'retry_interval')).toEqual(['45']);
-    expect(parsedValues(conf, 'forbidden_retry_interval')).toEqual(['45']);
-    expect(parsedValues(conf, 'fatal_retry_interval')).toEqual(['45']);
-    expect(parsedValues(conf, 'max_retries')).toEqual(['4294967295']);
-    expect(parsedValues(conf, 'auth_rejection_permanent')).toEqual(['no']);
+    expect(configValues(conf, 'retry_interval')).toEqual(['45']);
+    expect(configValues(conf, 'forbidden_retry_interval')).toEqual(['45']);
+    expect(configValues(conf, 'fatal_retry_interval')).toEqual(['45']);
+    expect(configValues(conf, 'max_retries')).toEqual(['4294967295']);
+    expect(configValues(conf, 'auth_rejection_permanent')).toEqual(['no']);
   });
 
   test("a trunk without register_retry_s retries at Asterisk's own 60 s", () => {
     const conf = renderTrunk(registrationTrunk);
-    expect(parsedValues(conf, 'retry_interval')).toEqual([]);
-    expect(parsedValues(conf, 'forbidden_retry_interval')).toEqual(['60']);
-    expect(parsedValues(conf, 'fatal_retry_interval')).toEqual(['60']);
+    expect(configValues(conf, 'retry_interval')).toEqual([]);
+    expect(configValues(conf, 'forbidden_retry_interval')).toEqual(['60']);
+    expect(configValues(conf, 'fatal_retry_interval')).toEqual(['60']);
   });
 
   test('an ip trunk registers nothing, so it carries no retry policy', () => {
     const conf = renderTrunk({ ...registrationTrunk, authMode: 'ip' });
-    expect(parsedValues(conf, 'max_retries')).toEqual([]);
+    expect(configValues(conf, 'max_retries')).toEqual([]);
   });
 });
 
@@ -176,9 +168,9 @@ describe('renderTrunksConf connected line and redirecting', () => {
         '[trunkuser]'
       ]);
       for (const endpoint of endpoints) {
-        expect(parsedValues(endpoint, 'send_connected_line')).toEqual(['no']);
-        expect(parsedValues(endpoint, 'send_diversion')).toEqual(['no']);
-        expect(parsedValues(endpoint, 'send_history_info')).toEqual([]);
+        expect(configValues(endpoint, 'send_connected_line')).toEqual(['no']);
+        expect(configValues(endpoint, 'send_diversion')).toEqual(['no']);
+        expect(configValues(endpoint, 'send_history_info')).toEqual([]);
       }
     }
   });
@@ -231,7 +223,7 @@ describe('renderTrunksConf DTMF', () => {
       username: 'trunkuser',
       inboundAuth: true
     });
-    expect(parsedValues(conf, 'dtmf_mode')).toEqual(['auto', 'auto']);
+    expect(configValues(conf, 'dtmf_mode')).toEqual(['auto', 'auto']);
   });
 });
 
@@ -248,16 +240,16 @@ describe('renderTrunksConf TLS and SRTP', () => {
   // `tls_verify` picks the TLS transport its endpoint and registration name.
   test('a tls trunk that checks its certificate uses transport-tls, one that does not transport-tls-noverify', () => {
     expect(
-      parsedValues(renderTrunk({ ...tlsTrunk, tlsVerify: true }), 'transport')
+      configValues(renderTrunk({ ...tlsTrunk, tlsVerify: true }), 'transport')
     ).toEqual(['transport-tls', 'transport-tls']);
     expect(
-      parsedValues(renderTrunk({ ...tlsTrunk, tlsVerify: false }), 'transport')
+      configValues(renderTrunk({ ...tlsTrunk, tlsVerify: false }), 'transport')
     ).toEqual(['transport-tls-noverify', 'transport-tls-noverify']);
   });
 
   test('tls_verify is ignored on a trunk that does not use tls', () => {
     const conf = renderTrunk({ ...registrationTrunk, tlsVerify: false });
-    expect(parsedValues(conf, 'transport')).toEqual([
+    expect(configValues(conf, 'transport')).toEqual([
       'transport-udp',
       'transport-udp'
     ]);
@@ -275,10 +267,10 @@ describe('renderTrunksConf TLS and SRTP', () => {
       .filter(block => block.split('\n').includes('type = endpoint'));
     expect(endpoints).toHaveLength(2);
     for (const endpoint of endpoints) {
-      expect(parsedValues(endpoint, 'media_encryption')).toEqual(['sdes']);
+      expect(configValues(endpoint, 'media_encryption')).toEqual(['sdes']);
     }
     expect(
-      parsedValues(renderTrunk(withAuthEndpoint), 'media_encryption')
+      configValues(renderTrunk(withAuthEndpoint), 'media_encryption')
     ).toEqual([]);
   });
 });
@@ -296,13 +288,13 @@ describe('renderTrunksConf qualify', () => {
 
   test('an ip trunk is probed every 60 s with qualify on and never with it off', () => {
     expect(
-      parsedValues(
+      configValues(
         renderTrunk({ ...ipTrunk, qualify: true }),
         'qualify_frequency'
       )
     ).toEqual(['60']);
     expect(
-      parsedValues(
+      configValues(
         renderTrunk({ ...ipTrunk, qualify: false }),
         'qualify_frequency'
       )
@@ -312,7 +304,7 @@ describe('renderTrunksConf qualify', () => {
   test('qualify is ignored on a registration trunk', () => {
     for (const qualify of [true, false]) {
       expect(
-        parsedValues(
+        configValues(
           renderTrunk({ ...registrationTrunk, qualify }),
           'qualify_frequency'
         )

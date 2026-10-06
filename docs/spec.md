@@ -972,7 +972,7 @@ Remapped codes must start with `*` or `#`, which keeps them disjoint from extens
 
 SIP trunks are first-class, admin-configurable objects managed through the REST API and stored in the `trunks` table. Any standards-compliant SIP trunk provider must work.
 
-**Auth mode.** Both modes are in the MVP. In `registration` mode Asterisk sends `REGISTER` with the trunk's username and password at `register_expiry_s`, retries every `register_retry_s`, and answers digest challenges on outbound INVITEs. In `ip` mode the provider whitelists the stack IP and Asterisk registers nothing; credentials pass only where `inbound_auth` is set.
+**Auth mode.** Both modes are in the MVP. In `registration` mode Asterisk sends `REGISTER` with the trunk's username and password at `register_expiry_s`, retries every `register_retry_s`, and answers digest challenges on outbound INVITEs. In `ip` mode the provider whitelists the stack IP and Asterisk registers nothing; credentials pass only where `inbound_auth` is set. A password takes every character but CR, LF and NUL and cannot begin or end with whitespace or a control character, which Asterisk's config parser strips; the rendered config writes a `;` as `\;`, since an unescaped one starts a comment.
 
 **Inbound identification.** Asterisk classifies an incoming call by trunk in one of three ways, depending on how the provider sends its INVITEs:
 

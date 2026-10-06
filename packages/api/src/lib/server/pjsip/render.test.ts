@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
 
+import { configValues } from '#testing/asteriskConfig.js';
+
 import { render } from './render.js';
 import type { RenderInput } from './shared.js';
 
@@ -574,6 +576,14 @@ describe('render', () => {
       'callerid = "Anna Annie Huber\\;[anonymous]" <101>'
     );
     expect(lines.filter(line => line.startsWith('['))).toHaveLength(1);
+  });
+
+  test("a device's password reads back whole whatever it holds, a `;` and brackets included", () => {
+    const sipPassword = '[a;b]=>c\\;';
+    const users = render({ ...input, devices: [{ ...deviceA, sipPassword }] })[
+      'pjsip_users.conf'
+    ];
+    expect(configValues(users, 'password')).toEqual([sipPassword]);
   });
 
   test('render refuses a device whose owner is not among the users', () => {

@@ -5,6 +5,7 @@ import {
   assertExtension,
   assertSafeConfigValue,
   assertSafeId,
+  assertWholeConfigValue,
   compareStrings,
   escapeConfigValue,
   formatAllow,
@@ -18,7 +19,7 @@ import { renderTrunksConf } from './trunks.js';
 function assertSafeDevice(device: Device, ringGroupIds: string[]): void {
   assertSafeConfigValue(device.userId, 'device.userId');
   assertSafeConfigValue(device.sipUsername, 'device.sipUsername');
-  assertSafeConfigValue(device.sipPassword, 'device.sipPassword');
+  assertWholeConfigValue(device.sipPassword, 'device.sipPassword');
   for (const ip of device.allowedIps ?? []) {
     assertSafeConfigValue(ip, 'device.allowedIps');
   }
@@ -67,7 +68,7 @@ function renderDeviceAuth(device: Device): string {
     'type = auth',
     'auth_type = userpass',
     `username = ${device.sipUsername}`,
-    `password = ${device.sipPassword}`
+    `password = ${escapeConfigValue(device.sipPassword)}`
   ].join('\n');
 }
 

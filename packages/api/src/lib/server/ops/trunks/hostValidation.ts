@@ -6,6 +6,11 @@ import {
   type HostDirection
 } from '@zamfono/shared';
 
+import {
+  hasStrippedEnd,
+  isWholeConfigValue
+} from '#lib/server/pjsip/shared.js';
+
 import { OpError } from '../types.js';
 
 // A CR/LF or a bracket could open a new PJSIP section when a host or outbound proxy is
@@ -111,32 +116,19 @@ export function assertValidOutboundProxy(
   }
 }
 
-// A CR/LF or a bracket could open a new PJSIP section, same as a host; an '@' or whitespace
-// would split `sip:<username>@<host>` (registrationUris in @zamfono/shared) into more or fewer
-// parts than the AMI Registry-event matching of §9.4 "Provisioning and status" expects.
+// A CR/LF or a bracket could open a new PJSIP section, same as a host, and an `inbound_auth`
+// trunk's username is a section name itself; a bracket is no SIP URI user character either. An
+// '@' or whitespace would split `sip:<username>@<host>` (registrationUris in @zamfono/shared)
+// into more or fewer parts than the AMI Registry-event matching of §9.4 "Provisioning and status"
+// expects.
 const UNSAFE_USERNAME_PATTERN = /[\r\n[\]@\s]/u;
-
-// Asterisk's config parser strips every character below this code point (space and the control
-// characters, `ast_strip`) from both ends of a value, and has no quoting or escape that keeps
-// them, so a credential with one at either end cannot be written as entered.
-const FIRST_UNTRIMMED_CODE_POINT = 0x21;
-
-/** Whether `value` begins or ends with a character Asterisk's config parser trims away. */
-function hasTrimmedEnd(value: string): boolean {
-  const first = value.codePointAt(0) ?? FIRST_UNTRIMMED_CODE_POINT;
-  const last =
-    value.codePointAt(value.length - 1) ?? FIRST_UNTRIMMED_CODE_POINT;
-  return (
-    first < FIRST_UNTRIMMED_CODE_POINT || last < FIRST_UNTRIMMED_CODE_POINT
-  );
-}
 
 /**
  * Throws 422 for a `username` that is not safe to interpolate into generated PJSIP config, or
  * into the `sip:<username>@<host>` registration URI (§9.4 "Provisioning and status").
  */
 export function assertValidUsername(username: string): void {
-  if (UNSAFE_USERNAME_PATTERN.test(username) || hasTrimmedEnd(username)) {
+  if (UNSAFE_USERNAME_PATTERN.test(username) || hasStrippedEnd(username)) {
     throw new OpError(
       HTTP_UNPROCESSABLE_CONTENT,
       `username contains characters unsafe for generated config: ${username}`
@@ -145,20 +137,16 @@ export function assertValidUsername(username: string): void {
 }
 
 /**
- * Throws 422 for a `password` that is not safe to interpolate into generated PJSIP config, or
- * that begins or ends with whitespace the config parser would trim off.
+ * Throws 422 for a `password` that would not read back from generated PJSIP config as written:
+ * one holding a CR, LF or NUL, or beginning or ending with whitespace or a control character the
+ * config parser strips. Any other character, a bracket or `;` included, is written escaped where
+ * Asterisk needs it (pjsip/shared.ts's `isWholeConfigValue`).
  */
 export function assertValidPassword(password: string): void {
-  if (UNSAFE_HOST_PATTERN.test(password)) {
+  if (!isWholeConfigValue(password)) {
     throw new OpError(
       HTTP_UNPROCESSABLE_CONTENT,
-      'password contains characters unsafe for generated config'
-    );
-  }
-  if (hasTrimmedEnd(password)) {
-    throw new OpError(
-      HTTP_UNPROCESSABLE_CONTENT,
-      'password must not begin or end with whitespace or a control character'
+      'password must hold no CR, LF or NUL, nor begin or end with whitespace or a control character'
     );
   }
 }

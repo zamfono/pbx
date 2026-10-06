@@ -19,7 +19,7 @@ trunk_id=$(api POST /trunks "{
   \"authMode\": \"ip\",
   \"inboundAuth\": true,
   \"username\": \"ci-auth-acct\",
-  \"password\": \"ci-auth-secret\",
+  \"password\": \"ci[auth];sec=ret\",
   \"inboundNumberFormat\": \"e164\",
   \"hosts\": [{ \"host\": \"$provider_ip\", \"direction\": \"outbound\" }]
 }" | jsonfield trunk.id)

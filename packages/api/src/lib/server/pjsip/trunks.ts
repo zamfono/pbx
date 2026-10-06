@@ -2,6 +2,7 @@ import { sipHostUri, trunkSectionName } from '@zamfono/shared';
 
 import {
   assertSafeConfigValue,
+  assertWholeConfigValue,
   compareStrings,
   escapeConfigValue,
   formatAllow,
@@ -25,7 +26,7 @@ function assertSafeTrunk(trunk: Trunk): void {
     assertSafeConfigValue(trunk.username, 'trunk.username');
   }
   if (trunk.password !== null) {
-    assertSafeConfigValue(trunk.password, 'trunk.password');
+    assertWholeConfigValue(trunk.password, 'trunk.password');
   }
   if (trunk.outboundProxy !== null) {
     assertSafeConfigValue(trunk.outboundProxy, 'trunk.outboundProxy');

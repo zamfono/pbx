@@ -75,10 +75,20 @@ export type TrunkHost = Trunk['hosts'][number];
 // endpoint contexts, so a value that fails this check is refused rather than written out.
 const EXTENSION_PATTERN = /^[0-9]+$/u;
 
-// Admin-supplied credentials, hostnames and proxies are interpolated into the generated
-// config; a CR/LF or a bracket could open a new PJSIP section, such as the `[anonymous]`
+// Ids, hostnames, proxies and usernames are interpolated into the generated config, some as
+// section names; a CR/LF or a bracket could open a new PJSIP section, such as the `[anonymous]`
 // endpoint §5.6 forbids, so any such value is refused rather than written out.
 const UNSAFE_CONFIG_PATTERN = /[\r\n[\]]/u;
+
+// A value Asterisk's config parser (main/config.c) cannot read back whole from `<key> = <value>`:
+// a CR or LF ends its line, and a NUL ends it as a C string. A bracket opens a section only at the
+// start of a line, a `;` is escaped (`escapeConfigValue`) and the line splits at its first `=`, so
+// every other character reads back as written.
+const LINE_ENDING_PATTERN = /[\r\n\0]/u;
+
+// The parser strips every character below this code point (space and the control characters,
+// `ast_strip`) from both ends of a value, and has no quoting or escape that keeps them.
+const FIRST_UNSTRIPPED_CODE_POINT = 0x21;
 
 // Server-generated ids (`newId()`, §11.1) are UUIDv7: hex digits and hyphens only. A moh
 // asset id is interpolated into a filesystem path, where the injection check above still
@@ -95,6 +105,28 @@ export function assertExtension(ext: string): void {
 /** Throws when `value` could break out of its PJSIP line or section. */
 export function assertSafeConfigValue(value: string, field: string): void {
   if (UNSAFE_CONFIG_PATTERN.test(value)) {
+    throw new Error(`render: unsafe value for ${field}`);
+  }
+}
+
+/** Whether `value` begins or ends with a character Asterisk's config parser strips away. */
+export function hasStrippedEnd(value: string): boolean {
+  const first = value.codePointAt(0) ?? FIRST_UNSTRIPPED_CODE_POINT;
+  const last =
+    value.codePointAt(value.length - 1) ?? FIRST_UNSTRIPPED_CODE_POINT;
+  return (
+    first < FIRST_UNSTRIPPED_CODE_POINT || last < FIRST_UNSTRIPPED_CODE_POINT
+  );
+}
+
+/** Whether `value`, escaped by `escapeConfigValue`, reads back from `<key> = <value>` as written. */
+export function isWholeConfigValue(value: string): boolean {
+  return !LINE_ENDING_PATTERN.test(value) && !hasStrippedEnd(value);
+}
+
+/** Throws when `value` would not read back from its line as written (`isWholeConfigValue`). */
+export function assertWholeConfigValue(value: string, field: string): void {
+  if (!isWholeConfigValue(value)) {
     throw new Error(`render: unsafe value for ${field}`);
   }
 }

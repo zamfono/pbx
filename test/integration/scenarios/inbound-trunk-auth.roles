@@ -1,4 +1,7 @@
 # shellcheck shell=bash disable=SC2034
 # Where the sides of `inbound-trunk-auth` differ from run-scenarios.sh's defaults.
 CALLER=sipp-provider
-CALLER_ARGS="-au ci-auth-acct -ap ci-auth-secret"
+# The trunk's password, `ci[auth];sec=ret`, holds brackets, a `;` and an `=`, which its auth
+# section must keep whole (§9.4 "Auth mode"). sipp reads `-ap` as message text, where a `[` opens
+# a keyword, so the `[` is written as its hex escape `\x5B`.
+CALLER_ARGS="-au ci-auth-acct -ap ci\x5Bauth];sec=ret"
