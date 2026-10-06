@@ -10,7 +10,7 @@ import type { MailTemplateWire } from './_shared.js';
 import './index.js';
 
 describe('mailTemplates', () => {
-  it('lists the six builtin templates in the tenant language', async () => {
+  it('lists the seven builtin templates in the tenant language', async () => {
     const db = await makeTestDb();
     await seedSettings(db);
     const listed = (await runOperation(
@@ -19,7 +19,7 @@ describe('mailTemplates', () => {
       {},
       asRun()
     )) as { items: MailTemplateWire[] };
-    expect(listed.items).toHaveLength(6);
+    expect(listed.items).toHaveLength(7);
     expect(listed.items.every(item => item.source === 'builtin')).toBe(true);
   });
 
@@ -41,7 +41,7 @@ describe('mailTemplates', () => {
       asRun()
     )) as Page;
     expect(second).toMatchObject({ nextCursor: null });
-    expect(second.items).toHaveLength(2);
+    expect(second.items).toHaveLength(3);
   });
 
   it('refuses a template naming a placeholder its kind does not offer', async () => {

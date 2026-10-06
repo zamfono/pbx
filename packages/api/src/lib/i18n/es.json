@@ -11,6 +11,22 @@
     "forgotLink": "¿Olvidaste tu contraseña?",
     "ssoPrefix": "Iniciar sesión con "
   },
+  "mfa": {
+    "verifyIntro": "Introduce el código de 6 dígitos de tu app de autenticación o uno de tus códigos de recuperación.",
+    "code": "Código",
+    "verifySubmit": "Verificar",
+    "invalidCode": "Código incorrecto.",
+    "enrolIntro": "Tu cuenta necesita el inicio de sesión en dos pasos. Escanea este código QR con una app de autenticación e introduce el código de 6 dígitos que muestra.",
+    "qrLabel": "Código QR para tu app de autenticación",
+    "secretLabel": "O introduce esta clave a mano en la app:",
+    "enrolSubmit": "Confirmar",
+    "codesIntro": "Guarda estos códigos de recuperación en un lugar seguro. Cada uno te permite iniciar sesión una vez si pierdes tu autenticador. Solo se muestran ahora.",
+    "copy": "Copiar",
+    "copied": "Copiado",
+    "download": "Descargar (.txt)",
+    "saved": "He guardado mis códigos de recuperación",
+    "continue": "Continuar"
+  },
   "forgot": {
     "title": "Contraseña olvidada",
     "intro": "Introduce tu correo electrónico y te enviaremos un enlace para establecer una nueva contraseña.",

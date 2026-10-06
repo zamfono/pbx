@@ -159,8 +159,10 @@ async function revertChange(
   change: ChangeEntry
 ): Promise<void> {
   switch (change.field) {
-    // §5.9: undo restores the devices; tokens stay revoked and the person signs in again.
+    // §5.9: undo restores the devices; tokens stay revoked and the person signs in again, and
+    // second factors stay removed, so one who needs them enrols again (§5.2).
     case 'tokensRevoked':
+    case 'mfaRemoved':
       return;
     // Lists the devices an extension rename renamed (§9.3 "Naming"); reverting the `extension`
     // renames them back.

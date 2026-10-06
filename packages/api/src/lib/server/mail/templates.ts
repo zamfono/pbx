@@ -65,6 +65,17 @@ export const PLACEHOLDERS: Record<
       'publishedAt'
     ],
     required: []
+  },
+  mfaChanged: {
+    offered: [
+      ...COMMON_PLACEHOLDERS,
+      'added',
+      'removed',
+      'reset',
+      'passkeyName',
+      'changedAt'
+    ],
+    required: []
   }
 };
 

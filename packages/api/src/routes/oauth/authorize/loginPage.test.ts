@@ -6,12 +6,14 @@ import { dictionaryFor } from '#lib/i18n/index.js';
 import Page from './+page.svelte';
 
 const state = vi.hoisted((): { result: unknown } => ({ result: undefined }));
+const second = vi.hoisted((): { result: unknown } => ({ result: undefined }));
 
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
 vi.mock('./authorize.remote.js', async () => {
   const { remoteFormStub } = await import('#testing/remoteFormStub.js');
   return {
     login: remoteFormStub(state),
+    secondFactor: remoteFormStub(second),
     consent: remoteFormStub({ result: undefined })
   };
 });
@@ -45,5 +47,46 @@ describe('the login page (§5.2 "Authentication pages")', () => {
     state.result = undefined;
     const { body } = render(Page, { props: { data } });
     expect(body).toMatch(/<h1[^>]*tabindex="-1"/u);
+  });
+
+  it('shows the authenticator enrolment as a QR code and as text (§5.2 "Two-factor authentication")', () => {
+    state.result = {
+      step: 'enrol',
+      qrSvg: '<svg data-qr="1"></svg>',
+      secret: 'MZXW 6YTB OI',
+      error: null
+    };
+    second.result = undefined;
+    const { body } = render(Page, { props: { data } });
+    expect(body).toMatch(
+      /role="img"[^>]*aria-label="QR code[^"]*"[^>]*>(?:<!--\w+-->)?<svg data-qr="1">/u
+    );
+    expect(body).toContain('MZXW 6YTB OI');
+    expect(body).toMatch(
+      /<input[^>]*autocomplete="one-time-code"[^>]*name="code"/u
+    );
+    expect(body).not.toContain('name="_password"');
+  });
+
+  it('shows a refused code as an alert the code box is described by', () => {
+    second.result = { step: 'verify', error: 'wrong' };
+    const { body } = render(Page, { props: { data } });
+    expect(body).toMatch(
+      /<p[^>]*id="code-refusal"[^>]*role="alert"[^>]*>wrong/u
+    );
+    expect(body).toMatch(
+      /<input[^>]*name="code"[^>]*aria-invalid="true"[^>]*aria-describedby="code-refusal"/u
+    );
+  });
+
+  it('shows the recovery codes once, with a download, behind the saved confirmation', () => {
+    second.result = { step: 'recoveryCodes', codes: ['AAAA-BBBB-CCCC-DDDD'] };
+    const { body } = render(Page, { props: { data } });
+    expect(body).toContain('AAAA-BBBB-CCCC-DDDD</li>');
+    expect(body).toMatch(
+      /<a[^>]*href="data:text\/plain[^"]*AAAA-BBBB-CCCC-DDDD[^"]*"[^>]*download="recovery-codes.txt"/u
+    );
+    expect(body).toMatch(/<input type="checkbox" required/u);
+    second.result = undefined;
   });
 });

@@ -15,7 +15,8 @@ export const MAIL_KINDS = [
   'setup',
   'reset',
   'updateFailed',
-  'breakingUpdate'
+  'breakingUpdate',
+  'mfaChanged'
 ] as const;
 export type MailKind = (typeof MAIL_KINDS)[number];
 

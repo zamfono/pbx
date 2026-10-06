@@ -445,6 +445,20 @@ container. Where that log survives depends on the runtime's log driver:
 The journal survives a reboot only where it is persistent, which it is when `/var/log/journal`
 exists.
 
+## Lost second factor
+
+Owners and admins pass a second factor at every password sign-in (`docs/spec.md` §5.2). Someone
+who lost their authenticator app, passkeys and recovery codes is reset by an owner or admin with
+`users.resetMfa` (an owner only by another owner), and sets the factor up again at their next
+sign-in. An owner whom no other owner can reset is reset from the host, in the stack directory:
+
+```bash
+docker compose exec api node reset-mfa.mjs owner@example.com
+```
+
+It removes the owner's methods and recovery codes, signs them out everywhere and writes the reset
+to the audit log. They then sign in with their password and set up a second factor again.
+
 ## Monitoring
 
 Point an uptime check at `https://<FQDN>/healthz`; its HTTP status suffices. The body is

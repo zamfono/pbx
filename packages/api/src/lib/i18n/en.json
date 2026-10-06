@@ -11,6 +11,22 @@
     "forgotLink": "Forgot your password?",
     "ssoPrefix": "Sign in with "
   },
+  "mfa": {
+    "verifyIntro": "Enter the 6-digit code from your authenticator app, or one of your recovery codes.",
+    "code": "Code",
+    "verifySubmit": "Verify",
+    "invalidCode": "Incorrect code.",
+    "enrolIntro": "Your account needs two-factor sign-in. Scan this QR code with an authenticator app, then enter the 6-digit code it shows.",
+    "qrLabel": "QR code for your authenticator app",
+    "secretLabel": "Or enter this key in the app by hand:",
+    "enrolSubmit": "Confirm",
+    "codesIntro": "Save these recovery codes somewhere safe. Each one signs you in once if you lose your authenticator. They are shown only now.",
+    "copy": "Copy",
+    "copied": "Copied",
+    "download": "Download (.txt)",
+    "saved": "I have saved my recovery codes",
+    "continue": "Continue"
+  },
   "forgot": {
     "title": "Forgot password",
     "intro": "Enter your e-mail and we will send you a link to set a new password.",

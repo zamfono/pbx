@@ -1,4 +1,4 @@
-import type { Db } from '@zamfono/shared';
+import { removeMfaMethods, type Db } from '@zamfono/shared';
 
 import { revokeUserPersonalAccessTokens } from '#lib/server/auth/personalAccessTokens.js';
 import { revokeUserTokens } from '#lib/server/auth/tokens.js';
@@ -74,8 +74,8 @@ export async function releaseUser(
 
 /**
  * Soft-deletes `userId` and cascades per §5.9: their devices, their extension row (dropping the
- * BLF keys that watched it through the FK), their sessions and personal access tokens, recording
- * every dropped row in the audit diff for undo. Shared by `users.delete` and `users.erase` (§5.10).
+ * BLF keys that watched it through the FK), their sessions, personal access tokens and second
+ * factors, recording every dropped row in the audit diff for undo. Shared by `users.delete` and `users.erase` (§5.10).
  */
 export async function cascadeSoftDeleteUser(
   ctx: Context,
@@ -97,6 +97,7 @@ export async function cascadeSoftDeleteUser(
   await pushRoster(ctx);
   await revokeUserTokens(ctx.db, userId, ctx.now);
   await revokeUserPersonalAccessTokens(ctx.db, userId, ctx.now);
+  await removeMfaMethods(ctx.db, userId);
   // Recorded under `ext`, the field name `audit.undo` special-cases to re-insert the dropped
   // `extensions` row (§5.9); `users.update`'s own rename field is `extension` (§10.3).
   if (ext !== null) {
@@ -117,5 +118,6 @@ export async function cascadeSoftDeleteUser(
     });
   }
   recordChange(ctx, { field: 'tokensRevoked', from: false, to: true });
+  recordChange(ctx, { field: 'mfaRemoved', from: false, to: true });
   propagate(ctx, ['pjsip', 'dialplan']);
 }

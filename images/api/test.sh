@@ -3,7 +3,7 @@
 # code does with it: the admin guide bundled at build time (spec §10.5), the hold-music tracks
 # that first boot seeds into the media volume (§6.3, §10.2), the ssh client restic's sftp backend
 # spawns (§6.5), the Argon2id generator for BOOTSTRAP_OWNER_PASSWORD_HASH and setup.sh's COUNTRY
-# check (§6.3 "First boot"). Run from the repository root's build
+# check (§6.3 "First boot"), and the owner second-factor reset (§5.2). Run from the repository root's build
 # context, which is what the Dockerfile expects.
 set -euo pipefail
 repo_root=$(CDPATH='' cd -- "$(dirname -- "$0")/../.." && pwd)
@@ -64,5 +64,15 @@ docker run --rm --entrypoint node "$API_IMAGE" check-country.mjs GB \
 if docker run --rm --entrypoint node "$API_IMAGE" check-country.mjs UK; then
   fail "check-country.mjs took UK, which is no ISO 3166-1 code"
 fi
+
+# The reset of a lost owner's second factor (§5.2 "Two-factor authentication") is in the image
+# and runs: without an e-mail it refuses with its usage, before it opens any database.
+if usage=$(docker run --rm --entrypoint node "$API_IMAGE" reset-mfa.mjs 2>&1); then
+  fail "reset-mfa.mjs took no e-mail"
+fi
+case "$usage" in
+  *'reset-mfa: usage:'*) ;;
+  *) fail "reset-mfa.mjs did not run: $usage" ;;
+esac
 
 echo "PASS: images/api"

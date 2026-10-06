@@ -201,6 +201,12 @@ export const settingsInputSchema = z
       .describe(
         'Install newer non-breaking releases automatically, after a backup, at a maintenance moment when no call is in progress; off by default. Owner-only.'
       ),
+    mfaRequiredForAll: z
+      .boolean()
+      .optional()
+      .describe(
+        'Every user needs a second factor at password sign-in, not only owners and admins; off by default. Owner-only.'
+      ),
     ...ssoInputFields,
     ...ringotelInputFields
   })

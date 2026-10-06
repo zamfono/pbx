@@ -27,3 +27,4 @@ export * from './isRecord.js';
 export * from './version.js';
 export * from './stackPaths.js';
 export * from './ports.js';
+export * from './mfa.js';

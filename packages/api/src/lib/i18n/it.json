@@ -11,6 +11,22 @@
     "forgotLink": "Password dimenticata?",
     "ssoPrefix": "Accedi con "
   },
+  "mfa": {
+    "verifyIntro": "Inserisci il codice a 6 cifre della tua app di autenticazione o uno dei tuoi codici di recupero.",
+    "code": "Codice",
+    "verifySubmit": "Verifica",
+    "invalidCode": "Codice errato.",
+    "enrolIntro": "Il tuo account richiede l’accesso a due fattori. Scansiona questo codice QR con un’app di autenticazione, poi inserisci il codice a 6 cifre che mostra.",
+    "qrLabel": "Codice QR per la tua app di autenticazione",
+    "secretLabel": "Oppure inserisci questa chiave a mano nell’app:",
+    "enrolSubmit": "Conferma",
+    "codesIntro": "Conserva questi codici di recupero in un luogo sicuro. Ognuno ti fa accedere una volta se perdi il tuo autenticatore. Vengono mostrati solo ora.",
+    "copy": "Copia",
+    "copied": "Copiato",
+    "download": "Scarica (.txt)",
+    "saved": "Ho salvato i miei codici di recupero",
+    "continue": "Continua"
+  },
   "forgot": {
     "title": "Password dimenticata",
     "intro": "Inserisci la tua e-mail: ti invieremo un link per impostare una nuova password.",

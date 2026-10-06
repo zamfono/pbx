@@ -83,7 +83,7 @@ Three long-running application services run per stack, plus the TLS proxy, the `
 
 **Write ownership.** Each SQLite table has a primary writer. Both processes read everything; WAL mode, `busy_timeout` and transactions that begin `IMMEDIATE` make concurrent writers safe (a read-only transaction begins `DEFERRED` and takes no write lock), so a cross-write is allowed where a flow naturally lands in the other process.
 
-- `api` owns the configuration tables: users, devices, trunks, trunk_hosts, outbound_routes, outbound_route_users, outbound_route_user_groups, outbound_route_numbers, dids, did_blocks, ring_groups, ring_group_members, user_groups, user_group_users, user_group_groups, extensions, device_blf_keys, forward_targets, user_forward_rules, ring_group_forward_rules, opening_hours, opening_hours_intervals, audio_assets, contacts, contact_phones, settings, ooo_rules, menus, menu_targets, blocked_numbers, sip_allowlist, sip_bans, mail_templates, tokens, oauth_clients, personal_access_tokens, webhooks, webhook_deliveries, backup_targets, backup_runs, update_state, maintenance_gate, audit_log.
+- `api` owns the configuration tables: users, devices, trunks, trunk_hosts, outbound_routes, outbound_route_users, outbound_route_user_groups, outbound_route_numbers, dids, did_blocks, ring_groups, ring_group_members, user_groups, user_group_users, user_group_groups, extensions, device_blf_keys, forward_targets, user_forward_rules, ring_group_forward_rules, opening_hours, opening_hours_intervals, audio_assets, contacts, contact_phones, settings, ooo_rules, menus, menu_targets, blocked_numbers, sip_allowlist, sip_bans, mail_templates, tokens, oauth_clients, personal_access_tokens, totp_credentials, recovery_codes, webhooks, webhook_deliveries, backup_targets, backup_runs, update_state, maintenance_gate, audit_log.
 - `core` owns the runtime tables: calls, call_qos, voicemails, recordings, presence_log.
 - Known cross-writes: `api` updates and deletes `voicemails` and `recordings` rows through their REST endpoints and, after a voicemail change, calls `core`'s internal `/internal/mwi/{mailbox}` so the MWI counts follow (§9.3). `core` toggles `users.dnd` through the `*90`/`*91` feature codes and stamps `devices.last_registered_at` when a `PeerStatusChange` event reports the device's endpoint `Reachable`, a timestamp of an event rather than a state: the last time the device became reachable, not its latest REGISTER, since Asterisk raises no event for a registration refresh; a greeting recorded by phone (§10.2) makes `core` insert the `audio_assets` row, write its file to `media/prompts/` and set the mailbox's `mailbox_audio_id`. Live state such as a trunk's registration status never lands in a table (§10.1); `api` reads it from the core when a request needs it.
 
@@ -171,6 +171,8 @@ SSO rules:
 - Users may be SSO-only (`password_hash NULL`). Every owner who can log in has a local password, as break-glass against identity-provider outages: an owner without one, created by an owner or promoted from SSO-only, cannot log in at all (no password login, SSO login, refresh-token rotation or personal access token) until they set it through their set-password link, and the SSO callback shows them the error page saying so. Promoting an SSO-only user to owner revokes their sessions and personal access tokens in the same transaction and returns that link, as `POST /users/{id}/resetPassword` does. A user without an e-mail (§11.2) has no login of any kind: no set-password link, password, SSO login or personal access token.
 - The `sso_*` settings are owner-only (§11.4): whoever controls the issuer decides who logs in as whom, since the first login after a provider change binds by e-mail.
 
+**Two-factor authentication.** Every password login of a user who has a second factor, or who must have one, passes a second step on the login page, between the password and the consent step: a code from an authenticator app (TOTP, RFC 6238: HMAC-SHA-1, 6 digits, 30-second steps, one step either side; a step already accepted is never accepted again) or one of the user's recovery codes; an owner's break-glass login is no exception. Owners and admins must have a second factor, every user once `settings.mfa_required_for_all` is set. A user who must have one and has none sets it up in that same login, before consent, with no way to skip it: the page shows the `otpauth://totp/<issuer>:<email>` URI as a QR code, the issuer being `settings.company_name`, and its 160-bit secret as base32 text, and the method counts once one code from it is accepted. Setting up the first method issues ten single-use recovery codes of 80 random bits, shown once with copy and download and an "I have saved them" confirmation before the login continues. SSO logins skip the step, since the identity provider's own MFA applies; there is no remember-device. Between its two steps a login lives in `api`'s memory for 5 minutes, single-use, reached only through the random id of an HttpOnly cookie, and an `api` restart voids it. Each code submitted counts against the account lock and the per-address login limit as a password attempt does (§5.5). The secret is stored encrypted (§5.4), each recovery code as its SHA-256 hash. No operation creates a method; only the person sets one up. `POST /users/{id}/resetMfa` removes a user's methods and codes and ends their sessions (§10.3), and a user who must have a second factor sets one up again at the next login; an owner whom no other owner can reset is reset on the host with `docker compose exec api node reset-mfa.mjs <email>`, which the audit log records under the system's actor. A method set up, removed or reset is mailed to the user (`mfaChanged`, §10.2 "Mail").
+
 **Authentication pages.** The browser-served surface of the MVP: five SvelteKit pages inside `api`, server-rendered in `settings.language`, in one design that carries `settings.company_name` as its title.
 
 | Page                                   | Purpose                                                                                                                 |
@@ -198,7 +200,7 @@ Every operation (§10.3) performs its own RBAC check, so REST, MCP, undo and UI 
 
 ### 5.4 Secrets
 
-All stored secrets are encrypted at rest with libsodium's XChaCha20-Poly1305 IETF AEAD (`crypto_aead_xchacha20poly1305_ietf`) under `SECRETBOX_KEY` from `.env`: SIP passwords and every `*_enc` column in `trunks`, `webhooks`, `backup_targets` and `settings`, and the dynamic OAuth client ids (§5.2). Every blob is `version(1 byte) || nonce(24) || ciphertext`; the version byte is a generation counter that names the key the blob was written with. Every blob is bound to its purpose, the AEAD's additional data: a stored secret's `<table>.<column>`, a sealed cookie's name, the client ids' own label; a blob made for one purpose never decrypts as another.
+All stored secrets are encrypted at rest with libsodium's XChaCha20-Poly1305 IETF AEAD (`crypto_aead_xchacha20poly1305_ietf`) under `SECRETBOX_KEY` from `.env`: SIP passwords and every `*_enc` column in `trunks`, `webhooks`, `backup_targets`, `totp_credentials` and `settings`, and the dynamic OAuth client ids (§5.2). Every blob is `version(1 byte) || nonce(24) || ciphertext`; the version byte is a generation counter that names the key the blob was written with. Every blob is bound to its purpose, the AEAD's additional data: a stored secret's `<table>.<column>`, a sealed cookie's name, the client ids' own label; a blob made for one purpose never decrypts as another.
 
 **Key rotation** is a redeploy, never a command. `.env` holds `SECRETBOX_KEY` (generation N) and, during a rotation, `SECRETBOX_KEY_PREVIOUS` (generation N−1); a read decrypts with the key its version byte names, and a byte matching neither is refused. `api` refuses to start when both keys carry the same generation. At boot, before it serves a request, `api` sweeps every `*_enc` column and re-encrypts each blob still on the previous generation under the current key, then logs `key rotation: {n} re-encrypted, {m} remaining`; `m` counts the blobs the current key cannot decrypt, a non-zero `m` after the sweep is a secret nobody can read, and `/healthz` reports the same count as `secrets:keyRotation`. The procedure:
 
@@ -224,7 +226,7 @@ The limits are constants of the implementation:
 | Forgot-password request                             | client address | 30 per hour                         | 429                                                 |
 | Client registration (`/oauth/register`)             | client address | 60 per minute                       | 429 (a CPU guard only; the endpoint writes nothing) |
 
-**Account lock.** The lock is a fixed window. Attempts made while locked neither count nor extend it, so nobody can keep an account locked by hammering the form. That protects the owners' break-glass accounts too. A successful login resets the account's counter. The login form answers a locked account exactly as it answers a wrong password, so the lock reveals nothing about the account's existence. Counters and locks live in `api`'s memory, so an `api` restart clears them; the limits are a brake, the passwords' strength is the guarantee.
+**Account lock.** The lock is a fixed window. A code at the second step of a login (§5.2 "Two-factor authentication") counts as an attempt too, and a correct password's attempt stays counted until the second step has passed. Attempts made while locked neither count nor extend it, so nobody can keep an account locked by hammering the form. That protects the owners' break-glass accounts too. A successful login resets the account's counter. The login form answers a locked account exactly as it answers a wrong password, so the lock reveals nothing about the account's existence. Counters and locks live in `api`'s memory, so an `api` restart clears them; the limits are a brake, the passwords' strength is the guarantee.
 
 **Per-address limits** are sized for an office behind one NAT address on the day everyone signs in and sets up their MCP client. A client registers once per installation and stores its `client_id`, so registration traffic is rare after that.
 
@@ -324,7 +326,7 @@ The response lists those references. The admin retargets them first, each as its
 
 An entity's own rules and their forward targets travel with it. A ring group's rules may point at the group's own mailbox, and a user's rules at their own; these are deleted with the entity and restored by undo, and never count as blocking references.
 
-Soft-deleting a user also soft-deletes their devices, so the rendered configuration drops the endpoints and their registrations end, and revokes their tokens and personal access tokens, so no session survives. Undo restores the devices; tokens stay revoked and the person signs in again.
+Soft-deleting a user also soft-deletes their devices, so the rendered configuration drops the endpoints and their registrations end, revokes their tokens and personal access tokens, so no session survives, and deletes their second factors and recovery codes (§5.2). Undo restores the devices; tokens stay revoked and the person signs in again, setting up a second factor again where one is required.
 
 Soft-deleting a user or ring group also deletes its `extensions` row and, through the FK, the BLF keys of other devices watching it, both recorded in the audit diff, so the extension is free for a new owner at once. Endpoint names carry a random per-device slug (§9.3), so a new owner's devices never collide with the old ones. Undo re-inserts the row, or is refused if the extension has been taken (§5.8).
 
@@ -1249,6 +1251,7 @@ Mail is optional. The relay is `settings.smtp_host`, `smtp_port`, `smtp_security
 - on the core's request: the voicemail notification with the audio attached;
 - on the core's request: the missed-call mail, one per missed inbound call to a user with `notify_missed_calls` set, carrying caller number, the phone-book name where known, time and the targeted DID; a call that leaves a message sends only the voicemail mail;
 - from `api` itself: the setup mail with the set-password link, sent when an admin creates an account (§5.2); and the admin-triggered and self-service reset mails;
+- from `api` itself, to the user: the notice that a second factor of theirs was set up, removed or reset (§5.2 "Two-factor authentication");
 - from `api` itself, to every owner: the failed automatic update and the breaking release that needs a manual update (§6.3 "Automatic updates").
 
 **Without a relay**, `POST /users` and `POST /users/{id}/resetPassword` return the one-time set-password link in their response, and the admin passes it on. The login page offers no forgot-password form, voicemail notifications are skipped (MWI and the `voicemail.new` event remain), and `/healthz` has no `mail:relay` check. The link is returned to the admin in both modes, since a mailed link can land in a spam folder.
@@ -1284,6 +1287,8 @@ A withheld caller's `callerNumber` is empty, as in the header templates (§9.4),
 **`updateFailed`** — placeholders: `fromVersion` (empty when unknown), `toVersion`, `reason`, `failedAt`.
 
 **`breakingUpdate`** — placeholders: `currentVersion`, `version`, `releaseUrl`, `publishedAt` (each empty when GitHub names none).
+
+**`mfaChanged`** — placeholders: `added`, `removed`, `reset` (exactly one is true), `passkeyName` (the passkey's name; empty for the authenticator app and for a reset), `changedAt`.
 
 #### Recording semantics
 
@@ -1370,9 +1375,9 @@ The endpoints by area, as a sketch, each with the minimum role it needs:
 
 **Audit** (min. role: admin) — `GET /audit` (filters: entity kind/id, actor, channel, client, operation, time range, `state` = live | undone | all), `POST /audit/{id}/undo` (one entry per call, §5)
 
-**Confirmation** — every `DELETE`, `POST /users/{id}/erase`, `POST /devices/{id}/rotate`, `POST /personalAccessTokens/{id}/revoke`, `POST /provisioning/ringotel/adopt` and `POST /system/update` require `confirm: true` in the body and answer 409 with the question text without it (§10.3, "Confirmation")
+**Confirmation** — every `DELETE`, `POST /users/{id}/erase`, `POST /users/{id}/resetMfa`, `POST /devices/{id}/rotate`, `POST /personalAccessTokens/{id}/revoke`, `POST /provisioning/ringotel/adopt` and `POST /system/update` require `confirm: true` in the body and answer 409 with the question text without it (§10.3, "Confirmation")
 
-**Users** (min. role: admin (self-service subset for `user`)) — `GET/POST /users` (`POST` takes an `email`, an `extension` or both, an owner or admin always an `email`, and returns the one-time set-password link, mailed too with a relay, `null` without an e-mail; reads return `null` for the one absent; a `PATCH` setting `extension` to `null` answers 409 while the user has devices or ring-group memberships or no e-mail, one setting `email` to `null` answers 409 for an owner or admin or a user without an extension, §11.2), `GET/PATCH/DELETE /users/{id}` (`DELETE` answers 409 with the blocking references, §5.9; a `PATCH` promoting a user without a password to owner returns the same link, §5.2), `POST /users/{id}/resetPassword` (same link semantics), `POST /users/{id}/erase` (owners only, §5.10), `GET /users/{id}/forwarding` (the rules, in the shape the `PUT` takes, `sip` targets with their `headers`), `PUT /users/{id}/forwarding` (the rules replaced as a whole), `PUT /users/{id}/presence` (dnd; outside the audit log, §5.7), `PUT/DELETE /users/{id}/voicemailGreeting` (the personal greeting, a WAV or MP3 upload; outside the audit log, §5.7). Self-service, on the user's own id alone (403 for another's): `GET /users/{id}`, `GET /users/{id}/forwarding`, `PUT /users/{id}/forwarding` (a new or changed `sip` target excepted, Forward targets), `PUT /users/{id}/presence`, `PUT/DELETE /users/{id}/voicemailGreeting` and the `PATCH` fields `clir`, `rejectAnonymous`, `ringTimeoutS`, `notifyMissedCalls`, `findMe`; `callerIdDidId` is admin-set (§9.4)
+**Users** (min. role: admin (self-service subset for `user`)) — `GET/POST /users` (`POST` takes an `email`, an `extension` or both, an owner or admin always an `email`, and returns the one-time set-password link, mailed too with a relay, `null` without an e-mail; reads return `null` for the one absent; a `PATCH` setting `extension` to `null` answers 409 while the user has devices or ring-group memberships or no e-mail, one setting `email` to `null` answers 409 for an owner or admin or a user without an extension, §11.2), `GET/PATCH/DELETE /users/{id}` (`DELETE` answers 409 with the blocking references, §5.9; a `PATCH` promoting a user without a password to owner returns the same link, §5.2), `POST /users/{id}/resetPassword` (same link semantics), `POST /users/{id}/resetMfa` (removes the user's second factors and recovery codes and ends their sessions, §5.2; an owner's owner-only), `POST /users/{id}/erase` (owners only, §5.10), `GET /users/{id}/forwarding` (the rules, in the shape the `PUT` takes, `sip` targets with their `headers`), `PUT /users/{id}/forwarding` (the rules replaced as a whole), `PUT /users/{id}/presence` (dnd; outside the audit log, §5.7), `PUT/DELETE /users/{id}/voicemailGreeting` (the personal greeting, a WAV or MP3 upload; outside the audit log, §5.7). Self-service, on the user's own id alone (403 for another's): `GET /users/{id}`, `GET /users/{id}/forwarding`, `PUT /users/{id}/forwarding` (a new or changed `sip` target excepted, Forward targets), `PUT /users/{id}/presence`, `PUT/DELETE /users/{id}/voicemailGreeting` and the `PATCH` fields `clir`, `rejectAnonymous`, `ringTimeoutS`, `notifyMissedCalls`, `findMe`; `callerIdDidId` is admin-set (§9.4)
 
 **Personal access tokens** (min. role: user (own) / admin; an owner's owner-only) — `GET/POST /users/{id}/personalAccessTokens` (`POST` takes `name` and an optional `expiresAt` and returns the token once; `GET` lists the user's tokens, never their values, with `createdBy`, `createdAt`, `expiresAt`, `lastUsedAt` and `revokedAt`), `POST /personalAccessTokens/{id}/revoke` (§5.2)
 
@@ -1612,7 +1617,7 @@ WAL mode, `foreign_keys=ON`, write ownership split per §3.1 (`api` = config tab
 - `settings`: a singleton, never deleted;
 - `update_state`: `api`'s own singleton, never deleted, without undo (§6.3 "Automatic updates");
 - `maintenance_gate`: `api`'s own record of the maintenance gate, a row per work, never deleted, without undo (§6.4 "Maintenance gate");
-- `tokens`, `oauth_clients` and `personal_access_tokens`: security artifacts without undo;
+- `tokens`, `oauth_clients`, `personal_access_tokens`, `totp_credentials` and `recovery_codes`: security artifacts without undo;
 - `sip_bans`: a security artifact without undo; a ban ends at its `expires_at`, never for a permanent one, or by `sipBans.lift` (§5.6);
 - `webhook_deliveries`: the webhook outbox, without undo; deleting a hook deletes its pending rows (§10.6);
 - `audit_log`: append-only.
@@ -2124,6 +2129,7 @@ CREATE TABLE settings (
   backup_cron                TEXT    NOT NULL DEFAULT '0 3 * * *',
   tls_reload_hour            INTEGER CHECK (tls_reload_hour BETWEEN 0 AND 23),
   auto_update                INTEGER NOT NULL DEFAULT 0,
+  mfa_required_for_all       INTEGER NOT NULL DEFAULT 0 CHECK (mfa_required_for_all IN (0,1)),
   config_propagation_pending INTEGER NOT NULL DEFAULT 0 CHECK (config_propagation_pending IN (0,1)),
   -- single sign-on
   sso_provider               TEXT    CHECK (sso_provider IN ('microsoft','google','oidc')),
@@ -2273,7 +2279,7 @@ CREATE TABLE sip_bans (
 -- means the shipped template for that kind and language applies.
 --   body_html: NULL = the mail is sent as plain text only
 CREATE TABLE mail_templates (
-  kind       TEXT    NOT NULL CHECK (kind IN ('voicemail','missedCall','setup','reset','updateFailed','breakingUpdate')),
+  kind       TEXT    NOT NULL CHECK (kind IN ('voicemail','missedCall','setup','reset','updateFailed','breakingUpdate','mfaChanged')),
   language   TEXT    NOT NULL CHECK (language IN ('de','en','es','fr','it','ru')),
   subject    TEXT    NOT NULL,
   body_text  TEXT    NOT NULL,
@@ -2359,6 +2365,28 @@ CREATE TABLE personal_access_tokens (
   last_used_at TEXT,
   revoked_at   TEXT
 );
+
+-- totp_credentials — a user's authenticator app, the second factor of a password login (§5.2).
+--   secret_enc: the 160-bit TOTP secret (§5.4)
+--   last_step:  the 30-second step of the code last accepted; no step up to it is accepted again
+CREATE TABLE totp_credentials (
+  id         TEXT    PRIMARY KEY,
+  user_id    TEXT    NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+  secret_enc BLOB    NOT NULL,
+  last_step  INTEGER NOT NULL,
+  created_at TEXT    NOT NULL
+);
+
+-- recovery_codes — a user's single-use recovery codes (§5.2); a code is deleted when it is used,
+-- and setting up a new set replaces the old one.
+--   code_hash: SHA-256 of the code without its separators; the code is shown once and never stored
+CREATE TABLE recovery_codes (
+  id         TEXT    PRIMARY KEY,
+  user_id    TEXT    NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  code_hash  TEXT    NOT NULL UNIQUE,
+  created_at TEXT    NOT NULL
+);
+CREATE INDEX recovery_codes_user ON recovery_codes(user_id);
 
 -- webhooks — admin-configured event receivers (§10.6).
 --   secret_enc:       HMAC-SHA256 signing secret
@@ -2472,7 +2500,8 @@ CREATE TABLE maintenance_gate (
 --   actor_user_id:   no FK, so §5 erasure can address a purged user's entries
 --   actor_user_name: captured at write time; entries stay readable after the actor is gone
 --   channel:         how the call arrived (§10.3, Context); 'job' = a background job, e.g. the
---                    Ringotel re-registration (§10.4), with actor 'system'
+--                    Ringotel re-registration (§10.4), or the host command resetting an owner's
+--                    second factors (§5.2), with actor 'system'
 --   client_id, client_name: the OAuth client behind the token (§5.2), captured at write time; NULL for
 --                    UI sessions, undo and jobs
 --   operation:       the operation name (§10.3), e.g. 'users.update'; identical for REST, MCP,
@@ -2733,6 +2762,7 @@ A DID's `number` is what the trunk boundary produces (§9.4): the international 
 | `backup_cron` | cron expression of the restic backup job | `0 3 * * *` | §6.5 |
 | `tls_reload_hour` | hour `0`–`23` for certificate swaps when the tenant schedule offers no closed period (priority chain in §6.4) | NULL | §6.4 |
 | `auto_update` 👑 | 1 = install newer non-breaking releases on their own, after a backup, through the maintenance gate | `0` | §6.3 |
+| `mfa_required_for_all` 👑 | 1 = every user passes a second factor at a password login, not only owners and admins (§5.2) | `0` | §5 |
 | `config_propagation_pending` | 1 while a config propagation failed and none has succeeded since; set and cleared by `api` (§3.1 "Config propagation"); shown by `/healthz`, never part of `/settings` | `0` | §3.1 |
 | `sso_provider` 👑 | `microsoft` \| `google` \| `oidc`; NULL = local passwords only | NULL | §5 |
 | `sso_label` 👑 | login-button text for `oidc` (required for it, CHECK); the presets bring their own | NULL | §5 |

@@ -11,6 +11,22 @@
     "forgotLink": "Passwort vergessen?",
     "ssoPrefix": "Anmelden mit "
   },
+  "mfa": {
+    "verifyIntro": "Geben Sie den 6-stelligen Code aus Ihrer Authenticator-App oder einen Ihrer Wiederherstellungscodes ein.",
+    "code": "Code",
+    "verifySubmit": "Bestätigen",
+    "invalidCode": "Falscher Code.",
+    "enrolIntro": "Ihr Konto braucht eine Zwei-Faktor-Anmeldung. Scannen Sie diesen QR-Code mit einer Authenticator-App und geben Sie dann den 6-stelligen Code ein, den sie anzeigt.",
+    "qrLabel": "QR-Code für Ihre Authenticator-App",
+    "secretLabel": "Oder geben Sie diesen Schlüssel von Hand in der App ein:",
+    "enrolSubmit": "Bestätigen",
+    "codesIntro": "Bewahren Sie diese Wiederherstellungscodes sicher auf. Jeder meldet Sie einmal an, falls Sie Ihren Authenticator verlieren. Sie werden nur jetzt angezeigt.",
+    "copy": "Kopieren",
+    "copied": "Kopiert",
+    "download": "Herunterladen (.txt)",
+    "saved": "Ich habe meine Wiederherstellungscodes gespeichert",
+    "continue": "Weiter"
+  },
   "forgot": {
     "title": "Passwort vergessen",
     "intro": "Geben Sie Ihre E-Mail-Adresse ein, wir senden Ihnen einen Link zum Setzen eines neuen Passworts.",

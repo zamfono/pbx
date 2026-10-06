@@ -52,6 +52,9 @@ COPY db/migrations db/migrations
 COPY packages/api/scripts/hashPassword.mjs hash-password.mjs
 # setup.sh's check of COUNTRY against the rule the first boot applies (§6.3 "First boot").
 COPY packages/api/scripts/checkCountry.mjs check-country.mjs
+# The reset of an owner's lost second factor (§5.2 "Two-factor authentication"), against the live
+# database: `docker compose exec api node reset-mfa.mjs <email>`.
+COPY packages/api/scripts/resetMfa.mjs reset-mfa.mjs
 USER node
 
 # The commit this image was built from (§6.3 "Images", §7 "Version"), passed by

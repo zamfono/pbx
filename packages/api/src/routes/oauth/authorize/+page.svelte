@@ -4,20 +4,29 @@
   import { format } from '#lib/i18n/index.js';
 
   import type { PageData } from './$types.js';
-  import { consent as consentForm, login } from './authorize.remote.js';
+  import {
+    consent as consentForm,
+    login,
+    secondFactor
+  } from './authorize.remote.js';
+  import SecondFactor from './SecondFactor.svelte';
 
   const { data }: { data: PageData } = $props();
 
   const dict = $derived(data.dictionary.login);
-  const result = $derived(login.result);
+  // The second step's form is only ever submitted after the login form, so its result, once
+  // there, is the latest outcome.
+  const result = $derived(secondFactor.result ?? login.result);
   // §5.2 "Authentication pages": a consent step naming the requesting client, rendered only once
-  // the person has actually authenticated — by password, the login form's own result carries it
-  // (`loginSubmit` returns this instead of redirecting whenever the outer request named a
+  // the person has actually authenticated — by password, the login form's result or the second
+  // step's carries it (returned instead of a redirect whenever the outer request named a
   // client); by SSO, the callback seals the same `zamfono_consent` cookie and `load`'s
   // `data.consent` carries it instead, since that path returns here on a fresh GET.
   const consent = $derived(
     data.consent ?? (result && 'needsConsent' in result ? result : null)
   );
+  // §5.2 "Two-factor authentication": the second step of a password sign-in.
+  const step = $derived(result && 'step' in result ? result : null);
   const refusal = $derived(result && 'message' in result ? result : null);
   const consentText = $derived(
     data.clientName === null
@@ -29,7 +38,7 @@
   // so a keyboard or screen-reader user lands on the step rather than on a removed button.
   let heading: HTMLHeadingElement | undefined = $state();
   $effect(() => {
-    if (result && 'needsConsent' in result) {
+    if (result && ('needsConsent' in result || 'step' in result)) {
       heading?.focus();
     }
   });
@@ -72,6 +81,12 @@
         {dict.consentDeny}
       </button>
     </form>
+  {:else if step !== null}
+    <SecondFactor
+      {step}
+      companyName={data.companyName}
+      dict={data.dictionary.mfa}
+    />
   {:else}
     {#if consentText !== null}
       <p class="auth-intro">{consentText}</p>

@@ -91,9 +91,25 @@ export type UpdateMailRequest =
       };
     };
 
-/** Every mail `sendMail` renders: the core's, the account mails and the update mails. */
+/** The notice to a user that a second factor of theirs changed (§5.2 "Two-factor
+ *  authentication", §10.2 "Mail"): exactly one of `added`, `removed` and `reset` is true;
+ *  `passkeyName` names a passkey and is empty for the authenticator app and for a reset. */
+export type MfaChangedRequest = {
+  kind: 'mfaChanged';
+  to: { userId: string };
+  values: {
+    added: boolean;
+    removed: boolean;
+    reset: boolean;
+    passkeyName: string;
+    changedAt: string;
+  };
+};
+
+/** Every mail `sendMail` renders: the core's, the account mails, the update mails and the
+ *  two-factor notice. */
 export type AnyMailRequest =
-  MailRequest | SetupOrResetRequest | UpdateMailRequest;
+  MailRequest | SetupOrResetRequest | UpdateMailRequest | MfaChangedRequest;
 
 /** The call a mail is about (§7), `undefined` for any other mail or a template test. */
 function callIdOf(req: AnyMailRequest): string | undefined {

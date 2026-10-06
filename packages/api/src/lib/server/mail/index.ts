@@ -21,6 +21,7 @@ export {
 export {
   sendMail,
   type AnyMailRequest,
+  type MfaChangedRequest,
   type SetupOrResetRequest,
   type UpdateMailRequest
 } from './send.js';

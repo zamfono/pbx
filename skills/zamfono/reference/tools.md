@@ -121,6 +121,7 @@
 | `users.get` | `GET /api/v1/users/{id}` | Reads one live user by id. | user | no |
 | `users.getForwarding` | `GET /api/v1/users/{id}/forwarding` | Reads a user's call-forwarding rules in the shape users.setForwarding takes; a user reads their own, an admin anyone's. | user | no |
 | `users.list` | `GET /api/v1/users` | Lists the tenant's live users, paginated. | admin | no |
+| `users.resetMfa` | `POST /api/v1/users/{id}/resetMfa` | Removes a user's two-factor methods and recovery codes and signs them out everywhere. | admin | yes |
 | `users.resetPassword` | `POST /api/v1/users/{id}/resetPassword` | Issues a new one-time link to set a user's password. | admin | no |
 | `users.setForwarding` | `PUT /api/v1/users/{id}/forwarding` | Replaces a user's call-forwarding rules as a whole; a user sets their own, without new sip or recording targets, an admin anyone's. | user | no |
 | `users.setPresence` | `PUT /api/v1/users/{id}/presence` | Sets a user's do-not-disturb state. | user | no |

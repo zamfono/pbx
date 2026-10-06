@@ -114,6 +114,7 @@ function scopeRoutes(suffix: string, entries: ScopeEntry[]): RouteTuple[] {
 const STATIC_ROUTES: RouteTuple[] = [
   ...crud('users', '/users', ALL_CRUD),
   ['POST', '/users/{id}/resetPassword', 'users.resetPassword'],
+  ['POST', '/users/{id}/resetMfa', 'users.resetMfa'],
   ['POST', '/users/{id}/erase', 'users.erase'],
   ['GET', '/users/{id}/forwarding', 'users.getForwarding'],
   ['PUT', '/users/{id}/forwarding', 'users.setForwarding'],

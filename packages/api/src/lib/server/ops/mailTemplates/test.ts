@@ -82,6 +82,17 @@ const SAMPLE_REQUEST_BUILDERS: Record<Input['kind'], SampleRequestBuilder> = {
       releaseUrl: 'https://example.invalid/releases/sample',
       publishedAt: now
     }
+  }),
+  mfaChanged: (userId, now) => ({
+    kind: 'mfaChanged',
+    to: { userId },
+    values: {
+      added: true,
+      removed: false,
+      reset: false,
+      passkeyName: 'Sample laptop',
+      changedAt: now
+    }
   })
 };
 

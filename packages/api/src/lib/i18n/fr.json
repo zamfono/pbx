@@ -11,6 +11,22 @@
     "forgotLink": "Mot de passe oublié ?",
     "ssoPrefix": "Se connecter avec "
   },
+  "mfa": {
+    "verifyIntro": "Saisissez le code à 6 chiffres de votre application d’authentification, ou l’un de vos codes de récupération.",
+    "code": "Code",
+    "verifySubmit": "Vérifier",
+    "invalidCode": "Code incorrect.",
+    "enrolIntro": "Votre compte exige une connexion à deux facteurs. Scannez ce code QR avec une application d’authentification, puis saisissez le code à 6 chiffres qu’elle affiche.",
+    "qrLabel": "Code QR pour votre application d’authentification",
+    "secretLabel": "Ou saisissez cette clé à la main dans l’application :",
+    "enrolSubmit": "Confirmer",
+    "codesIntro": "Conservez ces codes de récupération en lieu sûr. Chacun vous connecte une fois si vous perdez votre authentificateur. Ils ne sont affichés que maintenant.",
+    "copy": "Copier",
+    "copied": "Copié",
+    "download": "Télécharger (.txt)",
+    "saved": "J’ai enregistré mes codes de récupération",
+    "continue": "Continuer"
+  },
   "forgot": {
     "title": "Mot de passe oublié",
     "intro": "Saisissez votre e-mail, nous vous enverrons un lien pour définir un nouveau mot de passe.",

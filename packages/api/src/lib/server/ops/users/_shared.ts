@@ -7,11 +7,14 @@ import {
   HTTP_CONFLICT,
   HTTP_UNPROCESSABLE_CONTENT,
   isE164,
+  mfaMethods,
   USER_ROLES,
   type DB,
   type Db,
   type FindMeLeg
 } from '@zamfono/shared';
+
+import { mfaOut } from '#lib/server/auth/mfa/status.js';
 
 import { assertNoLiveHolder } from '../liveHolder.js';
 import { mailboxMaxMessagesField } from '../mailbox.js';
@@ -98,6 +101,7 @@ export const userOut = z.object({
     .describe(
       'When an active login lock on this account (§5.5) expires, ISO 8601; null while unlocked.'
     ),
+  mfa: mfaOut,
   createdAt: z.string()
 });
 export type UserOut = z.infer<typeof userOut>;
@@ -124,6 +128,7 @@ export async function toUserOut(db: Db, row: UserRow): Promise<UserOut> {
     mailboxMaxMessages: row.mailboxMaxMessages,
     ...logLevelWire(row),
     lockedUntil: row.email === null ? null : accountLockedUntil(row.email),
+    mfa: await mfaMethods(db, row.id),
     createdAt: row.createdAt
   };
 }

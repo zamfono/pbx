@@ -67,6 +67,7 @@ const OWNER_ONLY_OPS = new Set([
   'personalAccessTokens.revoke',
   'users.create',
   'users.delete',
+  'users.resetMfa',
   'users.resetPassword'
 ]);
 

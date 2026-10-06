@@ -92,11 +92,62 @@ login=$(authorize_page | form_submission "email=$email" "_password=$password" 'a
 login_action=${login%%$'\n'*}
 [ -n "$login_action" ] || { echo 'the login page rendered no form' >&2; exit 1; }
 
-# The login step answers the consent page and seals `zamfono_consent`; no code is minted until
-# the consent step is approved (§5.2 "Authentication pages").
-consent=$(curl -fsS -X POST "$api/oauth/authorize$login_action" "${FWD[@]}" \
-  "${PAGE[@]}" "${COOKIES[@]}" --data "${login#*$'\n'}" \
-  | form_submission 'action=approve')
+# `submit <form_submission output>` posts that form the way a browser does, printing the page the
+# step answers.
+submit() {
+  curl -fsS -X POST "$api/oauth/authorize${1%%$'\n'*}" "${FWD[@]}" \
+    "${PAGE[@]}" "${COOKIES[@]}" --data "${1#*$'\n'}"
+}
+
+# The authenticator an owner's or admin's first login sets up (§5.2 "Two-factor authentication")
+# is this harness's own: its secret, read off the enrolment page, and the 30-second step of the
+# code last sent are kept per run (`STATE_DIR`) and account, whichever address the login goes
+# through, so a later login computes its code. A step is accepted once, so a login in the step
+# the last one used waits for the next.
+totp_file="${STATE_DIR:-${TMPDIR:-/tmp}}/totp-$(printf '%s' "$email" | openssl dgst -sha256 -r | cut -c1-16)"
+totp_code() {
+  python3 -c "
+import base64, hmac, struct, sys, time
+secret, last = sys.argv[1], int(sys.argv[2])
+step = int(time.time()) // 30
+if step <= last:
+    time.sleep((last + 1) * 30 - time.time() + 0.5)
+    step = last + 1
+key = base64.b32decode(secret + '=' * (-len(secret) % 8))
+mac = hmac.digest(key, struct.pack('>Q', step), 'sha1')
+offset = mac[-1] & 15
+print(step, '%06d' % ((struct.unpack('>I', mac[offset:offset + 4])[0] & 0x7fffffff) % 1000000))
+" "$@"
+}
+second_step() {
+  local page=$1 secret last=-1 step code
+  if printf '%s' "$page" | grep -q 'class="auth-command"'; then
+    secret=$(printf '%s' "$page" | sed -n 's/.*<code class="auth-command">\([A-Z2-7 ]*\)<\/code>.*/\1/p' | tr -d ' ')
+    [ -n "$secret" ] || { echo 'the enrolment step showed no secret' >&2; exit 1; }
+  else
+    [ -s "$totp_file" ] || { echo "no authenticator of $email to answer the second step" >&2; exit 1; }
+    read -r secret last <"$totp_file"
+  fi
+  read -r step code < <(totp_code "$secret" "$last")
+  mkdir -p "$(dirname "$totp_file")"
+  printf '%s %s\n' "$secret" "$step" >"$totp_file"
+  page=$(submit "$(printf '%s' "$page" | form_submission "code=$code" 'action=code')")
+  # Enrolment answers the recovery codes, confirmed as saved before the login continues.
+  if printf '%s' "$page" | grep -q 'class="auth-codes"'; then
+    page=$(submit "$(printf '%s' "$page" | form_submission 'action=saved')")
+  fi
+  printf '%s' "$page"
+}
+
+# The login step answers the consent page and seals `zamfono_consent`, after the second step where
+# the account has one; no code is minted until the consent step is approved (§5.2
+# "Authentication pages").
+page=$(submit "$login")
+# The second step's code box, named like every remote-form field: `code/<id>/<form>`.
+if printf '%s' "$page" | grep -q 'name="code/'; then
+  page=$(second_step "$page")
+fi
+consent=$(printf '%s' "$page" | form_submission 'action=approve')
 consent_action=${consent%%$'\n'*}
 [ -n "$consent_action" ] || { echo 'the login step rendered no consent form' >&2; exit 1; }
 

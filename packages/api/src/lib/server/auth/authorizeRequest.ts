@@ -1,7 +1,7 @@
 import { error } from '@sveltejs/kit';
 import { z } from 'zod';
 
-import { HTTP_BAD_REQUEST, type Db } from '@zamfono/shared';
+import { HTTP_BAD_REQUEST, type Db, type UserRole } from '@zamfono/shared';
 
 import type { Keyring } from '../secretbox.js';
 import { originFromEnv } from '../stackAddress.js';
@@ -160,10 +160,12 @@ export async function ssoInfo(
 export async function lookupUser(
   db: Db,
   email: string
-): Promise<{ id: string; passwordHash: string | null } | undefined> {
+): Promise<
+  { id: string; passwordHash: string | null; role: UserRole } | undefined
+> {
   return db
     .selectFrom('users')
-    .select(['id', 'passwordHash'])
+    .select(['id', 'passwordHash', 'role'])
     .where('email', '=', email)
     .where('deletedAt', 'is', null)
     .executeTakeFirst();

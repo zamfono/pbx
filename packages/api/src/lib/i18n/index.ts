@@ -22,6 +22,23 @@ export type Dictionary = {
     forgotLink: string;
     ssoPrefix: string;
   };
+  /** The second step of a password sign-in (§5.2 "Two-factor authentication"). */
+  mfa: {
+    verifyIntro: string;
+    code: string;
+    verifySubmit: string;
+    invalidCode: string;
+    enrolIntro: string;
+    qrLabel: string;
+    secretLabel: string;
+    enrolSubmit: string;
+    codesIntro: string;
+    copy: string;
+    copied: string;
+    download: string;
+    saved: string;
+    continue: string;
+  };
   forgot: {
     title: string;
     intro: string;

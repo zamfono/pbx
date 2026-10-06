@@ -5,7 +5,12 @@ import type { DB, Db } from '@zamfono/shared';
 import { decrypt, encrypt, type Keyring } from '../secretbox.js';
 
 type EncTable =
-  'backupTargets' | 'devices' | 'settings' | 'trunks' | 'webhooks';
+  | 'backupTargets'
+  | 'devices'
+  | 'settings'
+  | 'totpCredentials'
+  | 'trunks'
+  | 'webhooks';
 type EncColumn<T extends EncTable> = Extract<keyof DB[T], `${string}Enc`>;
 type AnyEncColumn = { [T in EncTable]: EncColumn<T> }[EncTable];
 
@@ -19,6 +24,7 @@ const ENC_COLUMNS: readonly {
     table: 'settings',
     columns: ['ringotelApiTokenEnc', 'smtpPasswordEnc', 'ssoClientSecretEnc']
   },
+  { table: 'totpCredentials', columns: ['secretEnc'] },
   { table: 'trunks', columns: ['passwordEnc'] },
   { table: 'webhooks', columns: ['secretEnc'] }
 ];

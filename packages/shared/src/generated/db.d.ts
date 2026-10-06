@@ -304,6 +304,13 @@ export interface Recordings {
   userId: string | null;
 }
 
+export interface RecoveryCodes {
+  codeHash: string;
+  createdAt: string;
+  id: string;
+  userId: string;
+}
+
 export interface RingGroupForwardRules {
   condition: RingGroupForwardCondition;
   groupId: string;
@@ -356,6 +363,7 @@ export interface Settings {
   language: Generated<Language>;
   mailFrom: string | null;
   mainDidId: string;
+  mfaRequiredForAll: Generated<number>;
   parkingTimeoutS: Generated<number>;
   recordingRetentionDays: Generated<number | null>;
   rejectAnonymous: Generated<number>;
@@ -418,6 +426,14 @@ export interface Tokens {
   revokedAt: string | null;
   sessionId: string | null;
   tokenHash: string;
+  userId: string;
+}
+
+export interface TotpCredentials {
+  createdAt: string;
+  id: string;
+  lastStep: number;
+  secretEnc: Buffer;
   userId: string;
 }
 
@@ -585,6 +601,7 @@ export interface DB {
   personalAccessTokens: PersonalAccessTokens;
   presenceLog: PresenceLog;
   recordings: Recordings;
+  recoveryCodes: RecoveryCodes;
   ringGroupForwardRules: RingGroupForwardRules;
   ringGroupMembers: RingGroupMembers;
   ringGroups: RingGroups;
@@ -592,6 +609,7 @@ export interface DB {
   sipAllowlist: SipAllowlist;
   sipBans: SipBans;
   tokens: Tokens;
+  totpCredentials: TotpCredentials;
   trunkHosts: TrunkHosts;
   trunks: Trunks;
   updateState: UpdateState;

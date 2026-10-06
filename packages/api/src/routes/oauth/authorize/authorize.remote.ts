@@ -8,6 +8,10 @@ import {
   loginSubmit,
   type LoginResult
 } from './loginSubmit.js';
+import {
+  SecondFactorPayloadSchema,
+  secondFactorSubmit
+} from './secondFactorSubmit.js';
 import { ssoSubmit } from './ssoSubmit.js';
 
 /**
@@ -27,6 +31,19 @@ export const login = form(
     return loginSubmit(event, payload);
   }
 );
+
+/**
+ * The second step of a password sign-in (§5.2 "Two-factor authentication"): an authenticator or
+ * recovery code, enrolment's confirming code, or the confirmation that the recovery codes are
+ * saved. The pending sign-in it acts on is the server's, reached through the `zamfono_mfa`
+ * cookie, so the form carries no client parameters of its own.
+ */
+export const secondFactor = form(SecondFactorPayloadSchema, async payload => {
+  const event = getRequestEvent();
+  // A code is a login attempt to §5.5's per-address limit, as either first-step button is.
+  checkLoginAddress(event);
+  return secondFactorSubmit(event, payload);
+});
 
 const ConsentPayloadSchema = z.object({
   action: z.enum(['approve', 'deny']),
