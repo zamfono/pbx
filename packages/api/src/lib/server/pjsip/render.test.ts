@@ -18,6 +18,7 @@ function fixture(name: string): string {
 // check its provider's certificate (§9.3, §9.4).
 const input: RenderInput = {
   fqdn: 'pbx.example.com',
+  sipHost: '192.0.2.10',
   settings: {
     codecs: ['opus', 'g722', 'alaw'],
     ringotelMaxRegs: 3,
@@ -318,6 +319,17 @@ describe('render', () => {
     expect(conf).toContain('send_pai = yes\ntrust_id_outbound = yes\n');
     expect(conf).not.toContain('from_user');
     expect(conf).not.toContain('from_domain');
+  });
+
+  test("a from-only trunk's From names the address the stack writes into SIP, on ip and registration trunks alike", () => {
+    const endpoint = (id: string): string | undefined =>
+      rendered['pjsip_trunks.conf']
+        .split(`[trunk-${id}]\ntype = endpoint`)[1]
+        ?.split('\n\n')[0];
+    for (const id of ['t1', 't3']) {
+      expect(endpoint(id)).toContain('from_domain = 192.0.2.10');
+      expect(endpoint(id)).not.toContain('from_user');
+    }
   });
 
   test('a from-only trunk endpoint sends no P-Asserted-Identity', () => {

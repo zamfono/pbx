@@ -5,6 +5,9 @@ Every change made to [the specification](spec.md) during implementation, newest 
 **2026-10-06 · §10.2 Three-way calls.** `*5` or `calls.addParty` to an own DID whose target is a `sip` target dials that target over its own trunk as the DID's own forward, recorded as that target's when it records, where it was refused with 404 (422 over the API).
 *Why:* the product owner's recording flag records every call a forward target answers, "however the call reached it", and only an external target was dialled there.
 
+**2026-10-06 · §9.4 Caller-ID.** A `from` trunk's endpoint carries the address the stack writes into SIP as `from_domain`, so its OPTIONS probes name that address in `From` as its calls do; a `both` trunk's leg keeps it as `SIPFROMDOMAIN`, since a `from_domain` would keep its host in a withheld call's anonymous `From`, and `anonymous.invalid` set on the leg would become the host of its `P-Asserted-Identity`.
+*Why:* the product owner: "From: use the public IP as far as (sensibly) possible". OPTIONS probes to an `ip` trunk named the container's address in the ports mode; only a `from` trunk, which never carries a withheld call, can take `from_domain` without changing the anonymous `From` or the asserted identity.
+
 **2026-10-06 · §9.4 Auth mode, Inbound identification.** A trunk username takes only the characters of a SIP URI's user part (RFC 3261 `user`); the API refuses any other with 422, and a stored one leaves its trunk out of the rendered config. An `inbound_auth` trunk's username, which names its endpoint's section, is also refused past 79 characters (422), and a stored longer one leaves its trunk out of the render, since Asterisk cuts a longer section name short.
 *Why:* usernames accepted characters a SIP URI's user part does not (`<`, `>`, `"`, `#`, `:`, a bare `%`), so Asterisk then refused the trunk; between restricting the username and percent-encoding it in the URIs, the product owner: "trunk usernames: tighten".
 

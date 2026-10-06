@@ -15,6 +15,8 @@ import { UnrenderableValueError } from './skippedRows.js';
 export type RenderInput = {
   // fqdn: the stack's FQDN (§6.3), the SIP domain every device registers in (§9.3 "NAT").
   fqdn: string;
+  // sipHost: the address the stack writes into SIP, `EXTERNAL_IPV4` else `STACK_IPV4` (§6.1).
+  sipHost: string;
   // holdMohClass: the MoH class a party hears while a device holds them (§10.2 "Hold music"):
   // the class of `settings.hold_moh_audio_id`, else Asterisk's static `default`.
   settings: {

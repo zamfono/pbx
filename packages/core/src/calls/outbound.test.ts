@@ -394,8 +394,11 @@ describe('outbound dialing', () => {
     ).toEqual([]);
   });
 
-  it('names the address the stack writes into SIP as the From host of a trunk leg (§9.4 "Caller-ID")', async () => {
-    const trunkId = await seedTrunk(db, { priority: 1 });
+  it('names the address the stack writes into SIP as the From host of a both trunk leg (§9.4 "Caller-ID")', async () => {
+    const trunkId = await seedTrunk(db, {
+      priority: 1,
+      callerIdHeader: 'both'
+    });
     await seedRoute(db, trunkId, { priority: 1 });
 
     await dial('+498912345');
@@ -405,6 +408,17 @@ describe('outbound dialing', () => {
     // chan_pjsip takes the From host from the transport's bound address otherwise, which
     // `external_signaling_address` does not rewrite: the container's own in the ports mode.
     expect(body.variables.SIPFROMDOMAIN).toBe('192.0.2.10');
+  });
+
+  it('leaves a from-only trunk leg\'s From host to its endpoint\'s from_domain (§9.4 "Caller-ID")', async () => {
+    const trunkId = await seedTrunk(db, { priority: 1 });
+    await seedRoute(db, trunkId, { priority: 1 });
+
+    await dial('+498912345');
+
+    const originate = fakeAri.calls.find(entry => isPlacement(entry));
+    const body = originate?.body as { variables: Record<string, string> };
+    expect(Object.keys(body.variables)).not.toContain('SIPFROMDOMAIN');
   });
 
   it('presents the number as the caller ID on a pai trunk, leaving From and PAI to the endpoint (§9.4 "Caller-ID")', async () => {

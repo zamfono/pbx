@@ -147,11 +147,12 @@ function holdMohClass(
     : DEFAULT_MOH_CLASS;
 }
 
-/** The full `RenderInput`: the live database's rows and the stack's `fqdn`. */
+/** The full `RenderInput`: the live database's rows, the stack's `fqdn` and its `sipHost`. */
 export async function loadRenderInput(
   db: Db,
   kr: Keyring,
-  fqdn: string
+  fqdn: string,
+  sipHost: string
 ): Promise<RenderInput> {
   const settings = await loadSettings(db);
   const [users, devices, ringGroups, parkingSlots, trunks, moh] =
@@ -165,6 +166,7 @@ export async function loadRenderInput(
     ]);
   return {
     fqdn,
+    sipHost,
     settings: {
       codecs: codecsColumn.decode(settings.codecsJson),
       ringotelMaxRegs: settings.ringotelMaxRegs,

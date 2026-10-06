@@ -172,7 +172,9 @@ export async function originateTrunkLeg(
     const snapshot = await pipeline.deps.cache.get();
     const { stackSipHost } = pipeline.deps;
     const fromHost = trunkFromHost(trunk, snapshot, stackSipHost);
-    if (fromHost !== null) {
+    // A `from` trunk's endpoint names the host itself (`from_domain`), it never carrying a
+    // withheld call, whose anonymous `From` host a `from_domain` would keep (§9.4 "Caller-ID").
+    if (fromHost !== null && trunk.callerIdHeader !== 'from') {
       variables.SIPFROMDOMAIN = fromHost;
     }
     if (ctx.forward !== undefined) {

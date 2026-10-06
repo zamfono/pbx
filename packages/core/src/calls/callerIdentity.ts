@@ -63,8 +63,9 @@ export function resolveAttemptIdentity(params: {
 /**
  * The host of a trunk leg's `From` (§9.4 "Caller-ID"): a `pai` trunk's `from_domain`, its first
  * outbound host; else the address the stack writes into SIP (`stackSipHost`, `EXTERNAL_IPV4` else
- * `STACK_IPV4`). The leg carries it as `SIPFROMDOMAIN`, since chan_pjsip otherwise takes the
- * transport's bound address, which `external_signaling_address` does not rewrite in `From`.
+ * `STACK_IPV4`). A `from` trunk's endpoint names the latter as its `from_domain`; a `both` trunk's
+ * leg carries it as `SIPFROMDOMAIN`, since chan_pjsip otherwise takes the transport's bound address,
+ * which `external_signaling_address` does not rewrite in `From`.
  */
 export function trunkFromHost(
   trunk: TrunkRow,
