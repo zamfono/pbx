@@ -31,15 +31,9 @@ const EMPTY_STATE: StateResponse = {
 
 process.env.DB_FILE = ':memory:';
 
-const originalToken = process.env.METRICS_TOKEN;
-
 afterEach(() => {
   vi.mocked(getCoreClient).mockReset();
-  if (originalToken === undefined) {
-    delete process.env.METRICS_TOKEN;
-  } else {
-    process.env.METRICS_TOKEN = originalToken;
-  }
+  vi.unstubAllEnvs();
 });
 
 function stubCore(): void {
@@ -68,7 +62,7 @@ function eventWithAuth(authorization: string | null): RequestEvent {
 
 describe('GET /metrics', () => {
   it('is 404 while METRICS_TOKEN is unset', async () => {
-    delete process.env.METRICS_TOKEN;
+    vi.stubEnv('METRICS_TOKEN', undefined);
     stubCore();
 
     const response = await GET(eventWithAuth('Bearer anything'));
@@ -77,7 +71,7 @@ describe('GET /metrics', () => {
   });
 
   it('is 401 on a missing or wrong bearer token', async () => {
-    process.env.METRICS_TOKEN = randomUUID();
+    vi.stubEnv('METRICS_TOKEN', randomUUID());
     stubCore();
 
     const missing = await GET(eventWithAuth(null));
@@ -89,7 +83,7 @@ describe('GET /metrics', () => {
 
   it('answers 200 with the Prometheus text body on the right bearer token', async () => {
     const token = randomUUID();
-    process.env.METRICS_TOKEN = token;
+    vi.stubEnv('METRICS_TOKEN', token);
     stubCore();
     await migrateForTest(getDb());
     await seedSettings(getDb());

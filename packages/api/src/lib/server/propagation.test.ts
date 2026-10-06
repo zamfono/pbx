@@ -21,19 +21,18 @@ vi.unmock('./propagation.js');
 
 /** A fresh `SECRETBOX_KEY`, the keyring a propagation renders with. */
 function testKeyring(): Keyring {
-  process.env.SECRETBOX_KEY = keySpec();
+  vi.stubEnv('SECRETBOX_KEY', keySpec());
   return keyringFromEnv(privateEnv);
 }
 
 /** Has the next propagation render into `genDir` and reach `core` through `coreClient`. */
 function propagateInto(genDir: string, coreClient: CoreClient): void {
-  process.env.ASTERISK_GEN_DIR = genDir;
+  vi.stubEnv('ASTERISK_GEN_DIR', genDir);
   vi.mocked(getCoreClient).mockReturnValue(coreClient);
 }
 
 afterEach(() => {
-  delete process.env.SECRETBOX_KEY;
-  delete process.env.ASTERISK_GEN_DIR;
+  vi.unstubAllEnvs();
   vi.mocked(getCoreClient).mockReset();
 });
 

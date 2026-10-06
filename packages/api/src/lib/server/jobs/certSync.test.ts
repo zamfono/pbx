@@ -108,6 +108,7 @@ async function settingsDb(): Promise<Db> {
 afterEach(() => {
   vi.useRealTimers();
   vi.mocked(getCoreClient).mockReset();
+  vi.unstubAllEnvs();
 });
 
 /** Places `crt`/`key` bytes where the `proxy` image's `cert_obtained` hook writes them
@@ -441,7 +442,7 @@ describe('CertSync', () => {
     const nextCert = caIssuedCert(workDir, 3650);
     await seedCaddyCert(caddyDataDir, nextCert.crt, nextCert.key);
     const db = await settingsDb();
-    delete process.env.TLS_RELOAD_HOUR;
+    vi.stubEnv('TLS_RELOAD_HOUR', undefined);
     const coreClient = stubCore();
     // Before the default 03:00 maintenance hour.
     let now = new Date('2026-01-01T01:00:00Z');
@@ -471,7 +472,7 @@ describe('CertSync', () => {
     const nextCert = caIssuedCert(workDir, 3650);
     await seedCaddyCert(caddyDataDir, nextCert.crt, nextCert.key);
     const db = await settingsDb();
-    delete process.env.TLS_RELOAD_HOUR;
+    vi.stubEnv('TLS_RELOAD_HOUR', undefined);
     const coreClient = stubCore();
     coreClient.liveCalls = [LIVE_CALL];
     let now = new Date('2026-01-01T01:00:00Z');
@@ -501,7 +502,7 @@ describe('CertSync', () => {
     const nextCert = caIssuedCert(workDir, 3650);
     await seedCaddyCert(caddyDataDir, nextCert.crt, nextCert.key);
     const db = await settingsDb();
-    delete process.env.TLS_RELOAD_HOUR;
+    vi.stubEnv('TLS_RELOAD_HOUR', undefined);
     const coreClient = stubCore();
     coreClient.liveCalls = [LIVE_CALL];
     let now = new Date('2026-01-01T02:00:00Z');

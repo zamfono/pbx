@@ -44,16 +44,6 @@ vi.mock('./sweep.js', async importOriginal => ({
   startSweep: vi.fn(() => ({ stop: vi.fn() }))
 }));
 
-const ENV_KEYS = [
-  'ARI_URL',
-  'ARI_PASSWORD',
-  'AMI_HOST',
-  'AMI_PASSWORD',
-  'EXTERNAL_IPV4',
-  'DB_FILE',
-  'HEP_ENABLED'
-] as const;
-
 /**
  * A migrated database on disk carrying the one `settings` row the config snapshot requires
  * (`loadSnapshot` reads it with `executeTakeFirstOrThrow`). `main()` opens `DB_FILE` itself, so
@@ -71,18 +61,8 @@ async function migratedDbFile(): Promise<string> {
 }
 
 describe('main', () => {
-  const savedEnv = Object.fromEntries(
-    ENV_KEYS.map(key => [key, process.env[key]])
-  );
-
   afterEach(() => {
-    for (const key of ENV_KEYS) {
-      if (savedEnv[key] === undefined) {
-        Reflect.deleteProperty(process.env, key);
-      } else {
-        process.env[key] = savedEnv[key];
-      }
-    }
+    vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
 
@@ -93,13 +73,13 @@ describe('main', () => {
     const { url } = await fakeAri.listen();
     await fakeAri.close();
 
-    process.env.ARI_URL = url;
-    process.env.ARI_PASSWORD = 'ari-secret';
-    process.env.AMI_HOST = '127.0.0.1:1';
-    process.env.AMI_PASSWORD = 'ami-secret';
-    process.env.EXTERNAL_IPV4 = '192.0.2.10';
-    process.env.DB_FILE = ':memory:';
-    process.env.HEP_ENABLED = 'false';
+    vi.stubEnv('ARI_URL', url);
+    vi.stubEnv('ARI_PASSWORD', 'ari-secret');
+    vi.stubEnv('AMI_HOST', '127.0.0.1:1');
+    vi.stubEnv('AMI_PASSWORD', 'ami-secret');
+    vi.stubEnv('EXTERNAL_IPV4', '192.0.2.10');
+    vi.stubEnv('DB_FILE', ':memory:');
+    vi.stubEnv('HEP_ENABLED', 'false');
 
     const ariClose = vi.spyOn(AriClient.prototype, 'close');
     const amiClose = vi.spyOn(AmiClient.prototype, 'close');
@@ -117,13 +97,13 @@ describe('main', () => {
     const ami = await fakeAmi.listen();
     vi.mocked(startSweep).mockClear();
 
-    process.env.ARI_URL = ari.url;
-    process.env.ARI_PASSWORD = 'ari-secret';
-    process.env.AMI_HOST = `${ami.host}:${ami.port}`;
-    process.env.AMI_PASSWORD = 'ami-secret';
-    process.env.EXTERNAL_IPV4 = '192.0.2.10';
-    process.env.DB_FILE = await migratedDbFile();
-    process.env.HEP_ENABLED = 'false';
+    vi.stubEnv('ARI_URL', ari.url);
+    vi.stubEnv('ARI_PASSWORD', 'ari-secret');
+    vi.stubEnv('AMI_HOST', `${ami.host}:${ami.port}`);
+    vi.stubEnv('AMI_PASSWORD', 'ami-secret');
+    vi.stubEnv('EXTERNAL_IPV4', '192.0.2.10');
+    vi.stubEnv('DB_FILE', await migratedDbFile());
+    vi.stubEnv('HEP_ENABLED', 'false');
 
     const booted = await main();
     try {
@@ -143,13 +123,13 @@ describe('main', () => {
     const stop = vi.fn();
     vi.mocked(startSweep).mockClear().mockReturnValue({ stop });
 
-    process.env.ARI_URL = ari.url;
-    process.env.ARI_PASSWORD = 'ari-secret';
-    process.env.AMI_HOST = `${ami.host}:${ami.port}`;
-    process.env.AMI_PASSWORD = 'ami-secret';
-    process.env.EXTERNAL_IPV4 = '192.0.2.10';
-    process.env.DB_FILE = await migratedDbFile();
-    process.env.HEP_ENABLED = 'false';
+    vi.stubEnv('ARI_URL', ari.url);
+    vi.stubEnv('ARI_PASSWORD', 'ari-secret');
+    vi.stubEnv('AMI_HOST', `${ami.host}:${ami.port}`);
+    vi.stubEnv('AMI_PASSWORD', 'ami-secret');
+    vi.stubEnv('EXTERNAL_IPV4', '192.0.2.10');
+    vi.stubEnv('DB_FILE', await migratedDbFile());
+    vi.stubEnv('HEP_ENABLED', 'false');
 
     const booted = await main();
     await booted.close();
@@ -161,9 +141,6 @@ describe('main', () => {
 });
 
 describe('stopping on SIGTERM or SIGINT', () => {
-  const savedEnv = Object.fromEntries(
-    ENV_KEYS.map(key => [key, process.env[key]])
-  );
   let fakeAri: FakeAri;
   let fakeAmi: FakeAmi;
   let listenersBefore = new Set<unknown>();
@@ -174,13 +151,13 @@ describe('stopping on SIGTERM or SIGINT', () => {
     fakeAmi = new FakeAmi();
     const ari = await fakeAri.listen();
     const ami = await fakeAmi.listen();
-    process.env.ARI_URL = ari.url;
-    process.env.ARI_PASSWORD = 'ari-secret';
-    process.env.AMI_HOST = `${ami.host}:${ami.port}`;
-    process.env.AMI_PASSWORD = 'ami-secret';
-    process.env.EXTERNAL_IPV4 = '192.0.2.10';
-    process.env.DB_FILE = await migratedDbFile();
-    process.env.HEP_ENABLED = 'false';
+    vi.stubEnv('ARI_URL', ari.url);
+    vi.stubEnv('ARI_PASSWORD', 'ari-secret');
+    vi.stubEnv('AMI_HOST', `${ami.host}:${ami.port}`);
+    vi.stubEnv('AMI_PASSWORD', 'ami-secret');
+    vi.stubEnv('EXTERNAL_IPV4', '192.0.2.10');
+    vi.stubEnv('DB_FILE', await migratedDbFile());
+    vi.stubEnv('HEP_ENABLED', 'false');
     listenersBefore = new Set([
       ...process.listeners('SIGTERM'),
       ...process.listeners('SIGINT')
@@ -220,13 +197,7 @@ describe('stopping on SIGTERM or SIGINT', () => {
         process.off(name, listener);
       }
     }
-    for (const key of ENV_KEYS) {
-      if (savedEnv[key] === undefined) {
-        Reflect.deleteProperty(process.env, key);
-      } else {
-        process.env[key] = savedEnv[key];
-      }
-    }
+    vi.unstubAllEnvs();
     vi.useRealTimers();
     vi.restoreAllMocks();
     logged.length = 0;

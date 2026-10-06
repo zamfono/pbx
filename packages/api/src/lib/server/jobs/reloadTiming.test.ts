@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
 import { seedSettings } from '@zamfono/shared/testDb.js';
@@ -81,6 +81,10 @@ const MON_FRI_9_TO_5 = [1, 2, 3, 4, 5].map(weekday => ({
   closes: '17:00'
 }));
 
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+
 describe('nextMaintenanceMoment', () => {
   it('picks the midpoint of a tenant OOO period starting within 7 days', async () => {
     const db = await makeTestDb();
@@ -114,19 +118,15 @@ describe('nextMaintenanceMoment', () => {
   it('falls back to TLS_RELOAD_HOUR when settings.tlsReloadHour is unset', async () => {
     const db = await makeTestDb();
     await seedSettings(db);
-    process.env.TLS_RELOAD_HOUR = '5';
-    try {
-      const moment = await nextMaintenanceMoment(db, NOW);
-      expect(moment.toISOString()).toBe('2026-09-17T05:00:00.000Z');
-    } finally {
-      delete process.env.TLS_RELOAD_HOUR;
-    }
+    vi.stubEnv('TLS_RELOAD_HOUR', '5');
+    const moment = await nextMaintenanceMoment(db, NOW);
+    expect(moment.toISOString()).toBe('2026-09-17T05:00:00.000Z');
   });
 
   it('falls back to 03:00 when nothing else is configured', async () => {
     const db = await makeTestDb();
     await seedSettings(db);
-    delete process.env.TLS_RELOAD_HOUR;
+    vi.stubEnv('TLS_RELOAD_HOUR', undefined);
 
     const moment = await nextMaintenanceMoment(db, NOW);
 
@@ -136,19 +136,10 @@ describe('nextMaintenanceMoment', () => {
   it('resolves a stored timezone Intl cannot use through TZ instead of throwing (§11.4)', async () => {
     const db = await makeTestDb();
     await seedSettings(db, { timezone: 'Mars/Olympus' });
-    delete process.env.TLS_RELOAD_HOUR;
-    const previousTz = process.env.TZ;
-    process.env.TZ = 'Europe/Berlin';
-    try {
-      const moment = await nextMaintenanceMoment(db, NOW);
-      // 03:00 in Berlin, on summer time (UTC+2) in September.
-      expect(moment.toISOString()).toBe('2026-09-17T01:00:00.000Z');
-    } finally {
-      if (previousTz === undefined) {
-        delete process.env.TZ;
-      } else {
-        process.env.TZ = previousTz;
-      }
-    }
+    vi.stubEnv('TLS_RELOAD_HOUR', undefined);
+    vi.stubEnv('TZ', 'Europe/Berlin');
+    const moment = await nextMaintenanceMoment(db, NOW);
+    // 03:00 in Berlin, on summer time (UTC+2) in September.
+    expect(moment.toISOString()).toBe('2026-09-17T01:00:00.000Z');
   });
 });

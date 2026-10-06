@@ -1,5 +1,5 @@
 import * as privateEnv from '$app/env/private';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { type Db } from '@zamfono/shared';
 import { seedSettings, seedUser } from '@zamfono/shared/testDb.js';
@@ -72,6 +72,7 @@ const realFetch = globalThis.fetch;
 
 afterEach(() => {
   globalThis.fetch = realFetch;
+  vi.unstubAllEnvs();
 });
 
 describe('devices.create/delete/rotate/setBlf: provisioning wiring (§10.4)', () => {
@@ -398,31 +399,22 @@ describe('devices', () => {
   it('refuses a plain device while both plain transports are disabled', async () => {
     const db = await makeTestDb();
     const userId = await seedAnna(db);
-    const original = {
-      udp: process.env.SIP_UDP_ENABLED,
-      tcp: process.env.SIP_TCP_ENABLED
-    };
-    process.env.SIP_UDP_ENABLED = 'false';
-    process.env.SIP_TCP_ENABLED = 'false';
-    try {
-      await expect(
-        runOperation(
-          db,
-          'devices.create',
-          {
-            userId,
-            label: 'Desk phone',
-            kind: 'manual',
-            transport: 'plain',
-            allowedIps: ['10.0.0.1']
-          },
-          asRun()
-        )
-      ).rejects.toMatchObject({ status: 422 });
-    } finally {
-      process.env.SIP_UDP_ENABLED = original.udp;
-      process.env.SIP_TCP_ENABLED = original.tcp;
-    }
+    vi.stubEnv('SIP_UDP_ENABLED', 'false');
+    vi.stubEnv('SIP_TCP_ENABLED', 'false');
+    await expect(
+      runOperation(
+        db,
+        'devices.create',
+        {
+          userId,
+          label: 'Desk phone',
+          kind: 'manual',
+          transport: 'plain',
+          allowedIps: ['10.0.0.1']
+        },
+        asRun()
+      )
+    ).rejects.toMatchObject({ status: 422 });
   });
 
   it('records an allowedIps change as wire arrays, not the stored JSON string', async () => {

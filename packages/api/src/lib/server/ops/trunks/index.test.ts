@@ -11,14 +11,8 @@ import '../outboundRoutes/index.js';
 import './index.js';
 
 describe('trunks operations', () => {
-  const originalSipUdpEnabled = process.env.SIP_UDP_ENABLED;
-
   afterEach(() => {
-    if (originalSipUdpEnabled === undefined) {
-      delete process.env.SIP_UDP_ENABLED;
-    } else {
-      process.env.SIP_UDP_ENABLED = originalSipUdpEnabled;
-    }
+    vi.unstubAllEnvs();
   });
 
   it('inserts the catch-all outbound route, with empty caller and number lists, alongside the first trunk', async () => {
@@ -43,7 +37,7 @@ describe('trunks operations', () => {
 
   it('refuses a udp trunk while SIP_UDP_ENABLED=false', async () => {
     const db = await makeTestDb();
-    process.env.SIP_UDP_ENABLED = 'false';
+    vi.stubEnv('SIP_UDP_ENABLED', 'false');
     await expect(createTrunk(db, { transport: 'udp' })).rejects.toMatchObject({
       status: 422
     });
@@ -765,19 +759,15 @@ describe('trunks operations', () => {
   it("refuses the 'sip' override while HEP_ENABLED is false (§7)", async () => {
     const db = await makeTestDb();
     const { trunk } = await createTrunk(db);
-    process.env.HEP_ENABLED = 'false';
+    vi.stubEnv('HEP_ENABLED', 'false');
 
-    try {
-      const attempt = runOperation(
-        db,
-        'trunks.update',
-        { id: trunk.id, logLevel: 'sip' },
-        asRun()
-      );
-      await expect(attempt).rejects.toMatchObject({ status: 422 });
-    } finally {
-      delete process.env.HEP_ENABLED;
-    }
+    const attempt = runOperation(
+      db,
+      'trunks.update',
+      { id: trunk.id, logLevel: 'sip' },
+      asRun()
+    );
+    await expect(attempt).rejects.toMatchObject({ status: 422 });
   });
 
   // §10.3 "Conventions": list endpoints paginate with `?limit=` and an opaque `?cursor=`.

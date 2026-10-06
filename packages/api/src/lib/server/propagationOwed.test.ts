@@ -57,7 +57,7 @@ async function setUp(): Promise<Db> {
   await seedSettings(db, { timezone: 'UTC' });
   const genDir = await mkdtemp(path.join(tmpdir(), 'zamfono-gen-'));
   dirs.push(genDir);
-  process.env.ASTERISK_GEN_DIR = genDir;
+  vi.stubEnv('ASTERISK_GEN_DIR', genDir);
   vi.mocked(getCoreClient).mockReturnValue(coreClient());
   return db;
 }
@@ -70,7 +70,7 @@ beforeEach(() => {
 afterEach(async () => {
   vi.useRealTimers();
   vi.mocked(getCoreClient).mockReset();
-  delete process.env.ASTERISK_GEN_DIR;
+  vi.unstubAllEnvs();
   await Promise.all(
     dirs.splice(0).map(dir => rm(dir, { recursive: true, force: true }))
   );

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { Db } from '@zamfono/shared';
 
@@ -26,14 +26,8 @@ const REGISTRATION = {
 const INBOUND_ONLY = [{ host: '192.0.2.10', direction: 'inbound' }];
 
 describe('trunk hosts and transport (§9.4 "Hosts", "Signaling")', () => {
-  const originalSipUdpEnabled = process.env.SIP_UDP_ENABLED;
-
   afterEach(() => {
-    if (originalSipUdpEnabled === undefined) {
-      delete process.env.SIP_UDP_ENABLED;
-    } else {
-      process.env.SIP_UDP_ENABLED = originalSipUdpEnabled;
-    }
+    vi.unstubAllEnvs();
   });
 
   it('refuses a registration trunk with no outbound or both host, on create and update', async () => {
@@ -77,7 +71,7 @@ describe('trunk hosts and transport (§9.4 "Hosts", "Signaling")', () => {
   it('lets a trunk on a since-disabled transport be edited, and refuses switching to it', async () => {
     const db = await makeTestDb();
     const { trunk } = await createTrunk(db, { transport: 'udp' });
-    process.env.SIP_UDP_ENABLED = 'false';
+    vi.stubEnv('SIP_UDP_ENABLED', 'false');
     await expect(
       updateTrunk(db, { id: trunk.id, name: 'Renamed' })
     ).resolves.toBeDefined();

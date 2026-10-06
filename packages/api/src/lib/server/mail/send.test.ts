@@ -1,5 +1,4 @@
 import path from 'node:path';
-import process from 'node:process';
 import type { Transporter } from 'nodemailer';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -91,15 +90,8 @@ describe('relayFromSettings', () => {
 });
 
 describe('sendMail', () => {
-  const originalFqdn = process.env.FQDN;
-
   afterEach(() => {
     vi.unstubAllEnvs();
-    if (originalFqdn === undefined) {
-      delete process.env.FQDN;
-    } else {
-      process.env.FQDN = originalFqdn;
-    }
   });
 
   it('sends a voicemail mail with the recipient, subject and attachment', async () => {
@@ -282,7 +274,7 @@ describe('sendMail', () => {
   });
 
   it('renders a non-empty fqdn from FQDN', async () => {
-    process.env.FQDN = 'pbx.example.test';
+    vi.stubEnv('FQDN', 'pbx.example.test');
     const db = await migratedTestDb();
     await insertSettings(db, { smtpHost: 'smtp.example.test' });
     await insertUser(db, 'u1', 'user@example.test');

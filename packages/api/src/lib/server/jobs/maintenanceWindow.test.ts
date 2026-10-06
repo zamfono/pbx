@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type Db } from '@zamfono/shared';
 import { seedSettings } from '@zamfono/shared/testDb.js';
@@ -21,14 +21,13 @@ const BUSY_REASON =
   'live calls 2, Asterisk channels 3, recordings in progress 1';
 
 describe('createMaintenanceGate', () => {
-  const saved = { reloadHour: process.env.TLS_RELOAD_HOUR };
   const state: { db?: Db; idle: boolean; asked: number } = {
     idle: true,
     asked: 0
   };
 
   beforeEach(async () => {
-    delete process.env.TLS_RELOAD_HOUR;
+    vi.stubEnv('TLS_RELOAD_HOUR', undefined);
     state.idle = true;
     state.asked = 0;
     const db = await makeTestDb();
@@ -37,9 +36,7 @@ describe('createMaintenanceGate', () => {
   });
 
   afterEach(() => {
-    if (saved.reloadHour !== undefined) {
-      process.env.TLS_RELOAD_HOUR = saved.reloadHour;
-    }
+    vi.unstubAllEnvs();
   });
 
   function database(): Db {

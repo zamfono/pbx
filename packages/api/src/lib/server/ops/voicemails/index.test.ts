@@ -67,6 +67,7 @@ async function seedVoicemail(
 
 afterEach(() => {
   vi.mocked(getCoreClient).mockReset();
+  vi.unstubAllEnvs();
 });
 
 describe('voicemails', () => {
@@ -178,22 +179,13 @@ describe('voicemails', () => {
     await mkdir(path.join(mediaDir, 'voicemail'), { recursive: true });
     const filePath = path.join(mediaDir, 'voicemail', filename);
     await writeFile(filePath, 'audio-bytes');
-    const previousMediaDir = process.env.MEDIA_DIR;
-    process.env.MEDIA_DIR = mediaDir;
-    try {
-      await runOperation(
-        db,
-        'voicemails.delete',
-        { id: vmId },
-        asRun({ actor: anna, confirm: true })
-      );
-    } finally {
-      if (previousMediaDir === undefined) {
-        delete process.env.MEDIA_DIR;
-      } else {
-        process.env.MEDIA_DIR = previousMediaDir;
-      }
-    }
+    vi.stubEnv('MEDIA_DIR', mediaDir);
+    await runOperation(
+      db,
+      'voicemails.delete',
+      { id: vmId },
+      asRun({ actor: anna, confirm: true })
+    );
 
     await expect(access(filePath)).rejects.toThrow();
     const row = await db
@@ -229,9 +221,6 @@ describe('voicemails', () => {
     const filePath = path.join(mediaDir, 'voicemail', filename);
     await writeFile(filePath, 'audio-bytes');
     vi.stubEnv('MEDIA_DIR', mediaDir);
-    onTestFinished(() => {
-      vi.unstubAllEnvs();
-    });
 
     await expect(
       runOperation(

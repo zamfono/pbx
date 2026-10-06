@@ -1,7 +1,7 @@
 import { access, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { afterEach, describe, expect, it, onTestFinished } from 'vitest';
+import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 
 import {
   MS_PER_DAY,
@@ -666,14 +666,8 @@ describe('runPurge', () => {
 });
 
 describe('runPurge: voicemail files', () => {
-  const previousMediaDir = process.env.MEDIA_DIR;
-
   afterEach(() => {
-    if (previousMediaDir === undefined) {
-      delete process.env.MEDIA_DIR;
-    } else {
-      process.env.MEDIA_DIR = previousMediaDir;
-    }
+    vi.unstubAllEnvs();
   });
 
   /** A voicemail row in a mailbox, with its WAV on the media volume; returns the file's path. */
@@ -710,7 +704,7 @@ describe('runPurge: voicemail files', () => {
     const mediaDir = await mkdtemp(path.join(os.tmpdir(), 'zamfono-purge-'));
     onTestFinished(() => rm(mediaDir, { recursive: true, force: true }));
     await mkdir(path.join(mediaDir, 'voicemail'), { recursive: true });
-    process.env.MEDIA_DIR = mediaDir;
+    vi.stubEnv('MEDIA_DIR', mediaDir);
     const db = await migratedTestDb();
     await seedSettings(db);
     const deletedUser = await createUser(db, '101');

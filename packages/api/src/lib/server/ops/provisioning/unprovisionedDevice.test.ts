@@ -21,6 +21,7 @@ const realFetch = globalThis.fetch;
 afterEach(() => {
   globalThis.fetch = realFetch;
   vi.restoreAllMocks();
+  vi.unstubAllEnvs();
 });
 
 type Created = { device: { id: string } };
@@ -188,7 +189,7 @@ describe('a ringotel device created before provisioning.ringotelSetup (§10.4)',
 
 describe('a ringotel device created before provisioning.ringotelAdopt (§10.4)', () => {
   it('gets no Ringotel user from an adoption that rolls back, so a retry adopts', async () => {
-    process.env.FQDN = 'pbx.example.com';
+    vi.stubEnv('FQDN', 'pbx.example.com');
     const db = await makeTestDb();
     await seedSettings(db, {
       ringotelApiTokenEnc: encrypt(

@@ -1,7 +1,7 @@
 import { access, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { describe, expect, it, onTestFinished } from 'vitest';
+import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
 
@@ -51,6 +51,10 @@ async function seedRecording(
   return { id, callId };
 }
 
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+
 describe('recordings', () => {
   it('lists recordings for an admin and refuses a user role', async () => {
     const db = await makeTestDb();
@@ -71,24 +75,15 @@ describe('recordings', () => {
     onTestFinished(() => rm(mediaDir, { recursive: true, force: true }));
     await mkdir(path.join(mediaDir, 'recordings'), { recursive: true });
     await writeFile(path.join(mediaDir, 'recordings', 'rec-2.wav'), 'wav');
-    const previousMediaDir = process.env.MEDIA_DIR;
-    process.env.MEDIA_DIR = mediaDir;
-    try {
-      const file = (await runOperation(
-        db,
-        'recordings.audio',
-        { id },
-        asRun()
-      )) as BinaryResult;
-      expect(file.contentType).toBe('audio/wav');
-      expect((await file.read()).toString()).toBe('wav');
-    } finally {
-      if (previousMediaDir === undefined) {
-        delete process.env.MEDIA_DIR;
-      } else {
-        process.env.MEDIA_DIR = previousMediaDir;
-      }
-    }
+    vi.stubEnv('MEDIA_DIR', mediaDir);
+    const file = (await runOperation(
+      db,
+      'recordings.audio',
+      { id },
+      asRun()
+    )) as BinaryResult;
+    expect(file.contentType).toBe('audio/wav');
+    expect((await file.read()).toString()).toBe('wav');
   });
 
   it('recordings.delete removes file, raw pair and row with undoable 0', async () => {
@@ -105,22 +100,13 @@ describe('recordings', () => {
       path.join(mediaDir, 'recordings', name)
     );
     await Promise.all(rawPaths.map(rawPath => writeFile(rawPath, 'raw')));
-    const previousMediaDir = process.env.MEDIA_DIR;
-    process.env.MEDIA_DIR = mediaDir;
-    try {
-      await runOperation(
-        db,
-        'recordings.delete',
-        { id },
-        asRun({ confirm: true })
-      );
-    } finally {
-      if (previousMediaDir === undefined) {
-        delete process.env.MEDIA_DIR;
-      } else {
-        process.env.MEDIA_DIR = previousMediaDir;
-      }
-    }
+    vi.stubEnv('MEDIA_DIR', mediaDir);
+    await runOperation(
+      db,
+      'recordings.delete',
+      { id },
+      asRun({ confirm: true })
+    );
 
     await expect(access(filePath)).rejects.toThrow();
     await Promise.all(

@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import process from 'node:process';
-import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { epochSeconds, nowIso } from '@zamfono/shared';
 import { migrateForTest, seedSettings } from '@zamfono/shared/testDb.js';
@@ -37,6 +37,10 @@ vi.mock('#lib/server/jobs/background.js', () => ({
 
 process.env.DB_FILE = ':memory:';
 process.env.JWT_SECRET = JWT_SECRET;
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 beforeAll(async () => {
   const db = getDb();
@@ -196,7 +200,10 @@ describe('hooks handle', () => {
   // §5.4: "At boot, before it serves a request, `api` sweeps every `*_enc` column". A fresh
   // module instance, with the environment the sweep needs, starts its own boot sweep.
   it('resolves init once the background jobs have started, and stops them on shutdown', async () => {
-    process.env.SECRETBOX_KEY = `1:${randomBytes(KEY_BYTE_LENGTH).toString('base64')}`;
+    vi.stubEnv(
+      'SECRETBOX_KEY',
+      `1:${randomBytes(KEY_BYTE_LENGTH).toString('base64')}`
+    );
     let initialized = false;
     const initializing = Promise.resolve(initHooks()).then(() => {
       initialized = true;
@@ -221,7 +228,6 @@ describe('hooks handle', () => {
       'neither EXTERNAL_IPV4 nor STACK_IPV4 is set'
     );
     expect(jobs.start).not.toHaveBeenCalled();
-    vi.unstubAllEnvs();
   });
 
   it('sets locals.auth from a valid bearer token: the user, its session, the client and its name', async () => {

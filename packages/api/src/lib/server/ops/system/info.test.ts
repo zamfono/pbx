@@ -42,8 +42,6 @@ const NO_UPDATER = {
 afterEach(() => {
   vi.mocked(getCoreClient).mockReset();
   vi.mocked(updaterClient).mockReset();
-  delete process.env.ZAMFONO_VERSION;
-  delete process.env.ZAMFONO_REVISION;
   vi.unstubAllEnvs();
 });
 
@@ -56,8 +54,8 @@ async function tenantDb(): Promise<Db> {
 
 describe('system.info', () => {
   it("reports api's version and the one core reports, each on its own", async () => {
-    process.env.ZAMFONO_VERSION = '0.0.5';
-    process.env.ZAMFONO_REVISION = '79c1041aaaaaaa';
+    vi.stubEnv('ZAMFONO_VERSION', '0.0.5');
+    vi.stubEnv('ZAMFONO_REVISION', '79c1041aaaaaaa');
     vi.mocked(getCoreClient).mockReturnValue(
       stubCoreClient({ version: () => Promise.resolve(CORE) })
     );
