@@ -8,6 +8,9 @@ Every change made to [the specification](spec.md) during implementation, newest 
 **2026-10-06 · §10.2 Three-way calls.** `*5` or `calls.addParty` to an own DID whose `external` target records records the added leg as that target's, nobody's participation, like an ordinary dial of the DID.
 *Why:* the product owner, told that "*5 to one of your own DIDs whose forward target records: not recorded, because that path adds the target as an extra party instead of forwarding": "okay record `*5`. any other similar gaps?"
 
+**2026-10-06 · §9.3 NAT.** A device endpoint carries `from_domain`, the stack's `FQDN`, so the calls, OPTIONS probes and MWI `NOTIFY`s Asterisk sends a device name the domain the device registers in as their `From` host, not the container's address in the ports mode.
+*Why:* the product owner, asked whether calls to devices and the OPTIONS probes, which still carried the container's address in `From` in the ports mode, should be fixed too: "From: use the public IP as far as (sensibly) possible". The FQDN resolves to that public address and is what a device registers against and checks a TLS certificate for.
+
 **2026-10-06 · §5.6 Enforcement, §7 Metrics, §9.1.** The ban list's drop rules count what they drop; the ban helper's status line adds the packets and bytes after the digest, and `GET /metrics` exposes them as the counters `zamfono_sip_ban_dropped_packets_total` and `zamfono_sip_ban_dropped_bytes_total`.
 *Why:* the product owner: "how effective is the IP ban altogether?", then "add the counter to the "to build"".
 
@@ -31,6 +34,7 @@ Every change made to [the specification](spec.md) during implementation, newest 
 
 **2026-10-05 · §6.3 Updates.** On SIGTERM or SIGINT the updater takes no new request, waits up to a bound below the container's stop grace period for a run of `update.sh` of its own to end, and exits; a run still going is cut off with it, and the next start marks it failed.
 *Why:* the product owner showed `podman restart zamfono-updater-1` ending in "StopSignal SIGTERM failed to stop container zamfono-updater-1 in 10 seconds, resorting to SIGKILL": `node` as PID 1 ignores SIGTERM without a handler of its own.
+
 **2026-10-05 · §9.4, §10.4.** For each Asterisk start (the ARI `startup_time`) the core has not handled, it sends `PJSIPRegister` once for every `registration` trunk over TCP or TLS, as soon as its ARI and AMI connections are up; a failure is logged and not retried for that start. The handled start lives in the core's memory: a reconnect to the same Asterisk sends nothing, a restart of the core against it registers once more.
 *Why:* the product owner: "all TPC (and TLS) trunks need to re-register after a restart", then, after a TLS trunk stayed unregistered after the update 0.3.0 → 0.3.1 until `trunks.reregister` was called: "i have noticed that TCP / TLS trunks dont recover after updates. didn't we say that they should re-register after each restart / update?"
 
@@ -39,16 +43,22 @@ Every change made to [the specification](spec.md) during implementation, newest 
 
 **2026-10-05 · §10.2.** A user's `unconditional` forward to an external number or a SIP target makes its answered trunk leg that user's participation, a ring-group member's followed forward included: it is recorded under the user's effective flag, its row naming the user. Other forward conditions, OOO rules, schedules and ring-group, menu or DID forwards leave the trunk leg nobody's.
 *Why:* the product owner: "i just noticed, that unconditional SIP forwarding doesn't trigger recordings. but it should respect the user's recording setting.", "with an unconditional SIP forward, the external target _becomes_ de facto the user and should be recorded according to the user's settings.", and, asked "Should I extend its scope to "unconditional forward to a `sip` or `external` target"? The other forward conditions would stay out.", "yes, please".
+
 **2026-10-05 · §5.6, §6.1, §6.3, §9.1.** A `netns` service, the `proxy` image idle, holds the stack's network namespace, its address on `public`, its published ports and its attachment to `internal`, where it answers to the name `asterisk`; `asterisk` and `proxy` join it with `network_mode: service:netns`, so either restarts or is recreated alone. The entrypoint loads the ban list's nftables table in one transaction that first deletes the table an earlier start left in the namespace. Podman's refusal to replace a namespace still joined concerns `netns`, so the updater's run removes `asterisk` and `proxy` before `up -d`.
 *Why:* after a restart of the `asterisk` container on the test host (Podman, 2026-10-05) `proxy` stayed in Asterisk's old network namespace and HTTPS was dead until `proxy` was recreated; the product owner: "then tackle all the other points you mentioned".
+
 **2026-10-05 · §10.3.** `GET /calls` takes `parentCallId`: the history rows whose `parent_call_id` is that call (its transfer, added and park legs), combinable with the other filters; a `user` still sees only rows in their own scope, so naming another's call yields an empty list, not a refusal. History only, like `from`, `to` and `status`: ignored with `live=true`. `GET /calls/{id}` carries `childCallIds`, the ids of the call's ended direct children (no grandchildren), by `started_at`, for a `user` only those in their own scope.
 *Why:* the product owner: "`GET /calls` should have the ability to filter by `parentCallId`", then "1a: how about a list of child calls in `GET /calls/{id}`?" and "yes, add `childCallIds`".
+
 **2026-10-05 · §6.4, §9.1.** The TLS transports no longer have `allow_reload=yes`; a certificate replaced at the same paths still reaches both on the next PJSIP reload, which restarts a TLS transport's listener when its certificate or key file has changed.
 *Why:* with `allow_reload=yes` Asterisk destroys and recreates a TLS transport on a PJSIP reload, on every one in the ports mode, and crashed when an outgoing TLS connection, a trunk's registration among them, was still in its handshake (test host, 2026-10-05).
+
 **2026-10-05 · §10.3.** `database:status` reads `closed` while the database cannot be opened or read: the check reads the schema, a page of the file, and a database that does not open answers `closed` and 503 rather than an error.
 *Why:* nothing closes the database while a process runs, so a check that asked only `select 1` could never fail, and a database that did not open made `/healthz` and `/readyz` answer 500.
+
 **2026-10-05 · §7.** At level `sip`, a transfer hangs up the transferrer as the call it leaves closes, before the call's closing tail, so that call's log holds the BYE ending the transferrer's dialog and its answer; the transferee's dialog goes on in the log of its onward call.
 *Why:* the product owner: "on transfers the `BYE` and corresponding `ACK` is not logged in the SIP logs"; the transferrer was hung up only after the call's log had been written.
+
 **2026-10-05 · §5.8, §9.4, §10.3.** A trunk's status carries `registeredAt`, the time of the last `Registered` AMI `Registry` event the core saw, which a refresh that keeps the trunk `registered` moves too; `null` for an `ip` trunk and until the core sees a REGISTER succeed after its AMI connection opened. New `trunks.reregister`, `POST /trunks/{id}/reregister` (admin): `PJSIPRegister` on the trunk's registration, which unregisters it first and registers it afresh; 409 for an `ip` trunk, 503 while `core` or Asterisk does not answer; audited as a pure action, not undoable. The registrar server stays unreported: AMI names only the configured server URI, never the SRV target Asterisk resolved.
 *Why:* the product owner: "add an operation to forcibly re-register a trunk", and after a restart "it _shows_ registered, but compare the registration time with the server's start time": the trunk had re-registered at Asterisk start, but `statusChangedAt` does not move while the status stays `registered`.
 

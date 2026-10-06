@@ -17,6 +17,7 @@ function fixture(name: string): string {
 // `inbound` CIDR host plus `inbound_auth`, and one `ip` trunk over TLS with SRTP that does not
 // check its provider's certificate (§9.3, §9.4).
 const input: RenderInput = {
+  fqdn: 'pbx.example.com',
   settings: {
     codecs: ['opus', 'g722', 'alaw'],
     ringotelMaxRegs: 3,

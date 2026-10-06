@@ -19,6 +19,10 @@ why the specified behaviour changed; the commit history, how.
 
 - A trunk username takes only SIP URI user characters; a trunk whose stored username has any other is left out of the config and shows in `config:render`.
 
+### Fixed
+
+- Calls, OPTIONS probes and MWI notifications to devices name the stack's FQDN in `From`, not the container's address.
+
 ## [0.3.2] - 2026-10-06
 
 ### Added

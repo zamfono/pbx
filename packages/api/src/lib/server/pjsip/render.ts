@@ -109,11 +109,16 @@ function formatCallerId(name: string, ext: string): string {
 // No `transport =` line: an endpoint ACL applies to every bound transport alike (§9.3
 // "Transport policy"), so `identify_by = auth_username` matches by digest username instead.
 // `moh_suggest` is the class a party this device puts on hold hears (§10.2 "Hold music").
+// `from_domain` names the stack's FQDN, the domain the device registered in, as the `From` host
+// of every request Asterisk sends the device: its calls, OPTIONS probes and unsolicited MWI
+// NOTIFYs would otherwise name the transport's bound address, the container's own in the ports
+// mode, which `external_signaling_address` leaves in `From` (§9.3 "NAT").
 function renderDeviceEndpoint(
   device: Device,
   owner: RenderInput['users'][number],
-  settings: RenderInput['settings']
+  input: Pick<RenderInput, 'fqdn' | 'settings'>
 ): string {
+  const { settings } = input;
   const lines = [
     `[${device.sipUsername}]`,
     'type = endpoint',
@@ -127,7 +132,8 @@ function renderDeviceEndpoint(
     'rewrite_contact = yes',
     'rtp_symmetric = yes',
     'force_rport = yes',
-    'direct_media = no'
+    'direct_media = no',
+    `from_domain = ${input.fqdn}`
   ];
   if (device.transport === 'tls') {
     lines.push('media_encryption = sdes');
@@ -160,7 +166,7 @@ function renderUsersConf(input: RenderInput, skipped: SkippedRow[]): string {
           owner.ringGroupIds
         ),
         renderDeviceAuth(device),
-        renderDeviceEndpoint(device, owner, input.settings)
+        renderDeviceEndpoint(device, owner, input)
       ];
     },
     skipped

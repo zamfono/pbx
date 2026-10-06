@@ -58,7 +58,7 @@ const serialized = serialQueue();
  * inconsistent with each other; the rows the render left out are recorded once they are.
  */
 async function renderConfig(db: Db): Promise<void> {
-  const input = await loadRenderInput(db, keyringFromEnv(env));
+  const input = await loadRenderInput(db, keyringFromEnv(env), env.FQDN);
   const { files, skipped } = render(input);
   const dir = env.ASTERISK_GEN_DIR;
   await mkdir(dir, { recursive: true });
