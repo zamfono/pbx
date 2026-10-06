@@ -154,3 +154,29 @@ export function nextHop(
   }
   return { ok: true, hops: next };
 }
+
+/**
+ * `target` followed through the tenant's own DIDs it names (`ownDidTarget`) to the target the
+ * chain ends at, each DID one hop on the `hops` already taken, as `enterOwnDid` counts them
+ * (§10.1 step 7); `null` for a chain that passes `MAX_HOPS`.
+ */
+export function throughOwnDids(
+  snapshot: Snapshot,
+  target: ForwardTarget,
+  hops: number
+): ForwardTarget | null {
+  let current = target;
+  let taken = hops;
+  for (
+    let next = ownDidTarget(snapshot, current);
+    next !== null;
+    next = ownDidTarget(snapshot, current)
+  ) {
+    taken += 1;
+    if (taken > MAX_HOPS) {
+      return null;
+    }
+    current = next;
+  }
+  return current;
+}

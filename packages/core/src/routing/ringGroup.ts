@@ -96,6 +96,8 @@ export type MemberState = {
   idleDevices: number;
   oooInEffect: boolean;
   unconditional: ForwardTarget | null;
+  /** `unconditional` runs through own DIDs forwarding on past the hop limit (§10.1 step 7). */
+  forwardHopLimit?: true;
   /** The registered devices of `unconditional`'s user, when it forwards to a user; 0 otherwise. */
   forwardRegisteredDevices: number;
 };
@@ -108,8 +110,8 @@ export type MemberLeg =
  * The legs a group actually rings, in member order (§10.1 step 5): DND, offline (no registered
  * device) or an in-effect OOO rule skips the member, and one already in a call is skipped while
  * `skipBusy`, or without another registered device to ring. Of the rest, an unconditional forward to a user who has a registered device, or to
- * an external number or a SIP target, is followed as the member's leg; any other unconditional target skips the
- * member, so a group never drops its caller into one member's voicemail, and a forward to a user
+ * an external number or a SIP target, is followed as the member's leg; any other unconditional target, or one past
+ * the hop limit, skips the member, so a group never drops its caller into one member's voicemail, and a forward to a user
  * with nothing to ring rings nothing.
  */
 export function ringable(
@@ -131,9 +133,10 @@ export function ringable(
       continue;
     }
     const followed =
-      forward.kind === 'external' ||
-      forward.kind === 'sip' ||
-      (forward.kind === 'user' && member.forwardRegisteredDevices > 0);
+      member.forwardHopLimit !== true &&
+      (forward.kind === 'external' ||
+        forward.kind === 'sip' ||
+        (forward.kind === 'user' && member.forwardRegisteredDevices > 0));
     if (followed) {
       legs.push({ userId: member.userId, via: 'forward', target: forward });
     }

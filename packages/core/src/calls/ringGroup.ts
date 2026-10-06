@@ -187,13 +187,11 @@ export async function ringGroup(
   // Only a group that rings busy members needs to know which of their devices is the busy one.
   const busy =
     group.skipBusy === 1 ? new Set<string>() : await busyDevices(pipeline);
-  const members = buildMemberStates(
-    pipeline,
-    snapshot,
-    groupId,
-    pipeline.deps.now(),
-    busy
-  );
+  const members = buildMemberStates(pipeline, snapshot, groupId, {
+    now: pipeline.deps.now(),
+    busy,
+    hops: call.hops
+  });
   const legs = ringable(members, group.skipBusy === 1);
 
   if (legs.length === 0) {

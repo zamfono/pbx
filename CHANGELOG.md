@@ -26,6 +26,7 @@ why the specified behaviour changed; the commit history, how.
 - `*5` to an own DID that forwards to another own DID's number follows it internally instead of dialling it over a trunk.
 - OPTIONS probes to a trunk with caller-ID header `from` name the stack's public address in `From`, not the container's.
 - A recording forward target's leg stays recorded after it is transferred onward.
+- A ring-group member forwarding to an own DID that forwards to another own DID is rung at the last one's target.
 
 ## [0.3.2] - 2026-10-06
 

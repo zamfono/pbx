@@ -8,6 +8,9 @@ Every change made to [the specification](spec.md) during implementation, newest 
 **2026-10-06 · §9.4 Caller-ID.** A `from` trunk's endpoint carries the address the stack writes into SIP as `from_domain`, so its OPTIONS probes name that address in `From` as its calls do; a `both` trunk's leg keeps it as `SIPFROMDOMAIN`, since a `from_domain` would keep its host in a withheld call's anonymous `From`, and `anonymous.invalid` set on the leg would become the host of its `P-Asserted-Identity`.
 *Why:* the product owner: "From: use the public IP as far as (sensibly) possible". OPTIONS probes to an `ip` trunk named the container's address in the ports mode; only a `from` trunk, which never carries a withheld call, can take `from_domain` without changing the anonymous `From` or the asserted identity.
 
+**2026-10-06 · §10.1 step 7.** A ring-group member's unconditional forward to an own DID is followed through DIDs forwarding to each other to the last one's target, each DID a hop as when a call enters one; a member whose chain passes the hop limit is not rung.
+*Why:* only the first DID was followed, so a DID whose target names another own DID left the member's leg on an own number, which never leaves through a trunk, and the member rang nothing.
+
 **2026-10-06 · §10.2 Recording semantics.** A recording forward target's trunk leg that a transfer hands on (a blind transfer over the API or by `REFER`, or an attended transfer) goes on being recorded in the row it continues in, as a participation of its own there: a second recording, naming nobody unless the user flag applies.
 *Why:* the leg's recording ended with the original row, since only a user's flag was evaluated for the onward call's caller and a transferee; the product owner's rule is that such a target records every call it answers, "however the call reached it".
 

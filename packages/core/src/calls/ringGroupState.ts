@@ -10,7 +10,7 @@ import { buildOooRules } from '../routing/scheduleRows.js';
 import {
   buildUserRules,
   findForwardTarget,
-  ownDidTarget,
+  throughOwnDids,
   type ForwardTarget
 } from '../routing/targets.js';
 import { groupMemberUserIds } from './extensionOwner.js';
@@ -21,21 +21,24 @@ export type GroupOutcome = 'unanswered' | 'unavailable';
 export type GroupRules = Partial<Record<GroupOutcome, ForwardTarget>>;
 
 /** `ring_group_members`, flattened through `groupMemberUserIds`, as the `MemberState[]` `ringable` (§10.1 step 5) expects;
- * `busy` holds the devices carrying a call (`busyDevices`). */
+ * `busy` holds the devices carrying a call (`busyDevices`), `hops` the forward hops the call has
+ * taken (`Call.hops`). */
 export function buildMemberStates(
   pipeline: Pipeline,
   snapshot: Snapshot,
   groupId: string,
-  now: string,
-  busy: ReadonlySet<string>
+  at: { now: string; busy: ReadonlySet<string>; hops: number }
 ): MemberState[] {
+  const { now, busy } = at;
   const userIds = groupMemberUserIds(snapshot, groupId);
   const oooRules = buildOooRules(snapshot.oooRules);
   return userIds.map(userId => {
     const rule = buildUserRules(snapshot, userId).unconditional ?? null;
-    // A forward to an own DID is followed to the DID's target (§10.1 Outbound step 5).
-    const unconditional =
-      rule === null ? null : (ownDidTarget(snapshot, rule) ?? rule);
+    // A forward to an own DID is followed to the DID's target (§10.1 Outbound step 5), through
+    // DIDs forwarding to each other up to the hop limit (step 7).
+    const followed =
+      rule === null ? null : throughOwnDids(snapshot, rule, at.hops);
+    const unconditional = followed ?? rule;
     const devices = registeredDevices(pipeline, snapshot, userId);
     return {
       userId,
@@ -46,6 +49,7 @@ export function buildMemberStates(
         .length,
       oooInEffect: ownInEffectOoo(oooRules, `user:${userId}`, now) !== null,
       unconditional,
+      ...(rule !== null && followed === null ? { forwardHopLimit: true } : {}),
       forwardRegisteredDevices:
         unconditional?.kind === 'user'
           ? registeredDevices(pipeline, snapshot, unconditional.userId).length
