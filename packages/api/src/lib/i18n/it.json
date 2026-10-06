@@ -32,6 +32,7 @@
     "title": "Problema di accesso",
     "expired": "Questo link è scaduto. Riprova.",
     "noUser": "Nessun account corrisponde a questo accesso.",
+    "noPassword": "Imposta prima la password con il link ricevuto, poi accedi.",
     "domain": "Il tuo dominio e-mail non è autorizzato ad accedere qui.",
     "unverifiedEmail": "Il tuo provider di identità non ha verificato questo indirizzo e-mail.",
     "issuer": "Questo accesso è stato emesso dal provider di identità sbagliato.",

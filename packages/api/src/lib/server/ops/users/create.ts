@@ -2,7 +2,12 @@ import * as env from '$app/env/private';
 import pino from 'pino';
 import { z } from 'zod';
 
-import { findMeSchema, HTTP_CONFLICT, newId } from '@zamfono/shared';
+import {
+  findMeSchema,
+  HTTP_CONFLICT,
+  newId,
+  USER_ROLES
+} from '@zamfono/shared';
 
 import { issueResetToken } from '#lib/server/auth/tokens.js';
 import { sendMail } from '#lib/server/mail/index.js';
@@ -29,19 +34,15 @@ import {
 
 const logger = pino({ name: 'users.create' });
 
-// §11.2 `users` CHECK (role <> 'owner' OR password_hash IS NOT NULL): this operation never sets
-// a password, so it never creates an owner; promotion to owner happens through `users.update`.
-const CREATABLE_ROLES = ['admin', 'user'] as const;
-
 const inputSchema = z
   .object({
     name: z.string().min(1),
     email: z.email(),
     role: z
-      .enum(CREATABLE_ROLES)
+      .enum(USER_ROLES)
       .optional()
       .describe(
-        "admin, given by an owner only, configures the stack, user only their own self-service fields; 'user' by default, owner only by promotion through users.update."
+        "owner and admin, given by an owner only, configure the stack, user only their own self-service fields; 'user' by default. A new owner cannot log in until they set their password through the setup link."
       ),
     extension: z.string().min(1).describe(EXTENSION_DESCRIPTION),
     ...userCallFields,
@@ -106,8 +107,8 @@ export const create = defineOperation({
   output: outputSchema,
   problems: [HTTP_CONFLICT],
   minRole: 'admin',
-  // Only an owner brings an admin into being (§10.3).
-  ownerOnly: (_ctx, input) => input.role === 'admin',
+  // Only an owner brings an admin or an owner into being (§10.3).
+  ownerOnly: (_ctx, input) => input.role !== undefined && input.role !== 'user',
   entity: (_input, out: Output) => ({ kind: 'user', id: out.user.id }),
   run: async (ctx, input) => {
     await assertValidExtension(ctx.db, input.extension);

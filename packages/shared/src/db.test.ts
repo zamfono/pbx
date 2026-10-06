@@ -5,7 +5,7 @@ import { migrateForTest, MIGRATIONS_DIR } from './testDb.js';
 
 test('migrates and enforces the schema', async () => {
   const db = openDb(':memory:');
-  expect(await pendingMigrations(db, MIGRATIONS_DIR)).toHaveLength(4);
+  expect(await pendingMigrations(db, MIGRATIONS_DIR)).toHaveLength(5);
   await migrateForTest(db);
   expect(await pendingMigrations(db, MIGRATIONS_DIR)).toEqual([]);
 
@@ -45,6 +45,20 @@ test('migrates and enforces the schema', async () => {
         name: 'B',
         email: 'a@x',
         createdAt: '2026-01-03T00:00:00Z'
+      })
+      .execute()
+  ).resolves.toBeDefined();
+
+  // an owner may lack a password until they set one; they cannot log in meanwhile (§5.2)
+  await expect(
+    db
+      .insertInto('users')
+      .values({
+        id: 'o1',
+        name: 'O',
+        email: 'o@x',
+        role: 'owner',
+        createdAt: 't'
       })
       .execute()
   ).resolves.toBeDefined();

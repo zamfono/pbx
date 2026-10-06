@@ -43,6 +43,7 @@ export type Dictionary = {
     title: string;
     expired: string;
     noUser: string;
+    noPassword: string;
     domain: string;
     unverifiedEmail: string;
     issuer: string;

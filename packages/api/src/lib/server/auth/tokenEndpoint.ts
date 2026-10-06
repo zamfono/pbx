@@ -2,7 +2,8 @@ import { epochSeconds, HTTP_BAD_REQUEST, HTTP_OK } from '@zamfono/shared';
 
 import { notifyUsersChanged } from '../eventSink.js';
 import type { AuthCodeStore } from './codes.js';
-import { ACCESS_TOKEN_TTL_S, isRole, signAccessToken } from './jwt.js';
+import { ACCESS_TOKEN_TTL_S, signAccessToken } from './jwt.js';
+import { loginUser } from './loginUser.js';
 import {
   GRANT_AUTHORIZATION_CODE,
   GRANT_REFRESH_TOKEN,
@@ -58,13 +59,8 @@ async function handleAuthorizationCode(
   if (!redeemed) {
     return oauthError(HTTP_BAD_REQUEST, 'invalid_grant');
   }
-  const user = await deps.db
-    .selectFrom('users')
-    .select(['id', 'role'])
-    .where('id', '=', redeemed.userId)
-    .where('deletedAt', 'is', null)
-    .executeTakeFirst();
-  if (!user || !isRole(user.role)) {
+  const user = await loginUser(deps.db, redeemed.userId);
+  if (!user) {
     return oauthError(HTTP_BAD_REQUEST, 'invalid_grant');
   }
   const nowIso = deps.now();
@@ -96,13 +92,8 @@ async function handleRefreshToken(
     }
     return oauthError(HTTP_BAD_REQUEST, 'invalid_grant');
   }
-  const user = await deps.db
-    .selectFrom('users')
-    .select(['id', 'role'])
-    .where('id', '=', rotated.userId)
-    .where('deletedAt', 'is', null)
-    .executeTakeFirst();
-  if (!user || !isRole(user.role)) {
+  const user = await loginUser(deps.db, rotated.userId);
+  if (!user) {
     return oauthError(HTTP_BAD_REQUEST, 'invalid_grant');
   }
   const nowS = epochSeconds(Date.parse(nowIso));

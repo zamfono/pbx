@@ -26,7 +26,8 @@ type FinishLoginFailure =
   | 'unverifiedEmail'
   | 'domain'
   | 'noUser'
-  | 'subMismatch';
+  | 'subMismatch'
+  | 'noPassword';
 
 type FinishLoginResult =
   { ok: true; userId: string } | { ok: false; reason: FinishLoginFailure };

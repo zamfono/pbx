@@ -1,20 +1,11 @@
-import * as env from '$app/env/private';
-import pino from 'pino';
 import { z } from 'zod';
 
 import { HTTP_NOT_FOUND } from '@zamfono/shared';
 
-import { issueResetToken } from '#lib/server/auth/tokens.js';
-import { sendMail } from '#lib/server/mail/index.js';
-import { keyringFromEnv } from '#lib/server/secretbox.js';
-
-import { afterCommit } from '../afterCommit.js';
 import { setUndoable } from '../audit.js';
 import { defineOperation } from '../types.js';
-import { setupLinkFor } from './_setupMail.js';
+import { issueSetPasswordLink } from './_setupMail.js';
 import { liveUser, namesAnOwner } from './_shared.js';
-
-const logger = pino({ name: 'users.resetPassword' });
 
 /** `POST /users/{id}/resetPassword` (§10.3, §5.2): issues a fresh one-time set-password link,
  *  valid as long as a setup link, since the admin hands it over. An owner's is owner-only. */
@@ -37,24 +28,7 @@ export const resetPassword = defineOperation({
   entity: input => ({ kind: 'user', id: input.id }),
   run: async (ctx, input) => {
     await liveUser(ctx.db, input.id);
-    const { raw, expiresAt } = await issueResetToken(
-      ctx.db,
-      input.id,
-      'setup',
-      ctx.now
-    );
-    const link = setupLinkFor(raw);
-    // Sent once the write has committed, never after a rollback; not awaited, as in `users.create`.
-    afterCommit(ctx, db => {
-      sendMail(db, keyringFromEnv(env), {
-        kind: 'reset',
-        to: { userId: input.id },
-        values: { link, linkExpiresAt: expiresAt }
-      }).catch((error: unknown) => {
-        logger.warn({ err: error }, 'users.resetPassword: reset mail failed');
-      });
-      return Promise.resolve(null);
-    });
+    const link = await issueSetPasswordLink(ctx, input.id);
     // Issuing a link is nothing to revert: there is no prior state for undo to restore.
     setUndoable(ctx, false);
     return { link };

@@ -27,4 +27,8 @@ describe('the error page (§5.2 "Authentication pages")', () => {
     expect(body).toContain(dict.error.generic);
     expect(body).not.toContain('native code');
   });
+
+  it('tells an owner refused at SSO login to set their password first', () => {
+    expect(bodyFor('?reason=noPassword')).toContain(dict.error.noPassword);
+  });
 });

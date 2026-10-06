@@ -32,6 +32,7 @@
     "title": "Problem bei der Anmeldung",
     "expired": "Dieser Link ist abgelaufen. Bitte versuchen Sie es erneut.",
     "noUser": "Kein Konto passt zu dieser Anmeldung.",
+    "noPassword": "Legen Sie zuerst über den zugesandten Link Ihr Passwort fest und melden Sie sich dann an.",
     "domain": "Ihre E-Mail-Domain ist hier nicht zur Anmeldung berechtigt.",
     "unverifiedEmail": "Ihr Identitätsanbieter hat diese E-Mail-Adresse nicht bestätigt.",
     "issuer": "Diese Anmeldung stammt vom falschen Identitätsanbieter.",

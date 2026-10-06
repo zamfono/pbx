@@ -49,7 +49,7 @@ function toSnapshot(device: DeviceRow): DeviceSnapshot {
  */
 export async function assertDeletable(
   db: Db,
-  user: Pick<UserRow, 'id' | 'role'>
+  user: Pick<UserRow, 'id' | 'role' | 'passwordHash'>
 ): Promise<void> {
   await assertNotLastOwner(db, user);
   const references = await findUserReferences(db, user.id);
@@ -66,7 +66,7 @@ export async function assertDeletable(
  */
 export async function releaseUser(
   ctx: Context,
-  user: Pick<UserRow, 'id' | 'role'>
+  user: Pick<UserRow, 'id' | 'role' | 'passwordHash'>
 ): Promise<() => void> {
   await assertDeletable(ctx.db, user);
   return releaseRingotelUsers(ctx, await loadLiveDevices(ctx.db, user.id));

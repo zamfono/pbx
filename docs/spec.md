@@ -168,7 +168,7 @@ SSO rules:
 - An e-mail that matches no active user is refused. Accounts are created by admins, never by SSO.
 - Each stack's `https://<fqdn>/oauth/callback` must be listed on the shared app registration. Microsoft allows 256 redirect URIs on a work-and-school-accounts registration; Google's console enforces a cap its documentation does not state, around 100 as observed; the registration is part of onboarding a stack.
 - With `settings.sso_allowed_domain` set, an SSO login whose e-mail domain differs is refused before the user lookup, and for `google` so is one whose `hd` differs, so a private Google account on a company address is refused; NULL accepts any domain the provider vouches for.
-- Users may be SSO-only (`password_hash NULL`). Every owner keeps a local password as break-glass against identity-provider outages (`users` CHECK, §11.2); promoting an SSO-only user to owner is refused until they have set one.
+- Users may be SSO-only (`password_hash NULL`). Every owner who can log in has a local password, as break-glass against identity-provider outages: an owner without one, created by an owner or promoted from SSO-only, cannot log in at all (no password login, SSO login, refresh-token rotation or personal access token) until they set it through their set-password link, and the SSO callback shows them the error page saying so. Promoting an SSO-only user to owner revokes their sessions and personal access tokens in the same transaction and returns that link, as `POST /users/{id}/resetPassword` does.
 - The `sso_*` settings are owner-only (§11.4): whoever controls the issuer decides who logs in as whom, since the first login after a provider change binds by e-mail.
 
 **Authentication pages.** The browser-served surface of the MVP: five SvelteKit pages inside `api`, server-rendered in `settings.language`, in one design that carries `settings.company_name` as its title.
@@ -178,7 +178,7 @@ SSO rules:
 | Login and consent (`/oauth/authorize`) | E-mail and password form, SSO buttons when a provider is configured, a consent step naming the requesting client        |
 | Set password (`/auth/setPassword`)     | Target of the setup and reset mail links (§10.2 "Mail"); the person types a new password                                |
 | Forgot password                        | Form posting the reset request; linked from the login page                                                              |
-| SSO callback and error page            | OIDC return handler; a plain error page for a rejected redirect URI, an SSO e-mail matching no user, an expired link    |
+| SSO callback and error page            | OIDC return handler; a plain error page for a rejected redirect URI, an SSO e-mail matching no user, an expired link, an owner yet to set a password |
 | Post-login landing                     | For a sign-in without client redirect: one line confirming the login, with the command to connect an MCP client (§10.5) |
 
 The first-boot owner needs none of them: their password hash is seeded (§6.3). Every later user sets their password through the mail link, or through the link an admin hands over (§10.2).
@@ -318,7 +318,7 @@ A soft delete is refused with a conflict while routing still depends on the row:
 - for a block: live DIDs whose number lies within it, that is, begins with its base (and, for a digits block, has the block's digit count); membership is derived from the number, never stored;
 - for a menu: the DIDs and forward targets pointing at it from other menus, rules and schedules;
 - for an audio asset: the greetings, MoH classes, announcements and menus using it;
-- for an owner: being the last owner.
+- for an owner: being the last owner with a password (§5.2).
 
 The response lists those references. The admin retargets them first, each as its own audited and undoable change, or promotes another owner first. Ring-group memberships and route caller lists never block a delete; the member is skipped while soft-deleted (§11.1).
 
@@ -1362,7 +1362,7 @@ Every `DELETE` carries `confirm`, as do `users.erase`, `devices.rotate`, `person
 
 #### REST surface
 
-Base: `https://<host>/api/v1`. JSON only. Bearer auth, on every endpoint but the public OpenAPI document: a JWT access token issued by the OAuth server, or a personal access token (§5.2). RBAC roles: `owner`, `admin`, `user` — any number of owners, at least one; only owners change roles, reset an owner's password, change an owner's e-mail, soft-delete an owner, or create an admin or undo the soft delete of an admin or owner (an admin gets 403, before any confirmation), and the last owner cannot be demoted or soft-deleted.
+Base: `https://<host>/api/v1`. JSON only. Bearer auth, on every endpoint but the public OpenAPI document: a JWT access token issued by the OAuth server, or a personal access token (§5.2). RBAC roles: `owner`, `admin`, `user` — any number of owners, at least one; only owners change roles, reset an owner's password, change an owner's e-mail, soft-delete an owner, or create an admin or owner or undo the soft delete of an admin or owner (an admin gets 403, before any confirmation), and the last owner with a password (§5.2) cannot be demoted or soft-deleted.
 
 The endpoints by area, as a sketch, each with the minimum role it needs:
 
@@ -1372,7 +1372,7 @@ The endpoints by area, as a sketch, each with the minimum role it needs:
 
 **Confirmation** — every `DELETE`, `POST /users/{id}/erase`, `POST /devices/{id}/rotate`, `POST /personalAccessTokens/{id}/revoke`, `POST /provisioning/ringotel/adopt` and `POST /system/update` require `confirm: true` in the body and answer 409 with the question text without it (§10.3, "Confirmation")
 
-**Users** (min. role: admin (self-service subset for `user`)) — `GET/POST /users` (`POST` returns the one-time set-password link, mailed too with a relay), `GET/PATCH/DELETE /users/{id}` (`DELETE` answers 409 with the blocking references, §5.9), `POST /users/{id}/resetPassword` (same link semantics), `POST /users/{id}/erase` (owners only, §5.10), `GET /users/{id}/forwarding` (the rules, in the shape the `PUT` takes, `sip` targets with their `headers`), `PUT /users/{id}/forwarding` (the rules replaced as a whole), `PUT /users/{id}/presence` (dnd; outside the audit log, §5.7), `PUT/DELETE /users/{id}/voicemailGreeting` (the personal greeting, a WAV or MP3 upload; outside the audit log, §5.7). Self-service, on the user's own id alone (403 for another's): `GET /users/{id}`, `GET /users/{id}/forwarding`, `PUT /users/{id}/forwarding` (a new or changed `sip` target excepted, Forward targets), `PUT /users/{id}/presence`, `PUT/DELETE /users/{id}/voicemailGreeting` and the `PATCH` fields `clir`, `rejectAnonymous`, `ringTimeoutS`, `notifyMissedCalls`, `findMe`; `callerIdDidId` is admin-set (§9.4)
+**Users** (min. role: admin (self-service subset for `user`)) — `GET/POST /users` (`POST` returns the one-time set-password link, mailed too with a relay), `GET/PATCH/DELETE /users/{id}` (`DELETE` answers 409 with the blocking references, §5.9; a `PATCH` promoting a user without a password to owner returns the same link, §5.2), `POST /users/{id}/resetPassword` (same link semantics), `POST /users/{id}/erase` (owners only, §5.10), `GET /users/{id}/forwarding` (the rules, in the shape the `PUT` takes, `sip` targets with their `headers`), `PUT /users/{id}/forwarding` (the rules replaced as a whole), `PUT /users/{id}/presence` (dnd; outside the audit log, §5.7), `PUT/DELETE /users/{id}/voicemailGreeting` (the personal greeting, a WAV or MP3 upload; outside the audit log, §5.7). Self-service, on the user's own id alone (403 for another's): `GET /users/{id}`, `GET /users/{id}/forwarding`, `PUT /users/{id}/forwarding` (a new or changed `sip` target excepted, Forward targets), `PUT /users/{id}/presence`, `PUT/DELETE /users/{id}/voicemailGreeting` and the `PATCH` fields `clir`, `rejectAnonymous`, `ringTimeoutS`, `notifyMissedCalls`, `findMe`; `callerIdDidId` is admin-set (§9.4)
 
 **Personal access tokens** (min. role: user (own) / admin; an owner's owner-only) — `GET/POST /users/{id}/personalAccessTokens` (`POST` takes `name` and an optional `expiresAt` and returns the token once; `GET` lists the user's tokens, never their values, with `createdBy`, `createdAt`, `expiresAt`, `lastUsedAt` and `revokedAt`), `POST /personalAccessTokens/{id}/revoke` (§5.2)
 
@@ -1624,9 +1624,9 @@ WAL mode, `foreign_keys=ON`, write ownership split per §3.1 (`api` = config tab
 ```sql
 -- ── config tables (primary writer: api) ─────────────────────────────────────
 
--- users — one row per person; at least one live 'owner' (app-enforced: the last owner cannot be
--- demoted or soft-deleted, §5.9, §10.3).
---   password_hash:          Argon2id; NULL = SSO-only; every owner keeps a local password (CHECK, §5)
+-- users — one row per person; at least one live 'owner' with a password (app-enforced: the last
+-- one cannot be demoted or soft-deleted, §5.9, §10.3).
+--   password_hash:          Argon2id; NULL = SSO-only; an owner without one cannot log in (§5.2)
 --   sso_subject:            OIDC `sub` at the tenant's provider, bound on first SSO login and cleared when
 --                           the tenant changes provider, issuer or Entra tenant id (§5.2)
 --   dnd:                    cross-written by core via the feature codes (§3)
@@ -1667,8 +1667,7 @@ CREATE TABLE users (
   log_level            TEXT    CHECK (log_level IN ('events','qos','sip')),
   log_level_expires_at TEXT,
   created_at           TEXT    NOT NULL,
-  deleted_at           TEXT,
-  CHECK (role <> 'owner' OR password_hash IS NOT NULL)
+  deleted_at           TEXT
 );
 
 -- devices — SIP endpoints; one row per softphone/desk phone of a user. At most one live 'ringotel'

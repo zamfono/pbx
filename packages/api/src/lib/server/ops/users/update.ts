@@ -7,14 +7,18 @@ import {
   USER_ROLES
 } from '@zamfono/shared';
 
+import { revokeUserPersonalAccessTokens } from '#lib/server/auth/personalAccessTokens.js';
+import { revokeUserTokens } from '#lib/server/auth/tokens.js';
+
 import { assertAudioOfKind } from '../audio/_shared.js';
-import { recordFieldChanges } from '../audit.js';
+import { recordChange, recordFieldChanges } from '../audit.js';
 import { ownUserId } from '../gates.js';
 import { propagate } from '../propagate.js';
 import { pushRoster } from '../roster.js';
 import { logLevelInputFields, resolveLogLevel } from '../settings/logLevel.js';
 import { defineOperation, type Context } from '../types.js';
 import { affectedDevice, maybeRenameExtension } from './_rename.js';
+import { issueSetPasswordLink } from './_setupMail.js';
 import {
   assertCallerIdDidValid,
   assertEmailAvailable,
@@ -70,6 +74,12 @@ const outputSchema = z.object({
     .optional()
     .describe(
       "The user's devices an extension change renamed, each with its new SIP username."
+    ),
+  setupLink: z
+    .string()
+    .optional()
+    .describe(
+      'Promoting a user without a password to owner: the one-time link they set one with, also mailed to them; they cannot log in until then.'
     )
 });
 type Output = z.infer<typeof outputSchema>;
@@ -150,6 +160,29 @@ async function maybePushRoster(
   await pushRoster(ctx, [after]);
 }
 
+/**
+ * Promoting a user without a password, an SSO-only one, to owner (§5.2): an owner logs in only
+ * once they have one, so their sessions and personal access tokens end with the promotion, and
+ * the set-password link they set it through is issued and mailed. `undefined` for any other change.
+ */
+async function promoteWithoutPassword(
+  ctx: Context,
+  before: UserRow,
+  input: Input
+): Promise<string | undefined> {
+  if (
+    input.role !== 'owner' ||
+    before.role === 'owner' ||
+    before.passwordHash !== null
+  ) {
+    return undefined;
+  }
+  await revokeUserTokens(ctx.db, before.id, ctx.now);
+  await revokeUserPersonalAccessTokens(ctx.db, before.id, ctx.now);
+  recordChange(ctx, { field: 'tokensRevoked', from: false, to: true });
+  return issueSetPasswordLink(ctx, before.id);
+}
+
 export const update = defineOperation({
   name: 'users.update',
   description:
@@ -179,6 +212,7 @@ export const update = defineOperation({
     }
 
     const affectedDevices = await maybeRenameExtension(ctx, input);
+    const setupLink = await promoteWithoutPassword(ctx, before, input);
     const after = resolvedFields(before, input);
     const logLevel = resolveLogLevel(ctx, before, input);
     recordFieldChanges(
@@ -202,6 +236,9 @@ export const update = defineOperation({
     const output: Output = { user: await toUserOut(ctx.db, row) };
     if (affectedDevices !== undefined) {
       output.affectedDevices = affectedDevices;
+    }
+    if (setupLink !== undefined) {
+      output.setupLink = setupLink;
     }
     // The routing pipeline reads this row — the ring timeout, find-me legs, CLIR and
     // reject-anonymous among them — so every update reaches `core`, not only the extension

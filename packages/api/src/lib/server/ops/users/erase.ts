@@ -26,10 +26,10 @@ const PERSONAL_FIELDS = new Set(['name', 'email', 'findMe', 'rules']);
 async function liveUserOrNone(
   db: Db,
   id: string
-): Promise<Pick<UserRow, 'id' | 'role'> | undefined> {
+): Promise<Pick<UserRow, 'id' | 'role' | 'passwordHash'> | undefined> {
   return db
     .selectFrom('users')
-    .select(['id', 'role'])
+    .select(['id', 'role', 'passwordHash'])
     .where('id', '=', id)
     .where('deletedAt', 'is', null)
     .executeTakeFirst();

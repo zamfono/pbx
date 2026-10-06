@@ -32,6 +32,7 @@
     "title": "Problema al iniciar sesión",
     "expired": "Este enlace ha caducado. Inténtalo de nuevo.",
     "noUser": "Ninguna cuenta coincide con este inicio de sesión.",
+    "noPassword": "Primero establece tu contraseña con el enlace que recibiste y luego inicia sesión.",
     "domain": "Tu dominio de correo no tiene permiso para iniciar sesión aquí.",
     "unverifiedEmail": "Tu proveedor de identidad no ha verificado esta dirección de correo.",
     "issuer": "Este inicio de sesión fue emitido por el proveedor de identidad equivocado.",

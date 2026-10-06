@@ -37,8 +37,8 @@ permission prompt for a destructive tool is the human gate.
 
 A soft delete is itself refused, listing the blocking references, while another live row still
 points at it — a DID targeting the user, another group's fallback, the tenant main number. Retarget
-those first, or promote another owner; there is always at least one live `owner`, who cannot be
-demoted or soft-deleted.
+those first, or promote another owner; there is always at least one live `owner` with a password,
+who cannot be demoted or soft-deleted.
 
 ## Role checks are the same everywhere
 

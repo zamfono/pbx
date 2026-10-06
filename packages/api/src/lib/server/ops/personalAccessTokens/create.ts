@@ -7,6 +7,7 @@ import {
   newId
 } from '@zamfono/shared';
 
+import { mayLogIn } from '#lib/server/auth/loginUser.js';
 import { newPersonalAccessToken } from '#lib/server/auth/personalAccessTokens.js';
 
 import { recordChange, setUndoable } from '../audit.js';
@@ -63,7 +64,12 @@ export const create = defineOperation({
   ownerOnly: forAnOwner,
   entity: (_input, output) => ({ kind: 'personalAccessToken', id: output.id }),
   run: async (ctx, input) => {
-    await liveUser(ctx.db, input.userId);
+    if (!mayLogIn(await liveUser(ctx.db, input.userId))) {
+      throw new OpError(
+        HTTP_CONFLICT,
+        'personalAccessTokens: this owner has not set a password yet and cannot log in'
+      );
+    }
     const expiresAt =
       input.expiresAt === undefined || input.expiresAt === null
         ? null

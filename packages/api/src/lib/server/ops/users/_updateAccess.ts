@@ -2,7 +2,7 @@
  * Who may write what through `users.update` (§5.3, §10.3): a `user` only their own self-service
  * fields, only an owner a role, and only an owner an owner's e-mail.
  */
-import { HTTP_FORBIDDEN, HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
+import { HTTP_FORBIDDEN } from '@zamfono/shared';
 
 import { OpError, type Context } from '../types.js';
 import { assertNotLastOwner, type UserRow } from './_shared.js';
@@ -40,15 +40,7 @@ export async function assertRoleChangeAllowed(
   if (ctx.actor.role !== 'owner') {
     throw new OpError(HTTP_FORBIDDEN, 'users: only owners change roles');
   }
-  if (input.role === 'owner' && before.passwordHash === null) {
-    throw new OpError(
-      HTTP_UNPROCESSABLE_CONTENT,
-      'users: an SSO-only user needs a password before becoming owner'
-    );
-  }
-  if (before.role === 'owner') {
-    await assertNotLastOwner(ctx.db, before);
-  }
+  await assertNotLastOwner(ctx.db, before);
 }
 
 /** Throws 403 unless `ctx.actor` may change `before`'s e-mail, where a forgot-password link goes:

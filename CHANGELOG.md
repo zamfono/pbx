@@ -18,6 +18,7 @@ why the specified behaviour changed; the commit history, how.
 
 ### Changed
 
+- An owner can create an owner, and promote an SSO-only user to owner; either gets a set-password link and cannot log in until they have set it.
 - Trunk calls name the stack's FQDN, not its IP address, as the host in `From`, `P-Asserted-Identity` and `Diversion` (except on `pai` trunks).
 - A trunk username takes only SIP URI user characters; a trunk whose stored username has any other is left out of the config and shows in `config:render`.
 

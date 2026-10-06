@@ -32,6 +32,7 @@
     "title": "Problème de connexion",
     "expired": "Ce lien a expiré. Veuillez réessayer.",
     "noUser": "Aucun compte ne correspond à cette connexion.",
+    "noPassword": "Définissez d'abord votre mot de passe avec le lien reçu, puis connectez-vous.",
     "domain": "Votre domaine de messagerie n'est pas autorisé à se connecter ici.",
     "unverifiedEmail": "Votre fournisseur d'identité n'a pas vérifié cette adresse e-mail.",
     "issuer": "Cette connexion a été émise par le mauvais fournisseur d'identité.",

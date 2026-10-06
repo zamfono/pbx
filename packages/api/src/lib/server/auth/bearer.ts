@@ -6,12 +6,8 @@
 import { epochSeconds, nowIso, type Db } from '@zamfono/shared';
 
 import type { Actor } from '../ops/types.js';
-import {
-  isRole,
-  verifyAccessToken,
-  verifyLinkToken,
-  type LinkKind
-} from './jwt.js';
+import { verifyAccessToken, verifyLinkToken, type LinkKind } from './jwt.js';
+import { loginUser } from './loginUser.js';
 import {
   livePersonalAccessToken,
   PAT_PREFIX,
@@ -43,16 +39,10 @@ async function liveAuthenticated(
   deps: BearerDeps,
   claims: { sub: string; cid: string | null }
 ): Promise<Authenticated | null> {
-  const user = await deps.db
-    .selectFrom('users')
-    .select(['id', 'name', 'role'])
-    .where('id', '=', claims.sub)
-    .where('deletedAt', 'is', null)
-    .executeTakeFirst();
-  if (!user || !isRole(user.role)) {
+  const actor = await loginUser(deps.db, claims.sub);
+  if (!actor) {
     return null;
   }
-  const actor = { id: user.id, name: user.name, role: user.role };
   if (claims.cid === null) {
     return { actor };
   }
@@ -68,8 +58,7 @@ async function liveAuthenticated(
  * The live user behind bearer token `token`, read fresh from `users` so a role change takes
  * effect at once: a personal access token's user (§5.2), or an access token's, which fails
  * unless issued for `audience` when one is given; `null` for a token that fails verification, an
- * access token whose session has ended (§5.2), a soft-deleted user, or a stored role that is none
- * of the three (§5.3).
+ * access token whose session has ended (§5.2), or a user `loginUser` refuses.
  */
 export async function authenticateToken(
   deps: BearerDeps,

@@ -125,23 +125,26 @@ export async function toUserOut(db: Db, row: UserRow): Promise<UserOut> {
 }
 
 /**
- * Throws `OpError(409)` when `user` is the tenant's last live owner: owners are never demoted or
- * soft-deleted below one (§5.3, §5.9, §10.3).
+ * Throws `OpError(409)` when `user` is the tenant's last live owner who can log in, one with a
+ * local password: owners are never demoted or soft-deleted below one (§5.2, §5.3, §5.9, §10.3).
+ * An owner who has not set a password yet keeps nobody in, so removing them is never refused.
  */
 export async function assertNotLastOwner(
   db: Db,
-  user: Pick<UserRow, 'id' | 'role'>
+  user: Pick<UserRow, 'id' | 'role' | 'passwordHash'>
 ): Promise<void> {
-  if (user.role !== 'owner') {
+  if (user.role !== 'owner' || user.passwordHash === null) {
     return;
   }
-  const owners = await db
+  const other = await db
     .selectFrom('users')
     .select('id')
     .where('role', '=', 'owner')
+    .where('passwordHash', 'is not', null)
     .where('deletedAt', 'is', null)
-    .execute();
-  if (owners.length <= 1) {
+    .where('id', '<>', user.id)
+    .executeTakeFirst();
+  if (!other) {
     throw new OpError(HTTP_CONFLICT, "cannot remove the tenant's last owner");
   }
 }

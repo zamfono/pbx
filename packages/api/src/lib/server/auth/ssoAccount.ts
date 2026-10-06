@@ -2,6 +2,8 @@ import pino from 'pino';
 
 import type { Db } from '@zamfono/shared';
 
+import { mayLogIn } from './loginUser.js';
+
 const logger = pino({ name: 'sso' });
 
 const NO_ROWS_UPDATED = 0n;
@@ -9,7 +11,13 @@ const NO_ROWS_UPDATED = 0n;
 /** The account an SSO login resolves to, or why none does (§5.2 "SSO rules"). */
 export type SsoAccountResult =
   | { ok: true; userId: string }
-  | { ok: false; reason: 'noUser' | 'unverifiedEmail' | 'subMismatch' };
+  | {
+      ok: false;
+      reason: 'noUser' | 'unverifiedEmail' | 'subMismatch' | 'noPassword';
+    };
+
+/** A matched user `mayLogIn` refuses: an owner who has not set their password yet (§5.2). */
+const NO_PASSWORD: SsoAccountResult = { ok: false, reason: 'noPassword' };
 
 /** What an SSO login's checked `id_token` says about the person: `email` is `null` when it
  *  carries none, `emailVouched` whether the issuer vouches for it (§5.2 "SSO rules"). */
@@ -23,7 +31,7 @@ export type SsoClaims = {
  * Matches `claims` against `users` (§5.2 "SSO rules"): a bound `sso_subject` wins outright,
  * whatever the e-mail; otherwise only a vouched e-mail counts, and an unbound live user with that
  * e-mail is bound to `sub` on first login; an e-mail already bound to a different `sub` is refused
- * and logged, never silently re-bound.
+ * and logged, never silently re-bound. A matched user `mayLogIn` refuses is `noPassword`, unbound.
  *
  * The select-then-bind runs in one transaction, and the bind's own `WHERE` re-checks
  * `sso_subject IS NULL` rather than trusting the `SELECT` above it: `users_sso_subject` is a
@@ -38,12 +46,12 @@ export async function matchSsoAccount(
   return db.transaction().execute(async trx => {
     const bySub = await trx
       .selectFrom('users')
-      .select('id')
+      .select(['id', 'role', 'passwordHash'])
       .where('ssoSubject', '=', sub)
       .where('deletedAt', 'is', null)
       .executeTakeFirst();
     if (bySub) {
-      return { ok: true, userId: bySub.id };
+      return mayLogIn(bySub) ? { ok: true, userId: bySub.id } : NO_PASSWORD;
     }
     if (email === null) {
       return { ok: false, reason: 'noUser' };
@@ -53,12 +61,15 @@ export async function matchSsoAccount(
     }
     const unbound = await trx
       .selectFrom('users')
-      .select('id')
+      .select(['id', 'role', 'passwordHash'])
       .where('email', '=', email)
       .where('ssoSubject', 'is', null)
       .where('deletedAt', 'is', null)
       .executeTakeFirst();
     if (unbound) {
+      if (!mayLogIn(unbound)) {
+        return NO_PASSWORD;
+      }
       const { numUpdatedRows } = await trx
         .updateTable('users')
         .set({ ssoSubject: sub })

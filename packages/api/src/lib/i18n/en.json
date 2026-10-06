@@ -32,6 +32,7 @@
     "title": "Sign-in problem",
     "expired": "This link has expired. Please try again.",
     "noUser": "No account matches that sign-in.",
+    "noPassword": "Set your password first, through the link you were sent, then sign in.",
     "domain": "Your e-mail domain is not allowed to sign in here.",
     "unverifiedEmail": "Your identity provider has not verified this e-mail address.",
     "issuer": "This sign-in was issued by the wrong identity provider.",

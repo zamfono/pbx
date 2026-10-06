@@ -16,6 +16,7 @@
     const known: Record<string, string> = {
       expired: dict.expired,
       noUser: dict.noUser,
+      noPassword: dict.noPassword,
       domain: dict.domain,
       unverifiedEmail: dict.unverifiedEmail,
       issuer: dict.issuer,
