@@ -6,14 +6,36 @@ import {
 
 import { Conflict, OpError } from '../types.js';
 
-/** The extension a live user owns (§11.2 `extensions`); every live user has exactly one. */
-export async function userExtension(db: Db, userId: string): Promise<string> {
+/** The extension a live user owns (§11.2 `extensions`): at most one, `null` for none. */
+export async function userExtension(
+  db: Db,
+  userId: string
+): Promise<string | null> {
   const row = await db
     .selectFrom('extensions')
     .select('ext')
     .where('userId', '=', userId)
-    .executeTakeFirstOrThrow();
-  return row.ext;
+    .executeTakeFirst();
+  return row?.ext ?? null;
+}
+
+/**
+ * The extension of `user`, for what only a user with one has (§11.2): a device, which is named
+ * after it, and a ring-group membership. Throws `Conflict(409)` naming the user without one.
+ */
+export async function requireUserExtension(
+  db: Db,
+  user: { id: string; name: string },
+  what: string
+): Promise<string> {
+  const ext = await userExtension(db, user.id);
+  if (ext === null) {
+    throw new Conflict(
+      `${what}: the user has no extension; give them one first`,
+      [{ kind: 'user', id: user.id, label: user.name }]
+    );
+  }
+  return ext;
 }
 
 /**

@@ -21,7 +21,8 @@ async function ringGroupIdsByUser(db: Db): Promise<Map<string, string[]>> {
   return byUser;
 }
 
-/** Live users with their extension (§11.2 `extensions`) and the live ring groups they belong to. */
+/** Live users with an extension (§11.2 `extensions`), with it and the live ring groups they
+ *  belong to. */
 async function loadUsers(db: Db): Promise<RenderInput['users']> {
   const rows = await db
     .selectFrom('users')

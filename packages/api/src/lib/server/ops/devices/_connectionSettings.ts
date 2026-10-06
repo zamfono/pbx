@@ -15,7 +15,7 @@ import {
 } from '#lib/server/stackAddress.js';
 
 import { loadSettings } from '../settings/_shared.js';
-import { userExtension } from '../users/_extensions.js';
+import { requireUserExtension } from '../users/_extensions.js';
 import { liveUser } from '../users/_shared.js';
 import type { DeviceRow } from './_shared.js';
 
@@ -54,7 +54,7 @@ export async function connectionSettings(
   password: string
 ): Promise<ConnectionSettings> {
   const user = await liveUser(db, device.userId);
-  const extension = await userExtension(db, device.userId);
+  const extension = await requireUserExtension(db, user, 'devices');
   const settings = await loadSettings(db);
   const fqdn = env.FQDN;
   const tls = device.transport === 'tls';

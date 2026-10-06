@@ -22,7 +22,7 @@ describe('catalogLines', () => {
     expect(registry.size).toBeGreaterThan(0);
     expect(registry.has('users.create')).toBe(true);
     expect(catalogLines()).toContain(
-      '| `users.create` | `POST /api/v1/users` | Creates a user, assigns their extension and returns a setup link. | admin | no |'
+      '| `users.create` | `POST /api/v1/users` | Creates a user, with an e-mail, an extension or both, and returns a setup link for one with an e-mail. | admin | no |'
     );
   });
 

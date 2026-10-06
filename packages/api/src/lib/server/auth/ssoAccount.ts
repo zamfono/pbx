@@ -46,8 +46,10 @@ export async function matchSsoAccount(
   return db.transaction().execute(async trx => {
     const bySub = await trx
       .selectFrom('users')
-      .select(['id', 'role', 'passwordHash'])
+      .select(['id', 'role', 'email', 'passwordHash'])
       .where('ssoSubject', '=', sub)
+      // A user without an e-mail has no login (§5.2); losing it clears the binding too.
+      .where('email', 'is not', null)
       .where('deletedAt', 'is', null)
       .executeTakeFirst();
     if (bySub) {
@@ -61,7 +63,7 @@ export async function matchSsoAccount(
     }
     const unbound = await trx
       .selectFrom('users')
-      .select(['id', 'role', 'passwordHash'])
+      .select(['id', 'role', 'email', 'passwordHash'])
       .where('email', '=', email)
       .where('ssoSubject', 'is', null)
       .where('deletedAt', 'is', null)

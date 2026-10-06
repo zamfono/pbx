@@ -25,9 +25,13 @@ import { userExtension } from './_extensions.js';
 /** A `users` row as Kysely's `CamelCasePlugin` maps it (§11.2). */
 export type UserRow = Selectable<DB['users']>;
 
-/** The user extension's meaning (§11.2 `users`), required on create and optional on update. */
+/** The user extension's meaning (§11.2 `extensions`). */
 export const EXTENSION_DESCRIPTION =
-  "The internal number colleagues dial, digits of the tenant's fixed extension length.";
+  "The internal number colleagues dial, digits of the tenant's fixed extension length; null for none: no devices, no ring groups, not dialable. A user has an e-mail, an extension or both.";
+
+/** The user e-mail's meaning (§5.2, §11.2 `users`). */
+export const EMAIL_DESCRIPTION =
+  'Where the set-password link and mail go, and the login; null for none: a phone-only user, role user, who cannot log in. A user has an e-mail, an extension or both.';
 
 /** The call-handling fields `users.create` and `users.update` share, each optional (§11.2 `users`). */
 export const userCallFields = {
@@ -73,9 +77,9 @@ export const userCallFields = {
 export const userOut = z.object({
   id: z.string(),
   name: z.string(),
-  email: z.string(),
+  email: z.string().nullable().describe(EMAIL_DESCRIPTION),
   role: z.enum(USER_ROLES),
-  extension: z.string(),
+  extension: z.string().nullable().describe(EXTENSION_DESCRIPTION),
   ringTimeoutS: z.number(),
   dnd: z.boolean(),
   findMe: findMeSchema,
@@ -119,7 +123,7 @@ export async function toUserOut(db: Db, row: UserRow): Promise<UserOut> {
     mailboxAudioId: row.mailboxAudioId,
     mailboxMaxMessages: row.mailboxMaxMessages,
     ...logLevelWire(row),
-    lockedUntil: accountLockedUntil(row.email),
+    lockedUntil: row.email === null ? null : accountLockedUntil(row.email),
     createdAt: row.createdAt
   };
 }

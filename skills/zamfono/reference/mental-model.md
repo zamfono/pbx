@@ -5,9 +5,11 @@ that single tenant; there is no cross-tenant sharing.
 
 ## Entities
 
-- **User** — a person with an extension, a role (`owner`, `admin` or `user`) and zero or more
-  **devices**. Each device is one SIP registration (a softphone or a desk phone). A user's
-  extension is shared by all their devices; only the device slug differs.
+- **User** — a person with an e-mail, an extension or both, a role (`owner`, `admin` or `user`)
+  and zero or more **devices**. Each device is one SIP registration (a softphone or a desk phone).
+  A user's extension is shared by all their devices; only the device slug differs. Without an
+  extension a user has no devices and is in no ring group; without an e-mail, a phone-only
+  `user`, they cannot log in.
 - **Trunk** — a connection to a PSTN or SIP provider. Trunks carry the tenant's inbound and
   outbound calls and are tried in a configured order; only those flagged `emergency` carry
   emergency calls. A trunk with `transport` `tls` checks its provider's certificate

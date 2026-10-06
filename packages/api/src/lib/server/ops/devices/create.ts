@@ -18,7 +18,7 @@ import { recordChange } from '../audit.js';
 import { ownActingUser } from '../gates.js';
 import { propagate } from '../propagate.js';
 import { defineOperation, OpError } from '../types.js';
-import { userExtension } from '../users/_extensions.js';
+import { requireUserExtension } from '../users/_extensions.js';
 import { liveUser } from '../users/_shared.js';
 import {
   connectionSettings,
@@ -87,7 +87,11 @@ export const create = defineOperation({
   entity: (_input, out: Output) => ({ kind: 'device', id: out.device.id }),
   run: async (ctx, input) => {
     const transport = input.transport ?? 'tls';
-    await liveUser(ctx.db, input.userId);
+    const ext = await requireUserExtension(
+      ctx.db,
+      await liveUser(ctx.db, input.userId),
+      'devices'
+    );
     assertKindTransport(input.kind, transport);
     if (transport === 'plain') {
       assertPlainTransportEnabled();
@@ -102,7 +106,6 @@ export const create = defineOperation({
     if (input.kind === 'ringotel') {
       await assertNoExistingRingotelDevice(ctx.db, input.userId);
     }
-    const ext = await userExtension(ctx.db, input.userId);
     const username = await uniqueSipUsername(ctx.db, ext);
     const password = newSipPassword();
     const id = newId();

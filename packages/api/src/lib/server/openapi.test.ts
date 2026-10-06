@@ -69,7 +69,8 @@ describe('the OpenAPI request bodies describe the REST contract (§10.3)', () =>
 
     const usersCreate = bodySchema('/users', 'post');
     expect(usersCreate.properties).not.toHaveProperty('confirm');
-    expect(usersCreate.required).toContain('email');
+    // A user has an e-mail, an extension or both (§11.2), so neither is required alone.
+    expect(usersCreate.required).toEqual(['name']);
   });
 });
 

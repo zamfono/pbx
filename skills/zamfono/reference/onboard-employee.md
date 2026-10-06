@@ -8,15 +8,15 @@ arguments:
     description: The employee's e-mail address, for the set-password link
     required: true
   - name: extension
-    description: A specific extension to assign; omit to let the tenant assign the next free one
+    description: The extension to assign, which their devices need; omit for an employee without a phone
     required: false
 ---
 
 # Onboard an employee
 
-1. Create the user: `users.create` (`POST /api/v1/users`) with `name`, `email` and, optionally,
-   `extension`. The response carries a one-time set-password link; with no mail relay configured,
-   pass that link on to the employee yourself.
+1. Create the user: `users.create` (`POST /api/v1/users`) with `name`, `email` and `extension`;
+   without an extension a user has no devices, so skip step 2. The response carries a one-time
+   set-password link; with no mail relay configured, pass that link on to the employee yourself.
 2. Create their first device: `devices.create` (`POST /api/v1/users/{id}/devices`).
    - With the `manual` provisioning provider, the response carries the device's `connectionSettings`
      (server, transport and port, SIP username and password, and the rest a phone asks for) once —

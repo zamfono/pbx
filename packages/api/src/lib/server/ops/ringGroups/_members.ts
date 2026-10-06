@@ -7,6 +7,8 @@ import {
   memberSchema,
   type MemberSpec
 } from '../members.js';
+import { requireUserExtension } from '../users/_extensions.js';
+import { liveUser } from '../users/_shared.js';
 
 /** A ring group's member as a read returns it: the member and its place in the ring order. */
 export const ringGroupMemberOut = memberSchema.extend({ position: z.number() });
@@ -78,6 +80,13 @@ export async function replaceMembers(
   members: MemberSpec[]
 ): Promise<void> {
   await assertMembersValid(db, members, 'ringGroups');
+  await Promise.all(
+    members
+      .filter(member => member.kind === 'user')
+      .map(async member =>
+        requireUserExtension(db, await liveUser(db, member.id), 'ringGroups')
+      )
+  );
   const merged = [...members];
   const parked = (await loadMemberRows(db, groupId)).filter(
     row => !isLive(row)

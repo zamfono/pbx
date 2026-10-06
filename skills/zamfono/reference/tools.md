@@ -115,7 +115,7 @@
 | `userGroups.list` | `GET /api/v1/userGroups` | Lists the tenant's live user groups. | admin | no |
 | `userGroups.update` | `PATCH /api/v1/userGroups/{id}` | Updates a user group's name and nested membership. | admin | no |
 | `users.clearVoicemailGreeting` | `DELETE /api/v1/users/{id}/voicemailGreeting` | Removes a user's personal voicemail greeting; callers hear the default prompt in the tenant language again. | user | yes |
-| `users.create` | `POST /api/v1/users` | Creates a user, assigns their extension and returns a setup link. | admin | no |
+| `users.create` | `POST /api/v1/users` | Creates a user, with an e-mail, an extension or both, and returns a setup link for one with an e-mail. | admin | no |
 | `users.delete` | `DELETE /api/v1/users/{id}` | Soft-deletes a user, cascading their devices, extension and sessions. | admin | yes |
 | `users.erase` | `POST /api/v1/users/{id}/erase` | Erases a user's personal data from their audit trail (GDPR, irreversible). | owner | yes |
 | `users.get` | `GET /api/v1/users/{id}` | Reads one live user by id. | user | no |

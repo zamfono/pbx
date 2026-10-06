@@ -11,6 +11,10 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+### Upgrade notes
+
+- API and MCP clients: a user's `email` and `extension` can now be `null`, and so can `setupLink` in the `POST /users` response.
+
 ### Added
 
 - `*5` to an own DID whose external forward target records is recorded too.
@@ -18,6 +22,7 @@ why the specified behaviour changed; the commit history, how.
 
 ### Changed
 
+- A user needs an e-mail, an extension or both: a user without an extension has no devices or ring groups, one without an e-mail is a phone-only user who cannot log in.
 - An owner can create an owner, and promote an SSO-only user to owner; either gets a set-password link and cannot log in until they have set it.
 - Trunk calls name the stack's FQDN, not its IP address, as the host in `From`, `P-Asserted-Identity` and `Diversion` (except on `pai` trunks).
 - A trunk username takes only SIP URI user characters; a trunk whose stored username has any other is left out of the config and shows in `config:render`.

@@ -90,6 +90,21 @@ describe('authenticateToken', () => {
     expect(await authenticateToken(deps, await tokenFor('owner'))).toBeNull();
   });
 
+  it('refuses a token for a user without an e-mail, who cannot log in (§5.2)', async () => {
+    const deps = await depsWith(async db => {
+      await db
+        .insertInto('extensions')
+        .values({ ext: '101', userId: 'owner' })
+        .execute();
+      await db
+        .updateTable('users')
+        .set({ role: 'user', email: null })
+        .where('id', '=', 'owner')
+        .execute();
+    });
+    expect(await authenticateToken(deps, await tokenFor('owner'))).toBeNull();
+  });
+
   it('refuses a token whose session ended since it was issued (§5.2)', async () => {
     const deps = await depsWith();
     const token = await tokenFor('owner');

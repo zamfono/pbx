@@ -273,6 +273,37 @@ describe('sendMail', () => {
     expect(result).toBe('skipped');
   });
 
+  it('skips a user without an e-mail (§11.2)', async () => {
+    const db = await migratedTestDb();
+    await insertSettings(db, { smtpHost: 'smtp.example.test' });
+    await db
+      .insertInto('users')
+      .values({ id: 'u1', name: 'Lobby', createdAt: nowIso() })
+      .execute();
+    await db
+      .insertInto('extensions')
+      .values({ ext: '101', userId: 'u1' })
+      .execute();
+    const { transport, sent } = fakeTransport();
+    const result = await sendMail(
+      db,
+      testKeyring(),
+      {
+        kind: 'missedCall',
+        to: { userId: 'u1' },
+        values: {
+          callerNumber: '+491111111',
+          callerName: 'Alice',
+          receivedAt: '2026-06-15T12:00:00.000Z',
+          didLabel: 'Main line'
+        }
+      },
+      { transport }
+    );
+    expect(result).toBe('skipped');
+    expect(sent).toEqual([]);
+  });
+
   it('renders a non-empty fqdn from FQDN', async () => {
     vi.stubEnv('FQDN', 'pbx.example.test');
     const db = await migratedTestDb();

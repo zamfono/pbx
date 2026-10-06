@@ -5,7 +5,7 @@ import { migrateForTest, MIGRATIONS_DIR } from './testDb.js';
 
 test('migrates and enforces the schema', async () => {
   const db = openDb(':memory:');
-  expect(await pendingMigrations(db, MIGRATIONS_DIR)).toHaveLength(5);
+  expect(await pendingMigrations(db, MIGRATIONS_DIR)).toHaveLength(6);
   await migrateForTest(db);
   expect(await pendingMigrations(db, MIGRATIONS_DIR)).toEqual([]);
 
@@ -62,6 +62,32 @@ test('migrates and enforces the schema', async () => {
       })
       .execute()
   ).resolves.toBeDefined();
+
+  // a user needs an e-mail or an extension; an owner or admin needs an e-mail (§11.2)
+  await expect(
+    db
+      .insertInto('users')
+      .values({ id: 'a1', name: 'A', role: 'admin', createdAt: 't' })
+      .execute()
+  ).rejects.toThrow(/CHECK constraint failed: users_staff_email/u);
+  await db
+    .insertInto('users')
+    .values({ id: 'p1', name: 'Lobby phone', createdAt: 't' })
+    .execute();
+  await db
+    .insertInto('extensions')
+    .values({ ext: '101', userId: 'p1' })
+    .execute();
+  await expect(
+    db.deleteFrom('extensions').where('ext', '=', '101').execute()
+  ).rejects.toThrow(/a user needs an e-mail or an extension/u);
+  await expect(
+    db
+      .updateTable('users')
+      .set({ email: null })
+      .where('id', '=', 'u2')
+      .execute()
+  ).rejects.toThrow(/a user needs an e-mail or an extension/u);
 
   // trigger: nesting cycle
   await db

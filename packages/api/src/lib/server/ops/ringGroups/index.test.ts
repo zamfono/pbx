@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { newId, nowIso } from '@zamfono/shared';
+import { newId, nowIso, type Db } from '@zamfono/shared';
 import { seedSettings } from '@zamfono/shared/testDb.js';
 
 import { propagateConfig } from '#lib/server/propagation.js';
@@ -10,6 +10,17 @@ import { runOperation } from '../runner.js';
 import { Conflict } from '../types.js';
 
 import './index.js';
+
+/** A test database whose seeded owner has extension 100, as a ring-group member needs (§11.2). */
+async function dbWithOwnerExtension(): Promise<Db> {
+  const db = await makeTestDb();
+  await seedSettings(db);
+  await db
+    .insertInto('extensions')
+    .values({ ext: '100', userId: 'owner' })
+    .execute();
+  return db;
+}
 
 describe('ringGroups', () => {
   it('create assigns the lowest free extension and propagates pjsip and dialplan', async () => {
@@ -95,8 +106,7 @@ describe('ringGroups', () => {
   });
 
   it('update replaces members as a whole and propagates pjsip', async () => {
-    const db = await makeTestDb();
-    await seedSettings(db);
+    const db = await dbWithOwnerExtension();
     const group = (await runOperation(
       db,
       'ringGroups.create',
@@ -124,8 +134,7 @@ describe('ringGroups', () => {
   });
 
   it('update of a routing field alone tells core, without an Asterisk reload (§3.1, §7)', async () => {
-    const db = await makeTestDb();
-    await seedSettings(db);
+    const db = await dbWithOwnerExtension();
     const group = (await runOperation(
       db,
       'ringGroups.create',
@@ -147,8 +156,7 @@ describe('ringGroups', () => {
   });
 
   it('reads without a since-soft-deleted member and updates unchanged without a 404', async () => {
-    const db = await makeTestDb();
-    await seedSettings(db);
+    const db = await dbWithOwnerExtension();
     const memberId = newId();
     await db
       .insertInto('users')
@@ -160,6 +168,10 @@ describe('ringGroups', () => {
         passwordHash: 'x',
         createdAt: nowIso()
       })
+      .execute();
+    await db
+      .insertInto('extensions')
+      .values({ ext: '102', userId: memberId })
       .execute();
     const group = (await runOperation(
       db,

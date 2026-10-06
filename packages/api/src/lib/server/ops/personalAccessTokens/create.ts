@@ -67,7 +67,7 @@ export const create = defineOperation({
     if (!mayLogIn(await liveUser(ctx.db, input.userId))) {
       throw new OpError(
         HTTP_CONFLICT,
-        'personalAccessTokens: this owner has not set a password yet and cannot log in'
+        'personalAccessTokens: this user cannot log in: one without an e-mail never can, an owner only once they have set a password'
       );
     }
     const expiresAt =

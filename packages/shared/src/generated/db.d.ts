@@ -499,7 +499,7 @@ export interface Users {
   createdAt: string;
   deletedAt: string | null;
   dnd: Generated<number>;
-  email: string;
+  email: string | null;
   findMeJson: string | null;
   id: string;
   logLevel: LogLevelOverride | null;

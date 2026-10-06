@@ -16,6 +16,7 @@ import {
   extensionOfUser,
   loadAllLiveExtensions,
   resolveIds,
+  ringotelEmail,
   ringotelSipUsername,
   type RemoteUser
 } from './ringotelRoster.js';
@@ -101,7 +102,7 @@ async function pushRosterExtensions(
       orgid: orgId,
       id: remote.id,
       name: user.name,
-      email: user.email,
+      email: ringotelEmail(user.email),
       extension: ext,
       ...(sipUsername === null
         ? {}

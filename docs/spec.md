@@ -168,7 +168,7 @@ SSO rules:
 - An e-mail that matches no active user is refused. Accounts are created by admins, never by SSO.
 - Each stack's `https://<fqdn>/oauth/callback` must be listed on the shared app registration. Microsoft allows 256 redirect URIs on a work-and-school-accounts registration; Google's console enforces a cap its documentation does not state, around 100 as observed; the registration is part of onboarding a stack.
 - With `settings.sso_allowed_domain` set, an SSO login whose e-mail domain differs is refused before the user lookup, and for `google` so is one whose `hd` differs, so a private Google account on a company address is refused; NULL accepts any domain the provider vouches for.
-- Users may be SSO-only (`password_hash NULL`). Every owner who can log in has a local password, as break-glass against identity-provider outages: an owner without one, created by an owner or promoted from SSO-only, cannot log in at all (no password login, SSO login, refresh-token rotation or personal access token) until they set it through their set-password link, and the SSO callback shows them the error page saying so. Promoting an SSO-only user to owner revokes their sessions and personal access tokens in the same transaction and returns that link, as `POST /users/{id}/resetPassword` does.
+- Users may be SSO-only (`password_hash NULL`). Every owner who can log in has a local password, as break-glass against identity-provider outages: an owner without one, created by an owner or promoted from SSO-only, cannot log in at all (no password login, SSO login, refresh-token rotation or personal access token) until they set it through their set-password link, and the SSO callback shows them the error page saying so. Promoting an SSO-only user to owner revokes their sessions and personal access tokens in the same transaction and returns that link, as `POST /users/{id}/resetPassword` does. A user without an e-mail (§11.2) has no login of any kind: no set-password link, password, SSO login or personal access token.
 - The `sso_*` settings are owner-only (§11.4): whoever controls the issuer decides who logs in as whom, since the first login after a provider change binds by e-mail.
 
 **Authentication pages.** The browser-served surface of the MVP: five SvelteKit pages inside `api`, server-rendered in `settings.language`, in one design that carries `settings.company_name` as its title.
@@ -776,7 +776,7 @@ handle /metrics/litestream {
 
 **First boot.** On its first start against a freshly migrated, empty database, `api` seeds it from `.env`:
 
-- the owner, from `BOOTSTRAP_OWNER_EMAIL`, `BOOTSTRAP_OWNER_NAME` and `BOOTSTRAP_OWNER_PASSWORD_HASH`. The hash is an Argon2id PHC string stored verbatim as `users.password_hash`; the `api` image ships a one-line generator for it. The owner's extension is the highest of the tenant's extension length less one — 98, 998, 9998 — since every live user owns exactly one `extensions` row (§11.2). All nines stays free because `999` is the emergency number in several countries (§9.4 "Emergency calls"), and no internal extension may shadow one;
+- the owner, from `BOOTSTRAP_OWNER_EMAIL`, `BOOTSTRAP_OWNER_NAME` and `BOOTSTRAP_OWNER_PASSWORD_HASH`. The hash is an Argon2id PHC string stored verbatim as `users.password_hash`; the `api` image ships a one-line generator for it. The owner gets an extension too, the highest of the tenant's extension length less one — 98, 998, 9998 — so they have both an e-mail and an extension (§11.2). All nines stays free because `999` is the emergency number in several countries (§9.4 "Emergency calls"), and no internal extension may shadow one;
 - the main number: a `dids` row for `MAIN_DID` whose target is the owner, referenced by `settings.main_did_id` (§11.4); the owner retargets it to a menu or ring group later like any other DID;
 - the `settings` row, from `COMPANY_NAME`, `COUNTRY`, `EXT_LENGTH`, and the mail relay `SMTP_*` with `MAIL_FROM` (§11.4). `MAIL_FROM` is required whenever `SMTP_HOST` is set and is validated at boot; a missing or malformed value stops `api` with an error before it serves a request. `emergency_numbers_json` comes from the per-country table shipped in the `api` image (JSON keyed by ISO 3166-1 alpha-2); a country without an entry gets `["112"]` and a `WARN` log line, and the owner completes the list through `PATCH /settings`;
 - nine parking slots as `extensions` rows with `is_parking_slot` set (§10.2), numbered `7` followed by zeros and the digits 1 to 9 at the tenant's extension length: 71 to 79 for two digits, 701 to 709 for three, 7001 to 7009 for four; the length's floor of 2 (§11.4) is what leaves room for them;
@@ -931,7 +931,7 @@ Clients are third-party classic SIP softphones such as Ringotel; desk phones are
 
 **One endpoint per device.** A user may have several devices, and each is its own PJSIP endpoint. An inbound call to the user rings all registered devices of that user; the core dials them in parallel. A device registered several times (a Ringotel app on desktop and mobile, §10.4) rings on each reachable contact, as a leg of that device's: the core reads the contacts over AMI (`PJSIPShowEndpoint`) and dials each at `PJSIP/<endpoint>/<contact URI>`, since `PJSIP/<endpoint>` alone reaches only one.
 
-**Naming.** Endpoints are named `e<ext>-d<slug>`, for example `e101-d3kx7`; the slug is a short random identifier generated once per device. A user has exactly one extension (§11.2), so all their devices share the `e<ext>` part and differ only by slug. SIP passwords are 24 random characters generated by the application. Changing a user's extension renames their endpoints: the configuration is regenerated and reloaded, the provisioning provider re-pushes the new names (§10.4), and `manual` devices must be updated by hand. The `PATCH /users/{id}` response and the audit entry list the affected devices.
+**Naming.** Endpoints are named `e<ext>-d<slug>`, for example `e101-d3kx7`; the slug is a short random identifier generated once per device. A user has at most one extension, and only a user with one has devices (§11.2), so all their devices share the `e<ext>` part and differ only by slug. SIP passwords are 24 random characters generated by the application. Changing a user's extension renames their endpoints: the configuration is regenerated and reloaded, the provisioning provider re-pushes the new names (§10.4), and `manual` devices must be updated by hand. The `PATCH /users/{id}` response and the audit entry list the affected devices.
 
 **Transport policy.** The policy is declared per device in `devices.transport`:
 
@@ -1372,7 +1372,7 @@ The endpoints by area, as a sketch, each with the minimum role it needs:
 
 **Confirmation** — every `DELETE`, `POST /users/{id}/erase`, `POST /devices/{id}/rotate`, `POST /personalAccessTokens/{id}/revoke`, `POST /provisioning/ringotel/adopt` and `POST /system/update` require `confirm: true` in the body and answer 409 with the question text without it (§10.3, "Confirmation")
 
-**Users** (min. role: admin (self-service subset for `user`)) — `GET/POST /users` (`POST` returns the one-time set-password link, mailed too with a relay), `GET/PATCH/DELETE /users/{id}` (`DELETE` answers 409 with the blocking references, §5.9; a `PATCH` promoting a user without a password to owner returns the same link, §5.2), `POST /users/{id}/resetPassword` (same link semantics), `POST /users/{id}/erase` (owners only, §5.10), `GET /users/{id}/forwarding` (the rules, in the shape the `PUT` takes, `sip` targets with their `headers`), `PUT /users/{id}/forwarding` (the rules replaced as a whole), `PUT /users/{id}/presence` (dnd; outside the audit log, §5.7), `PUT/DELETE /users/{id}/voicemailGreeting` (the personal greeting, a WAV or MP3 upload; outside the audit log, §5.7). Self-service, on the user's own id alone (403 for another's): `GET /users/{id}`, `GET /users/{id}/forwarding`, `PUT /users/{id}/forwarding` (a new or changed `sip` target excepted, Forward targets), `PUT /users/{id}/presence`, `PUT/DELETE /users/{id}/voicemailGreeting` and the `PATCH` fields `clir`, `rejectAnonymous`, `ringTimeoutS`, `notifyMissedCalls`, `findMe`; `callerIdDidId` is admin-set (§9.4)
+**Users** (min. role: admin (self-service subset for `user`)) — `GET/POST /users` (`POST` takes an `email`, an `extension` or both, an owner or admin always an `email`, and returns the one-time set-password link, mailed too with a relay, `null` without an e-mail; reads return `null` for the one absent; a `PATCH` setting `extension` to `null` answers 409 while the user has devices or ring-group memberships or no e-mail, one setting `email` to `null` answers 409 for an owner or admin or a user without an extension, §11.2), `GET/PATCH/DELETE /users/{id}` (`DELETE` answers 409 with the blocking references, §5.9; a `PATCH` promoting a user without a password to owner returns the same link, §5.2), `POST /users/{id}/resetPassword` (same link semantics), `POST /users/{id}/erase` (owners only, §5.10), `GET /users/{id}/forwarding` (the rules, in the shape the `PUT` takes, `sip` targets with their `headers`), `PUT /users/{id}/forwarding` (the rules replaced as a whole), `PUT /users/{id}/presence` (dnd; outside the audit log, §5.7), `PUT/DELETE /users/{id}/voicemailGreeting` (the personal greeting, a WAV or MP3 upload; outside the audit log, §5.7). Self-service, on the user's own id alone (403 for another's): `GET /users/{id}`, `GET /users/{id}/forwarding`, `PUT /users/{id}/forwarding` (a new or changed `sip` target excepted, Forward targets), `PUT /users/{id}/presence`, `PUT/DELETE /users/{id}/voicemailGreeting` and the `PATCH` fields `clir`, `rejectAnonymous`, `ringTimeoutS`, `notifyMissedCalls`, `findMe`; `callerIdDidId` is admin-set (§9.4)
 
 **Personal access tokens** (min. role: user (own) / admin; an owner's owner-only) — `GET/POST /users/{id}/personalAccessTokens` (`POST` takes `name` and an optional `expiresAt` and returns the token once; `GET` lists the user's tokens, never their values, with `createdBy`, `createdAt`, `expiresAt`, `lastUsedAt` and `revokedAt`), `POST /personalAccessTokens/{id}/revoke` (§5.2)
 
@@ -1495,7 +1495,7 @@ No STUN server or outbound proxy is needed: Asterisk handles NAT itself (§9.1).
 
 **User** — at most one Zamfono device of kind `ringotel` per user (`devices_one_ringotel_per_user`), since the Ringotel user already covers every app the person runs and Ringotel keeps extensions unique per organization; `onDeviceCreated` calls `createUser` (parameters under "`createUser` parameters"), an extension change, a change of the person's name or e-mail address, or a password rotation (§5.2) pushes the new values via `updateUser` (§9.3); a device whose Ringotel user is missing when a push needs it gets the user `onDeviceCreated` would give it, recovered within the 24 hours after a deletion as an undo's is (Configuration and lifecycle)
 
-**`createUser` parameters.** `extension` = the user's extension; `username` and `authname` = the SIP username `e<ext>-d<slug>`; `password` = the generated SIP password; display name and e-mail; `status: 1`, since Ringotel sends the onboarding mail only for activated users.
+**`createUser` parameters.** `extension` = the user's extension; `username` and `authname` = the SIP username `e<ext>-d<slug>`; `password` = the generated SIP password; display name and e-mail, `''` for a user without one, so Ringotel mails nothing; `status: 1`, since Ringotel sends the onboarding mail only for activated users.
 
 **When a device reaches Ringotel.** An activated user registers against the stack with its SIP credentials before Ringotel accepts it, and Asterisk holds a device only once its write has committed and propagated (§3.1). So `onDeviceCreated`, `onCredentialsRotated` and `onDeviceBlfChanged` run after that propagation, outside the operation's transaction, never inside it. The device's write stands whatever Ringotel answers: a refusal becomes a `warnings` entry of the operation's result naming Ringotel's reason, and `POST /devices/{id}/rotate` pushes the device again (a BLF panel: `PUT /devices/{id}/blf` again). A stack without a Ringotel setup pushes nothing and says so in a `warnings` entry too; setup and adoption provision such a device once they committed and propagated, where a refusal is a `warnings` entry of theirs too and never fails them, so a setup or adoption that rolls back has created no Ringotel user. An undo that restores a `ringotel` device, or its user, pushes it the same way, after the undo propagated. Device pushes run one at a time, each sending the device as the database holds it when its turn comes, so Ringotel ends up with the last committed write whatever order the requests would have reached it in; a device deleted by then is not pushed (`skipped`). Each of these pushes appends an `audit_log` entry of its own (§5.7), operation `ringotel.push` on the device, attributed to the caller of the operation it follows, with `outcome` (`pushed`, `refused`, `skipped`), `trigger` (the operation: `devices.create`, `devices.rotate`, `devices.setBlf`, `audit.undo`, `provisioning.ringotelSetup` or `provisioning.ringotelAdopt`, or `api.start` for the push of every device after a restart that dropped the pushes waiting for an owed propagation, §3.1, attributed to the job) and either `ringotelUserId` or `reason` as its changes, so what Ringotel answered outlives the result and the logs. Ringotel reports some refusals inside an HTTP 200 `result` (`{"error": …, "status": -1}`); those count as refusals as much as a top-level `error`. An operation that calls Ringotel before it commits (setup, adoption, `provisioning.ringotelOptions`, `devices.delete`, and `users.delete` or `users.erase` of a user with a `ringotel` device) makes those calls before its transaction opens, so no write lock waits on Ringotel, and checks again in the transaction what a concurrent write could have changed since (a stack set up meanwhile refuses with 409, and the organization or connection the losing call created is deleted again; a profile or roster changed meanwhile leaves both pending). A deletion's Ringotel call takes the device pushes' turn and keeps it until its write is in the transaction, so no push re-creates the user; a deletion that does not commit pushes the device's stored credentials again, so a device that stays live keeps its Ringotel user. It gives its caller a refusal as a 502 carrying Ringotel's message; every push that runs after the commit makes it a `warnings` entry instead.
 
@@ -1625,7 +1625,14 @@ WAL mode, `foreign_keys=ON`, write ownership split per §3.1 (`api` = config tab
 -- ── config tables (primary writer: api) ─────────────────────────────────────
 
 -- users — one row per person; at least one live 'owner' with a password (app-enforced: the last
--- one cannot be demoted or soft-deleted, §5.9, §10.3).
+-- one cannot be demoted or soft-deleted, §5.9, §10.3). A live user has an e-mail, an extension
+-- (`extensions`) or both: the API refuses a user with neither, and two triggers refuse the write
+-- that would leave one (users_email_or_extension, the e-mail going while no extension row exists;
+-- extensions_user_email_or_extension, the extension row going while the e-mail is NULL).
+--   email:                  NULL = a phone-only user: role 'user' (CHECK), no login of any kind (§5.2);
+--                           removing it clears password_hash and sso_subject and revokes the user's
+--                           sessions, personal access tokens and set-password links in the same
+--                           transaction
 --   password_hash:          Argon2id; NULL = SSO-only; an owner without one cannot log in (§5.2)
 --   sso_subject:            OIDC `sub` at the tenant's provider, bound on first SSO login and cleared when
 --                           the tenant changes provider, issuer or Entra tenant id (§5.2)
@@ -1649,7 +1656,7 @@ WAL mode, `foreign_keys=ON`, write ownership split per §3.1 (`api` = config tab
 CREATE TABLE users (
   id                   TEXT    PRIMARY KEY,
   name                 TEXT    NOT NULL,
-  email                TEXT    COLLATE NOCASE NOT NULL UNIQUE,
+  email                TEXT    COLLATE NOCASE UNIQUE,
   role                 TEXT    NOT NULL DEFAULT 'user' CHECK (role IN ('owner','admin','user')),
   password_hash        TEXT,
   sso_subject          TEXT    UNIQUE,
@@ -1667,7 +1674,8 @@ CREATE TABLE users (
   log_level            TEXT    CHECK (log_level IN ('events','qos','sip')),
   log_level_expires_at TEXT,
   created_at           TEXT    NOT NULL,
-  deleted_at           TEXT
+  deleted_at           TEXT,
+  CHECK (email IS NOT NULL OR role = 'user')
 );
 
 -- devices — SIP endpoints; one row per softphone/desk phone of a user. At most one live 'ringotel'
@@ -1940,7 +1948,8 @@ CREATE TABLE user_group_groups (
 );
 
 -- extensions — the tenant's numbering space; the PK makes cross-entity conflicts unrepresentable.
--- Every live user and ring group has exactly one row (existence is API-enforced); parking slots
+-- Every live ring group has exactly one row, a live user at most one (existence is API-enforced);
+-- a user without one has no devices, is in no ring group and is not dialable; parking slots
 -- (§10.2) are rows of their own kind, so a slot can never collide with a person's extension. The row is
 -- deleted with its owner's soft delete, so the extension is free for reuse at once; undo
 -- re-inserts it or is refused when the extension has been taken (§5.8, §5.9). Hints (§9.3) and the

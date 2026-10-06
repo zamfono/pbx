@@ -22,13 +22,15 @@ export function setupLinkFor(token: string): string {
 }
 
 /**
- * Issues an existing user a one-time set-password link, valid as long as a setup link since an
- * admin hands it over (§5.2), and mails it in the `reset` template once the write has committed,
- * never after a rollback; not awaited, as `sendMail`'s retries run over minutes (§10.2 "Failure").
+ * Issues a user a one-time set-password link, valid 7 days since an admin may hand it over
+ * (§5.2), and mails it once the write has committed, never after a rollback; not awaited, as
+ * `sendMail`'s retries run over minutes (§10.2 "Failure"). `mail` is the template: `setup`
+ * invites a new user, naming who did, `reset` serves an existing one.
  */
 export async function issueSetPasswordLink(
   ctx: Context,
-  userId: string
+  userId: string,
+  mail: 'setup' | 'reset'
 ): Promise<string> {
   const { raw, expiresAt } = await issueResetToken(
     ctx.db,
@@ -39,9 +41,13 @@ export async function issueSetPasswordLink(
   const link = setupLinkFor(raw);
   afterCommit(ctx, db => {
     sendMail(db, keyringFromEnv(env), {
-      kind: 'reset',
+      kind: mail,
       to: { userId },
-      values: { link, linkExpiresAt: expiresAt }
+      values: {
+        link,
+        linkExpiresAt: expiresAt,
+        ...(mail === 'setup' ? { invitedBy: ctx.actor.name } : {})
+      }
     }).catch((error: unknown) => {
       logger.warn({ err: error }, 'set-password mail failed');
     });

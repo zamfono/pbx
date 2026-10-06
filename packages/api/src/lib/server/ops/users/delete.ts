@@ -25,7 +25,10 @@ export const deleteUser = defineOperation({
   confirm: async (ctx, input) => {
     const user = await liveUser(ctx.db, input.id);
     const ext = await userExtension(ctx.db, input.id);
-    return softDeleteQuestion(ctx, `${user.name} (extension ${ext})`);
+    return softDeleteQuestion(
+      ctx,
+      ext === null ? user.name : `${user.name} (extension ${ext})`
+    );
   },
   entity: input => ({ kind: 'user', id: input.id }),
   prepare: async (ctx, input) =>

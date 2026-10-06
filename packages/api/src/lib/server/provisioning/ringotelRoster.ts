@@ -17,6 +17,12 @@ export async function extensionOfUser(
   return row?.ext ?? null;
 }
 
+/** A user's e-mail as Ringotel takes it: `''`, its own value for none, for a user without one
+ *  (§11.2), so it mails no provisioning instructions. */
+export function ringotelEmail(email: string | null): string {
+  return email ?? '';
+}
+
 export async function userProfile(
   db: Db,
   userId: string
@@ -30,7 +36,7 @@ export async function userProfile(
   if (ext === null) {
     throw new Error(`ringotel: user ${userId} has no extension`);
   }
-  return { name: user.name, email: user.email, ext };
+  return { name: user.name, email: ringotelEmail(user.email), ext };
 }
 
 /**

@@ -177,6 +177,29 @@ describe('createRingotelProvider', () => {
     ]);
   });
 
+  it("onDeviceCreated gives a user without an e-mail Ringotel's empty address (§11.2)", async () => {
+    const db = await makeTestDb();
+    const { userId } = await seed(db);
+    await db
+      .updateTable('users')
+      .set({ email: null })
+      .where('id', '=', userId)
+      .execute();
+    const device = await seedDevice(db, userId);
+    const { client, calls } = fakeClient();
+    const provider = createRingotelProvider({ client, db, now: () => NOW });
+
+    await provider.onDeviceCreated(device, {
+      username: 'e101-abcde',
+      password: 'p@ss1'
+    });
+
+    expect(calls[0]).toMatchObject({
+      method: 'createUser',
+      params: { email: '', extension: '101' }
+    });
+  });
+
   it('onCredentialsRotated resolves the Ringotel id via getUsers, then updateUser', async () => {
     const db = await makeTestDb();
     const { userId } = await seed(db);

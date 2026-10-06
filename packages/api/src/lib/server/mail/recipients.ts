@@ -4,6 +4,7 @@ import { ringGroupMemberships } from '../ringGroupMembership.js';
 
 export type Recipients = { emails: string[]; name: string };
 
+/** The addresses mail to `to` goes to; a user without an e-mail (§11.2) is none of them. */
 export async function resolveRecipients(
   db: Db,
   to: MailboxOwner
@@ -13,7 +14,9 @@ export async function resolveRecipients(
       .selectFrom('users')
       .select(['email', 'name'])
       .where('id', '=', to.userId)
+      .where('email', 'is not', null)
       .where('deletedAt', 'is', null)
+      .$narrowType<{ email: string }>()
       .executeTakeFirst();
     return user
       ? { emails: [user.email], name: user.name }
@@ -35,7 +38,9 @@ export async function resolveRecipients(
     .selectFrom('users')
     .select('email')
     .where('id', 'in', userIds)
+    .where('email', 'is not', null)
     .where('deletedAt', 'is', null)
+    .$narrowType<{ email: string }>()
     .execute();
   return { emails: users.map(user => user.email), name: group?.name ?? '' };
 }

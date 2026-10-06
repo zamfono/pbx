@@ -84,7 +84,7 @@ export async function cascadeSoftDeleteUser(
   const ext = await userExtension(ctx.db, userId);
   const [devices, droppedBlfKeys] = await Promise.all([
     loadLiveDevices(ctx.db, userId),
-    loadDroppedBlfKeys(ctx, ext)
+    ext === null ? [] : loadDroppedBlfKeys(ctx, ext)
   ]);
   await softDelete(ctx, 'users', userId);
   await ctx.db
@@ -99,7 +99,9 @@ export async function cascadeSoftDeleteUser(
   await revokeUserPersonalAccessTokens(ctx.db, userId, ctx.now);
   // Recorded under `ext`, the field name `audit.undo` special-cases to re-insert the dropped
   // `extensions` row (§5.9); `users.update`'s own rename field is `extension` (§10.3).
-  recordChange(ctx, { field: 'ext', from: ext, to: null });
+  if (ext !== null) {
+    recordChange(ctx, { field: 'ext', from: ext, to: null });
+  }
   if (devices.length > 0) {
     recordChange(ctx, {
       field: 'devices',

@@ -48,7 +48,7 @@ export async function assertRoleChangeAllowed(
 export function assertEmailChangeAllowed(
   ctx: Context,
   before: UserRow,
-  input: { email?: string }
+  input: { email?: string | null }
 ): void {
   if (
     input.email !== undefined &&
