@@ -124,6 +124,45 @@ describe('renderTrunksConf escaping', () => {
   );
 });
 
+describe('renderTrunksConf username', () => {
+  test('a username of every SIP URI user character class reads back whole, in auth and in client_uri', () => {
+    const username = "a-b_c.d!e~f*g'h(i)j&k=l+m$n,o;p?q/r%40";
+    const conf = renderTrunk({ ...registrationTrunk, username });
+    expect(configValues(conf, 'username')).toEqual([username]);
+    expect(configValues(conf, 'client_uri')).toEqual([
+      `sip:${username}@sip.provider-a.example`
+    ]);
+  });
+
+  test.each(['a<b', 'a"b', 'a#b', 'a:b', 'a%b', 'a b'])(
+    'a stored username %j, no SIP URI user character, leaves its trunk out',
+    username => {
+      const { files, skipped } = render({
+        settings: {
+          codecs: ['alaw'],
+          ringotelMaxRegs: 3,
+          extLength: 3,
+          holdMohClass: 'default'
+        },
+        users: [],
+        devices: [],
+        ringGroups: [],
+        parkingSlots: [],
+        trunks: [
+          { ...registrationTrunk, username },
+          { ...registrationTrunk, id: 't2', name: 'Trunk B' }
+        ],
+        moh: []
+      });
+      expect(skipped).toEqual([
+        { type: 'trunk', id: 't1', field: 'trunk.username' }
+      ]);
+      expect(files['pjsip_trunks.conf']).not.toContain('[trunk-t1]');
+      expect(files['pjsip_trunks.conf']).toContain('[trunk-t2]');
+    }
+  );
+});
+
 describe('renderTrunksConf registration retries', () => {
   test('every failure, a 403 or a rejected challenge included, retries at register_retry_s, indefinitely', () => {
     const conf = renderTrunk({ ...registrationTrunk, registerRetryS: 45 });
@@ -220,6 +259,38 @@ describe('renderTrunksConf inbound_auth source restriction', () => {
       .split('\n\n')
       .filter(block => block.split('\n').includes('type = endpoint'))
       .map(block => block.split('\n')[0]);
+
+  test('an 80-byte username, too long for a section name, leaves its trunk out', () => {
+    const { files, skipped } = render({
+      settings: {
+        codecs: ['alaw'],
+        ringotelMaxRegs: 3,
+        extLength: 3,
+        holdMohClass: 'default'
+      },
+      users: [],
+      devices: [],
+      ringGroups: [],
+      parkingSlots: [],
+      trunks: [
+        { ...authTrunk, ...registrarOnly, username: 'a'.repeat(80) },
+        { ...authTrunk, ...registrarOnly, id: 't2', name: 'Trunk B' }
+      ],
+      moh: []
+    });
+    expect(skipped).toEqual([
+      { type: 'trunk', id: 't1', field: 'trunk.username' }
+    ]);
+    expect(files['pjsip_trunks.conf']).not.toContain('[trunk-t1]');
+    expect(files['pjsip_trunks.conf']).toContain('[trunkuser]');
+  });
+
+  test('a 79-byte username names its endpoint whole', () => {
+    const username = 'a'.repeat(79);
+    expect(endpointNames({ ...authTrunk, ...registrarOnly, username })).toEqual(
+      ['[trunk-t1]', `[${username}]`]
+    );
+  });
 
   test('with an inbound or both host, only the host-identified endpoint takes the credential', () => {
     for (const direction of ['both', 'inbound'] as const) {

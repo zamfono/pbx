@@ -11,6 +11,10 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+### Changed
+
+- A trunk username takes only SIP URI user characters; a trunk whose stored username has any other is left out of the config and shows in `config:render`.
+
 ## [0.3.2] - 2026-10-06
 
 ### Added

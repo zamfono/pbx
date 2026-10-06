@@ -10,6 +10,7 @@ import {
   type TrunkTransport
 } from '@zamfono/shared';
 
+import { MAX_SECTION_NAME_LENGTH } from '#lib/server/pjsip/shared.js';
 import { plainSipTransports } from '#lib/server/stackAddress.js';
 
 import { endpointNameHolder } from '../devices/_sipUsername.js';
@@ -132,8 +133,10 @@ export async function assertNameAvailable(
  * Throws when an `inbound_auth` trunk's `username` cannot name its own endpoint. Asterisk's
  * `identify_by = auth_username` looks the Authorization username up as an endpoint's name (§9.4
  * "Inbound identification"), so the trunk's inbound endpoint is a section named by the username:
- * 422 for a `;`, which a section header cannot carry, the `trunk-` prefix every trunk's own
- * endpoint uses, or `anonymous`, the endpoint that would match every unidentified request (§5.6); 409 when a live device or another live `inbound_auth` trunk already holds it.
+ * 422 for a `;`, which a section header cannot carry, more characters than a section name keeps
+ * (`MAX_SECTION_NAME_LENGTH`), the `trunk-` prefix every trunk's own endpoint uses, or
+ * `anonymous`, the endpoint that would match every unidentified request (§5.6); 409 when a live
+ * device or another live `inbound_auth` trunk already holds it.
  */
 export async function assertInboundAuthUsernameFree(
   db: Db,
@@ -142,6 +145,7 @@ export async function assertInboundAuthUsernameFree(
 ): Promise<void> {
   if (
     username.includes(';') ||
+    username.length > MAX_SECTION_NAME_LENGTH ||
     username.startsWith(TRUNK_SECTION_PREFIX) ||
     username === 'anonymous'
   ) {

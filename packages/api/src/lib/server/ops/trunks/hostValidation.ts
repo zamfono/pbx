@@ -6,10 +6,7 @@ import {
   type HostDirection
 } from '@zamfono/shared';
 
-import {
-  hasStrippedEnd,
-  isWholeConfigValue
-} from '#lib/server/pjsip/shared.js';
+import { isSipUriUser, isWholeConfigValue } from '#lib/server/pjsip/shared.js';
 
 import { OpError } from '../types.js';
 
@@ -116,22 +113,16 @@ export function assertValidOutboundProxy(
   }
 }
 
-// A CR/LF or a bracket could open a new PJSIP section, same as a host, and an `inbound_auth`
-// trunk's username is a section name itself; a bracket is no SIP URI user character either. An
-// '@' or whitespace would split `sip:<username>@<host>` (registrationUris in @zamfono/shared)
-// into more or fewer parts than the AMI Registry-event matching of §9.4 "Provisioning and status"
-// expects.
-const UNSAFE_USERNAME_PATTERN = /[\r\n[\]@\s]/u;
-
 /**
- * Throws 422 for a `username` that is not safe to interpolate into generated PJSIP config, or
- * into the `sip:<username>@<host>` registration URI (§9.4 "Provisioning and status").
+ * Throws 422 for a `username` that is no SIP URI user part (pjsip/shared.ts's `isSipUriUser`):
+ * the username is the user of the registration's `sip:<username>@<host>` (§9.4 "Provisioning and
+ * status"), and any other character makes PJSIP refuse the trunk.
  */
 export function assertValidUsername(username: string): void {
-  if (UNSAFE_USERNAME_PATTERN.test(username) || hasStrippedEnd(username)) {
+  if (!isSipUriUser(username)) {
     throw new OpError(
       HTTP_UNPROCESSABLE_CONTENT,
-      `username contains characters unsafe for generated config: ${username}`
+      `username holds a character no SIP URI user part takes: ${username}`
     );
   }
 }

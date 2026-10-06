@@ -2,12 +2,14 @@ import { sipHostUri, trunkSectionName } from '@zamfono/shared';
 
 import {
   assertSafeConfigValue,
+  assertSipUriUser,
   assertWholeConfigValue,
   compareStrings,
   escapeConfigValue,
   formatAllow,
   hostsByDirection,
   joinSections,
+  MAX_SECTION_NAME_LENGTH,
   outboundProxyLines,
   trunkTransport,
   type RenderInput,
@@ -28,7 +30,7 @@ const TRUNK_QUALIFY_FREQUENCY_S = 60;
 function assertSafeTrunk(trunk: Trunk): void {
   assertSafeConfigValue(trunk.id, 'trunk.id');
   if (trunk.username !== null) {
-    assertSafeConfigValue(trunk.username, 'trunk.username');
+    assertSipUriUser(trunk.username, 'trunk.username');
   }
   if (trunk.password !== null) {
     assertWholeConfigValue(trunk.password, 'trunk.password');
@@ -223,7 +225,10 @@ function renderTrunkAuthEndpoint(
   ) {
     return null;
   }
-  if (trunk.username.includes(';')) {
+  if (
+    trunk.username.includes(';') ||
+    trunk.username.length > MAX_SECTION_NAME_LENGTH
+  ) {
     throw new UnrenderableValueError('trunk.username');
   }
   return [

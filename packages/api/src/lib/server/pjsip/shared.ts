@@ -77,9 +77,9 @@ export type TrunkHost = Trunk['hosts'][number];
 // endpoint contexts, so a value that fails this check is refused rather than written out.
 const EXTENSION_PATTERN = /^[0-9]+$/u;
 
-// Ids, hostnames, proxies and usernames are interpolated into the generated config, some as
-// section names; a CR/LF or a bracket could open a new PJSIP section, such as the `[anonymous]`
-// endpoint §5.6 forbids, so any such value is refused rather than written out.
+// Ids, hostnames and proxies are interpolated into the generated config, some as section names;
+// a CR/LF or a bracket could open a new PJSIP section, such as the `[anonymous]` endpoint §5.6
+// forbids, so any such value is refused rather than written out.
 const UNSAFE_CONFIG_PATTERN = /[\r\n[\]]/u;
 
 // A value Asterisk's config parser (main/config.c) cannot read back whole from `<key> = <value>`:
@@ -91,6 +91,20 @@ const LINE_ENDING_PATTERN = /[\r\n\0]/u;
 // The parser strips every character below this code point (space and the control characters,
 // `ast_strip`) from both ends of a value, and has no quoting or escape that keeps them.
 const FIRST_UNSTRIPPED_CODE_POINT = 0x21;
+
+// RFC 3261 §25.1 `user`: alphanumerics, the marks `-_.!~*'()`, the user-unreserved `&=+$,;?/`
+// and `%` HEXDIG HEXDIG escapes. A trunk username is the user of `sip:<username>@<host>`, which
+// PJSIP refuses to parse with any other character. None of these opens a section or ends a line;
+// a `;` is escaped in a value (`escapeConfigValue`) and refused in a section name (trunks.ts's
+// `renderTrunkAuthEndpoint`). Case-sensitive on purpose: under the `i` and `u` flags together
+// `[a-z]` also matches `ſ` and the Kelvin sign.
+const SIP_URI_USER_PATTERN =
+  /^(?:[A-Za-z0-9\-_.!~*'()&=+$,;?/]|%[0-9A-Fa-f]{2})+$/u;
+
+// Asterisk's config parser keeps a section name in 80 bytes, its NUL included (main/config.c
+// `ast_category`), and cuts a longer one short. Every character of a name this applies to is
+// ASCII (`isSipUriUser`), so its length is its byte count.
+export const MAX_SECTION_NAME_LENGTH = 79;
 
 // Server-generated ids (`newId()`, §11.1) are UUIDv7: hex digits and hyphens only. A moh
 // asset id is interpolated into a filesystem path, where the injection check above still
@@ -111,8 +125,20 @@ export function assertSafeConfigValue(value: string, field: string): void {
   }
 }
 
+/** Whether `value` is an RFC 3261 SIP URI user part (`SIP_URI_USER_PATTERN`). */
+export function isSipUriUser(value: string): boolean {
+  return SIP_URI_USER_PATTERN.test(value);
+}
+
+/** Throws when `value` is no SIP URI user part (`isSipUriUser`). */
+export function assertSipUriUser(value: string, field: string): void {
+  if (!isSipUriUser(value)) {
+    throw new UnrenderableValueError(field);
+  }
+}
+
 /** Whether `value` begins or ends with a character Asterisk's config parser strips away. */
-export function hasStrippedEnd(value: string): boolean {
+function hasStrippedEnd(value: string): boolean {
   const first = value.codePointAt(0) ?? FIRST_UNSTRIPPED_CODE_POINT;
   const last =
     value.codePointAt(value.length - 1) ?? FIRST_UNSTRIPPED_CODE_POINT;
