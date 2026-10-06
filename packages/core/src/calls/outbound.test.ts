@@ -384,11 +384,27 @@ describe('outbound dialing', () => {
     // `trust_id_outbound` keeps the real number in its `P-Asserted-Identity`.
     expect(placedCallerId(originate ?? { body: undefined })).toBe('+491110000');
     expect(body.variables['CONNECTEDLINE(pres)']).toBe('prohib');
+    // The endpoint has no `from_domain`, so chan_pjsip still puts `anonymous.invalid` over the
+    // leg's `SIPFROMDOMAIN` in the anonymised `From`.
+    expect(body.variables.SIPFROMDOMAIN).toBe('192.0.2.10');
     expect(
       Object.keys(body.variables).filter(name =>
         name.startsWith('PJSIP_HEADER')
       )
     ).toEqual([]);
+  });
+
+  it('names the address the stack writes into SIP as the From host of a trunk leg (§9.4 "Caller-ID")', async () => {
+    const trunkId = await seedTrunk(db, { priority: 1 });
+    await seedRoute(db, trunkId, { priority: 1 });
+
+    await dial('+498912345');
+
+    const originate = fakeAri.calls.find(entry => isPlacement(entry));
+    const body = originate?.body as { variables: Record<string, string> };
+    // chan_pjsip takes the From host from the transport's bound address otherwise, which
+    // `external_signaling_address` does not rewrite: the container's own in the ports mode.
+    expect(body.variables.SIPFROMDOMAIN).toBe('192.0.2.10');
   });
 
   it('presents the number as the caller ID on a pai trunk, leaving From and PAI to the endpoint (§9.4 "Caller-ID")', async () => {
@@ -409,6 +425,8 @@ describe('outbound dialing', () => {
     expect(Object.keys(body.variables)).not.toContain(
       'PJSIP_HEADER(add,P-Asserted-Identity)'
     );
+    // The account identity's host is the endpoint's `from_domain`, the first outbound host.
+    expect(body.variables.SIPFROMDOMAIN).toBe('sip1.example.com');
   });
 
   it('skips a from-only trunk for a withheld call and ends 403 with no other route', async () => {

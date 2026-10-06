@@ -8,6 +8,7 @@ import {
   resolveClir,
   type Route
 } from '../routing/trunk.js';
+import { outboundHosts } from './trunkStatus.js';
 
 export type TrunkRow = Snapshot['trunks'][number];
 export type UserRow = Snapshot['users'][number];
@@ -57,4 +58,20 @@ export function resolveAttemptIdentity(params: {
     ok: true,
     identity: { number: headers.number, withhold: headers.withhold }
   };
+}
+
+/**
+ * The host of a trunk leg's `From` (§9.4 "Caller-ID"): a `pai` trunk's `from_domain`, its first
+ * outbound host; else the address the stack writes into SIP (`stackSipHost`, `EXTERNAL_IPV4` else
+ * `STACK_IPV4`). The leg carries it as `SIPFROMDOMAIN`, since chan_pjsip otherwise takes the
+ * transport's bound address, which `external_signaling_address` does not rewrite in `From`.
+ */
+export function trunkFromHost(
+  trunk: TrunkRow,
+  snapshot: Snapshot,
+  stackSipHost: string
+): string | null {
+  return trunk.callerIdHeader === 'pai' && trunk.username !== null
+    ? (outboundHosts(snapshot, trunk.id).at(0)?.host ?? null)
+    : stackSipHost;
 }

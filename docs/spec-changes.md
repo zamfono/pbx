@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-06 · §9.4 Caller-ID, Forwarded calls.** A trunk leg's `From` host is the address the stack writes into SIP (`EXTERNAL_IPV4`, else `STACK_IPV4`), a `pai` trunk's `from_domain` aside; the core sets it on the leg as `SIPFROMDOMAIN`, and the `Diversion` host is that `From` host in both modes.
+*Why:* the product owner, after trunk INVITEs in the ports mode carried `From: …@10.89.0.17`, the container's address: "add to the to build pile". `external_signaling_address` rewrites `Contact` and `Via` only, and an endpoint `from_domain` would also replace `anonymous.invalid` in a withheld call's `From`.
+
 **2026-10-05 · §6.3 Updates.** On SIGTERM or SIGINT the updater takes no new request, waits up to a bound below the container's stop grace period for a run of `update.sh` of its own to end, and exits; a run still going is cut off with it, and the next start marks it failed.
 *Why:* the product owner showed `podman restart zamfono-updater-1` ending in "StopSignal SIGTERM failed to stop container zamfono-updater-1 in 10 seconds, resorting to SIGKILL": `node` as PID 1 ignores SIGTERM without a handler of its own.
 **2026-10-05 · §9.4, §10.4.** For each Asterisk start (the ARI `startup_time`) the core has not handled, it sends `PJSIPRegister` once for every `registration` trunk over TCP or TLS, as soon as its ARI and AMI connections are up; a failure is logged and not retried for that start. The handled start lives in the core's memory: a reconnect to the same Asterisk sends nothing, a restart of the core against it registers once more.

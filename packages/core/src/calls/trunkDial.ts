@@ -11,7 +11,11 @@ import { channelLanguageVariable } from '../prompts.js';
 import type { AttemptFailure } from '../routing/trunk.js';
 import { SIP_SERVER_ERROR } from '../sipCodes.js';
 import { type Call } from './call.js';
-import type { AttemptIdentity, TrunkRow } from './callerIdentity.js';
+import {
+  trunkFromHost,
+  type AttemptIdentity,
+  type TrunkRow
+} from './callerIdentity.js';
 import { raiseLogLevel } from './callLogLevel.js';
 import { forwardVariables, type ForwardLeg } from './forwardContext.js';
 import { diversionTrunk } from './forwardDiversion.js';
@@ -154,10 +158,10 @@ export async function originateTrunkLeg(
   if (identity.withhold) {
     // chan_pjsip builds `From`, `P-Asserted-Identity` and `Privacy` from the channel's connected
     // line, which the originate's caller ID sets. Its presentation restricted, `From` becomes
-    // `"Anonymous" <sip:anonymous@anonymous.invalid>` (a `pai` trunk's `from_user` and
-    // `from_domain` keep the account identity), `Privacy: id` is added, and the endpoint's
-    // `trust_id_outbound` keeps the real number in the asserted identity (§9.4 "Anonymous calls
-    // (CLIR)", RFC 3325).
+    // `"Anonymous" <sip:anonymous@anonymous.invalid>`, `SIPFROMDOMAIN` notwithstanding (a `pai`
+    // trunk's `from_user` and `from_domain` keep the account identity), `Privacy: id` is added,
+    // and the endpoint's `trust_id_outbound` keeps the real number in the asserted identity (§9.4
+    // "Anonymous calls (CLIR)", RFC 3325).
     variables['CONNECTEDLINE(pres)'] = 'prohib';
   }
   // §7: the trunk carrying the call's leg counts toward its diagnostics level.
@@ -166,10 +170,14 @@ export async function originateTrunkLeg(
   try {
     // Read after the attempt is counted, so the language adds no wait ahead of the channel count.
     const snapshot = await pipeline.deps.cache.get();
+    const { stackSipHost } = pipeline.deps;
+    const fromHost = trunkFromHost(trunk, snapshot, stackSipHost);
+    if (fromHost !== null) {
+      variables.SIPFROMDOMAIN = fromHost;
+    }
     if (ctx.forward !== undefined) {
       // The one place a forwarded leg's `REDIRECTING` data, `Diversion` and custom headers are
       // applied, the `Diversion` under this attempt's trunk's policy (§9.4 "Forwarded calls").
-      const { stackSipHost } = pipeline.deps;
       Object.assign(
         variables,
         forwardVariables(

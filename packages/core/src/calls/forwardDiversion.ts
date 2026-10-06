@@ -14,13 +14,13 @@ import {
 import { userById, type Snapshot } from '../internal/snapshot.js';
 import { formatCallerId } from '../routing/trunk.js';
 import type { Call } from './call.js';
+import { trunkFromHost } from './callerIdentity.js';
 import type {
   Diversion,
   DivertingParty,
   RedirectingReason
 } from './forwardContext.js';
 import { cutUtf8 } from './forwardHeaders.js';
-import { outboundHosts } from './trunkStatus.js';
 
 /** The `reason` RFC 5806 §4 names for each hop's `REDIRECTING` reason. */
 const DIVERSION_REASONS = {
@@ -108,24 +108,16 @@ export type DiversionTrunk = {
   country: CountryCode;
 };
 
-/**
- * `trunk`'s `Diversion` settings. The host is chan_pjsip's own `Diversion`'s, the leg's `From`
- * host, where the core can know it: a `pai` trunk's `from_domain`, its first outbound host; else
- * the address the stack writes into SIP (`stackSipHost`, `EXTERNAL_IPV4` else `STACK_IPV4`).
- */
+/** `trunk`'s `Diversion` settings. The host is chan_pjsip's own `Diversion`'s, the leg's `From`
+ * host. */
 export function diversionTrunk(
   trunk: Snapshot['trunks'][number],
   snapshot: Snapshot,
   stackSipHost: string
 ): DiversionTrunk {
-  const firstHost = outboundHosts(snapshot, trunk.id).at(0)?.host ?? null;
-  const host =
-    trunk.callerIdHeader === 'pai' && trunk.username !== null
-      ? firstHost
-      : stackSipHost;
   return {
     policy: trunk.diversion,
-    host,
+    host: trunkFromHost(trunk, snapshot, stackSipHost),
     format: trunk.callerIdFormat,
     country: snapshot.settings.country
   };
