@@ -22,9 +22,10 @@ export const SIP_BAN_LIST_FILE = 'sip_bans.list';
 const HELPER_STATUS_FILE = 'sip_ban_helper.status';
 // The helper writes its heartbeat every 30 seconds; one older than this means it stopped (§9.1).
 const HELPER_STALE_MS = MS_PER_MINUTE;
-// `<time in ISO 8601 UTC to the second> <hex SHA-256 of the list it applied>` (§9.1).
+// `<time in ISO 8601 UTC to the second> <hex SHA-256 of the list it applied> <packets> <bytes>`,
+// the last two what the drop rules dropped since the table was loaded (§9.1).
 const HELPER_STATUS_LINE =
-  /^(?<time>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z) (?<hash>[0-9a-f]{64})$/u;
+  /^(?<time>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z) (?<hash>[0-9a-f]{64}) (?<packets>\d+) (?<bytes>\d+)$/u;
 
 /** The `sip_bans` rows of the bans active at `now`: not lifted and not expired (§11.2). */
 export function activeSipBans(db: Db, now: string) {
@@ -98,8 +99,13 @@ export function renderedSipBanListHash(): string | null {
   return renderedHash;
 }
 
-/** Whether the ban helper runs, and its last heartbeat, `null` while none is readable. */
-export type SipBanHelperState = { running: boolean; heartbeat: string | null };
+/** Whether the ban helper runs, its last heartbeat and the packets and bytes the drop rules
+ * dropped as of it, `null` while none is readable. */
+export type SipBanHelperState = {
+  running: boolean;
+  heartbeat: string | null;
+  dropped: { packets: number; bytes: number } | null;
+};
 
 /**
  * The ban helper's state (§9.1, §10.3 `sipBan:helper`): it runs while its heartbeat in
@@ -113,13 +119,15 @@ export async function sipBanHelperState(
     path.join(env.ASTERISK_GEN_DIR, HELPER_STATUS_FILE),
     'utf8'
   ).catch(() => '');
-  const { time, hash } = HELPER_STATUS_LINE.exec(text.trim())?.groups ?? {};
+  const { time, hash, packets, bytes } =
+    HELPER_STATUS_LINE.exec(text.trim())?.groups ?? {};
   const heartbeatMs = Date.parse(time ?? '');
   if (time === undefined || Number.isNaN(heartbeatMs)) {
-    return { running: false, heartbeat: null };
+    return { running: false, heartbeat: null, dropped: null };
   }
   return {
     running: nowMs - heartbeatMs <= HELPER_STALE_MS && hash === renderedHash,
-    heartbeat: time
+    heartbeat: time,
+    dropped: { packets: Number(packets), bytes: Number(bytes) }
   };
 }

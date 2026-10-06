@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-06 · §5.6 Enforcement, §7 Metrics, §9.1.** The ban list's drop rules count what they drop; the ban helper's status line adds the packets and bytes after the digest, and `GET /metrics` exposes them as the counters `zamfono_sip_ban_dropped_packets_total` and `zamfono_sip_ban_dropped_bytes_total`.
+*Why:* the product owner: "how effective is the IP ban altogether?", then "add the counter to the "to build"".
+
 **2026-10-06 · §9.4 Caller-ID, Forwarded calls.** A trunk leg's `From` host is the address the stack writes into SIP (`EXTERNAL_IPV4`, else `STACK_IPV4`), a `pai` trunk's `from_domain` aside; the core sets it on the leg as `SIPFROMDOMAIN`, and the `Diversion` host is that `From` host in both modes.
 *Why:* the product owner, after trunk INVITEs in the ports mode carried `From: …@10.89.0.17`, the container's address: "add to the to build pile". `external_signaling_address` rewrites `Contact` and `Via` only, and an endpoint `from_domain` would also replace `anonymous.invalid` in a withheld call's `From`.
 

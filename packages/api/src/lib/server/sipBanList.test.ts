@@ -28,36 +28,50 @@ beforeEach(async () => {
 });
 
 describe('sipBanHelperState (§9.1, §10.3)', () => {
-  it('runs with a fresh heartbeat naming the list api last rendered', async () => {
-    await writeStatus(`2026-10-05T11:59:01Z ${EMPTY_HASH}\n`);
+  it('runs with a fresh heartbeat naming the list api last rendered, with the drop counts', async () => {
+    await writeStatus(`2026-10-05T11:59:01Z ${EMPTY_HASH} 12 3456\n`);
     expect(await sipBanHelperState(NOW)).toEqual({
       running: true,
-      heartbeat: '2026-10-05T11:59:01Z'
+      heartbeat: '2026-10-05T11:59:01Z',
+      dropped: { packets: 12, bytes: 3456 }
     });
   });
 
   it.each([
     [
       'a heartbeat older than 60 seconds',
-      `2026-10-05T11:58:59Z ${EMPTY_HASH}\n`,
-      '2026-10-05T11:58:59Z'
+      `2026-10-05T11:58:59Z ${EMPTY_HASH} 0 0\n`,
+      '2026-10-05T11:58:59Z',
+      { packets: 0, bytes: 0 }
     ],
     [
       'another list',
-      `2026-10-05T11:59:30Z ${'0'.repeat(64)}\n`,
-      '2026-10-05T11:59:30Z'
+      `2026-10-05T11:59:30Z ${'0'.repeat(64)} 1 60\n`,
+      '2026-10-05T11:59:30Z',
+      { packets: 1, bytes: 60 }
     ],
-    ['an unreadable line', 'garbage\n', null],
-    ['an unparsable time', `yesterday ${EMPTY_HASH}\n`, null]
-  ])('does not run for %s', async (_case, text, heartbeat) => {
+    ['an unreadable line', 'garbage\n', null, null],
+    [
+      'a line without the drop counts',
+      `2026-10-05T11:59:01Z ${EMPTY_HASH}\n`,
+      null,
+      null
+    ],
+    ['an unparsable time', `yesterday ${EMPTY_HASH} 0 0\n`, null, null]
+  ])('does not run for %s', async (_case, text, heartbeat, dropped) => {
     await writeStatus(text);
-    expect(await sipBanHelperState(NOW)).toEqual({ running: false, heartbeat });
+    expect(await sipBanHelperState(NOW)).toEqual({
+      running: false,
+      heartbeat,
+      dropped
+    });
   });
 
   it('does not run, with no heartbeat, while the file is missing', async () => {
     expect(await sipBanHelperState(NOW)).toEqual({
       running: false,
-      heartbeat: null
+      heartbeat: null,
+      dropped: null
     });
   });
 });

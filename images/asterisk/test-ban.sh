@@ -23,9 +23,9 @@ put_list() {
 }
 
 # At its start, with no list on the volume, the helper applied the empty list and wrote its heartbeat.
-docker exec "$CONTAINER" grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z [0-9a-f]{64}$' \
+docker exec "$CONTAINER" grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z [0-9a-f]{64} [0-9]+ [0-9]+$' \
     "$GEN/sip_ban_helper.status" \
-  || fail "sip_ban_helper.status is not '<instant> <sha256>'"
+  || fail "sip_ban_helper.status is not '<instant> <sha256> <packets> <bytes>'"
 [ "$(status_digest)" = "$(sha256sum < /dev/null | cut -d' ' -f1)" ] \
   || fail "the helper's status does not name the empty list"
 docker exec "$CONTAINER" ban-helper-alive || fail "the healthcheck fails on a fresh heartbeat"
@@ -62,6 +62,16 @@ docker exec "$CONTAINER" nft list set inet zamfono sip_ban_v4 | grep '203\.0\.11
 rules=$(docker exec "$CONTAINER" nft list chain inet zamfono input | grep -c ' drop$')
 [ "$rules" = 2 ] || fail "after a restart the table holds $rules drop rules, not 2"
 docker exec "$CONTAINER" ban-helper-alive || fail "the healthcheck fails after a restart"
+
+# The drop rules count what they drop, and the next heartbeat names the packets and bytes: a
+# datagram from a banned source, the loopback address here, to 5060 is dropped and counted. The
+# list then leaves loopback unbanned again, for test-hep.sh's OPTIONS from it.
+put_list <<< '127.0.0.1'
+docker exec "$CONTAINER" bash -c 'echo probe > /dev/udp/127.0.0.1/5060'
+put_list <<< '203.0.113.7'
+read -r _ _ packets bytes < <(docker exec "$CONTAINER" cat "$GEN/sip_ban_helper.status")
+[ "${packets:-0}" -ge 1 ] && [ "${bytes:-0}" -gt 0 ] \
+  || fail "the status names $packets packets and $bytes bytes dropped, not the probe"
 
 applied=$(status_digest)
 printf '203.0.113.9; flush ruleset\n' | put_list

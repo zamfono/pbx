@@ -90,7 +90,7 @@ describe('an owed config propagation', () => {
       coreChecks: () => Promise.resolve(null),
       keyring: kr,
       certificateSync: { state: 'unknown', at: null },
-      sipBanHelper: { running: false, heartbeat: null },
+      sipBanHelper: { running: false, heartbeat: null, dropped: null },
       mailRelay: null
     });
     expect(health.checks['config:propagation']).toEqual([{ status: 'warn' }]);

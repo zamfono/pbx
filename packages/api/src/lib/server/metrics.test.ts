@@ -1,3 +1,5 @@
+import { mkdir, rm, writeFile } from 'node:fs/promises';
+import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
 import { newId, nowIso, type Db, type StateResponse } from '@zamfono/shared';
@@ -325,6 +327,40 @@ describe('renderMetrics', () => {
     await db.updateTable('settings').set({ sipBanStepsJson: '[]' }).execute();
     const off = await renderMetrics(stubDeps({ db }));
     expect(parseMetrics(off).get('zamfono_sip_bans_active')).toBe('0');
+  });
+
+  it('counts what the SIP-ban drop rules dropped, from the ban helper status, left out without one (§5.6)', async () => {
+    const db = await makeTestDb();
+    await seedSettings(db);
+    const statusFile = path.join(
+      process.env.ASTERISK_GEN_DIR ?? '',
+      'sip_ban_helper.status'
+    );
+    await mkdir(path.dirname(statusFile), { recursive: true });
+    await writeFile(
+      statusFile,
+      `2026-10-05T11:59:01Z ${'0'.repeat(64)} 12 3456\n`
+    );
+
+    const text = await renderMetrics(stubDeps({ db }));
+    await rm(statusFile);
+    const missing = await renderMetrics(stubDeps({ db }));
+
+    expect(text).toContain(
+      '# TYPE zamfono_sip_ban_dropped_packets_total counter'
+    );
+    expect(
+      parseMetrics(text).get('zamfono_sip_ban_dropped_packets_total')
+    ).toBe('12');
+    expect(parseMetrics(text).get('zamfono_sip_ban_dropped_bytes_total')).toBe(
+      '3456'
+    );
+    expect(missing).toContain(
+      '# TYPE zamfono_sip_ban_dropped_bytes_total counter'
+    );
+    expect(
+      parseMetrics(missing).has('zamfono_sip_ban_dropped_packets_total')
+    ).toBe(false);
   });
 
   it('renders the update gauges from update_state, all 0 without an updater (§6.3)', async () => {

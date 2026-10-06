@@ -133,8 +133,8 @@ mkdir -p "$ASTDB_DIR"
 chown asterisk:asterisk "$ASTDB_DIR"
 
 # The ban list (spec §5.6 "Enforcement", §9.1): a set per family, whose elements time out on their
-# own, and a rule dropping their packets to the SIP ports in this network namespace alone. The
-# ban helper fills the sets from sip_bans.list; it and this load need the container's
+# own, and a rule counting and dropping their packets to the SIP ports in this network namespace
+# alone. The ban helper fills the sets from sip_bans.list; it and this load need the container's
 # CAP_NET_ADMIN, which Asterisk, running as user `asterisk`, does not hold. The namespace outlives
 # this container (§6.1), so a restart finds the table it loaded: one transaction creates it where
 # it is missing, deletes it and loads it anew, and the helper fills the empty sets again.
@@ -146,8 +146,8 @@ table inet zamfono {
   set sip_ban_v6 { type ipv6_addr; flags interval, timeout; }
   chain input {
     type filter hook input priority filter; policy accept;
-    meta l4proto { tcp, udp } th dport 5060-5062 ip saddr @sip_ban_v4 drop
-    meta l4proto { tcp, udp } th dport 5060-5062 ip6 saddr @sip_ban_v6 drop
+    meta l4proto { tcp, udp } th dport 5060-5062 ip saddr @sip_ban_v4 counter drop
+    meta l4proto { tcp, udp } th dport 5060-5062 ip6 saddr @sip_ban_v6 counter drop
   }
 }
 NFT

@@ -69,9 +69,15 @@ sip_ban_lift() {
   api_delete "/sipBans/$1"
 }
 
+# `sip_ban_metric <name>` prints the metric's sample.
 sip_ban_metric() {
   curl -fsS "${FWD[@]}" -H "Authorization: Bearer $METRICS_TOKEN" "$api_base/metrics" \
-    | awk '$1 == "zamfono_sip_bans_active" { print $2 }'
+    | awk -v name="$1" '$1 == name { print $2 }'
+}
+
+# The drop rules counted at least one packet, as of the ban helper's last heartbeat (§7).
+sip_ban_counted() {
+  last_read=$(sip_ban_metric zamfono_sip_ban_dropped_packets_total) && [ "${last_read:-0}" -ge 1 ]
 }
 
 # The `outside` network's name, for the runtime's `network` command.
@@ -101,7 +107,7 @@ print(json.dumps({k: s[k] for k in ("sipBanFailures", "sipBanWindowS", "sipBanSu
   read -r id step expires <<<"$(sip_ban_active)"
   [ "$step" = 1 ] && [ "$expires" != None ] \
     || fail "the first ban is step $step, expiring $expires, not step 1 for a day"
-  reads 1 sip_ban_metric || fail "zamfono_sip_bans_active reads '$last_read', not 1"
+  reads 1 sip_ban_metric zamfono_sip_bans_active || fail "zamfono_sip_bans_active reads '$last_read', not 1"
   reads pass healthz_check sipBan:helper || fail '/healthz reports the ban helper stopped'
   poll $SIP_BAN_POLLS 1 sip_ban_dropped || fail "the banned scanner's REGISTER is still answered"
   sip_ban_http_answered || fail "the banned scanner's HTTP request is not answered"
@@ -110,6 +116,10 @@ print(json.dumps({k: s[k] for k in ("sipBanFailures", "sipBanWindowS", "sipBanSu
   sip_ban_lift "$id"
   poll $SIP_BAN_POLLS 1 sip_ban_answered || fail 'the lifted scanner is still dropped'
   echo '   sipBans.lift: answered again'
+  # The lift's apply wrote a heartbeat, which names what the drop rules counted meanwhile.
+  poll $SIP_BAN_POLLS 1 sip_ban_counted \
+    || fail "zamfono_sip_ban_dropped_packets_total reads '$last_read' after the dropped REGISTERs"
+  echo "   zamfono_sip_ban_dropped_packets_total: $last_read"
 
   allow=$(api POST /sipAllowlist '{"address":"10.213.48.0/24","label":"sip-ban"}' | jsonfield id)
   for ((attempt = 1; attempt <= 2 * SIP_BAN_FAILURES; attempt++)); do

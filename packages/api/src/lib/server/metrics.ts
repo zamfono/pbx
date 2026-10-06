@@ -2,7 +2,7 @@
  * `GET /metrics` (§7 "Metrics"): Prometheus text exposition of active calls, registered
  * devices, trunk registration and capacity, ARI connection state, API request latency,
  * database size, backup freshness, recording-mix failures, certificate-sync status, config
- * propagation and what is known of updates.
+ * propagation, SIP bans and what is known of updates.
  */
 import { stat } from 'node:fs/promises';
 
@@ -20,7 +20,7 @@ import {
 } from './metricsCounters.js';
 import { updateNews } from './ops/system/_state.js';
 import { isPropagationPending } from './propagationPending.js';
-import { countSipBansInForce } from './sipBanList.js';
+import { countSipBansInForce, sipBanHelperState } from './sipBanList.js';
 
 export type MetricsDeps = {
   db: Db;
@@ -67,6 +67,21 @@ function recordingMixFailureLines(state: StateResponse | null): string[] {
     );
   }
   return lines;
+}
+
+/** §5.6 "Enforcement": the packets and bytes the ban list's drop rules dropped since the
+ * `asterisk` container loaded them, as of the ban helper's last heartbeat; left out while its
+ * status is unreadable, like a mix failure without `core`. */
+async function sipBanDroppedLines(): Promise<string[]> {
+  const { dropped } = await sipBanHelperState();
+  return (['packets', 'bytes'] as const).flatMap(unit => {
+    const name = `zamfono_sip_ban_dropped_${unit}_total`;
+    const lines = [`# TYPE ${name} counter`];
+    if (dropped !== null) {
+      lines.push(`${name} ${dropped[unit]}`);
+    }
+    return lines;
+  });
 }
 
 async function trunkMetricLines(
@@ -205,6 +220,7 @@ export async function renderMetrics(deps: MetricsDeps): Promise<string> {
       'zamfono_sip_bans_active',
       await countSipBansInForce(deps.db)
     ),
+    ...(await sipBanDroppedLines()),
     ...recordingMixFailureLines(state),
     ...(await configPropagationLines(deps.db)),
     ...(await updateLines(deps.db)),

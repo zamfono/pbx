@@ -142,7 +142,7 @@ describe('mail:relay and system.info mail', () => {
       coreChecks: () => Promise.resolve(null),
       keyring: testKeyring(),
       certificateSync: { state: 'ok', at: null },
-      sipBanHelper: { running: true, heartbeat: null },
+      sipBanHelper: { running: true, heartbeat: null, dropped: null },
       mailRelay: relayState()
     });
   const info = async (db: Db): Promise<unknown> =>

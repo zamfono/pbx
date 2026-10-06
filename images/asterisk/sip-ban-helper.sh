@@ -2,7 +2,8 @@
 # The ban helper (spec §5.6 "Enforcement", §9.1): applies `sip_bans.list`, which `api` renders onto
 # the asterisk-config volume, to the nftables sets the entrypoint loaded, at its start and at each
 # change of the file, and writes its heartbeat to `sip_ban_helper.status` after every apply and
-# every 30 seconds. Runs as root, started by the entrypoint before Asterisk.
+# every 30 seconds, with what the drop rules dropped. Runs as root, started by the entrypoint before
+# Asterisk.
 #
 # Every line is parsed as an address and an optional instant; a list with any other line is
 # refused as a whole and the sets keep what they hold, so the file's text never reaches `nft`.
@@ -76,8 +77,19 @@ apply() {
   fi
 }
 
+# The packets and bytes the drop rules' counters hold, summed over both families.
+dropped() {
+  nft list chain inet zamfono input | awk '/ counter packets / {
+    for (i = 1; i < NF; i++) {
+      if ($i == "packets") packets += $(i + 1)
+      if ($i == "bytes") bytes += $(i + 1)
+    }
+  } END { print packets + 0, bytes + 0 }'
+}
+
 write_status() {
-  echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) $applied" > "$STATUS.tmp" && mv "$STATUS.tmp" "$STATUS"
+  echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) $applied $(dropped)" > "$STATUS.tmp" \
+    && mv "$STATUS.tmp" "$STATUS"
 }
 
 # A list replaced by a rename is a new file, so the directory is watched, not the file. A wake-up

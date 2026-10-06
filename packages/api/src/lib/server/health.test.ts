@@ -52,7 +52,11 @@ async function healthOf(
     coreChecks: () => Promise.resolve(CORE_PASSING),
     keyring: kr,
     certificateSync: { state: 'ok', at: '2026-10-05T12:00:00.000Z' },
-    sipBanHelper: { running: true, heartbeat: '2026-10-05T12:00:00Z' },
+    sipBanHelper: {
+      running: true,
+      heartbeat: '2026-10-05T12:00:00Z',
+      dropped: null
+    },
     mailRelay: null,
     ...deps
   });
@@ -136,7 +140,7 @@ describe('apiHealth (§6.3 "Health", §10.3 "Health")', () => {
     const health = await healthOf(openDb(':memory:'), {
       coreChecks: () => Promise.resolve(null),
       certificateSync: { state: 'unknown', at: null },
-      sipBanHelper: { running: false, heartbeat: null }
+      sipBanHelper: { running: false, heartbeat: null, dropped: null }
     });
     expect(health).toStrictEqual({
       status: 'fail',
@@ -201,7 +205,11 @@ describe('apiHealth (§6.3 "Health", §10.3 "Health")', () => {
     const db = await makeTestDb();
     await seedSettings(db);
     const health = await healthOf(db, {
-      sipBanHelper: { running: false, heartbeat: '2026-10-05T11:00:00Z' }
+      sipBanHelper: {
+        running: false,
+        heartbeat: '2026-10-05T11:00:00Z',
+        dropped: null
+      }
     });
     expect(health.checks['sipBan:helper']).toEqual([
       { status: 'fail', time: '2026-10-05T11:00:00Z' }
