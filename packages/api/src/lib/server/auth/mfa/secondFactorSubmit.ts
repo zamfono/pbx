@@ -1,47 +1,40 @@
-import { error, type RequestEvent } from '@sveltejs/kit';
+import { error, redirect, type RequestEvent } from '@sveltejs/kit';
 import * as env from '$app/env/private';
 import { z } from 'zod';
 
 import {
   HTTP_BAD_REQUEST,
+  HTTP_SEE_OTHER,
   nowIso,
   type Db,
   type MfaMethods
 } from '@zamfono/shared';
 
-import { loadBranding } from '#lib/server/auth/branding.js';
-import {
-  noticeMfaChange,
-  type MfaChange
-} from '#lib/server/auth/mfa/notice.js';
-import {
-  registerPasskey,
-  verifyPasskey
-} from '#lib/server/auth/mfa/passkeys.js';
-import {
-  issueRecoveryCodes,
-  redeemRecoveryCode
-} from '#lib/server/auth/mfa/recoveryCodes.js';
+import { getDb } from '#lib/server/db.js';
+import { limiter } from '#lib/server/limiter.js';
+import { keyringFromEnv } from '#lib/server/secretbox.js';
+
+import { loadBranding } from '../branding.js';
+import { completeLogin, type ConsentStep } from '../completeLogin.js';
+import { noticeMfaChange, type MfaChange } from './notice.js';
+import { registerPasskey, verifyPasskey } from './passkeys.js';
+import { issueRecoveryCodes, redeemRecoveryCode } from './recoveryCodes.js';
 import {
   finishSecondFactorLogin,
   secondFactorLogin,
   startSecondFactorLogin,
   updateSecondFactorLogin,
   type SecondFactorLogin
-} from '#lib/server/auth/mfa/secondFactorLogin.js';
-import { hasMfa } from '#lib/server/auth/mfa/status.js';
-import { matchTotp, newTotpSecret } from '#lib/server/auth/mfa/totp.js';
-import { saveTotp, verifyTotp } from '#lib/server/auth/mfa/totpCredential.js';
-import { getDb } from '#lib/server/db.js';
-import { limiter } from '#lib/server/limiter.js';
-import { keyringFromEnv } from '#lib/server/secretbox.js';
-
-import { completeLogin, type ConsentStep } from './completeLogin.js';
+} from './secondFactorLogin.js';
 import {
   enrolStep,
   verifyStep,
   type SecondFactorStep
 } from './secondFactorSteps.js';
+import { startSecuritySession } from './securitySession.js';
+import { hasMfa } from './status.js';
+import { matchTotp, newTotpSecret } from './totp.js';
+import { saveTotp, verifyTotp } from './totpCredential.js';
 
 // Any step accepts a code from an authenticator that never signed in before.
 const NO_STEP_YET = -1;
@@ -60,8 +53,6 @@ export const SecondFactorPayloadSchema = z.object({
 
 export type SecondFactorPayload = z.infer<typeof SecondFactorPayloadSchema>;
 
-export type { SecondFactorStep } from './secondFactorSteps.js';
-
 /**
  * Starts the second step of a sign-in whose password passed: a method `status` holds, or, for a
  * user who must have one and has none, the enrolment of an authenticator app or a passkey (no
@@ -69,7 +60,10 @@ export type { SecondFactorStep } from './secondFactorSteps.js';
  */
 export async function beginSecondFactor(
   event: RequestEvent,
-  login: Pick<SecondFactorLogin, 'userId' | 'account' | 'email' | 'client'>,
+  login: Pick<
+    SecondFactorLogin,
+    'purpose' | 'userId' | 'account' | 'email' | 'client'
+  >,
   status: MfaMethods
 ): Promise<SecondFactorStep> {
   const pending = {
@@ -181,10 +175,15 @@ async function passes(
   return redeemRecoveryCode(db, login.userId, code);
 }
 
-/** Ends the pending sign-in and completes the login it was for. */
+/** Ends the pending sign-in and completes what it was for: the OAuth login, or the security
+ *  page's session, which the page then shows. */
 function finish(event: RequestEvent, login: SecondFactorLogin): ConsentStep {
   limiter.loginSucceeded(login.account);
   finishSecondFactorLogin(event.cookies);
+  if (login.purpose === 'security') {
+    startSecuritySession(event.cookies, login.userId);
+    redirect(HTTP_SEE_OTHER, '/auth/security');
+  }
   return completeLogin(event, login.userId, login.client);
 }
 

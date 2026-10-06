@@ -19,6 +19,7 @@ why the specified behaviour changed; the commit history, how.
 
 - Two-factor sign-in: owners and admins (optionally everyone) confirm a password login with an authenticator code or a recovery code; `users.resetMfa` and `reset-mfa.mjs` reset it.
 - Passkeys as a second factor, set up and used through the browser's own prompt.
+- `/auth/security`: each person manages their own passkeys, authenticator app and recovery codes after a fresh sign-in.
 - `*5` to an own DID whose external forward target records is recorded too.
 - `*5` and `calls.addParty` to an own DID that forwards to a SIP target dial that target.
 

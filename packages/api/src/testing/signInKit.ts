@@ -9,6 +9,10 @@ import type { Db, UserRole } from '@zamfono/shared';
 import { seedUser } from '@zamfono/shared/testDb.js';
 
 import { encodeMetadataClientId } from '#lib/server/auth/clients.js';
+import {
+  secondFactorSubmit,
+  type SecondFactorPayload
+} from '#lib/server/auth/mfa/secondFactorSubmit.js';
 import { hashPassword } from '#lib/server/auth/password.js';
 import { keyringFromEnv } from '#lib/server/secretbox.js';
 
@@ -16,10 +20,6 @@ import {
   loginSubmit,
   type LoginResult
 } from '../routes/oauth/authorize/loginSubmit.js';
-import {
-  secondFactorSubmit,
-  type SecondFactorPayload
-} from '../routes/oauth/authorize/secondFactorSubmit.js';
 import { requestEvent, type CookieJar } from './requestEvent.js';
 
 export const ORIGIN = 'https://pbx.example.com';

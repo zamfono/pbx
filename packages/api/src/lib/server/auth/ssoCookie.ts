@@ -28,11 +28,13 @@ const PendingLoginSchema = z.object({
   state: z.string(),
   nonce: z.string(),
   codeVerifier: z.string(),
-  authorizeParams: PendingAuthorizeSchema.nullable()
+  authorizeParams: PendingAuthorizeSchema.nullable(),
+  security: z.literal(true).optional()
 });
 
 /** The login the SSO button started: the `state`, `nonce` and `codeVerifier` it generated, plus
- *  the outer `/oauth/authorize` request the login is resuming, if any. */
+ *  the outer `/oauth/authorize` request the login is resuming, if any; `security` marks one the
+ *  security page started, which opens that page's session instead (§5.2). */
 export type PendingLogin = z.infer<typeof PendingLoginSchema>;
 
 /** The `zamfono_sso` cookie, scoped to `/oauth`. It lasts 600 s: the login survives the round

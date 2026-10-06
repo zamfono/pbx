@@ -6,23 +6,21 @@ import { mfaMethods } from '@zamfono/shared';
 
 import {
   AuthorizePayloadSchema,
-  lookupUser,
   paramsFromPayload,
   resolveClient
 } from '#lib/server/auth/authorizeRequest.js';
 import { loadBranding } from '#lib/server/auth/branding.js';
+import {
+  completeLogin,
+  type ConsentStep
+} from '#lib/server/auth/completeLogin.js';
+import type { SecondFactorStep } from '#lib/server/auth/mfa/secondFactorSteps.js';
+import { beginSecondFactor } from '#lib/server/auth/mfa/secondFactorSubmit.js';
 import { hasMfa, mfaRequired } from '#lib/server/auth/mfa/status.js';
-import { verifyPassword } from '#lib/server/auth/password.js';
+import { checkPassword } from '#lib/server/auth/passwordCheck.js';
 import { getDb } from '#lib/server/db.js';
 import { limiter } from '#lib/server/limiter.js';
-import { accountLockKey } from '#lib/server/ops/users/_accountLock.js';
 import { keyringFromEnv } from '#lib/server/secretbox.js';
-
-import { completeLogin, type ConsentStep } from './completeLogin.js';
-import {
-  beginSecondFactor,
-  type SecondFactorStep
-} from './secondFactorSubmit.js';
 
 /** The login form's own fields, on top of the outer request's client parameters (§5.2). The
  *  leading underscore keeps the password out of the re-rendered page: SvelteKit repopulates a
@@ -41,17 +39,10 @@ export type LoginPayload = z.infer<typeof LoginPayloadSchema>;
 export type LoginResult =
   { message: string; email: string } | SecondFactorStep | ConsentStep;
 
-// A well-formed address and a non-empty password, checked here rather than in the form schema:
-// every refusal this page renders carries the same generic message (§5.5), so field-level
-// validation issues would distinguish submissions that must stay indistinguishable.
-const CredentialsSchema = z.object({
-  email: z.email(),
-  _password: z.string().min(1)
-});
-
 /**
  * The password form (§5.2 "Authentication pages", §5.5): wrong password or a locked account both
- * answer the same generic message, so neither reveals whether the account exists. A user who has
+ * answer the same generic message (`checkPassword`), so neither reveals whether the account
+ * exists. A user who has
  * a second factor, or must have one, goes on to the second step, and the attempt stays counted
  * against the account lock until that passes too; anyone else is signed in (`completeLogin`).
  */
@@ -63,27 +54,11 @@ export async function loginSubmit(
   const kr = keyringFromEnv(env);
   const resolved = await resolveClient(kr, paramsFromPayload(payload));
   const { dictionary } = await loadBranding(db);
-  const refused = { message: dictionary.login.invalid, email: payload.email };
-  const parsed = CredentialsSchema.safeParse(payload);
-  if (!parsed.success) {
-    return refused;
+  const checked = await checkPassword(db, payload);
+  if (checked === null) {
+    return { message: dictionary.login.invalid, email: payload.email };
   }
-  const { email, _password: password } = parsed.data;
-  // `users.email` is `COLLATE NOCASE` (§11.2): the account lock must key on the same normalized
-  // form, or varying the address's case gives an attacker a fresh 5-attempt budget per variant,
-  // and the user record must read it back under that same form (`accountLockKey`).
-  const account = accountLockKey(email);
-  if (!limiter.countLoginAttempt(account)) {
-    // Costs the same Argon2id pass a wrong-password response costs (`verifyPassword`'s own dummy
-    // hash), so a locked account's response time matches a wrong password's (§5.5).
-    await verifyPassword(null, password);
-    return refused;
-  }
-  const user = await lookupUser(db, email);
-  const verified = await verifyPassword(user?.passwordHash ?? null, password);
-  if (!verified || !user) {
-    return refused;
-  }
+  const { user, account, email } = checked;
   const client = resolved
     ? { authorize: resolved.authorize, clientName: resolved.meta.name }
     : null;
@@ -91,7 +66,7 @@ export async function loginSubmit(
   if (hasMfa(status) || (await mfaRequired(db, user.role))) {
     return beginSecondFactor(
       event,
-      { userId: user.id, account, email, client },
+      { purpose: 'oauth', userId: user.id, account, email, client },
       status
     );
   }

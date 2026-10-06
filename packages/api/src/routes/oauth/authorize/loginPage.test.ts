@@ -9,11 +9,15 @@ const state = vi.hoisted((): { result: unknown } => ({ result: undefined }));
 const second = vi.hoisted((): { result: unknown } => ({ result: undefined }));
 
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
+vi.mock('#lib/auth/secondFactor.remote.js', async () => ({
+  secondFactor: (await import('#testing/remoteFormStub.js')).remoteFormStub(
+    second
+  )
+}));
 vi.mock('./authorize.remote.js', async () => {
   const { remoteFormStub } = await import('#testing/remoteFormStub.js');
   return {
     login: remoteFormStub(state),
-    secondFactor: remoteFormStub(second),
     consent: remoteFormStub({ result: undefined })
   };
 });

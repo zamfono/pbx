@@ -1,15 +1,12 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
 
+  import { secondFactor } from '#lib/auth/secondFactor.remote.js';
+  import SecondFactor from '#lib/auth/SecondFactor.svelte';
   import { format } from '#lib/i18n/index.js';
 
   import type { PageData } from './$types.js';
-  import {
-    consent as consentForm,
-    login,
-    secondFactor
-  } from './authorize.remote.js';
-  import SecondFactor from './SecondFactor.svelte';
+  import { consent as consentForm, login } from './authorize.remote.js';
 
   const { data }: { data: PageData } = $props();
 

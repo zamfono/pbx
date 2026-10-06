@@ -186,3 +186,21 @@ export async function verifyPasskey(
     .executeTakeFirst();
   return numUpdatedRows > NO_ROWS;
 }
+
+/** A passkey as the security page lists it: never its key. */
+export type Passkey = {
+  id: string;
+  name: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+};
+
+/** `userId`'s passkeys, oldest first. */
+export async function listPasskeys(db: Db, userId: string): Promise<Passkey[]> {
+  return db
+    .selectFrom('webauthnCredentials')
+    .select(['id', 'name', 'createdAt', 'lastUsedAt'])
+    .where('userId', '=', userId)
+    .orderBy('createdAt')
+    .execute();
+}

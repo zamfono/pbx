@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { resolve } from '$app/paths';
   import { page } from '$app/state';
 
   import { format } from '#lib/i18n/index.js';
@@ -24,4 +25,7 @@
   <p class="auth-note">{message}</p>
   <p class="auth-note">{dict.mcpHint}</p>
   <code class="auth-command">{mcpCommand}</code>
+  <a class="auth-link" href={resolve('/auth/security')}
+    >{data.dictionary.security.landingLink}</a
+  >
 </div>

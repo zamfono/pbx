@@ -22,6 +22,8 @@ const COOKIE = { name: 'zamfono_mfa', path: '/' } as const;
 /** A sign-in whose password passed: whom it is for, the outer OAuth request it resumes, and
  *  where the person is in enrolment. */
 export type SecondFactorLogin = {
+  /** What the sign-in opens: an OAuth login, or the security page's own session. */
+  purpose: 'oauth' | 'security';
   userId: string;
   /** The §5.5 account-lock key, which every code attempt counts against. */
   account: string;

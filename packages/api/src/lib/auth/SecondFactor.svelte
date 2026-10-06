@@ -1,13 +1,13 @@
 <script lang="ts">
   import { tick } from 'svelte';
 
-  import PasskeyButton from '#lib/auth/PasskeyButton.svelte';
-  import RecoveryCodes from '#lib/auth/RecoveryCodes.svelte';
-  import TotpSetup from '#lib/auth/TotpSetup.svelte';
   import type { Dictionary } from '#lib/i18n/index.js';
+  import type { SecondFactorStep } from '#lib/server/auth/mfa/secondFactorSteps.js';
 
-  import { secondFactor } from './authorize.remote.js';
-  import type { SecondFactorStep } from './secondFactorSubmit.js';
+  import PasskeyButton from './PasskeyButton.svelte';
+  import RecoveryCodes from './RecoveryCodes.svelte';
+  import { secondFactor } from './secondFactor.remote.js';
+  import TotpSetup from './TotpSetup.svelte';
 
   // The second step of a password sign-in (§5.2 "Two-factor authentication"): a code or a
   // passkey, the enrolment of an authenticator app or a passkey, or the recovery codes that

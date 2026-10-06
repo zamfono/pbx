@@ -6,13 +6,12 @@ import { isRole } from './jwt.js';
  * Whether a user may log in and hold tokens of any kind (§5.2): never one without an e-mail, a
  * phone-only user (§11.2), and an owner only once they have a local password, the break-glass
  * every owner who can log in keeps. One an owner created, or an SSO-only user promoted to owner,
- * sets it through their set-password link first.
+ * sets it through their set-password link first. A user it admits has an e-mail, which its type
+ * then says.
  */
-export function mayLogIn(user: {
-  role: string;
-  email: string | null;
-  passwordHash: string | null;
-}): boolean {
+export function mayLogIn<
+  U extends { role: string; email: string | null; passwordHash: string | null }
+>(user: U): user is U & { email: string } {
   return (
     user.email !== null && (user.role !== 'owner' || user.passwordHash !== null)
   );

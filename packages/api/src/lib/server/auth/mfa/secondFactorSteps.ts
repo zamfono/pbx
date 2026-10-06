@@ -5,22 +5,16 @@ import type {
 import type { RequestEvent } from '@sveltejs/kit';
 import * as env from '$app/env/private';
 
-import { loadBranding } from '#lib/server/auth/branding.js';
-import {
-  authenticationOptions,
-  registrationOptions
-} from '#lib/server/auth/mfa/passkeys.js';
-import { qrSvg } from '#lib/server/auth/mfa/qr.js';
+import { getDb } from '#lib/server/db.js';
+
+import { loadBranding } from '../branding.js';
+import { authenticationOptions, registrationOptions } from './passkeys.js';
+import { qrSvg } from './qr.js';
 import {
   updateSecondFactorLogin,
   type SecondFactorLogin
-} from '#lib/server/auth/mfa/secondFactorLogin.js';
-import {
-  base32Encode,
-  groupedSecret,
-  otpauthUri
-} from '#lib/server/auth/mfa/totp.js';
-import { getDb } from '#lib/server/db.js';
+} from './secondFactorLogin.js';
+import { base32Encode, groupedSecret, otpauthUri } from './totp.js';
 
 /** The second step the page renders (§5.2 "Two-factor authentication"): a code or passkey to
  *  verify (`passkey` the browser's request options while the user has one), a method to set up
@@ -42,9 +36,22 @@ export type SecondFactorStep =
   | { step: 'recoveryCodes'; codes: string[] };
 
 /** The name a passkey or authenticator is issued under: the company name, else the FQDN. */
-async function issuer(): Promise<string> {
+export async function issuer(): Promise<string> {
   const { companyName } = await loadBranding(getDb());
   return companyName === '' ? env.FQDN : companyName;
+}
+
+/** What an authenticator app's setup shows for `secret`: the `otpauth` URI as a QR code, issued
+ *  as `name` for `email`, and the secret as grouped base32 text. */
+export function totpSetup(
+  name: string,
+  email: string,
+  secret: Buffer
+): { qrSvg: string; secret: string } {
+  return {
+    qrSvg: qrSvg(otpauthUri(name, email, secret)),
+    secret: groupedSecret(base32Encode(secret))
+  };
 }
 
 /** The verify step for `login`, with a fresh passkey challenge where the user has a passkey; the
@@ -82,8 +89,7 @@ export async function enrolStep(
   });
   return {
     step: 'enrol',
-    qrSvg: qrSvg(otpauthUri(name, login.email, login.totpSecret)),
-    secret: groupedSecret(base32Encode(login.totpSecret)),
+    ...totpSetup(name, login.email, login.totpSecret),
     passkey: options,
     error
   };

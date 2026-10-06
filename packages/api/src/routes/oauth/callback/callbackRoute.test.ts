@@ -8,6 +8,7 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { encodeMetadataClientId } from '#lib/server/auth/clients.js';
 import { CONSENT_COOKIE } from '#lib/server/auth/consent.js';
+import { securitySession } from '#lib/server/auth/mfa/securitySession.js';
 import { discover } from '#lib/server/auth/oidc.js';
 import { setSealedCookie } from '#lib/server/auth/sealedCookie.js';
 import { finishLogin } from '#lib/server/auth/sso.js';
@@ -172,6 +173,39 @@ describe('GET /oauth/callback', () => {
     expect(location.pathname).toBe('/oauth/authorize');
     expect(location.searchParams.get('code')).toBeNull();
     expect(cookie.written.has(CONSENT_COOKIE.name)).toBe(true);
+  });
+
+  it("opens the security page's session for an SSO sign-in the security page started (§5.2)", async () => {
+    ssoConfigFromSettingsMock.mockResolvedValue({
+      provider: 'oidc',
+      issuer: 'https://idp.example.com',
+      clientId: 'idp-client',
+      clientSecret: null,
+      tenantId: null,
+      allowedDomain: null,
+      label: 'IdP'
+    });
+    discoverMock.mockResolvedValue({
+      authorizationEndpoint: 'https://idp.example.com/authorize',
+      tokenEndpoint: 'https://idp.example.com/token',
+      jwksUri: 'https://idp.example.com/jwks',
+      issuer: 'https://idp.example.com'
+    });
+    finishLoginMock.mockResolvedValue({ ok: true, userId: 'user-1' });
+    const cookie = sealedLogin({
+      state: 'state-1',
+      nonce: 'nonce-1',
+      codeVerifier: 'verifier-1',
+      authorizeParams: null,
+      security: true
+    });
+    const err = await GET(
+      eventFor('state=state-1&code=auth-code', cookie)
+    ).catch((caught: unknown) => caught);
+    expect(isRedirect(err) && err.location).toBe(
+      'https://pbx.example.com/auth/security'
+    );
+    expect(securitySession(cookie)).toMatchObject({ userId: 'user-1' });
   });
 
   it('fails as a server error, not as an expired link, while SECRETBOX_KEY is malformed', async () => {

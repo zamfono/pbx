@@ -29,11 +29,12 @@ const RANDOM_TOKEN_BYTES = 32;
  * The client is not yet authenticated at this point, so nothing is written to `oauth_clients`
  * here; the callback seals a consent decision once `finishLogin` actually succeeds, and
  * `approveConsentSubmit` upserts the row once the person approves it, the same as a password
- * sign-in.
+ * sign-in. The security page's sign-in starts the same flow with `opens` `security` (§5.2).
  */
 export async function ssoSubmit(
   event: RequestEvent,
-  payload: AuthorizePayload
+  payload: AuthorizePayload,
+  opens: 'login' | 'security' = 'login'
 ): Promise<never> {
   const db = getDb();
   const kr = keyringFromEnv(env);
@@ -56,7 +57,8 @@ export async function ssoSubmit(
     state,
     nonce,
     codeVerifier,
-    authorizeParams: resolved?.authorize ?? null
+    authorizeParams: resolved?.authorize ?? null,
+    ...(opens === 'security' ? { security: true } : {})
   });
   redirect(
     HTTP_FOUND,

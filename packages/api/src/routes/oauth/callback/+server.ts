@@ -8,6 +8,7 @@ import { clientMetaFor } from '#lib/server/auth/clients.js';
 import { authCodeStore } from '#lib/server/auth/codes.js';
 import { CONSENT_COOKIE } from '#lib/server/auth/consent.js';
 import { loginRedirect } from '#lib/server/auth/loginRedirect.js';
+import { startSecuritySession } from '#lib/server/auth/mfa/securitySession.js';
 import {
   discover,
   type Discovery,
@@ -85,7 +86,8 @@ async function finishLoginOrErrorPage(
  * any other browser. On success, a sign-in for an outer client seals a consent decision into the
  * `zamfono_consent` cookie and returns to `/oauth/authorize` to render the consent step naming
  * that client, the same as the password form (§5.2 "Authentication pages": "a consent step naming
- * the requesting client"); a sign-in without one goes straight to the post-login page.
+ * the requesting client"); a sign-in without one goes straight to the post-login page, and one
+ * the security page started opens that page's session.
  */
 export async function GET(event: RequestEvent): Promise<Response> {
   const origin = originFromEnv();
@@ -122,6 +124,12 @@ export async function GET(event: RequestEvent): Promise<Response> {
   );
   if (!result.ok) {
     toErrorPage(origin, publicReason(result.reason));
+  }
+  if (pending.security === true) {
+    startSecuritySession(event.cookies, result.userId);
+    redirect(HTTP_FOUND, new URL('/auth/security', origin).toString(), {
+      external: [origin]
+    });
   }
   if (pending.authorizeParams === null) {
     redirect(

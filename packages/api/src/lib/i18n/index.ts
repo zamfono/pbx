@@ -45,6 +45,31 @@ export type Dictionary = {
     passkeyName: string;
     addPasskey: string;
   };
+  /** The security page, where a person manages their own second factors (§5.2). */
+  security: {
+    title: string;
+    signInIntro: string;
+    signedInAs: string;
+    required: string;
+    totp: string;
+    totpOn: string;
+    totpOff: string;
+    totpStart: string;
+    totpReplace: string;
+    totpRemove: string;
+    totpConfirm: string;
+    passkeys: string;
+    noPasskeys: string;
+    lastUsed: string;
+    neverUsed: string;
+    remove: string;
+    recoveryCodes: string;
+    codesLeft: string;
+    regenerate: string;
+    codesNeedMethod: string;
+    lastMethod: string;
+    landingLink: string;
+  };
   forgot: {
     title: string;
     intro: string;
