@@ -11,6 +11,7 @@ import { ringExternalLeg } from './externalLeg.js';
 import {
   CONDITION_REASONS,
   diversionFor,
+  recordingOf,
   type ForwardLeg
 } from './forwardContext.js';
 import { sipForwardLeg } from './forwardValues.js';
@@ -65,7 +66,8 @@ export async function originateExternalLeg(
           memberKey,
           state: 'placing',
           external: true,
-          standsInFor: memberKey
+          standsInFor: memberKey,
+          ...recordingOf(target)
         });
       },
       track: channelId => {

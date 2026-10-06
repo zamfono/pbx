@@ -58,3 +58,38 @@ test('a sip target names a trunk it keeps, and a safe user part', async () => {
     )
   ).rejects.toThrow(/FOREIGN KEY constraint failed/u);
 });
+
+// `record_calls`: an external or sip target records the calls it answers (§10.2 "Recording
+// semantics"); no other kind dials a trunk leg to record.
+test.each([
+  [
+    'an external target',
+    sql`INSERT INTO forward_targets (id, external, record_calls) VALUES ('r1', '+431', 1)`
+  ],
+  [
+    'a sip target',
+    sql`INSERT INTO forward_targets (id, sip_trunk_id, sip_user, sip_headers_json, record_calls) VALUES ('r2', 't1', 'a', '[]', 1)`
+  ]
+])('%s may record its calls', async (label, statement) => {
+  const db = await withTrunk();
+  await expect(statement.execute(db)).resolves.toBeDefined();
+});
+
+test.each([
+  [
+    'a mailbox target that records',
+    sql`INSERT INTO forward_targets (id, mailbox_user_id, record_calls) VALUES ('r3', 'u1', 1)`
+  ],
+  [
+    'a recording flag other than 0 or 1',
+    sql`INSERT INTO forward_targets (id, external, record_calls) VALUES ('r4', '+431', 2)`
+  ]
+])('a forward target refuses %s', async (label, statement) => {
+  const db = await withTrunk();
+  await sql`INSERT INTO users (id, name, email, created_at) VALUES ('u1', 'A', 'a@x', 't')`.execute(
+    db
+  );
+  await expect(statement.execute(db)).rejects.toThrow(
+    /CHECK constraint failed/u
+  );
+});

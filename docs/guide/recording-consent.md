@@ -1,8 +1,10 @@
 # Recording: announcement and consent
 
 Call recording is off by default and enabled per user or per ring group by an admin
-(`users.recordCalls`, `ringGroups.recordCalls`). Once on, a call yields one stereo recording per
-recorded participation: left channel the recorded user, right channel everything they heard.
+(`users.recordCalls`, `ringGroups.recordCalls`), or per `external` or `sip` forward target
+(`"record": true`), which records every call it answers. Once on, a call yields one stereo
+recording per recorded participation: left channel the recorded user or target, right channel
+everything they heard.
 Voicemail deposits, unanswered calls and feature-code service calls (`*95`, `*96`, `*97`) are
 never recorded — voicemail audio is already its own record.
 

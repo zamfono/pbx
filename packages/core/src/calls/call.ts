@@ -34,6 +34,9 @@ export type Leg = {
   /** The user whose `unconditional` forward this `trunk` leg, or external `member` leg, dials:
    * its participation and its answer are theirs (§10.2 "Effective flag", "Call history"). */
   standsInFor?: string;
+  /** The forward target this `trunk` leg, or external `member` leg, dials has its `record_calls`
+   * set: the leg is recorded whoever's participation it is (§10.2 "Effective flag"). */
+  targetRecords?: true;
   /** A `device` leg of the caller's own, rung before the call has a caller channel (§10.2
    * "Click-to-dial"): the caller's leg while it rings, and once it answers, the caller's leg under
    * the same id (§10.3 "Live calls"). */

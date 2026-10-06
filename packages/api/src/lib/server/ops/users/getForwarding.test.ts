@@ -61,17 +61,28 @@ describe('users.getForwarding', () => {
             kind: 'sip',
             trunkId,
             user: 'proj_def456',
-            headers: [...DEFAULT_SIP_HEADERS]
+            headers: [...DEFAULT_SIP_HEADERS],
+            record: false
           }
         },
         { condition: 'busy', target: { kind: 'mailboxUser', userId: anna.id } },
         {
           condition: 'noAnswer',
-          target: { kind: 'sip', trunkId, user: 'proj_abc123', headers }
+          target: {
+            kind: 'sip',
+            trunkId,
+            user: 'proj_abc123',
+            headers,
+            record: false
+          }
         },
         {
           condition: 'offline',
-          target: { kind: 'external', external: '+4915112345678' }
+          target: {
+            kind: 'external',
+            external: '+4915112345678',
+            record: false
+          }
         }
       ]
     });

@@ -21,6 +21,8 @@ export type GroupLeg = {
   external?: true;
   /** As a `Leg`'s: the member whose unconditional forward an external member leg dials. */
   standsInFor?: string;
+  /** As a `Leg`'s: the forward target an external member leg dials records its calls. */
+  targetRecords?: true;
 };
 
 /** Ends every one of `memberKey`'s still-ringing legs (§10.1 step 5: `allow_reject` stops ringing all of a declining member's devices). */

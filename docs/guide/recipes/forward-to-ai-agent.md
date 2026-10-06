@@ -56,6 +56,9 @@ outside the stack; this recipe gets the call to OpenAI. OpenAI's guide:
    opening hours is refused with 403 for it, except that their own forwarding may send an
    admin-set `sip` rule back unchanged, which keeps it (`guardrails`). The trunk cannot be deleted while a target dials over it.
 
+   Add `"record": true` to record every call the agent answers, one recording per call, however
+   it was forwarded there; a DID answered by the agent alone records each of its concurrent calls.
+
 3. Choose what the call tells your webhook. The target's `headers` lists the SIP headers the
    INVITE carries, each a `name` and a `value`:
 

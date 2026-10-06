@@ -15,6 +15,7 @@ why the specified behaviour changed; the commit history, how.
 
 - `/metrics` counts the packets and bytes the SIP ban dropped.
 - `system.checkUpdate` asks GitHub for the latest release now instead of within the hour.
+- An external or SIP forward target can record every call it answers (`"record": true`, admin-set).
 
 ### Changed
 

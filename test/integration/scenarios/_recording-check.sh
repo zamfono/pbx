@@ -8,7 +8,8 @@
 # removes the participation's raw pair once it stored the row (§10.2), so the rows are counted
 # once no raw pair is left in `media/recordings`: the scenario's call is the only one there was.
 #
-# Usage: _recording-check.sh <api-base> <token> <compose> <sample-rate-hz> [<member-extension>]
+# Usage: _recording-check.sh <api-base> <token> <compose> <sample-rate-hz> [<member-extension>|-]
+# (`-`: the recording is nobody's, as a recording forward target's on a DID of its own)
 set -euo pipefail
 
 api_base=$1
@@ -24,7 +25,11 @@ member_ext=${5:-101}
 MIN_AUDIO_BYTES=$((rate_hz * 2 * 2 / 2))
 
 call_id=$(await_new_call "$(cat "$(state_file recording-before)")" 15)
-member_id=$(user_with_ext "$member_ext")
+if [ "$member_ext" = - ]; then
+  member_id=-
+else
+  member_id=$(user_with_ext "$member_ext")
+fi
 # The call's own recordings, one `<id> <userId> <durationS>` line each.
 call_recordings() {
   api GET /recordings | python3 -c '

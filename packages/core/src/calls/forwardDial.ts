@@ -12,6 +12,7 @@ import type { TrunkRow } from './callerIdentity.js';
 import { dialRoutes } from './dialAttempt.js';
 import { openCursor, trunkWay } from './externalLegRoutes.js';
 import {
+  recordingOf,
   standInOf,
   type Forwarder,
   type ForwardLeg
@@ -71,7 +72,8 @@ async function dialSipTarget(
       [...call.diversions],
       snapshot
     )),
-    ...standInOf(forwarder)
+    ...standInOf(forwarder),
+    ...recordingOf(target)
   };
   const cursor = openCursor(
     {
@@ -94,8 +96,8 @@ async function dialSipTarget(
  * `forwarder` is the user whose own rule forwarded, not the original caller, and `null` when a DID,
  * menu, ring group or tenant rule forwards, which picks the routes of an external number and the
  * presented number and CLIR of either (§9.4). An own DID is entered internally instead (`enterOwnDid`).
- * The leg carries the hops so far, and stands in for a forwarder whose unconditional rule it is
- * (§10.2 "Effective flag").
+ * The leg carries the hops so far, stands in for a forwarder whose unconditional rule it is and is
+ * recorded when the target records (§10.2 "Effective flag").
  */
 export async function dialForwardTarget(
   pipeline: Pipeline,
@@ -117,7 +119,8 @@ export async function dialForwardTarget(
   const forward: ForwardLeg = {
     diversions: [...call.diversions],
     headers: [],
-    ...standInOf(forwarder)
+    ...standInOf(forwarder),
+    ...recordingOf(target)
   };
   await dialExternal(
     { pipeline, trunkChannels, forward },

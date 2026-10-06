@@ -65,7 +65,11 @@ describe('sip forward targets', () => {
     const trunkId = await createOpenAiTrunk(db);
     const did = await createDid(db, sipTarget(trunkId));
     // A write without headers gets the defaults, which every read returns (§10.3).
-    const stored = { ...sipTarget(trunkId), headers: DEFAULT_SIP_HEADERS };
+    const stored = {
+      ...sipTarget(trunkId),
+      headers: DEFAULT_SIP_HEADERS,
+      record: false
+    };
     expect(did.target).toEqual(stored);
     const row = await db
       .selectFrom('dids')

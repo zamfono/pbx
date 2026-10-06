@@ -11,7 +11,7 @@ import { propagate } from '../propagate.js';
 import { defineOperation, OpError, type Context } from '../types.js';
 import {
   forwardingSchema,
-  isSameSipTarget,
+  isSameAdminTarget,
   storedForwardRules,
   type Forwarding,
   type StoredForwardRule
@@ -22,11 +22,12 @@ type Rule = Forwarding['rules'][number];
 
 /**
  * §10.3 "Forward targets": the stored target rows a `user` actor's input keeps as they are, by
- * condition, each a rule sent back with the very `sip` target its own condition already holds.
- * Matched only under the same condition, so a `sip` target moved to another one is new and goes
- * through `createTarget`'s 403; an admin's input keeps none and writes every target afresh.
+ * condition, each a rule sent back with the very admin target (a `sip` one, or an `external` one
+ * that records) its own condition already holds. Matched only under the same condition, so such a
+ * target moved to another one is new and goes through `createTarget`'s 403; an admin's input keeps
+ * none and writes every target afresh.
  */
-function keptSipTargets(
+function keptAdminTargets(
   ctx: Context,
   existing: StoredForwardRule[],
   rules: Rule[]
@@ -37,7 +38,7 @@ function keptSipTargets(
   }
   for (const rule of rules) {
     const stored = existing.find(each => each.condition === rule.condition);
-    if (stored && isSameSipTarget(stored.target, rule.target)) {
+    if (stored && isSameAdminTarget(stored.target, rule.target)) {
       kept.set(rule.condition, stored.targetId);
     }
   }
@@ -46,14 +47,14 @@ function keptSipTargets(
 
 /**
  * `PUT /users/{id}/forwarding` (§10.3, §11.2): replaces a user's forwarding rules as a whole,
- * self-service on a `user` actor's own id (§10.3 "Users"). A `sip` target is refused for a `user`
- * through `createTarget`, unless it is the one the rule's condition already holds, which keeps its
+ * self-service on a `user` actor's own id (§10.3 "Users"). A `sip` target, or an `external` one that
+ * records, is refused for a `user` through `createTarget`, unless it is the one the rule's condition already holds, which keeps its
  * own row; a rule the input leaves out is removed like any other (§10.3 "Forward targets").
  */
 export const setForwarding = defineOperation({
   name: 'users.setForwarding',
   description:
-    "Replaces a user's call-forwarding rules as a whole; a user sets their own, without new sip targets, an admin anyone's.",
+    "Replaces a user's call-forwarding rules as a whole; a user sets their own, without new sip or recording targets, an admin anyone's.",
   input: forwardingSchema,
   output: forwardingSchema,
   problems: [HTTP_NOT_FOUND],
@@ -74,7 +75,7 @@ export const setForwarding = defineOperation({
     }
     // Resolved before the delete below, since `forward_targets` rows are gone once it runs.
     const existing = await storedForwardRules(ctx.db, input.id);
-    const kept = keptSipTargets(ctx, existing, input.rules);
+    const kept = keptAdminTargets(ctx, existing, input.rules);
     const keptIds = new Set(kept.values());
     await ctx.db
       .deleteFrom('userForwardRules')

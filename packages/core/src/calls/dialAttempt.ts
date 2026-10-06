@@ -97,13 +97,15 @@ function followAlerts(
 }
 
 /** The `trunk` leg `channelId` of an attempt to `candidate`, still placing; a forward's stands in
- * for the user whose unconditional rule it is (§10.2 "Effective flag"). */
+ * for the user whose unconditional rule it is, and is recorded when its target records (§10.2
+ * "Effective flag"). */
 function placingLeg(
   cursor: RouteCursor,
   candidate: Candidate,
   channelId: string
 ): Leg {
   const standsInFor = cursor.forward?.standsInFor;
+  const targetRecords = cursor.forward?.targetRecords;
   return {
     id: newId(),
     channelId,
@@ -113,7 +115,8 @@ function placingLeg(
     endCause: null,
     trunkId: candidate.trunk.id,
     target: cursor.number,
-    ...(standsInFor === undefined ? {} : { standsInFor })
+    ...(standsInFor === undefined ? {} : { standsInFor }),
+    ...(targetRecords === undefined ? {} : { targetRecords })
   };
 }
 

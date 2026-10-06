@@ -7,6 +7,7 @@ import {
   type UserForwardCondition
 } from '@zamfono/shared';
 
+import { isAdminTarget } from '../forwardTargets.js';
 import { targetSpecSchema, type TargetSpec } from '../forwardTargetSchema.js';
 import { rowToTarget } from '../forwardTargetSpec.js';
 
@@ -76,20 +77,28 @@ function headerPairs(headers: SipHeaderTemplate[]): string {
 }
 
 /**
- * §10.3 "Forward targets": whether `input` is the very `sip` target `stored` holds, the same
- * trunk, user part and headers, in order, name for name and value for value. `stored` comes
- * through `rowToTarget`, so its headers are the parsed JSON the wire returns.
+ * §10.3 "Forward targets": whether `input` is the very admin target (`isAdminTarget`) `stored`
+ * holds, with the same `record`: the same number, or the same trunk, user part and headers, in
+ * order, name for name and value for value. `stored` comes through `rowToTarget`, so its headers
+ * are the parsed JSON the wire returns.
  */
-export function isSameSipTarget(
+export function isSameAdminTarget(
   stored: TargetSpec,
   input: TargetSpec
 ): boolean {
+  if (!isAdminTarget(stored)) {
+    return false;
+  }
+  if (stored.kind === 'external' && input.kind === 'external') {
+    return stored.external === input.external && stored.record === input.record;
+  }
   if (stored.kind !== 'sip' || input.kind !== 'sip') {
     return false;
   }
   return (
     stored.trunkId === input.trunkId &&
     stored.user === input.user &&
-    headerPairs(stored.headers) === headerPairs(input.headers)
+    headerPairs(stored.headers) === headerPairs(input.headers) &&
+    stored.record === input.record
   );
 }

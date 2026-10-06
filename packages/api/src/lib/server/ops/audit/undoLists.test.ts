@@ -30,8 +30,12 @@ async function undoLatest(
   await runOperation(db, 'audit.undo', { id: entry.id }, asConfirmedRun());
 }
 
-function external(number: string): { kind: 'external'; external: string } {
-  return { kind: 'external', external: number };
+function external(number: string): {
+  kind: 'external';
+  external: string;
+  record: boolean;
+} {
+  return { kind: 'external', external: number, record: false };
 }
 
 describe('audit.undo of a whole-list replace', () => {

@@ -44,7 +44,8 @@ describe('targetFromRow', () => {
     mailboxUserId: null,
     mailboxRingGroupId: null,
     announcementAudioId: null,
-    menuId: null
+    menuId: null,
+    recordCalls: 0
   };
 
   it("reads a sip target's column pair and its headers", () => {
@@ -54,5 +55,22 @@ describe('targetFromRow', () => {
       user: 'proj_1',
       headers: [{ name: 'X-Called', value: '{{calledExtension}}' }]
     });
+  });
+
+  it('reads a recording target as one that records (§10.2 "Recording semantics")', () => {
+    expect(targetFromRow({ ...sipRow, recordCalls: 1 })).toMatchObject({
+      kind: 'sip',
+      record: true
+    });
+    expect(
+      targetFromRow({
+        ...sipRow,
+        external: '+15557777',
+        sipTrunkId: null,
+        sipUser: null,
+        sipHeaders: null,
+        recordCalls: 1
+      })
+    ).toEqual({ kind: 'external', number: '+15557777', record: true });
   });
 });

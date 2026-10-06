@@ -41,7 +41,8 @@ describe('menus', () => {
     )) as { id: string; fallbackTarget: unknown };
     expect(menu.fallbackTarget).toEqual({
       kind: 'external',
-      external: '+490000000'
+      external: '+490000000',
+      record: false
     });
   });
 
@@ -243,7 +244,8 @@ describe('menus', () => {
     )) as { fallbackTarget: unknown };
     expect(updated.fallbackTarget).toEqual({
       kind: 'external',
-      external: '+491111111'
+      external: '+491111111',
+      record: false
     });
     const targets = await db.selectFrom('forwardTargets').selectAll().execute();
     expect(targets).toHaveLength(1);

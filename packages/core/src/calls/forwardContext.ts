@@ -181,6 +181,8 @@ export type ForwardLeg = {
   headers: SipHeader[];
   /** The user whose unconditional forward the leg dials (`Leg.standsInFor`). */
   standsInFor?: string;
+  /** The target the leg dials records its calls (`Leg.targetRecords`). */
+  targetRecords?: true;
 };
 
 /** The user whose own rule forwards a call (§10.1 step 7), whose call an external or SIP target is
@@ -193,6 +195,13 @@ export function standInOf(
   forwarder: Forwarder | null
 ): Pick<ForwardLeg, 'standsInFor'> {
   return forwarder?.standsIn === true ? { standsInFor: forwarder.userId } : {};
+}
+
+/** The `ForwardLeg.targetRecords` of a leg dialled for `target` (§10.2 "Recording semantics"). */
+export function recordingOf(target: {
+  record?: true;
+}): Pick<ForwardLeg, 'targetRecords'> {
+  return target.record === true ? { targetRecords: true } : {};
 }
 
 /** The forwarding context `forward`'s leg carries over `trunk` (§9.4 "Forwarded calls"): its

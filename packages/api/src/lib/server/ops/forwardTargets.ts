@@ -6,17 +6,30 @@ import { insertForwardTarget } from './forwardTargetSpec.js';
 import { OpError, type Context } from './types.js';
 
 /**
- * §10.3 "Forward targets": a `sip` target is set or kept by an `admin` or `owner` alone, since it
- * sends calls to whatever host its trunk names (§9.4 "SIP targets"). The one check for every
- * operation a `user` may call, their own forwarding, OOO rules and opening hours: each writes its
- * targets through `createTarget`, and `ooo.update` calls this for the target it keeps, while
- * `users.setForwarding` keeps, without writing it, only the very `sip` target a rule's condition
- * already holds. The admin-only operations need it only through `createTarget`, where it always
- * passes.
+ * Whether only an `admin` or `owner` sets or keeps `target` (§10.3 "Forward targets"): a `sip`
+ * target, which sends calls to whatever host its trunk names (§9.4 "SIP targets"), and an
+ * `external` one that records (§10.2 "Recording semantics").
+ */
+export function isAdminTarget(target: TargetSpec): boolean {
+  return target.kind === 'sip' || (target.kind === 'external' && target.record);
+}
+
+/**
+ * §10.3 "Forward targets": an admin target (`isAdminTarget`) is set or kept by an `admin` or
+ * `owner` alone. The one check for every operation a `user` may call, their own forwarding, OOO
+ * rules and opening hours: each writes its targets through `createTarget`, and `ooo.update` calls
+ * this for the target it keeps, while `users.setForwarding` keeps, without writing it, only the
+ * very admin target a rule's condition already holds. The admin-only operations need it only
+ * through `createTarget`, where it always passes.
  */
 export function assertMayHoldTarget(ctx: Context, target: TargetSpec): void {
-  if (target.kind === 'sip' && ctx.actor.role === 'user') {
-    throw new OpError(HTTP_FORBIDDEN, 'a sip target is set by an admin');
+  if (isAdminTarget(target) && ctx.actor.role === 'user') {
+    throw new OpError(
+      HTTP_FORBIDDEN,
+      target.kind === 'sip'
+        ? 'a sip target is set by an admin'
+        : 'a recording target is set by an admin'
+    );
   }
 }
 

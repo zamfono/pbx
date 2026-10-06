@@ -7,8 +7,11 @@ import { liveRow } from './rows.js';
 import { udpHeadersWarning } from './sipHeaders.js';
 import { type Context } from './types.js';
 
-/** The one column `spec` sets on its `forward_targets` row; every other column stays `null`. */
-function forwardTargetColumns(spec: TargetSpec): Record<string, string> {
+/** The one column `spec` sets on its `forward_targets` row, with an `external` or `sip` target's
+ * `record_calls`; every other column stays `null`. */
+function forwardTargetColumns(
+  spec: TargetSpec
+): Record<string, string | number> {
   if (spec.kind === 'user') {
     return { userId: spec.userId };
   }
@@ -16,13 +19,14 @@ function forwardTargetColumns(spec: TargetSpec): Record<string, string> {
     return { ringGroupId: spec.ringGroupId };
   }
   if (spec.kind === 'external') {
-    return { external: spec.external };
+    return { external: spec.external, recordCalls: spec.record ? 1 : 0 };
   }
   if (spec.kind === 'sip') {
     return {
       sipTrunkId: spec.trunkId,
       sipUser: spec.user,
-      sipHeadersJson: JSON.stringify(spec.headers)
+      sipHeadersJson: JSON.stringify(spec.headers),
+      recordCalls: spec.record ? 1 : 0
     };
   }
   if (spec.kind === 'mailboxUser') {
@@ -48,6 +52,7 @@ type ForwardTargetColumns = {
   mailboxRingGroupId: string | null;
   announcementAudioId: string | null;
   menuId: string | null;
+  recordCalls: number;
 };
 
 /** The inverse of `forwardTargetColumns`: the wire target a `forward_targets` row represents. */
@@ -59,7 +64,11 @@ export function rowToTarget(row: ForwardTargetColumns): TargetSpec {
     return { kind: 'ringGroup', ringGroupId: row.ringGroupId };
   }
   if (row.external !== null) {
-    return { kind: 'external', external: row.external };
+    return {
+      kind: 'external',
+      external: row.external,
+      record: row.recordCalls === 1
+    };
   }
   // The table's CHECKs set `sip_user` and `sip_headers_json` exactly when `sip_trunk_id` is set.
   if (
@@ -71,7 +80,8 @@ export function rowToTarget(row: ForwardTargetColumns): TargetSpec {
       kind: 'sip',
       trunkId: row.sipTrunkId,
       user: row.sipUser,
-      headers: sipHeadersColumn.decode(row.sipHeadersJson)
+      headers: sipHeadersColumn.decode(row.sipHeadersJson),
+      record: row.recordCalls === 1
     };
   }
   if (row.mailboxUserId !== null) {

@@ -9,12 +9,13 @@ import type { Snapshot } from '../internal/snapshot.js';
 export type ForwardTarget =
   | { kind: 'user'; userId: string }
   | { kind: 'ringGroup'; ringGroupId: string }
-  | { kind: 'external'; number: string }
+  | { kind: 'external'; number: string; record?: true }
   | {
       kind: 'sip';
       trunkId: string;
       user: string;
       headers: SipHeaderTemplate[];
+      record?: true;
     }
   | { kind: 'mailboxUser'; userId: string }
   | { kind: 'mailboxRingGroup'; ringGroupId: string }
@@ -22,7 +23,7 @@ export type ForwardTarget =
   | { kind: 'menu'; menuId: string };
 
 /** A `forward_targets` row: exactly one target is set, `sip`'s being its column pair, enforced by
- * the table's CHECK. */
+ * the table's CHECK, which also allows `record_calls` on an `external` or `sip` target alone. */
 type ForwardTargetsRow = {
   id: string;
   userId: string | null;
@@ -36,7 +37,13 @@ type ForwardTargetsRow = {
   mailboxRingGroupId: string | null;
   announcementAudioId: string | null;
   menuId: string | null;
+  recordCalls: number;
 };
+
+/** An `external` or `sip` target's `record` (§10.2 "Recording semantics"): set only when it records. */
+function recordOf(row: ForwardTargetsRow): { record?: true } {
+  return row.recordCalls === 1 ? { record: true } : {};
+}
 
 /** Reads the one set column of `row` into the `ForwardTarget` union it represents. */
 export function targetFromRow(row: ForwardTargetsRow): ForwardTarget {
@@ -47,7 +54,7 @@ export function targetFromRow(row: ForwardTargetsRow): ForwardTarget {
     return { kind: 'ringGroup', ringGroupId: row.ringGroupId };
   }
   if (row.external !== null) {
-    return { kind: 'external', number: row.external };
+    return { kind: 'external', number: row.external, ...recordOf(row) };
   }
   // The table's CHECKs set `sip_user` and `sip_headers_json` exactly when `sip_trunk_id` is set.
   if (
@@ -59,7 +66,8 @@ export function targetFromRow(row: ForwardTargetsRow): ForwardTarget {
       kind: 'sip',
       trunkId: row.sipTrunkId,
       user: row.sipUser,
-      headers: row.sipHeaders
+      headers: row.sipHeaders,
+      ...recordOf(row)
     };
   }
   if (row.mailboxUserId !== null) {

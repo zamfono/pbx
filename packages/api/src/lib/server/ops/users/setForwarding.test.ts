@@ -26,7 +26,11 @@ describe('users.setForwarding, self-service', () => {
       { condition: 'busy', target: { kind: 'mailboxUser', userId: anna.id } },
       {
         condition: 'noAnswer',
-        target: { kind: 'external', external: '+4915112345678' }
+        target: {
+          kind: 'external',
+          external: '+4915112345678',
+          record: false
+        }
       }
     ];
     const out = await setForwarding(db, anna.id, rules, anna);

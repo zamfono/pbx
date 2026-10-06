@@ -83,7 +83,11 @@ describe('audit.undo of a settings.update', () => {
   it('restores the tenant fallback target a change replaced (§5.8)', async () => {
     const db = await makeTestDb();
     await seedSettings(db);
-    const first: TargetSpec = { kind: 'external', external: '+491111111' };
+    const first: TargetSpec = {
+      kind: 'external',
+      external: '+491111111',
+      record: false
+    };
     await updateSettings(db, { fallbackTarget: first });
     await updateSettings(db, {
       fallbackTarget: { kind: 'external', external: '+492222222' }
