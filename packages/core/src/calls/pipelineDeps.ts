@@ -11,7 +11,7 @@ import type { StateStore } from '../internal/stateStore.js';
 import type { Presence } from '../presence.js';
 import type { Call } from './call.js';
 import type { ParticipationRecorder } from './recordParticipation.js';
-import type { TrunkState } from './trunkState.js';
+import type { TrunkChannels } from './trunkChannels.js';
 import type { MailSender } from './voicemail.js';
 
 export type PipelineDeps = {
@@ -60,9 +60,9 @@ export type PipelineDeps = {
   // exists).
   logger: Logger;
   // `addParty.ts`'s `addParty` reaches `outboundExternal.ts`'s `originateExternalLeg` through
-  // `trunkState` for an external `*5` target, and the ring/answer/end call sites in
+  // `trunkChannels` for an external `*5` target, and the ring/answer/end call sites in
   // `outbound.ts`, `legs.ts`, `legsEnded.ts`, `ringGroup.ts` and `ringGroupDial.ts` call
   // `presence.setCallState` (§10.2 "Presence and BLF", "Three-way calls").
-  trunkState: TrunkState;
+  trunkChannels: TrunkChannels;
   presence: Presence;
 };

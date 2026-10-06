@@ -450,7 +450,7 @@ describe('outbound dialing', () => {
     const trunk2 = await seedTrunk(db, { priority: 2 });
     await seedRoute(db, trunk1, { priority: 1 });
     await seedRoute(db, trunk2, { priority: 2 });
-    pipeline.deps.trunkState.noteAttemptStarted(trunk1, 'busy-channel');
+    pipeline.deps.trunkChannels.noteAttemptStarted(trunk1, 'busy-channel');
 
     const call = await dial('+498912345');
 

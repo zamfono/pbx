@@ -13,7 +13,7 @@ import { dialCause, dialRoutes, type DialResult } from './dialAttempt.js';
 import { openCursor } from './externalLegRoutes.js';
 import type { Pipeline } from './pipeline.js';
 import { release } from './release.js';
-import type { TrunkState } from './trunkState.js';
+import type { TrunkChannels } from './trunkChannels.js';
 
 /** An emergency call's routing trace is kept at level `events` whatever the tenant default
  * (§10.1 "Emergency calls"). */
@@ -33,7 +33,7 @@ export function emergencyLogLevel(
  * cannot present the call. */
 async function attemptEmergencyTrunk(params: {
   pipeline: Pipeline;
-  trunkState: TrunkState;
+  trunkChannels: TrunkChannels;
   call: Call;
   trunkId: string;
   number: string;
@@ -91,7 +91,7 @@ function anyLiveEmergencyTrunk(
  */
 export async function dialEmergency(
   pipeline: Pipeline,
-  trunkState: TrunkState,
+  trunkChannels: TrunkChannels,
   call: Call,
   number: string,
   asUser: string | null
@@ -111,7 +111,7 @@ export async function dialEmergency(
     // eslint-disable-next-line no-await-in-loop -- trunks are tried one at a time, in priority order, until one succeeds
     const outcome = await attemptEmergencyTrunk({
       pipeline,
-      trunkState,
+      trunkChannels,
       call,
       trunkId,
       number,

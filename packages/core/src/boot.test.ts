@@ -5,7 +5,6 @@ import { nowIso, openDb, type Db } from '@zamfono/shared';
 import { AmiClient } from './ami/client.js';
 import { AriClient } from './ari/client.js';
 import { buildPipeline } from './boot.js';
-import { TrunkState } from './calls/trunkState.js';
 import { readEnv } from './env.js';
 import { EventBus } from './internal/eventBus.js';
 import { ConfigCache } from './internal/snapshot.js';
@@ -57,12 +56,6 @@ describe('buildPipeline', () => {
         }),
         tz: stackTz
       },
-      trunkState: new TrunkState({
-        log: noopLogger,
-        ...deps,
-        ami,
-        plainTransports: { sipUdpEnabled: true, sipTcpEnabled: true }
-      }),
       presence: new Presence({ log: noopLogger, ...deps, db })
     });
     return { ...built, state };

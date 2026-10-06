@@ -239,7 +239,6 @@ describe('CallActions: parking, voicemail deposit and per-call CLIR', () => {
 
   it('withholds the number of a click-to-dial with clir, as #31# would, but never an emergency call’s', async () => {
     await setUp();
-    pipeline.deps.trunkState = rig.trunkState();
     await seedExternalRoute(db, 'both');
     const anna = await seedUser(db, { ext: '101' });
     await seedRegisteredDevice(rig, anna, 'e101-a');

@@ -201,7 +201,7 @@ export async function ringExternalLeg(
   target: ExternalLegTarget,
   owner: ExternalLegOwner
 ): Promise<void> {
-  const { trunkState } = pipeline.deps;
+  const { trunkChannels } = pipeline.deps;
   const dialable = target.trunkId !== undefined || isE164(target.number);
   if (!dialable) {
     call.log.event({ event: 'externalLegUnrouted', number: target.number });
@@ -224,7 +224,7 @@ export async function ringExternalLeg(
     ...openCursor(
       {
         pipeline,
-        trunkState,
+        trunkChannels,
         call,
         snapshot,
         number: target.number,

@@ -427,11 +427,11 @@ describe('inbound number normalization at the trunk boundary (§9.4)', () => {
 
   it('counts the call among the delivering trunk’s channels in use until its channel is destroyed', async () => {
     const trunkId = await seedInboundTrunk(db, 'national');
-    const { state, trunkState } = pipeline.deps;
+    const { state, trunkChannels } = pipeline.deps;
 
     const call = await arrive(trunkId, '030123456', '08912345');
 
-    expect(trunkState.activeChannels(trunkId)).toBe(1);
+    expect(trunkChannels.activeChannels(trunkId)).toBe(1);
     expect(state.snapshot().trunkChannels).toEqual({ [trunkId]: 1 });
 
     fakeAri.emit({
@@ -441,14 +441,14 @@ describe('inbound number normalization at the trunk boundary (§9.4)', () => {
       channel: { id: call?.callerChannelId }
     });
     await eventually(() => {
-      expect(trunkState.activeChannels(trunkId)).toBe(0);
+      expect(trunkChannels.activeChannels(trunkId)).toBe(0);
       expect(state.snapshot().trunkChannels).toEqual({});
     });
   });
 
   it('does not count a call whose channel is destroyed during the config read that names its trunk', async () => {
     const trunkId = await seedInboundTrunk(db, 'national');
-    const { trunkState } = pipeline.deps;
+    const { trunkChannels } = pipeline.deps;
     // The inbound entry's config read is held until the caller's hangup has been delivered.
     const { cache } = pipeline.deps;
     const readConfig = cache.get.bind(cache);
@@ -485,7 +485,7 @@ describe('inbound number normalization at the trunk boundary (§9.4)', () => {
     releaseRead();
     await entering;
 
-    expect(trunkState.activeChannels(trunkId)).toBe(0);
+    expect(trunkChannels.activeChannels(trunkId)).toBe(0);
   });
 
   // A SIP MESSAGE from a trunk peer runs `from-trunk` on Asterisk's `Message/ast_msg_queue`

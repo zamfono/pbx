@@ -116,7 +116,6 @@ describe('do not disturb and call presence', () => {
 
   it('*90 dialled from a registered device sets dnd, hint BUSY and presence dnd', async () => {
     await setUp();
-    pipeline.deps.trunkState = rig.trunkState();
     const userId = await seedUser(db);
     await seedExtension(db, '201', { userId });
     await seedDevice(db, userId, 'e201-dabc');
@@ -228,7 +227,6 @@ describe('do not disturb and call presence', () => {
 
   it('dialling a colleague marks the dialling user INUSE and the callee RINGING then INUSE, and ends both on hangup', async () => {
     await setUp();
-    pipeline.deps.trunkState = rig.trunkState();
     const callerUserId = await seedUser(db);
     await seedExtension(db, '100', { userId: callerUserId });
     await seedDevice(db, callerUserId, 'e100-dabc');

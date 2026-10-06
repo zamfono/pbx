@@ -130,7 +130,7 @@ function watchAttempt(
   start: (trunkLeg: TrunkLeg) => void;
   abandon: () => void;
 } {
-  const { pipeline, trunkState, call } = cursor;
+  const { pipeline, trunkChannels, call } = cursor;
   const { ari } = pipeline.deps;
   let dialled = false;
   let alerted = false;
@@ -171,7 +171,7 @@ function watchAttempt(
     }
   });
   const ended = wait.promise.then(end => {
-    trunkState.noteAttemptEnded(channelId);
+    trunkChannels.noteAttemptEnded(channelId);
     return end;
   });
   return {
@@ -207,13 +207,13 @@ export async function placeAttempt(
   track: (channelId: string) => void,
   dialling: () => void
 ): Promise<Placement> {
-  const { pipeline, call, trunkState, number, forward } = cursor;
+  const { pipeline, call, trunkChannels, number, forward } = cursor;
   const { trunk, identity, endpoint } = candidate;
   const channelId = newId();
   track(channelId);
   const attempt = watchAttempt(cursor, candidate, channelId);
   const trunkLeg = await originateTrunkLeg(
-    { pipeline, call, trunkState, trunk, number, identity, forward },
+    { pipeline, call, trunkChannels, trunk, number, identity, forward },
     endpoint,
     channelId,
     () => {

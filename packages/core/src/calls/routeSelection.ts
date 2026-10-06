@@ -20,7 +20,7 @@ import {
 } from './callerIdentity.js';
 import { buildRoutes, callerGroupIds } from './outboundLookup.js';
 import type { Pipeline } from './pipeline.js';
-import type { TrunkState } from './trunkState.js';
+import type { TrunkChannels } from './trunkChannels.js';
 
 /** `number`'s matching routes for a call made as `asUser`, in priority order (§9.4 "Outbound
  * routing"); `null` for a leg dialled on nobody's behalf, which matches only caller-less routes. */
@@ -59,7 +59,7 @@ export function routeTrunk(
  */
 export function prepareRoute(params: {
   pipeline: Pipeline;
-  trunkState: TrunkState;
+  trunkChannels: TrunkChannels;
   call: Call;
   /** `null` for a SIP target, which bypasses `outbound_routes` (§9.4 "SIP targets"). */
   route: Route | null;
@@ -70,7 +70,7 @@ export function prepareRoute(params: {
 }):
   | { ok: true; identity: AttemptIdentity }
   | { ok: false; failure: AttemptFailure } {
-  const { pipeline, trunkState, call, route, trunk, snapshot } = params;
+  const { pipeline, trunkChannels, call, route, trunk, snapshot } = params;
   const skip = (
     failure: AttemptFailure
   ): { ok: false; failure: AttemptFailure } => {
@@ -87,7 +87,7 @@ export function prepareRoute(params: {
     return skip({ kind: 'unreachable' });
   }
   if (
-    !channelCapAllows(trunkState.activeChannels(trunk.id), trunk.maxChannels)
+    !channelCapAllows(trunkChannels.activeChannels(trunk.id), trunk.maxChannels)
   ) {
     return skip({ kind: 'cap' });
   }

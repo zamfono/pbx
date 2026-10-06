@@ -13,7 +13,7 @@ import { originateExternalLeg } from './outboundExternal.js';
 import type { Pipeline } from './pipeline.js';
 import { release } from './release.js';
 import { ringGroup } from './ringGroup.js';
-import type { TrunkState } from './trunkState.js';
+import type { TrunkChannels } from './trunkChannels.js';
 import { runUserStep } from './userStep.js';
 
 /**
@@ -72,7 +72,7 @@ async function ringInternalTarget(
 /** An external number dialled through `outbound_routes` (§9.4), as the initiator's call with the
  * CLIR prefix dialled with it, its answer joining `activeBridgeId`. Whether the party joined. */
 async function dialExternalTarget(
-  ctx: { pipeline: Pipeline; trunkState: TrunkState },
+  ctx: { pipeline: Pipeline; trunkChannels: TrunkChannels },
   call: Call,
   activeBridgeId: string,
   target: Extract<AddedTarget, { kind: 'external' }>
@@ -137,10 +137,10 @@ export async function dialAddPartyTarget(
     }
     call.to = target.number;
     call.direction = 'outbound';
-    const { trunkState } = pipeline.deps;
+    const { trunkChannels } = pipeline.deps;
     if (target.kind === 'external') {
       return await dialExternalTarget(
-        { pipeline, trunkState },
+        { pipeline, trunkChannels },
         call,
         activeBridgeId,
         target
@@ -150,7 +150,7 @@ export async function dialAddPartyTarget(
     call.log.raise('events');
     await dialEmergency(
       pipeline,
-      trunkState,
+      trunkChannels,
       call,
       target.number,
       call.callerUserId

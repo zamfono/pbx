@@ -51,7 +51,7 @@ describe('resyncOnReconnect', () => {
     const call = await answeredCall(rig, userId);
     presence.setCallState(userId, 'inCall', null, null, call.id);
     const listeners = rig.ari.listenerCount('event');
-    pipeline.deps.trunkState.watchInboundLeg(call.callerChannelId ?? '')(
+    pipeline.deps.trunkChannels.watchInboundLeg(call.callerChannelId ?? '')(
       'trunk-1'
     );
     await resyncOnReconnect(pipeline);
@@ -72,7 +72,7 @@ describe('resyncOnReconnect', () => {
       expect(slotResets()).toBeGreaterThan(resetsBefore);
     });
     expect(presence.isInCall(userId)).toBe(false);
-    expect(pipeline.deps.trunkState.activeChannels('trunk-1')).toBe(0);
+    expect(pipeline.deps.trunkChannels.activeChannels('trunk-1')).toBe(0);
     // The trunk leg's watch, waiting for the caller's `ChannelDestroyed`, ended with it.
     expect(rig.ari.listenerCount('event')).toBe(listeners);
   });
@@ -84,14 +84,14 @@ describe('resyncOnReconnect', () => {
     await resyncOnReconnect(pipeline);
     const resetsBefore = slotResets();
     // A trunk leg that ended while the socket was down: its `ChannelDestroyed` never arrived.
-    pipeline.deps.trunkState.watchInboundLeg('gone-channel')('trunk-1');
+    pipeline.deps.trunkChannels.watchInboundLeg('gone-channel')('trunk-1');
 
     const back = reconnected();
     fakeAri.disconnectClient();
     await back;
 
     await eventually(() => {
-      expect(pipeline.deps.trunkState.activeChannels('trunk-1')).toBe(0);
+      expect(pipeline.deps.trunkChannels.activeChannels('trunk-1')).toBe(0);
     });
     expect(pipeline.callByChannel.get(legOf(call))).toBe(call);
     expect(slotResets()).toBe(resetsBefore);

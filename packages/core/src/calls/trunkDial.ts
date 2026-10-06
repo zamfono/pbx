@@ -22,7 +22,7 @@ import { diversionTrunk } from './forwardDiversion.js';
 import { originateLeg } from './legOriginate.js';
 import type { Pipeline } from './pipeline.js';
 import type { TrunkLeg } from './provisional.js';
-import type { TrunkState } from './trunkState.js';
+import type { TrunkChannels } from './trunkChannels.js';
 import { outboundHosts } from './trunkStatus.js';
 
 const SIP_5XX_LOW = 500;
@@ -129,7 +129,7 @@ export function retriesNextHost(failure: AttemptFailure): boolean {
 export type TrunkLegCtx = {
   pipeline: Pipeline;
   call: Call;
-  trunkState: TrunkState;
+  trunkChannels: TrunkChannels;
   trunk: TrunkRow;
   number: string;
   identity: AttemptIdentity;
@@ -151,7 +151,7 @@ export async function originateTrunkLeg(
   channelId: string,
   dialling: () => void
 ): Promise<TrunkLeg> {
-  const { pipeline, call, trunkState, trunk, number, identity } = ctx;
+  const { pipeline, call, trunkChannels, trunk, number, identity } = ctx;
   const variables: Record<string, string> = {
     'CALLERID(num)': identity.number
   };
@@ -166,7 +166,7 @@ export async function originateTrunkLeg(
   }
   // §7: the trunk carrying the call's leg counts toward its diagnostics level.
   raiseLogLevel(call.log, trunk, pipeline.deps.now());
-  trunkState.noteAttemptStarted(trunk.id, channelId);
+  trunkChannels.noteAttemptStarted(trunk.id, channelId);
   try {
     // Read after the attempt is counted, so the language adds no wait ahead of the channel count.
     const snapshot = await pipeline.deps.cache.get();
@@ -204,7 +204,7 @@ export async function originateTrunkLeg(
     );
     return { id: channel.id, name: channel.name };
   } catch (error: unknown) {
-    trunkState.noteAttemptEnded(channelId);
+    trunkChannels.noteAttemptEnded(channelId);
     throw error;
   }
 }

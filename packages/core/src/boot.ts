@@ -11,7 +11,7 @@ import type { Logger } from './ari/types.js';
 import { STASIS_WAIT_MS } from './calls/legOriginate.js';
 import { Pipeline } from './calls/pipeline.js';
 import { Recorder } from './calls/recording.js';
-import type { TrunkState } from './calls/trunkState.js';
+import { TrunkChannels } from './calls/trunkChannels.js';
 import { CdrWriter } from './cdr.js';
 import type { CoreEnv } from './env.js';
 import { asteriskAddresses, startHepListener } from './hep.js';
@@ -29,8 +29,8 @@ const HEP_PORT = 9060;
 
 /**
  * The call pipeline and the collaborators it owns: the CDR writer (§7 "Call history"), the
- * recorder (§10.2 "Call recording") and the mail client that carries a deposit to `api`
- * (§3.1 "Mail").
+ * recorder (§10.2 "Call recording"), the mail client that carries a deposit to `api`
+ * (§3.1 "Mail") and the per-trunk channel count (§9.4 "Channels").
  */
 export function buildPipeline(deps: {
   db: Db;
@@ -41,7 +41,6 @@ export function buildPipeline(deps: {
   bus: EventBus;
   log: Logger;
   env: CoreEnv;
-  trunkState: TrunkState;
   presence: Presence;
 }): { pipeline: Pipeline; cdr: CdrWriter; recorder: Recorder } {
   const { db, ari, ami, cache, state, bus, log, env } = deps;
@@ -71,7 +70,7 @@ export function buildPipeline(deps: {
     db,
     apiClient: new ApiClient(env.apiInternalUrl),
     logger: log,
-    trunkState: deps.trunkState,
+    trunkChannels: new TrunkChannels({ ari, state }),
     presence: deps.presence
   });
   return { pipeline, cdr, recorder };

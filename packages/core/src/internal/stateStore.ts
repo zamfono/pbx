@@ -23,7 +23,7 @@ export class StateStore {
   /** The hold on each conversation, by its bridge (`hold.ts`), which the calls' legs show. */
   readonly holds = new Map<string, Hold>();
   readonly trunks = new Map<string, TrunkStatus>();
-  /** Active legs per trunk id (§9.4 "Channels"), which `TrunkState` counts. */
+  /** Active legs per trunk id (§9.4 "Channels"), which `TrunkChannels` counts. */
   readonly trunkChannels = new Map<string, number>();
   readonly presence = new Map<string, Presence>();
 

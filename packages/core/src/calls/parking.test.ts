@@ -222,7 +222,6 @@ describe('parking', () => {
   /** The retriever's own user, extension and device, added after `setUpParkedCall` warmed the
    * config snapshot; the invalidation stands in for the api's `/internal/configChanged`. */
   async function seedRetriever(): Promise<string> {
-    pipeline.deps.trunkState = rig.trunkState();
     const retrieverUserId = await seedUser(db);
     await seedExtension(db, '200', { userId: retrieverUserId });
     await seedDevice(db, retrieverUserId, 'e200-dabc');

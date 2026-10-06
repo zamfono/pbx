@@ -25,7 +25,7 @@ import type { Pipeline } from './pipeline.js';
 import { sipToHangupCause } from './releaseCause.js';
 import { ringGroup } from './ringGroup.js';
 import { ringUser } from './ringUser.js';
-import type { TrunkState } from './trunkState.js';
+import type { TrunkChannels } from './trunkChannels.js';
 
 // How long the fake Asterisk takes to answer the read of a channel's hangup-cause hash.
 const SLOW_READ_MS = 600;
@@ -130,7 +130,7 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
   let db: Db;
   let fakeAri: FakeAri;
   let ari: AriClient;
-  let trunkState: TrunkState;
+  let trunkChannels: TrunkChannels;
   let pipeline: Pipeline;
   let callerChannel: Channel;
   let call: Call;
@@ -165,7 +165,7 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
   beforeEach(async () => {
     rig = await startRig();
     ({ db, fakeAri, ari, pipeline } = rig);
-    trunkState = pipeline.deps.trunkState;
+    trunkChannels = pipeline.deps.trunkChannels;
     fakeAri.answerAfterMs = 60_000;
     await db
       .updateTable('settings')
@@ -222,7 +222,7 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
       const leg = originates(fakeAri).at(0);
       expect(leg?.callerId).toBe('+491230000');
       expect(leg?.variables?.['CALLERID(num)']).toBe('+491230000');
-      expect(trunkState.activeChannels(trunkId)).toBe(1);
+      expect(trunkChannels.activeChannels(trunkId)).toBe(1);
 
       const externalChannel = await channelTo(ari, external);
       const deviceChannel = await channelTo(ari, 'PJSIP/member-other');
@@ -234,7 +234,7 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
       expect(hangups(fakeAri, externalChannel.id)).toBe(1);
       emit('ChannelDestroyed', externalChannel.id, { cause: 16 });
       await eventually(() => {
-        expect(trunkState.activeChannels(trunkId)).toBe(0);
+        expect(trunkChannels.activeChannels(trunkId)).toBe(0);
       });
     });
 
@@ -288,8 +288,8 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
         `PJSIP/+15557777@trunk-${trunk2}`
       ]);
       expect(call.status).toBeNull();
-      expect(trunkState.activeChannels(trunk1)).toBe(0);
-      expect(trunkState.activeChannels(trunk2)).toBe(1);
+      expect(trunkChannels.activeChannels(trunk1)).toBe(0);
+      expect(trunkChannels.activeChannels(trunk2)).toBe(1);
       const second = await channelTo(ari, `PJSIP/+15557777@trunk-${trunk2}`);
       emit('ChannelStateChange', second.id, { state: 'Up' });
       await finished;

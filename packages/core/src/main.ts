@@ -81,8 +81,7 @@ function createAmiClient(env: CoreEnv, log: Logger): AmiClient {
  * constructor and seeds registration state from the boot `endpoints.list` in `resyncOnBoot`;
  * `TrunkState` likewise wires itself to ARI/AMI and resyncs registration trunks from AMI at boot;
  * the TCP and TLS ones then register afresh for each Asterisk start.
- * Both are handed to the `Pipeline` so its dial dispatch (`outboundDispatch.ts`) and feature codes
- * (`features.ts`) can reach them.
+ * `Presence` is handed to the `Pipeline` so its feature codes (`features.ts`) can reach it.
  */
 async function startLiveState(deps: {
   db: Db;
@@ -191,7 +190,6 @@ export async function main(): Promise<{ close: () => Promise<void> }> {
       bus,
       log,
       env,
-      trunkState,
       presence
     });
     const actions = new CallActions(pipeline);

@@ -22,8 +22,8 @@ import {
   routesFor,
   routeTrunk
 } from './routeSelection.js';
+import type { TrunkChannels } from './trunkChannels.js';
 import { dialTargets, retriesNextHost } from './trunkDial.js';
-import type { TrunkState } from './trunkState.js';
 
 /** One dial target of a way, with the trunk and the identity the attempt presents; `route` is
  * `null` for a way with no route. */
@@ -48,7 +48,7 @@ export type Way = {
  * "Forwarded calls"). */
 export type CursorCtx = {
   pipeline: Pipeline;
-  trunkState: TrunkState;
+  trunkChannels: TrunkChannels;
   call: Call;
   snapshot: Snapshot;
   number: string;

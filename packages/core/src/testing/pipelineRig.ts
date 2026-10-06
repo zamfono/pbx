@@ -9,7 +9,6 @@ import type { CallActions } from '../calls/actions.js';
 import { newCall, type Call } from '../calls/call.js';
 import { Pipeline } from '../calls/pipeline.js';
 import type { PipelineDeps } from '../calls/pipelineDeps.js';
-import type { TrunkState } from '../calls/trunkState.js';
 import { CdrWriter } from '../cdr.js';
 import { EventBus } from '../internal/eventBus.js';
 import { startInternalServer } from '../internal/server.js';
@@ -43,8 +42,6 @@ export type Rig = {
   pipeline: Pipeline;
   /** Reads the endpoint list and the config snapshot once every row a test needs exists. */
   devicesUp: () => Promise<void>;
-  /** A `TrunkState` over an AMI client that never connects, enough for route selection. */
-  trunkState: () => TrunkState;
   /** Serves `actions` on the internal API; its base URL. */
   startServer: (actions: CallActions) => Promise<string>;
   /** Whether the core hung `channelId` up. */
@@ -68,7 +65,7 @@ async function connectFakeAri(): Promise<{ fakeAri: FakeAri; ari: AriClient }> {
   return { fakeAri, ari };
 }
 
-/** A Pipeline whose deps `overrides` may replace (a stub mail sender, a trunk state), over a fresh database and a listening fake Asterisk. */
+/** A Pipeline whose deps `overrides` may replace (a stub mail sender, a trunk channel count), over a fresh database and a listening fake Asterisk. */
 export async function startRig(
   overrides: Partial<PipelineDeps> = {}
 ): Promise<Rig> {
@@ -109,7 +106,6 @@ export async function startRig(
       cache.invalidate();
       await presence.resyncOnBoot();
     },
-    trunkState: () => trunkStateFor(ari, db),
     startServer: async actions => {
       const started = await startInternalServer(
         {
@@ -122,7 +118,7 @@ export async function startRig(
           actions,
           presence,
           recorder: idleRecorder,
-          trunks: pipeline.deps.trunkState,
+          trunks: trunkStateFor(ari, db, { cache, state, bus }),
           version: resolveVersion({})
         },
         ANY_FREE_PORT

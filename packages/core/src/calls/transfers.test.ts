@@ -77,7 +77,6 @@ describe('transfers', () => {
   async function setUp(): Promise<void> {
     rig = await startRig();
     ({ db, fakeAri, ari, pipeline, cdr } = rig);
-    pipeline.deps.trunkState = rig.trunkState();
   }
 
   afterEach(async () => {

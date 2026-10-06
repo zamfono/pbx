@@ -55,7 +55,6 @@ describe('parking ring-back', () => {
       }
     });
     ({ db, fakeAri } = rig);
-    rig.pipeline.deps.trunkState = rig.trunkState();
     await db.updateTable('settings').set({ parkingTimeoutS: 1 }).execute();
     await seedSlot(db, '701');
   }

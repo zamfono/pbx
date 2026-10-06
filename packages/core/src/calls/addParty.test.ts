@@ -204,7 +204,6 @@ describe('add party', () => {
   it('*5 to an external number dials it through the normal outbound resolution', async () => {
     await setUp();
     await seedExternalRoute(db);
-    pipeline.deps.trunkState = rig.trunkState();
 
     const userA = await seedUser(db);
     const customerChannel = fakeAri.addChannel({
@@ -288,7 +287,6 @@ describe('add party', () => {
     userA: string;
   }> {
     await seedExternalRoute(db);
-    pipeline.deps.trunkState = rig.trunkState();
     const userA = await seedUser(db);
     const customerChannel = fakeAri.addChannel({
       caller: { number: '+15559999', name: '' }

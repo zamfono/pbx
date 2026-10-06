@@ -16,6 +16,7 @@ import { STASIS_WAIT_MS } from '../calls/legOriginate.js';
 import { Pipeline } from '../calls/pipeline.js';
 import type { PipelineDeps } from '../calls/pipelineDeps.js';
 import type { ParticipationRecorder } from '../calls/recordParticipation.js';
+import { TrunkChannels } from '../calls/trunkChannels.js';
 import { TrunkState } from '../calls/trunkState.js';
 import type { MailSender } from '../calls/voicemail.js';
 import { EventBus } from '../internal/eventBus.js';
@@ -76,7 +77,7 @@ export const noopRecorder: ParticipationRecorder = {
   onLegMoved: () => undefined
 };
 
-/** A `TrunkState` over an AMI client that never connects, enough for route selection. */
+/** A `TrunkState` over an AMI client that never connects. */
 export function trunkStateFor(
   ari: AriClient,
   db: Db,
@@ -126,8 +127,7 @@ export function testPipelineDeps(
     db,
     apiClient: { mail: () => Promise.resolve() },
     logger: noopLogger,
-    trunkState:
-      overrides.trunkState ?? trunkStateFor(ari, db, { cache, state, bus }),
+    trunkChannels: overrides.trunkChannels ?? new TrunkChannels({ ari, state }),
     presence:
       overrides.presence ??
       new Presence({

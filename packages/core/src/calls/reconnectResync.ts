@@ -55,13 +55,13 @@ async function reconcile(
   pipeline: Pipeline,
   asteriskRestarted: boolean
 ): Promise<void> {
-  const { ari, presence, trunkState } = pipeline.deps;
+  const { ari, presence, trunkChannels } = pipeline.deps;
   // Only channels known before the list was asked for can have gone without their event: one
   // that came up while the answer was on its way is missing from it but still alive.
   const known = new Set([
     ...[...trackedCalls(pipeline)].flatMap(channelsOf),
     ...pipeline.parkedSlotByChannel.keys(),
-    ...trunkState.countedChannels
+    ...trunkChannels.countedChannels
   ]);
   const live = new Set((await ari.channels.list()).map(channel => channel.id));
   const gone = new Set([...known].filter(id => !live.has(id)));

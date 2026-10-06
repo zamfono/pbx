@@ -303,7 +303,6 @@ describe('CallActions', () => {
 
   it('dials an external target through the user routes and trunks after the device answers', async () => {
     await setUp();
-    pipeline.deps.trunkState = rig.trunkState();
     const trunkId = await seedExternalRoute(db);
     const callerId = await seedUser(db, { ext: '101' });
     await seedRegisteredDevice(rig, callerId, 'e101-a');
@@ -337,7 +336,6 @@ describe('CallActions', () => {
 
   it('withholds the caller identity for a target dialled with the CLIR prefix, as that device would (§10.1 Outbound step 1)', async () => {
     await setUp();
-    pipeline.deps.trunkState = rig.trunkState();
     await seedExternalRoute(db, 'both');
     const callerId = await seedUser(db, { ext: '101' });
     await seedRegisteredDevice(rig, callerId, 'e101-a');

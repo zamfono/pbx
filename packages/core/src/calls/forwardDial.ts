@@ -22,8 +22,8 @@ import type { Pipeline } from './pipeline.js';
 import { release } from './release.js';
 import { liveTrunk } from './routeSelection.js';
 import { enterOwnDid } from './runTarget.js';
+import type { TrunkChannels } from './trunkChannels.js';
 import { dialTargets } from './trunkDial.js';
-import type { TrunkState } from './trunkState.js';
 
 type SipTarget = Extract<ForwardTarget, { kind: 'sip' }>;
 
@@ -45,12 +45,12 @@ function unusableCause(
  * one with no outbound host, is released with 503 as an external forward no route carries.
  */
 async function dialSipTarget(
-  ctx: { pipeline: Pipeline; trunkState: TrunkState },
+  ctx: { pipeline: Pipeline; trunkChannels: TrunkChannels },
   call: Call,
   target: SipTarget,
   forwarder: Forwarder | null
 ): Promise<void> {
-  const { pipeline, trunkState } = ctx;
+  const { pipeline, trunkChannels } = ctx;
   const snapshot = await pipeline.deps.cache.get();
   const trunk = liveTrunk(snapshot, target.trunkId);
   const unusable = unusableCause(trunk, snapshot);
@@ -76,7 +76,7 @@ async function dialSipTarget(
   const cursor = openCursor(
     {
       pipeline,
-      trunkState,
+      trunkChannels,
       call,
       snapshot,
       number: target.user,
@@ -95,8 +95,7 @@ async function dialSipTarget(
  * menu, ring group or tenant rule forwards, which picks the routes of an external number and the
  * presented number and CLIR of either (§9.4). An own DID is entered internally instead (`enterOwnDid`).
  * The leg carries the hops so far, and stands in for a forwarder whose unconditional rule it is
- * (§10.2 "Effective flag"). A pipeline with no
- * trunk state cannot reach a trunk at all, and releases rather than pretending to try.
+ * (§10.2 "Effective flag").
  */
 export async function dialForwardTarget(
   pipeline: Pipeline,
@@ -104,9 +103,9 @@ export async function dialForwardTarget(
   target: Extract<ForwardTarget, { kind: 'external' | 'sip' }>,
   forwarder: Forwarder | null
 ): Promise<void> {
-  const { trunkState } = pipeline.deps;
+  const { trunkChannels } = pipeline.deps;
   if (target.kind === 'sip') {
-    await dialSipTarget({ pipeline, trunkState }, call, target, forwarder);
+    await dialSipTarget({ pipeline, trunkChannels }, call, target, forwarder);
     return;
   }
   const own = ownDidTarget(await pipeline.deps.cache.get(), target);
@@ -121,7 +120,7 @@ export async function dialForwardTarget(
     ...standInOf(forwarder)
   };
   await dialExternal(
-    { pipeline, trunkState, forward },
+    { pipeline, trunkChannels, forward },
     call,
     target.number,
     forwarder?.userId ?? null,

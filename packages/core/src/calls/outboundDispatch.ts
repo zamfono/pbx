@@ -77,20 +77,20 @@ async function playErrorToneAndRelease(
 }
 
 /** An emergency or external number, dialled as `asUser`'s call through the pipeline's
- * `TrunkState` (§9.4). */
+ * `TrunkChannels` (§9.4). */
 async function dialTrunk(
   pipeline: Pipeline,
   call: Call,
   action: Extract<DialAction, { kind: 'external' | 'emergency' }>,
   asUser: string | null
 ): Promise<void> {
-  const { trunkState } = pipeline.deps;
+  const { trunkChannels } = pipeline.deps;
   if (action.kind === 'emergency') {
-    await dialEmergency(pipeline, trunkState, call, action.number, asUser);
+    await dialEmergency(pipeline, trunkChannels, call, action.number, asUser);
     return;
   }
   await dialExternal(
-    { pipeline, trunkState },
+    { pipeline, trunkChannels },
     call,
     action.number,
     asUser,

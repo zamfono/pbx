@@ -13,13 +13,13 @@ import { dialRoutes, type DialResult } from './dialAttempt.js';
 import { openCursor, routeWays } from './externalLegRoutes.js';
 import type { ForwardLeg } from './forwardContext.js';
 import type { Pipeline } from './pipeline.js';
-import type { TrunkState } from './trunkState.js';
+import type { TrunkChannels } from './trunkChannels.js';
 
-/** Who dials an external leg: the pipeline and trunk state, and for a leg dialled for a forward
- * target, the hops that led to it (§9.4 "Forwarded calls"). */
+/** Who dials an external leg: the pipeline and its trunk channel count, and for a leg dialled
+ * for a forward target, the hops that led to it (§9.4 "Forwarded calls"). */
 type ExternalDialCtx = {
   pipeline: Pipeline;
-  trunkState: TrunkState;
+  trunkChannels: TrunkChannels;
   forward?: ForwardLeg;
 };
 
@@ -41,13 +41,13 @@ export async function originateExternalLeg(
   asUser: string | null,
   clirPerCall: boolean | null
 ): Promise<DialResult> {
-  const { pipeline, trunkState } = ctx;
+  const { pipeline, trunkChannels } = ctx;
   const snapshot = await pipeline.deps.cache.get();
   return dialRoutes(
     openCursor(
       {
         pipeline,
-        trunkState,
+        trunkChannels,
         call,
         snapshot,
         number,
