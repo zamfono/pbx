@@ -339,13 +339,13 @@ describe('sip forward targets and the forwarding context (§9.4, §10.1 step 7)'
     };
 
     // §9.4 "Forwarded calls": AI has no number of their own, so their hop names the main number,
-    // Bea's hers, never an extension; newest first, at the address the stack writes into SIP.
+    // Bea's hers, never an extension; newest first, at the stack's FQDN.
     expect(await sent('all')).toBe(
-      '"AI Agent" <sip:+15551000@192.0.2.10>;reason=unconditional, ' +
-        '"Bea" <sip:+15551177@192.0.2.10>;reason=away'
+      '"AI Agent" <sip:+15551000@pbx.example.com>;reason=unconditional, ' +
+        '"Bea" <sip:+15551177@pbx.example.com>;reason=away'
     );
     expect(await sent('last')).toBe(
-      '"AI Agent" <sip:+15551000@192.0.2.10>;reason=unconditional'
+      '"AI Agent" <sip:+15551000@pbx.example.com>;reason=unconditional'
     );
     expect(await sent('off')).toBeUndefined();
   });

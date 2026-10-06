@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-06 · §9.4 Caller-ID, §6.3 Environment.** The `From` host of a trunk leg not on a `pai` trunk, and with it the host of its `P-Asserted-Identity` and `Diversion`, is the stack's `FQDN`, where it was the address the stack writes into SIP (`EXTERNAL_IPV4`, else `STACK_IPV4`); `core` reads `FQDN`, in lower case. A withheld call's `From` stays `"Anonymous" <sip:anonymous@anonymous.invalid>`.
+*Why:* the product owner: "From: use the public IP as far as (sensibly) possible", then, on learning that an address in `From` survives only because Asterisk's multihomed message filter (`pjsip_message_filter.c`), which rewrites an address-literal `From` host to the address a request leaves from, never runs (it reads its restrictions under another module's id than it stores them), while a host name is never rewritten: "Perhaps the FQDN is the answer then".
+
 **2026-10-06 · §10.2 Three-way calls.** `*5` or `calls.addParty` to an own DID whose target is a `sip` target dials that target over its own trunk as the DID's own forward, recorded as that target's when it records, where it was refused with 404 (422 over the API).
 *Why:* the product owner's recording flag records every call a forward target answers, "however the call reached it", and only an external target was dialled there.
 

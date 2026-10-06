@@ -3,10 +3,10 @@
 # header layout of the trunk each left over, the presented number being the main number
 # `+15551000` (101 has no number of their own):
 #
-#   from, shown     From: <sip:+15551000@…>, no P-Asserted-Identity, no Privacy
+#   from, shown     From: <sip:+15551000@<FQDN>>, no P-Asserted-Identity, no Privacy
 #   pai, shown      From: <sip:ci-pai-acct@<trunk host>>, one PAI <sip:+15551000@<trunk host>>
 #   pai, withheld   the same account identity in From, the same PAI, Privacy: id
-#   both, shown     From: <sip:+15551000@…>, one PAI <sip:+15551000@…>
+#   both, shown     From: <sip:+15551000@<FQDN>>, one PAI <sip:+15551000@<FQDN>>
 #   both, withheld  From: "Anonymous" <sip:anonymous@anonymous.invalid>, the same PAI, Privacy: id
 #
 # and none of them is followed by an INVITE or UPDATE inside its dialog, which would re-assert the
@@ -24,7 +24,7 @@ compose=$3
 
 trunk_ip=$(container_ip sipp)
 sipp_trace sipp /tmp/trunk-messages.log \
-  | python3 "$(dirname "$0")/_callerid-check.py" "$trunk_ip"
+  | python3 "$(dirname "$0")/_callerid-check.py" "$trunk_ip" "$FQDN"
 
 newest_call | PYTHONPATH="$(dirname "$0")" python3 -c '
 import json, sys

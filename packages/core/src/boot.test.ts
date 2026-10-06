@@ -52,7 +52,8 @@ describe('buildPipeline', () => {
         ...readEnv({
           ARI_PASSWORD: 'secret',
           AMI_PASSWORD: 'secret',
-          EXTERNAL_IPV4: '192.0.2.10'
+          EXTERNAL_IPV4: '192.0.2.10',
+          FQDN: 'pbx.example.com'
         }),
         tz: stackTz
       },

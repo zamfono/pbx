@@ -386,7 +386,7 @@ describe('outbound dialing', () => {
     expect(body.variables['CONNECTEDLINE(pres)']).toBe('prohib');
     // The endpoint has no `from_domain`, so chan_pjsip still puts `anonymous.invalid` over the
     // leg's `SIPFROMDOMAIN` in the anonymised `From`.
-    expect(body.variables.SIPFROMDOMAIN).toBe('192.0.2.10');
+    expect(body.variables.SIPFROMDOMAIN).toBe('pbx.example.com');
     expect(
       Object.keys(body.variables).filter(name =>
         name.startsWith('PJSIP_HEADER')
@@ -394,7 +394,7 @@ describe('outbound dialing', () => {
     ).toEqual([]);
   });
 
-  it('names the address the stack writes into SIP as the From host of a both trunk leg (§9.4 "Caller-ID")', async () => {
+  it('names the stack\'s FQDN as the From host of a both trunk leg (§9.4 "Caller-ID")', async () => {
     const trunkId = await seedTrunk(db, {
       priority: 1,
       callerIdHeader: 'both'
@@ -406,8 +406,9 @@ describe('outbound dialing', () => {
     const originate = fakeAri.calls.find(entry => isPlacement(entry));
     const body = originate?.body as { variables: Record<string, string> };
     // chan_pjsip takes the From host from the transport's bound address otherwise, which
-    // `external_signaling_address` does not rewrite: the container's own in the ports mode.
-    expect(body.variables.SIPFROMDOMAIN).toBe('192.0.2.10');
+    // `external_signaling_address` does not rewrite: the container's own in the ports mode. A
+    // host name, unlike an address, is one Asterisk's multihomed message filter never rewrites.
+    expect(body.variables.SIPFROMDOMAIN).toBe('pbx.example.com');
   });
 
   it('leaves a from-only trunk leg\'s From host to its endpoint\'s from_domain (§9.4 "Caller-ID")', async () => {

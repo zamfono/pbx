@@ -170,8 +170,8 @@ export async function originateTrunkLeg(
   try {
     // Read after the attempt is counted, so the language adds no wait ahead of the channel count.
     const snapshot = await pipeline.deps.cache.get();
-    const { stackSipHost } = pipeline.deps;
-    const fromHost = trunkFromHost(trunk, snapshot, stackSipHost);
+    const { stackFqdn } = pipeline.deps;
+    const fromHost = trunkFromHost(trunk, snapshot, stackFqdn);
     // A `from` trunk's endpoint names the host itself (`from_domain`), it never carrying a
     // withheld call, whose anonymous `From` host a `from_domain` would keep (§9.4 "Caller-ID").
     if (fromHost !== null && trunk.callerIdHeader !== 'from') {
@@ -184,7 +184,7 @@ export async function originateTrunkLeg(
         variables,
         forwardVariables(
           ctx.forward,
-          diversionTrunk(trunk, snapshot, stackSipHost)
+          diversionTrunk(trunk, snapshot, stackFqdn)
         )
       );
     }

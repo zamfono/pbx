@@ -43,9 +43,9 @@ export type CoreEnv = {
    * addresses the HEP collector counts as Asterisk's own, besides the `ariUrl` host's (§7). */
   stackIpv4: string | null;
   externalIpv4: string | null;
-  /** The address the stack writes into SIP (§6.1, §9.1): `EXTERNAL_IPV4` in the ports mode, else
-   * `STACK_IPV4`, which the transports bind in the macvlan mode. */
-  sipHost: string;
+  /** `FQDN` in lower case (§6.3): the `From` host of a trunk leg not on a `pai` trunk, the host
+   * its `Diversion` entries name (§9.4 "Caller-ID", "Forwarded calls"). */
+  fqdn: string;
   /** `api`'s internal HTTP API, where `core` posts its mail requests (§3.1 "Mail"). */
   apiInternalUrl: string;
   /** `ZAMFONO_VERSION` and `ZAMFONO_REVISION` (§7 "Version"). */
@@ -108,9 +108,8 @@ export function readEnv(env: NodeJS.ProcessEnv): CoreEnv {
   const stackIpv4 = optionalEnv(env, 'STACK_IPV4') ?? null;
   const externalIpv4 = optionalEnv(env, 'EXTERNAL_IPV4') ?? null;
   const tz = optionalEnv(env, 'TZ') ?? DEFAULT_TZ;
-  // The Asterisk entrypoint's order; the mode's overlay requires one of them (§6.1).
-  const sipHost = externalIpv4 ?? stackIpv4;
-  if (sipHost === null) {
+  // The mode's overlay requires one of them (§6.1).
+  if (externalIpv4 === null && stackIpv4 === null) {
     throw new Error(
       'missing required environment variable EXTERNAL_IPV4 or STACK_IPV4'
     );
@@ -133,7 +132,7 @@ export function readEnv(env: NodeJS.ProcessEnv): CoreEnv {
     timeZoneError: stackTimeZoneError(tz),
     stackIpv4,
     externalIpv4,
-    sipHost,
+    fqdn: requireEnv(env, 'FQDN').toLowerCase(),
     apiInternalUrl:
       optionalEnv(env, 'API_INTERNAL_URL') ?? DEFAULT_API_INTERNAL_URL,
     version: resolveVersion(env)

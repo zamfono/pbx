@@ -128,15 +128,15 @@ function renderTrunkIdentify(trunk: Trunk): string | null {
  * `both`, and `trust_id_outbound` keeps it there when the number is withheld. A `pai` trunk's
  * `From` is the account identity instead: `from_user` replaces the number with the trunk's
  * username, `from_domain` puts the registrar (for an `ip` trunk, the first outbound host) where
- * the stack's own address would be, and the asserted number takes that domain too. A `from`
- * trunk's `from_domain` is `sipHost`, which its OPTIONS probes name too: it never carries a
- * withheld call, whose anonymous `From` host a `from_domain` would keep. A `both` trunk has none:
- * the core names `sipHost` on each shown leg (`SIPFROMDOMAIN`), and chan_pjsip anonymises a
- * withheld one's `From` while its asserted number keeps that host.
+ * the stack's FQDN would be, and the asserted number takes that domain too. A `from` trunk's
+ * `from_domain` is the FQDN, which its OPTIONS probes name too: it never carries a withheld call,
+ * whose anonymous `From` host a `from_domain` would keep. A `both` trunk has none: the core names
+ * the FQDN on each shown leg (`SIPFROMDOMAIN`), and chan_pjsip anonymises a withheld one's `From`
+ * while its asserted number keeps that host.
  */
-function callerIdLines(trunk: Trunk, sipHost: string): string[] {
+function callerIdLines(trunk: Trunk, fqdn: string): string[] {
   if (trunk.callerIdHeader === 'from') {
-    return [`from_domain = ${sipHost}`];
+    return [`from_domain = ${fqdn}`];
   }
   const lines = ['send_pai = yes', 'trust_id_outbound = yes'];
   if (trunk.callerIdHeader === 'pai' && trunk.username !== null) {
@@ -183,7 +183,7 @@ function mediaEncryptionLines(trunk: Trunk): string[] {
 function renderTrunkEndpoint(
   trunk: Trunk,
   tenantCodecs: string[],
-  sipHost: string
+  fqdn: string
 ): string {
   const name = trunkSectionName(trunk.id);
   const codecs = trunk.codecs ?? tenantCodecs;
@@ -208,7 +208,7 @@ function renderTrunkEndpoint(
     lines.push(`auth = ${name}`);
   }
   lines.push('identify_by = ip');
-  lines.push(...callerIdLines(trunk, sipHost));
+  lines.push(...callerIdLines(trunk, fqdn));
   return lines.join('\n');
 }
 
@@ -272,7 +272,7 @@ export function renderTrunksConf(
         renderTrunkAor(trunk),
         renderTrunkIdentify(trunk),
         renderTrunkRegistration(trunk),
-        renderTrunkEndpoint(trunk, input.settings.codecs, input.sipHost),
+        renderTrunkEndpoint(trunk, input.settings.codecs, input.fqdn),
         renderTrunkAuthEndpoint(trunk, input.settings.codecs)
       ].filter((section): section is string => section !== null);
     },

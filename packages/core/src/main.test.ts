@@ -78,6 +78,7 @@ describe('main', () => {
     vi.stubEnv('AMI_HOST', '127.0.0.1:1');
     vi.stubEnv('AMI_PASSWORD', 'ami-secret');
     vi.stubEnv('EXTERNAL_IPV4', '192.0.2.10');
+    vi.stubEnv('FQDN', 'pbx.example.com');
     vi.stubEnv('DB_FILE', ':memory:');
     vi.stubEnv('HEP_ENABLED', 'false');
 
@@ -102,6 +103,7 @@ describe('main', () => {
     vi.stubEnv('AMI_HOST', `${ami.host}:${ami.port}`);
     vi.stubEnv('AMI_PASSWORD', 'ami-secret');
     vi.stubEnv('EXTERNAL_IPV4', '192.0.2.10');
+    vi.stubEnv('FQDN', 'pbx.example.com');
     vi.stubEnv('DB_FILE', await migratedDbFile());
     vi.stubEnv('HEP_ENABLED', 'false');
 
@@ -128,6 +130,7 @@ describe('main', () => {
     vi.stubEnv('AMI_HOST', `${ami.host}:${ami.port}`);
     vi.stubEnv('AMI_PASSWORD', 'ami-secret');
     vi.stubEnv('EXTERNAL_IPV4', '192.0.2.10');
+    vi.stubEnv('FQDN', 'pbx.example.com');
     vi.stubEnv('DB_FILE', await migratedDbFile());
     vi.stubEnv('HEP_ENABLED', 'false');
 
@@ -156,6 +159,7 @@ describe('stopping on SIGTERM or SIGINT', () => {
     vi.stubEnv('AMI_HOST', `${ami.host}:${ami.port}`);
     vi.stubEnv('AMI_PASSWORD', 'ami-secret');
     vi.stubEnv('EXTERNAL_IPV4', '192.0.2.10');
+    vi.stubEnv('FQDN', 'pbx.example.com');
     vi.stubEnv('DB_FILE', await migratedDbFile());
     vi.stubEnv('HEP_ENABLED', 'false');
     listenersBefore = new Set([

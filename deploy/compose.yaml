@@ -70,6 +70,7 @@ services:
     networks:
       - internal
     environment:
+      FQDN: ${FQDN}                             # the From host of trunk calls (§9.4)
       ARI_PASSWORD: ${ARI_PASSWORD}
       AMI_PASSWORD: ${AMI_PASSWORD}             # outbound registration state (§9.4)
       HEP_ENABLED: ${HEP_ENABLED:-}             # HEP listener on 9060/udp (§7)

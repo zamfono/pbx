@@ -42,7 +42,6 @@ const registrarOnly: Pick<Trunk, 'hosts'> = {
 function renderTrunk(trunk: Trunk): string {
   const input: RenderInput = {
     fqdn: 'pbx.example.com',
-    sipHost: '192.0.2.10',
     settings: {
       codecs: ['alaw'],
       ringotelMaxRegs: 3,
@@ -141,7 +140,6 @@ describe('renderTrunksConf username', () => {
     username => {
       const { files, skipped } = render({
         fqdn: 'pbx.example.com',
-        sipHost: '192.0.2.10',
         settings: {
           codecs: ['alaw'],
           ringotelMaxRegs: 3,
@@ -180,7 +178,6 @@ describe('renderTrunksConf registration retries', () => {
   test('a registration trunk without a registrar is left out, the other trunks rendered', () => {
     const { files, skipped } = render({
       fqdn: 'pbx.example.com',
-      sipHost: '192.0.2.10',
       settings: {
         codecs: ['alaw'],
         ringotelMaxRegs: 3,
@@ -269,7 +266,6 @@ describe('renderTrunksConf inbound_auth source restriction', () => {
   test('an 80-byte username, too long for a section name, leaves its trunk out', () => {
     const { files, skipped } = render({
       fqdn: 'pbx.example.com',
-      sipHost: '192.0.2.10',
       settings: {
         codecs: ['alaw'],
         ringotelMaxRegs: 3,

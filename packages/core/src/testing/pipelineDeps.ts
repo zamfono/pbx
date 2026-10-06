@@ -120,7 +120,7 @@ export function testPipelineDeps(
     recorder: noopRecorder,
     now: nowIso,
     stackTz: 'UTC',
-    stackSipHost: '192.0.2.10',
+    stackFqdn: 'pbx.example.com',
     legStasisWaitMs: STASIS_WAIT_MS,
     callLogMaxBytes: 1_048_576,
     mediaDir,

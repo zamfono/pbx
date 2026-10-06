@@ -23,7 +23,6 @@ import {
 import { loadRenderInput } from './renderInput.js';
 import { keyringFromEnv } from './secretbox.js';
 import { serialQueue } from './serialQueue.js';
-import { stackIpv4 } from './stackAddress.js';
 
 // Every module the render feeds (§9.1): PJSIP, the dialplan's hints include, `res_musiconhold`.
 const ALL_RELOAD_KINDS: ReloadKind[] = [...reloadKindSchema.options];
@@ -59,12 +58,7 @@ const serialized = serialQueue();
  * inconsistent with each other; the rows the render left out are recorded once they are.
  */
 async function renderConfig(db: Db): Promise<void> {
-  const input = await loadRenderInput(
-    db,
-    keyringFromEnv(env),
-    env.FQDN,
-    stackIpv4(env)
-  );
+  const input = await loadRenderInput(db, keyringFromEnv(env), env.FQDN);
   const { files, skipped } = render(input);
   const dir = env.ASTERISK_GEN_DIR;
   await mkdir(dir, { recursive: true });

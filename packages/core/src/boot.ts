@@ -63,7 +63,7 @@ export function buildPipeline(deps: {
     recorder,
     now: nowIso,
     stackTz: env.tz,
-    stackSipHost: env.sipHost,
+    stackFqdn: env.fqdn,
     legStasisWaitMs: STASIS_WAIT_MS,
     callLogMaxBytes: env.callLogMaxBytes,
     mediaDir: env.mediaDir,

@@ -43,9 +43,9 @@ export type PipelineDeps = {
   now: () => string;
   // The stack's `TZ` (§11.4 `timezone`: "NULL = stack `TZ`, else UTC"), `CoreEnv.tz`.
   stackTz: string;
-  // The address the stack writes into SIP (`CoreEnv.sipHost`), the host a forwarded leg's
-  // `Diversion` entries name (§9.4 "Forwarded calls").
-  stackSipHost: string;
+  // The stack's FQDN (`CoreEnv.fqdn`), the `From` host of a trunk leg not on a `pai` trunk and the
+  // host a forwarded leg's `Diversion` entries name (§9.4 "Caller-ID", "Forwarded calls").
+  stackFqdn: string;
   /** How long a created leg may take to enter the app before it counts as not placed
    * (`legOriginate.ts`), `STASIS_WAIT_MS`. */
   legStasisWaitMs: number;

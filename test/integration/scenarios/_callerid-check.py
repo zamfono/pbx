@@ -6,7 +6,7 @@ channel's current connected line in every one it sends, which by then is the par
 bridged to (the extension and its display name), not the presented number; nothing in these
 calls, a few seconds each and never held, has anything else to renegotiate.
 
-Usage: python3 _callerid-check.py <trunk-host> < /tmp/trunk-messages.log
+Usage: python3 _callerid-check.py <trunk-host> <fqdn> < /tmp/trunk-messages.log
 """
 import re
 import sys
@@ -14,7 +14,9 @@ import sys
 from _sip_trace import messages, received_invites
 
 trunk_host = re.escape(sys.argv[1])
-PRESENTED = r"<sip:\+15551000@[^>]+>"
+fqdn = re.escape(sys.argv[2])
+# A `from` or `both` trunk names the stack's FQDN as the host, in From and PAI alike.
+PRESENTED = rf"<sip:\+15551000@{fqdn}>"
 ACCOUNT = rf"<sip:ci-pai-acct@{trunk_host}>"
 # Per call: the called number, what From must start with, the one PAI (or none), Privacy.
 EXPECTED = [

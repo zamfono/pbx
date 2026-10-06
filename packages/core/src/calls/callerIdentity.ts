@@ -62,17 +62,18 @@ export function resolveAttemptIdentity(params: {
 
 /**
  * The host of a trunk leg's `From` (§9.4 "Caller-ID"): a `pai` trunk's `from_domain`, its first
- * outbound host; else the address the stack writes into SIP (`stackSipHost`, `EXTERNAL_IPV4` else
- * `STACK_IPV4`). A `from` trunk's endpoint names the latter as its `from_domain`; a `both` trunk's
- * leg carries it as `SIPFROMDOMAIN`, since chan_pjsip otherwise takes the transport's bound address,
- * which `external_signaling_address` does not rewrite in `From`.
+ * outbound host; else the stack's FQDN (`stackFqdn`). A `from` trunk's endpoint names the latter as
+ * its `from_domain`; a `both` trunk's leg carries it as `SIPFROMDOMAIN`, since chan_pjsip otherwise
+ * takes the transport's bound address, which `external_signaling_address` does not rewrite in
+ * `From`. A host name, unlike an address, is one Asterisk's multihomed message filter never
+ * rewrites to the address a message leaves from.
  */
 export function trunkFromHost(
   trunk: TrunkRow,
   snapshot: Snapshot,
-  stackSipHost: string
+  stackFqdn: string
 ): string | null {
   return trunk.callerIdHeader === 'pai' && trunk.username !== null
     ? (outboundHosts(snapshot, trunk.id).at(0)?.host ?? null)
-    : stackSipHost;
+    : stackFqdn;
 }

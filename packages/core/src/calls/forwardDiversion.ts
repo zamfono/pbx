@@ -113,11 +113,11 @@ export type DiversionTrunk = {
 export function diversionTrunk(
   trunk: Snapshot['trunks'][number],
   snapshot: Snapshot,
-  stackSipHost: string
+  stackFqdn: string
 ): DiversionTrunk {
   return {
     policy: trunk.diversion,
-    host: trunkFromHost(trunk, snapshot, stackSipHost),
+    host: trunkFromHost(trunk, snapshot, stackFqdn),
     format: trunk.callerIdFormat,
     country: snapshot.settings.country
   };

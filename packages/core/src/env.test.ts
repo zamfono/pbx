@@ -6,30 +6,29 @@ import { readEnv } from './env.js';
 const REQUIRED = {
   ARI_PASSWORD: 'ari',
   AMI_PASSWORD: 'ami',
-  EXTERNAL_IPV4: '192.0.2.10'
+  EXTERNAL_IPV4: '192.0.2.10',
+  FQDN: 'pbx.example.com'
 };
 
-// §6.1, §9.1: the address the stack writes into SIP, the host a forwarded leg's `Diversion`
-// entries name (§9.4 "Forwarded calls").
-describe('readEnv sipHost', () => {
-  it('takes EXTERNAL_IPV4 in the ports mode, before STACK_IPV4', () => {
-    expect(
-      readEnv({
-        ...REQUIRED,
-        EXTERNAL_IPV4: '198.51.100.7',
-        STACK_IPV4: '203.0.113.34'
-      }).sipHost
-    ).toBe('198.51.100.7');
+// §9.4 "Caller-ID": the From host of a trunk leg not on a `pai` trunk, and the host its
+// `Diversion` entries name ("Forwarded calls").
+describe('readEnv fqdn', () => {
+  it('takes FQDN in lower case', () => {
+    expect(readEnv({ ...REQUIRED, FQDN: 'PBX.Example.com' }).fqdn).toBe(
+      'pbx.example.com'
+    );
   });
 
-  it('takes STACK_IPV4 in the macvlan mode, an empty EXTERNAL_IPV4 counting as unset', () => {
-    expect(
-      readEnv({ ...REQUIRED, EXTERNAL_IPV4: '', STACK_IPV4: '203.0.113.34' })
-        .sipHost
-    ).toBe('203.0.113.34');
+  it('refuses to start without FQDN', () => {
+    expect(() => readEnv({ ...REQUIRED, FQDN: '' })).toThrow(
+      'missing required environment variable FQDN'
+    );
   });
+});
 
-  it('refuses to start while neither is set', () => {
+// §6.3 "Environment": the mode's overlay requires one of them (§6.1).
+describe('readEnv public address', () => {
+  it('refuses to start while neither EXTERNAL_IPV4 nor STACK_IPV4 is set', () => {
     expect(() =>
       readEnv({ ...REQUIRED, EXTERNAL_IPV4: '', STACK_IPV4: '' })
     ).toThrow(
