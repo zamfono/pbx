@@ -5,6 +5,9 @@ Every change made to [the specification](spec.md) during implementation, newest 
 **2026-10-06 · §9.4 Auth mode, Inbound identification.** A trunk username takes only the characters of a SIP URI's user part (RFC 3261 `user`); the API refuses any other with 422, and a stored one leaves its trunk out of the rendered config. An `inbound_auth` trunk's username, which names its endpoint's section, is also refused past 79 characters (422), and a stored longer one leaves its trunk out of the render, since Asterisk cuts a longer section name short.
 *Why:* usernames accepted characters a SIP URI's user part does not (`<`, `>`, `"`, `#`, `:`, a bare `%`), so Asterisk then refused the trunk; between restricting the username and percent-encoding it in the URIs, the product owner: "trunk usernames: tighten".
 
+**2026-10-06 · §10.2 Three-way calls.** `*5` or `calls.addParty` to an own DID whose `external` target records records the added leg as that target's, nobody's participation, like an ordinary dial of the DID.
+*Why:* the product owner, told that "*5 to one of your own DIDs whose forward target records: not recorded, because that path adds the target as an extra party instead of forwarding": "okay record `*5`. any other similar gaps?"
+
 **2026-10-06 · §5.6 Enforcement, §7 Metrics, §9.1.** The ban list's drop rules count what they drop; the ban helper's status line adds the packets and bytes after the digest, and `GET /metrics` exposes them as the counters `zamfono_sip_ban_dropped_packets_total` and `zamfono_sip_ban_dropped_bytes_total`.
 *Why:* the product owner: "how effective is the IP ban altogether?", then "add the counter to the "to build"".
 

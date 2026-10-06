@@ -10,13 +10,15 @@ import { resolveDialed } from '../routing/outbound.js';
 import { findForwardTarget } from '../routing/targets.js';
 import { SIP_NOT_FOUND } from '../sipCodes.js';
 import { extensionOf } from './extensionOwner.js';
+import { recordingOf, type ForwardLeg } from './forwardContext.js';
 import { resolveDialedContext } from './outboundLookup.js';
 
 /**
  * The added leg's target and its `calls.to_uri` in the pipeline's vocabulary (§11.2 `calls`):
  * the extension for a colleague or a group, the E.164 form for a number. `clir` is the per-call
- * CLIR prefix, if one was dialled; an external target without a caller is a DID's own forward,
- * dialled as no user's call, like an ordinary dial of that DID (§10.1 step 7).
+ * CLIR prefix, if one was dialled; an external target with a `forward` leg is a DID's own forward,
+ * dialled as no user's call and recorded when that target records, like an ordinary dial of that
+ * DID (§10.1 step 7).
  */
 export type AddedTarget =
   | { kind: 'user'; userId: string; to: string }
@@ -25,7 +27,7 @@ export type AddedTarget =
       kind: 'external';
       number: string;
       clir: boolean | null;
-      withCaller: boolean;
+      forward?: ForwardLeg;
     }
   | { kind: 'emergency'; number: string }
   | { kind: 'refuse'; code: number };
@@ -59,7 +61,8 @@ function ownDidTarget(
       kind: 'external',
       number: target.number,
       clir: null,
-      withCaller: false
+      // The DID forwards, diverting nobody.
+      forward: { diversions: [], headers: [], ...recordingOf(target) }
     };
   }
   return { kind: 'refuse', code: SIP_NOT_FOUND };
@@ -80,8 +83,7 @@ export function resolveAddedTarget(
       return {
         kind: 'external',
         number: action.number,
-        clir: action.clir,
-        withCaller: true
+        clir: action.clir
       };
     case 'ownDid':
       return ownDidTarget(

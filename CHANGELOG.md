@@ -11,6 +11,10 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+### Added
+
+- `*5` to an own DID whose external forward target records is recorded too.
+
 ### Changed
 
 - A trunk username takes only SIP URI user characters; a trunk whose stored username has any other is left out of the config and shows in `config:render`.

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
-import { seedUser } from '@zamfono/shared/testDb.js';
+import { seedDid, seedUser } from '@zamfono/shared/testDb.js';
 
 import type { AriClient } from '../ari/client.js';
 import type { CdrWriter } from '../cdr.js';
@@ -23,17 +23,19 @@ import {
   startFeatureRig,
   traceEvents
 } from '../testing/featureRig.js';
-import { noopRecorder } from '../testing/pipelineDeps.js';
+import { noopLogger, noopRecorder } from '../testing/pipelineDeps.js';
 import type { Rig } from '../testing/pipelineRig.js';
 import {
   seedDevice,
   seedExtension,
   seedExternalRoute,
+  seedForwardTarget,
   seedRingGroup
 } from '../testing/seedRows.js';
 import { newCall, type Call, type Leg } from './call.js';
 import { handleFeature } from './features.js';
 import type { Pipeline } from './pipeline.js';
+import { Recorder } from './recording.js';
 import { sipToHangupCause } from './releaseCause.js';
 
 describe('add party', () => {
@@ -526,6 +528,68 @@ describe('add party', () => {
       .where('id', '=', addPartyCall.id)
       .executeTakeFirstOrThrow();
     expect(row).toEqual({ toUri: '+15557777', calleeUserId: userC });
+  });
+
+  it("*5 to one of the tenant's own DIDs whose external target records records the added leg as nobody's", async () => {
+    await setUp();
+    const { addPartyCall } = await externalAddParty();
+    await seedDid(
+      db,
+      '+15557777',
+      await seedForwardTarget(db, { external: '+15558888', recordCalls: 1 })
+    );
+    rig.cache.invalidate();
+    pipeline.deps.recorder = new Recorder({
+      ari,
+      cache: rig.cache,
+      db,
+      mediaDir: '/media',
+      mix: () => Promise.resolve(5),
+      log: noopLogger,
+      now: nowIso
+    });
+    const recordRequests = (): typeof fakeAri.calls =>
+      fakeAri.calls.filter(
+        entry => entry.method === 'POST' && entry.path.endsWith('/record')
+      );
+
+    await handleFeature(
+      pipeline,
+      presence,
+      addPartyCall,
+      'addParty',
+      '+15557777'
+    );
+
+    // §10.2 "Three-way calls": the added leg's recording follows the target's own flag, a snoop
+    // pair on the trunk leg.
+    await eventually(() => {
+      expect(recordRequests()).toHaveLength(2);
+    });
+    const added = [...addPartyCall.legs.values()].find(
+      leg => leg.state === 'up'
+    );
+    fakeAri.hangUpRemotely(added?.channelId ?? '');
+    const snoopHungUp = (entry: (typeof fakeAri.calls)[number]): boolean =>
+      rig.hungUp(entry.path.slice('channels/'.length, -'/record'.length));
+    const records = await eventually(() => {
+      const all = recordRequests();
+      expect(all.every(snoopHungUp)).toBe(true);
+      return all;
+    });
+    for (const entry of records) {
+      fakeAri.emit({
+        type: 'RecordingFinished',
+        timestamp: nowIso(),
+        application: 'zamfono',
+        recording: { name: (entry.body as { name?: string }).name }
+      });
+    }
+    await eventually(async () => {
+      expect(
+        await db.selectFrom('recordings').select(['callId', 'userId']).execute()
+      ).toEqual([{ callId: addPartyCall.id, userId: null }]);
+    });
   });
 
   it('*5 to a parking slot is refused: a parked call is retrieved, not added', async () => {

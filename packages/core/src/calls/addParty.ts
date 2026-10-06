@@ -70,7 +70,8 @@ async function ringInternalTarget(
 }
 
 /** An external number dialled through `outbound_routes` (§9.4), as the initiator's call with the
- * CLIR prefix dialled with it, its answer joining `activeBridgeId`. Whether the party joined. */
+ * CLIR prefix dialled with it, or as a DID's own forward, its answer joining `activeBridgeId`.
+ * Whether the party joined. */
 async function dialExternalTarget(
   ctx: { pipeline: Pipeline; trunkChannels: TrunkChannels },
   call: Call,
@@ -79,10 +80,10 @@ async function dialExternalTarget(
 ): Promise<boolean> {
   const { pipeline } = ctx;
   const result = await originateExternalLeg(
-    ctx,
+    { ...ctx, forward: target.forward },
     call,
     target.number,
-    target.withCaller ? call.callerUserId : null,
+    target.forward === undefined ? call.callerUserId : null,
     target.clir
   );
   if (result.kind === 'answered') {
