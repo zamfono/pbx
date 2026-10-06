@@ -3,9 +3,10 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { HTTP_NO_CONTENT, MS_PER_DAY, MS_PER_SECOND } from '@zamfono/shared';
 
 /**
- * The endpoints that need no authentication (§10.3 "CORS"), by exact path, with the methods
- * each serves: the static icons and the prerendered OpenAPI document among them, which
- * adapter-node serves before any hook runs.
+ * The endpoints that need no authentication and serve clients on other origins (§10.3 "CORS"), by
+ * exact path, with the methods each serves: the static icons and the prerendered OpenAPI document
+ * among them, which adapter-node serves before any hook runs. The password-reset endpoints, which
+ * only the stack's own pages call, are not among them.
  */
 const PUBLIC_ENDPOINTS: ReadonlyMap<string, string> = new Map([
   ['/healthz', 'GET, HEAD'],
@@ -22,9 +23,7 @@ const PUBLIC_ENDPOINTS: ReadonlyMap<string, string> = new Map([
   ['/logoDark.png', 'GET, HEAD'],
   ['/oauth/register', 'POST'],
   ['/oauth/token', 'POST'],
-  ['/oauth/revoke', 'POST'],
-  ['/auth/resetRequest', 'POST'],
-  ['/auth/reset', 'POST']
+  ['/oauth/revoke', 'POST']
 ]);
 
 // The request headers those endpoints read: a JSON or form body, and a client's HTTP Basic

@@ -40,9 +40,7 @@ const PUBLIC_PATHS = [
   '/logoDark.png',
   '/oauth/register',
   '/oauth/token',
-  '/oauth/revoke',
-  '/auth/resetRequest',
-  '/auth/reset'
+  '/oauth/revoke'
 ];
 
 const CLOSED_PATHS = [
@@ -51,6 +49,8 @@ const CLOSED_PATHS = [
   '/oauth/authorize',
   '/oauth/callback',
   '/auth/forgot',
+  '/auth/resetRequest',
+  '/auth/reset',
   '/upload/x',
   '/internal/certificate',
   '/readyz',

@@ -7,6 +7,10 @@ Every change made to [the specification](spec.md) during implementation, newest 
 
 **2026-10-06 · §9.4 Caller-ID, Forwarded calls.** A trunk leg's `From` host is the address the stack writes into SIP (`EXTERNAL_IPV4`, else `STACK_IPV4`), a `pai` trunk's `from_domain` aside; the core sets it on the leg as `SIPFROMDOMAIN`, and the `Diversion` host is that `From` host in both modes.
 *Why:* the product owner, after trunk INVITEs in the ports mode carried `From: …@10.89.0.17`, the container's address: "add to the to build pile". `external_signaling_address` rewrites `Contact` and `Via` only, and an endpoint `from_domain` would also replace `anonymous.invalid` in a withheld call's `From`.
+
+**2026-10-06 · §10.3 CORS.** `/auth/resetRequest` and `/auth/reset` carry no `Access-Control-Allow-Origin` and get no preflight answer: same-origin only. `/oauth/revoke` stays open.
+*Why:* the product owner: "i agree with CORS": only the stack's own forgot-password and reset pages call the two endpoints, so opening them to every origin served no client and let any web page send password-reset requests and tokens from a visitor's browser.
+
 **2026-10-06 · §6.3 Updates, §10.3 System.** New `system.checkUpdate` (`POST /system/updateCheck`, admin): the updater asks GitHub for the latest release now instead of within its hour, at most once a minute, and the call answers with `system.info`'s `update`; GitHub's spent rate limit (a 429, or a 403 that says so) answers 503 with `Retry-After`. The updater's GitHub requests name the ETag of the last answer.
 *Why:* the product owner, asked whether `system.info` should take a flag to force a fresh update check: "okay. add `system.checkUpdate` to the todos"; a separate operation keeps `system.info` a plain read, and GitHub's anonymous limit of 60 requests an hour per address bounds how often it may ask.
 

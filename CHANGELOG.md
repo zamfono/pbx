@@ -16,6 +16,10 @@ why the specified behaviour changed; the commit history, how.
 - `/metrics` counts the packets and bytes the SIP ban dropped.
 - `system.checkUpdate` asks GitHub for the latest release now instead of within the hour.
 
+### Changed
+
+- `/auth/resetRequest` and `/auth/reset` send no CORS headers: only the stack's own pages call them.
+
 ### Fixed
 
 - The updater stops on SIGTERM, so a restart of it no longer waits 10 seconds for a kill.
