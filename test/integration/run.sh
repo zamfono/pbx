@@ -33,8 +33,9 @@
 #     down by hand (the message on exit gives the exact command) once done.
 #
 #   SHARD=<k>/<n> bash test/integration/run.sh
-#     Plays every n-th scenario, from the k-th on, on a stack of its own; the named steps after the
-#     scenarios run on the last shard only (only.sh). CI plays the scenarios as two shards.
+#     Plays the k-th of n shares of the scenarios on a stack of its own; the named steps after the
+#     scenarios run on the last shard only, which plays fewer scenarios to make up for them
+#     (only.sh). CI plays the scenarios as two shards.
 #
 #   UPGRADE_FROM=latest|<X.Y.Z> bash test/integration/run.sh
 #     Starts the stack as that release, from its published bundle and images, and upgrades it to

@@ -165,8 +165,8 @@ jobs:
     name: compose-docker (${{ matrix.shard }})
     needs: images
     runs-on: ubuntu-latest
-    # Two fresh installs, the path a new operator takes, in parallel, each playing half the sipp
-    # scenarios (run.sh's SHARD); the last one also runs the named steps.
+    # Two fresh installs, the path a new operator takes, in parallel, sharing the sipp scenarios
+    # (run.sh's SHARD); the last one also runs the named steps and plays fewer scenarios for them.
     strategy:
       fail-fast: false
       matrix:

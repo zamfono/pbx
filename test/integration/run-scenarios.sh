@@ -15,7 +15,7 @@
 #
 # `ONLY=<glob>[,<glob>...]` (run.sh's own usage block, `only.sh`'s `name_selected`) plays only the
 # scenarios whose name matches one of the globs, for reproducing one or a few by hand; `SHARD=k/n`
-# (`only.sh`'s `shard_selected`) plays every n-th, for CI's parallel runs.
+# (`only.sh`'s `shard_selected`) plays the k-th of n shares, for CI's parallel runs.
 
 # The part each container plays in scenario `$1`: its `<name>.roles`, sourced, sets those that
 # differ from these defaults.
