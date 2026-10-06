@@ -86,6 +86,9 @@ export async function handleOutbound(
     callLogMaxBytes: pipeline.deps.callLogMaxBytes
   });
   call.callerUserId = callerUserId;
+  if (transfer?.transfereeTargetRecords !== undefined) {
+    call.callerTargetRecords = transfer.transfereeTargetRecords;
+  }
   call.parentCallId = transfer?.parentCallId ?? null;
   call.didId = transfer?.didId ?? null;
   const asUser =

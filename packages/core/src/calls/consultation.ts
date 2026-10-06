@@ -24,7 +24,7 @@ import { callUp } from './callState.js';
 import { consultationLive, endHold, holdOf, holdParty } from './hold.js';
 import { closeCall } from './liveCall.js';
 import { actedParty, namedLeg } from './liveLegs.js';
-import { userOfChannel } from './onwardCall.js';
+import { transfereeOf } from './onwardCall.js';
 import type { Pipeline } from './pipeline.js';
 
 /** `POST /internal/calls/{id}/consult`: holds the other party, or the leg `req.legId`, and dials
@@ -100,10 +100,7 @@ export async function transferToConsultation(
       'the consultation is not answered'
     );
   }
-  const transferee = {
-    channelId: hold.channelId,
-    userId: userOfChannel(call, hold.channelId)
-  };
+  const transferee = transfereeOf(call, hold.channelId);
   call.log.event({
     event: 'attendedTransfer',
     actorUserId: req.actorUserId,

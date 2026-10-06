@@ -10,7 +10,12 @@ import type { AriClient } from '../ari/client.js';
 import { logUnlessGone } from '../ari/failures.js';
 import type { Logger } from '../ari/types.js';
 import type { ConfigCache } from '../internal/snapshot.js';
-import { legParticipant, type Call, type Leg } from './call.js';
+import {
+  legParticipant,
+  type Call,
+  type Leg,
+  type Transferee
+} from './call.js';
 import {
   startSnoopPair,
   waitForRecordingFinished
@@ -84,41 +89,42 @@ export class Recorder {
 
   /** Starts recording the calling party's own participation when their `record_calls` flag is
    * set (§10.2 "Internal calls": a call between two flagged users produces two recordings, one
-   * per side). The caller is never a `Leg` — it has no routing group of its own — so its flag is
-   * evaluated alone, unlike `onLegUp`'s OR-resolution with the routing group. A call with no
-   * caller channel has no calling party in it to record. */
+   * per side), or when it is a transferee's trunk leg whose forward target records
+   * (`Call.callerTargetRecords`). The caller is never a `Leg` — it has no routing group of its
+   * own — so its flags are evaluated alone, unlike `onLegUp`'s OR-resolution with the routing
+   * group. A call with no caller channel has no calling party in it to record. */
   async onCallerUp(call: Call): Promise<void> {
     if (call.callerChannelId !== null) {
-      await this.startOnOwnFlag(
-        call.id,
-        call.callerUserId,
-        call.callerChannelId
-      );
+      await this.startOnOwnFlags(call.id, {
+        channelId: call.callerChannelId,
+        userId: call.callerUserId,
+        ...(call.callerTargetRecords === undefined
+          ? {}
+          : { targetRecords: call.callerTargetRecords })
+      });
     }
   }
 
   /** Starts recording a transferee's participation in the call it now carries on (§10.1
    * attended transfer; §10.2 "The next participation after a transfer is evaluated on its own
    * flags"). No group routed it there, so its user flag is evaluated alone, like the caller's. */
-  async onTransfereeUp(
-    call: Call,
-    transferee: { channelId: string; userId: string | null }
-  ): Promise<void> {
-    await this.startOnOwnFlag(call.id, transferee.userId, transferee.channelId);
+  async onTransfereeUp(call: Call, transferee: Transferee): Promise<void> {
+    await this.startOnOwnFlags(call.id, transferee);
   }
 
-  private async startOnOwnFlag(
+  /** Records `party` on its user's flag, its row naming them, or on its forward target's, its row
+   * naming nobody (§10.2 "Recording semantics"). */
+  private async startOnOwnFlags(
     callId: string,
-    userId: string | null,
-    channelId: string
+    party: Transferee
   ): Promise<void> {
-    if (userId === null) {
+    const { userId, channelId } = party;
+    const own =
+      userId !== null && userRecords(await this.deps.cache.get(), userId);
+    if (!own && party.targetRecords !== true) {
       return;
     }
-    if (!userRecords(await this.deps.cache.get(), userId)) {
-      return;
-    }
-    await this.start(callId, userId, channelId);
+    await this.start(callId, own ? userId : null, channelId);
   }
 
   /** Starts `channelId`'s snoop pair. Best effort (§10.2 "A snoop or mixing failure never affects

@@ -10,7 +10,7 @@ import { newId, type CallLogLevel } from '@zamfono/shared';
 import { logFailure } from '../ari/failures.js';
 import { userById, type Snapshot } from '../internal/snapshot.js';
 import { setChannelLanguage } from '../prompts.js';
-import { newCall, type Call } from './call.js';
+import { newCall, type Call, type Transferee } from './call.js';
 import { raiseLogLevel } from './callLogLevel.js';
 import { presentCallerUserId } from './callLookup.js';
 import { extensionOf } from './extensionOwner.js';
@@ -22,6 +22,20 @@ export function userOfChannel(call: Call, channelId: string): string | null {
     return presentCallerUserId(call);
   }
   return call.legs.get(channelId)?.userId ?? null;
+}
+
+/** `channelId` of `call` as the transferee a transfer hands on: the user present as it, and the
+ * recording flag of the forward target whose trunk leg it is. */
+export function transfereeOf(call: Call, channelId: string): Transferee {
+  const targetRecords =
+    channelId === call.callerChannelId
+      ? call.callerTargetRecords
+      : call.legs.get(channelId)?.targetRecords;
+  return {
+    channelId,
+    userId: userOfChannel(call, channelId),
+    ...(targetRecords === undefined ? {} : { targetRecords })
+  };
 }
 
 /** The number the transferee's new call is from: the original caller's, a colleague's extension,
@@ -95,7 +109,11 @@ export async function startOnwardCall(
     callLogMaxBytes: pipeline.deps.callLogMaxBytes
   });
   child.parentCallId = parent.id;
-  child.callerUserId = userOfChannel(parent, transferee);
+  const { userId, targetRecords } = transfereeOf(parent, transferee);
+  child.callerUserId = userId;
+  if (targetRecords !== undefined) {
+    child.callerTargetRecords = targetRecords;
+  }
   child.didId = inherited.didId;
   raiseLogLevel(child.log, userById(snapshot, entry.asUserId), startedAt);
   await pipeline.deps.cdr.open(child);

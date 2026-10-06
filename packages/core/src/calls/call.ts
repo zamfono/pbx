@@ -109,9 +109,20 @@ export type Call = {
    * place to the transferee (§10.1 "Transfers and pickup"); absent while it is `callerUserId`'s
    * own, who stays the history's caller either way. */
   callerChannelUserId?: string | null;
+  /** `callerChannelId` is a transferee's whose forward target records (`Leg.targetRecords`): the
+   * trunk leg goes on being recorded in this row (§10.2 "Recording semantics"). */
+  callerTargetRecords?: true;
   /** Who ended the call (`callEnd.ts`): the first hangup request on the caller or an answered
    * leg, and whether the `ended` trace line is written yet. */
   ending?: CallEnding;
+};
+
+/** A transferee's channel as the row it goes on in records it (§10.2 "Recording semantics"): its
+ * user, and whether the forward target whose trunk leg it is records (`Leg.targetRecords`). */
+export type Transferee = {
+  channelId: string;
+  userId: string | null;
+  targetRecords?: true;
 };
 
 type CallEnding = {

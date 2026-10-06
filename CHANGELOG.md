@@ -25,6 +25,7 @@ why the specified behaviour changed; the commit history, how.
 - Calls, OPTIONS probes and MWI notifications to devices name the stack's FQDN in `From`, not the container's address.
 - `*5` to an own DID that forwards to another own DID's number follows it internally instead of dialling it over a trunk.
 - OPTIONS probes to a trunk with caller-ID header `from` name the stack's public address in `From`, not the container's.
+- A recording forward target's leg stays recorded after it is transferred onward.
 
 ## [0.3.2] - 2026-10-06
 

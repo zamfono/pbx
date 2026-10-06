@@ -3,15 +3,12 @@
  * every answer path calls (`answer.ts`). Separate from `recording.ts` so the call path depends
  * on the shape alone.
  */
-import type { Call, Leg } from './call.js';
+import type { Call, Leg, Transferee } from './call.js';
 
 export type ParticipationRecorder = {
   onCallerUp(call: Call): Promise<void>;
   onLegUp(call: Call, leg: Leg): Promise<void>;
-  onTransfereeUp(
-    call: Call,
-    transferee: { channelId: string; userId: string | null }
-  ): Promise<void>;
+  onTransfereeUp(call: Call, transferee: Transferee): Promise<void>;
   onCallerEnded(call: Call): Promise<void>;
   onLegEnded(call: Call, leg: Leg): Promise<void>;
   /** `leg`'s channel goes on in `to` (a parking ring-back's answer, §10.2 "Call parking"). */

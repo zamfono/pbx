@@ -14,12 +14,12 @@ import { newId } from '@zamfono/shared';
 
 import type { AriEventOf } from '../ari/events.js';
 import { ignoreGone, logFailure } from '../ari/failures.js';
-import type { Call } from './call.js';
+import type { Call, Transferee } from './call.js';
 import { otherChannelIn, presentCallerUserId } from './callLookup.js';
 import { callPartiesChanged } from './callState.js';
 import { endHold } from './hold.js';
 import { closeCall } from './liveCall.js';
-import { userOfChannel } from './onwardCall.js';
+import { transfereeOf, userOfChannel } from './onwardCall.js';
 import type { Pipeline } from './pipeline.js';
 
 type AttendedTransfer = AriEventOf<'BridgeAttendedTransfer'>;
@@ -36,7 +36,7 @@ export function handOver(
   pipeline: Pipeline,
   consultation: Call,
   secondLeg: string | null,
-  transferee: { channelId: string; userId: string | null }
+  transferee: Transferee
 ): void {
   const { recorder, presence } = pipeline.deps;
   const transferrerUserId =
@@ -66,6 +66,11 @@ export function handOver(
     consultation.callerChannelId = transferee.channelId;
     consultation.callerLegId = newId();
     consultation.callerChannelUserId = transferee.userId;
+    if (transferee.targetRecords === undefined) {
+      delete consultation.callerTargetRecords;
+    } else {
+      consultation.callerTargetRecords = transferee.targetRecords;
+    }
     pipeline.registerCall(consultation);
     callPartiesChanged(pipeline.deps, consultation);
     return;
@@ -85,7 +90,10 @@ export function handOver(
     kind: 'device',
     userId: transferee.userId,
     state: 'up',
-    endCause: null
+    endCause: null,
+    ...(transferee.targetRecords === undefined
+      ? {}
+      : { targetRecords: transferee.targetRecords })
   });
   callPartiesChanged(pipeline.deps, consultation);
 }
@@ -128,10 +136,7 @@ async function carryOn(
 ): Promise<void> {
   const { call: original, secondLeg, transfereeId } = parent;
   consultation.parentCallId = original.id;
-  const transferee = {
-    channelId: transfereeId,
-    userId: userOfChannel(original, transfereeId)
-  };
+  const transferee = transfereeOf(original, transfereeId);
   handOver(pipeline, consultation, secondLeg, transferee);
   if (ev.destination_type === 'bridge' && ev.destination_bridge !== undefined) {
     consultation.bridgeId = ev.destination_bridge;

@@ -13,7 +13,12 @@
 import { isEvent, type AriEvent, type AriEventOf } from '../ari/events.js';
 import { ignoreGone, logFailure } from '../ari/failures.js';
 import { closeCall } from './liveCall.js';
-import { fromOf, transfereeEntry, userOfChannel } from './onwardCall.js';
+import {
+  fromOf,
+  transfereeEntry,
+  transfereeOf,
+  userOfChannel
+} from './onwardCall.js';
 import {
   dropPendingTransfer,
   localDiallingHalf,
@@ -78,10 +83,14 @@ async function onBlindTransfer(
     // its parent. A trunk-side transferrer's onward call re-enters `from-trunk` as an inbound
     // call of its own, so it has nothing to take.
     if (transferrerUserId !== null) {
+      const { userId, targetRecords } = transfereeOf(call, transferee.id);
       setPendingTransfer(pipeline, diallingHalf ?? transferee.id, {
         parentCallId: call.id,
         transferrerUserId,
-        transfereeUserId: userOfChannel(call, transferee.id),
+        transfereeUserId: userId,
+        ...(targetRecords === undefined
+          ? {}
+          : { transfereeTargetRecords: targetRecords }),
         from: fromOf(call, transferee.id, snapshot),
         // The same row a transfer over the API gives the transferee (`transfers.ts`).
         ...transfereeEntry(call, transferee.id)

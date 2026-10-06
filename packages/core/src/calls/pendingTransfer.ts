@@ -25,6 +25,8 @@ type PendingTransfer = {
   transferrerUserId: string;
   /** The transferee, the onward call's caller: their user, `null` for an outside party. */
   transfereeUserId: string | null;
+  /** The transferee is a trunk leg whose forward target records (`Call.callerTargetRecords`). */
+  transfereeTargetRecords?: true;
   /** The number the onward call is from: the transferee's. */
   from: string;
   /** Whether the onward call continues an inbound call, and through which DID (`transfereeEntry`). */
