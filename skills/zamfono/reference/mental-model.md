@@ -20,7 +20,9 @@ that single tenant; there is no cross-tenant sharing.
   always tried. A trunk's `diversion` says what a call forwarded out over it tells the far end
   about who forwarded it: `off` (the default) nothing, `last` the last forward, `all` every
   forward, each by the forwarder's own number or the company's main number, never an extension.
-  Some carriers show the original caller's number on a forwarded call only when it carries one.
+  Some carriers show the original caller's number on a forwarded call only when it carries one,
+  and a trunk's `forwardedCallerId` puts that number in `From` itself, for a carrier contract
+  with "CLIP no screening". See `caller-id` for what a trunk presents and where.
 - **DID** — a phone number the tenant owns, routed on arrival to a forward target. A **number
   block** (`didBlocks`) covers the numbers that begin with a base, either a fixed count of digits
   after it or any number of them, and gives the ones no DID holds a fallback target, for a

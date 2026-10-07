@@ -11,6 +11,14 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+### Added
+
+- Trunk option `forwardedCallerId` ("CLIP no screening"): forwarded and blind-transferred calls show the original caller, with the company's number in `P-Asserted-Identity` or `P-Preferred-Identity`.
+
+### Changed
+
+- A number routed to an external number or SIP target, and a blind transfer (reason `deflection`), carry `Diversion` under the trunk's `diversion` policy.
+
 ## [0.4.0] - 2026-10-07
 
 ### Upgrade notes

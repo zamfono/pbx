@@ -10,16 +10,13 @@ import { userById, type Snapshot } from '../internal/snapshot.js';
 import type { ForwardTarget } from '../routing/targets.js';
 import type { Call } from './call.js';
 import { callerNumber, contactName } from './contactName.js';
-import type {
-  Diversion,
-  ForwardLeg,
-  RedirectingReason
-} from './forwardContext.js';
+import type { Diversion, RedirectingReason } from './forwardContext.js';
 import {
   renderForwardHeaders,
   type ForwardValues,
   type SipHeader
 } from './forwardHeaders.js';
+import type { ForwardLeg } from './forwardLeg.js';
 import type { Pipeline } from './pipeline.js';
 
 /** A hop's `REDIRECTING` reason as `{{forwardReason}}` names it, in the wire's camelCase. */
@@ -30,7 +27,8 @@ const FORWARD_REASONS = {
   cfb: 'busy',
   cfnr: 'noAnswer',
   unavailable: 'unavailable',
-  dnd: 'dnd'
+  dnd: 'dnd',
+  deflection: 'deflection'
 } as const satisfies Record<RedirectingReason, string>;
 
 /**
@@ -44,7 +42,9 @@ export function forwardValues(
   snapshot: Snapshot,
   callerName: string
 ): ForwardValues {
-  const called = diversions.find(hop => hop.party !== 'menu');
+  const called = diversions.find(
+    hop => hop.party === 'user' || hop.party === 'ringGroup'
+  );
   const last = diversions.at(-1);
   return {
     callerNumber: callerNumber(call.from),

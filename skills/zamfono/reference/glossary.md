@@ -64,7 +64,18 @@ HMAC of the body. See `webhooks`.
 **Mail template** — the subject and bodies one kind of mail is rendered from, builtin or the
 tenant's own (`mailTemplates`). See `mail-templates`.
 
-**CLIR** — withholding the caller's own number on an outbound call.
+**CLIR** — withholding the caller's own number on an outbound call. See `caller-id`.
+
+**P-Asserted-Identity / P-Preferred-Identity** — SIP headers naming the caller's identity as the
+sender vouches for it (asserted) or asks the provider to use (preferred), beside the `From` the
+callee is shown. See `caller-id`.
+
+**Diversion** — the SIP header a forwarded or blind-transferred call carries to name who forwarded
+it and why, as a trunk's `diversion` allows. See `caller-id`.
+
+**CLIP no screening** — a carrier feature that shows the callee a number the caller supplies in
+`From`, such as the original caller of a forwarded call, while the network-vouched identity stays
+the company's own; a trunk's `forwardedCallerId`. See `caller-id`.
 
 **Recording (a participation)** — one stereo file capturing one user's side of one call, made
 when that user's or the routing ring group's recording flag is set. See `recording-consent`.

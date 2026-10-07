@@ -1,45 +1,56 @@
 /**
  * A call's forwarding context (§9.4 "Forwarded calls"): the forward hops it took, each with the
- * diverting party and a reason, and what a trunk leg dialled for a forward target carries of
- * them: the `REDIRECTING` data, the `Diversion` its trunk's policy sends, written by
- * `forwardDiversion.ts`, and a `sip` target's headers, rendered by `forwardHeaders.ts`.
+ * diverting party and a reason, recorded as the call forwards. What a trunk leg dialled for a
+ * forward target or a blind transfer carries of them is `forwardLeg.ts`'s.
  */
 import { userById, type Snapshot } from '../internal/snapshot.js';
+import type { ForwardTarget } from '../routing/targets.js';
 import type { Call } from './call.js';
 import { extensionOf } from './extensionOwner.js';
-import {
-  diversionHeader,
-  diversionNumber,
-  type DiversionTrunk
-} from './forwardDiversion.js';
-import { headerVariables, type SipHeader } from './forwardHeaders.js';
+import { diversionNumber } from './forwardDiversion.js';
 
 /**
- * Asterisk's `REDIRECTING` reasons a forward hop maps to (§9.4 "Forwarded calls"), and the
- * `Diversion` `reason` sent for each (`forwardDiversion.ts`): `away` away, `time_of_day`
- * time-of-day, `cfu` unconditional, `cfb` user-busy, `cfnr` no-answer, `unavailable` unavailable,
- * `dnd` do-not-disturb.
+ * Asterisk's `REDIRECTING` reasons a forward hop or a blind transfer maps to (§9.4 "Forwarded
+ * calls"), and the `Diversion` `reason` sent for each (`forwardDiversion.ts`): `away` away,
+ * `time_of_day` time-of-day, `cfu` unconditional, `cfb` user-busy, `cfnr` no-answer,
+ * `unavailable` unavailable, `dnd` do-not-disturb, `deflection` deflection.
  */
 export type RedirectingReason =
-  'away' | 'time_of_day' | 'cfu' | 'cfb' | 'cfnr' | 'unavailable' | 'dnd';
+  | 'away'
+  | 'time_of_day'
+  | 'cfu'
+  | 'cfb'
+  | 'cfnr'
+  | 'unavailable'
+  | 'dnd'
+  | 'deflection';
 
 /** One forward hop: who diverted the call, and why. `number` is the `REDIRECTING` number, an
  * extension where the party has no number of its own; `diversionNumber` the one its `Diversion`
  * entry names, never an extension, `null` for none (§9.4 "Forwarded calls"). `party` and
- * `extension` are the diverting party's kind and extension, a menu's `null`, which a `sip`
- * target's headers name (§9.4 "Header templates"). */
+ * `extension` are the diverting party's kind and extension, a menu's and a tenant number's `null`,
+ * which a `sip` target's headers name (§9.4 "Header templates"). */
 export type Diversion = {
   number: string;
   diversionNumber: string | null;
   name: string | null;
   reason: RedirectingReason;
-  party: 'user' | 'ringGroup' | 'menu';
+  party: 'user' | 'ringGroup' | 'menu' | 'number';
   extension: string | null;
 };
 
-/** The entity a hop diverts from: the target the call was on when its rule applied. */
+/** The entity a hop diverts from: the target the call was on when its rule applied, or the
+ * tenant number whose own target it is (`TenantNumber`). */
 export type DivertingParty =
-  { userId: string } | { ringGroupId: string } | { menuId: string };
+  | { userId: string }
+  | { ringGroupId: string }
+  | { menuId: string }
+  | TenantNumber;
+
+/** A tenant number that forwards (§9.4 "Forwarded calls"): a DID, or the called number a block's
+ * or the tenant's fallback routes (`fallbackBlockId` the block, `null` for the tenant's). */
+export type TenantNumber =
+  { didId: string } | { fallbackBlockId: string | null };
 
 /** A user's forward rule condition, or a ring group's outcome, as the hop's reason. */
 export const CONDITION_REASONS = {
@@ -71,7 +82,8 @@ type PartyIdentity = Omit<
 
 /** `party`'s number, name and extension: a user's primary number or extension, a ring group's
  * extension, a menu's called number, the one an inbound call dialled, else the tenant's main
- * number; `null` for a menu with neither, a main DID since deleted. */
+ * number; `null` for a menu with neither, a main DID since deleted; a DID's own number and label, a
+ * fallback's called number and its block's label. */
 function partyIdentity(
   snapshot: Snapshot,
   call: Call,
@@ -96,6 +108,26 @@ function partyIdentity(
         null,
       party: 'ringGroup',
       extension
+    };
+  }
+  if ('didId' in party) {
+    const did = snapshot.dids.find(row => row.id === party.didId);
+    return {
+      number: did?.number ?? null,
+      name: did?.label ?? null,
+      party: 'number',
+      extension: null
+    };
+  }
+  if ('fallbackBlockId' in party) {
+    const block = snapshot.didBlocks.find(
+      row => row.id === party.fallbackBlockId
+    );
+    return {
+      number: call.to,
+      name: block?.label ?? null,
+      party: 'number',
+      extension: null
     };
   }
   return {
@@ -137,86 +169,29 @@ export function noteDiversion(call: Call, diversion: Diversion | null): void {
   }
 }
 
-/** A diverting party's number and name as the `REDIRECTING` fields of `prefix` take them. */
-function partyVariables(
-  prefix: 'orig' | 'from',
-  diversion: Diversion
-): Record<string, string> {
-  return {
-    [`REDIRECTING(${prefix}-num,i)`]: diversion.number,
-    ...(diversion.name === null
-      ? {}
-      : { [`REDIRECTING(${prefix}-name,i)`]: diversion.name })
-  };
-}
-
-/**
- * The `REDIRECTING` data of a leg that took `diversions`, first hop first: the first hop as the
- * original party, the last as the redirecting one, and the count, each set with `i` so nothing is
- * signalled before the INVITE; nothing is sent from it, since every trunk endpoint has
- * `send_diversion = no` (§9.4 "Forwarded calls"). None for a leg no hop led to.
- */
-export function redirectingVariables(
-  diversions: Diversion[]
-): Record<string, string> {
-  const first = diversions.at(0);
-  const last = diversions.at(-1);
-  if (first === undefined || last === undefined) {
-    return {};
+/** Records the hop tenant `number` makes to its own `target` when that is an `external` or `sip`
+ * target, which a trunk leg dials: the number forwards unconditionally (§9.4 "Forwarded calls"). */
+export function noteNumberForward(
+  snapshot: Snapshot,
+  call: Call,
+  number: TenantNumber,
+  target: ForwardTarget
+): void {
+  if (target.kind === 'external' || target.kind === 'sip') {
+    noteDiversion(call, diversionFor(snapshot, call, number, 'cfu'));
   }
-  return {
-    ...partyVariables('orig', first),
-    'REDIRECTING(orig-reason,i)': first.reason,
-    ...partyVariables('from', last),
-    'REDIRECTING(reason,i)': last.reason,
-    'REDIRECTING(count,i)': String(diversions.length)
-  };
 }
 
-/** A trunk leg dialled for a forward target: the hops that led to it, the call's own and, for a
- * ring-group member's followed forward, the member's (§10.1 step 5), and the headers it sends, a
- * `sip` target's rendered for it and none for an `external` one (§9.4 "Forwarded calls"). */
-export type ForwardLeg = {
-  diversions: Diversion[];
-  headers: SipHeader[];
-  /** The user whose unconditional forward the leg dials (`Leg.standsInFor`). */
-  standsInFor?: string;
-  /** The target the leg dials records its calls (`Leg.targetRecords`). */
-  targetRecords?: true;
-};
-
-/** The user whose own rule forwards a call (§10.1 step 7), whose call an external or SIP target is
- * dialled as; `standsIn` for their `unconditional` rule, whose trunk leg then is their
- * participation (§10.2 "Effective flag"). */
-export type Forwarder = { userId: string; standsIn: boolean };
-
-/** The `ForwardLeg.standsInFor` of a leg `forwarder` forwards to. */
-export function standInOf(
-  forwarder: Forwarder | null
-): Pick<ForwardLeg, 'standsInFor'> {
-  return forwarder?.standsIn === true ? { standsInFor: forwarder.userId } : {};
-}
-
-/** The `ForwardLeg.targetRecords` of a leg dialled for `target` (§10.2 "Recording semantics"). */
-export function recordingOf(target: {
-  record?: true;
-}): Pick<ForwardLeg, 'targetRecords'> {
-  return target.record === true ? { targetRecords: true } : {};
-}
-
-/** The forwarding context `forward`'s leg carries over `trunk` (§9.4 "Forwarded calls"): its
- * `REDIRECTING` data, the `Diversion` the trunk's policy sends and its headers, every header the
- * leg adds, so any other joins them here. */
-export function forwardVariables(
-  forward: ForwardLeg,
-  trunk: DiversionTrunk
-): Record<string, string> {
-  const diversion = diversionHeader(forward.diversions, trunk);
-  return {
-    ...redirectingVariables(forward.diversions),
-    ...(diversion === null
-      ? {}
-      : headerVariables([{ name: 'Diversion', value: diversion }])),
-    ...headerVariables(forward.headers)
-  };
+/** Records a blind transfer by `transferrerUserId` in its onward call's context: the
+ * transferrer's deflection, the first hop of whatever leg the onward call forwards to (§9.4
+ * "Forwarded calls"). */
+export function noteBlindTransfer(
+  snapshot: Snapshot,
+  call: Call,
+  transferrerUserId: string
+): void {
+  noteDiversion(
+    call,
+    diversionFor(snapshot, call, { userId: transferrerUserId }, 'deflection')
+  );
 }

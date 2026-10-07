@@ -14,7 +14,7 @@ import {
 } from '../routing/trunk.js';
 import type { Call } from './call.js';
 import type { AttemptIdentity, TrunkRow, UserRow } from './callerIdentity.js';
-import type { ForwardLeg } from './forwardContext.js';
+import type { ForwardLeg } from './forwardLeg.js';
 import type { Pipeline } from './pipeline.js';
 import {
   liveTrunk,

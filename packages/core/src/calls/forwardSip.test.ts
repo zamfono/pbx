@@ -202,7 +202,7 @@ describe('sip forward targets and the forwarding context (§9.4, §10.1 step 7)'
     expect(legs.map(leg => leg.endpoint)).toEqual([
       `PJSIP/${SIP_USER}@trunk-${trunkId}/sip:sip.api.openai.com:5061`
     ]);
-    // A DID's own target diverts nobody (§10.1 step 7).
+    // A target entered with no hop recorded carries no forwarding context.
     expect(forwardContext(legs.at(0))).toEqual({
       'PJSIP_HEADER(add,X-Zamfono-Caller)': CALLER,
       'PJSIP_HEADER(add,X-Zamfono-Did)': CALLED

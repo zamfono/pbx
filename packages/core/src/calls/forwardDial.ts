@@ -5,7 +5,7 @@
  * "Forwarded calls").
  */
 import { userById, type Snapshot } from '../internal/snapshot.js';
-import { ownDidTarget, type ForwardTarget } from '../routing/targets.js';
+import { ownDid, type ForwardTarget } from '../routing/targets.js';
 import { SIP_SERVICE_UNAVAILABLE } from '../sipCodes.js';
 import { type Call } from './call.js';
 import type { TrunkRow } from './callerIdentity.js';
@@ -16,7 +16,7 @@ import {
   standInOf,
   type Forwarder,
   type ForwardLeg
-} from './forwardContext.js';
+} from './forwardLeg.js';
 import { sipForwardLeg } from './forwardValues.js';
 import { dialExternal, settleDial } from './outboundExternal.js';
 import type { Pipeline } from './pipeline.js';
@@ -111,7 +111,7 @@ export async function dialForwardTarget(
     await dialSipTarget({ pipeline, trunkChannels }, call, target, forwarder);
     return;
   }
-  const own = ownDidTarget(await pipeline.deps.cache.get(), target);
+  const own = ownDid(await pipeline.deps.cache.get(), target);
   if (own !== null) {
     await enterOwnDid(pipeline, call, own);
     return;

@@ -116,6 +116,25 @@ describe('forwardValues', () => {
     });
   });
 
+  it('names a DID by its label as the forwarder, never as the called party', () => {
+    const hotline: Diversion = {
+      number: '+15551077',
+      diversionNumber: '+15551077',
+      name: 'Hotline',
+      reason: 'cfu',
+      party: 'number',
+      extension: null
+    };
+    expect(forwardValues(call(), [hotline], snapshot, '')).toMatchObject({
+      calledExtension: '',
+      calledName: '',
+      forwardedByExtension: '',
+      forwardedByName: 'Hotline',
+      forwardReason: 'unconditional',
+      hopCount: '1'
+    });
+  });
+
   it('leaves the hop placeholders empty without a hop, and a withheld caller and a verbatim DID', () => {
     expect(
       forwardValues(

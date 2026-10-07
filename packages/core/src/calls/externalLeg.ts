@@ -28,7 +28,7 @@ import {
   type Candidate,
   type RouteCursor
 } from './externalLegRoutes.js';
-import type { ForwardLeg } from './forwardContext.js';
+import type { ForwardLeg } from './forwardLeg.js';
 import type { Pipeline } from './pipeline.js';
 
 /** How the race that owns the leg holds it; every channel id named here is one attempt's. */

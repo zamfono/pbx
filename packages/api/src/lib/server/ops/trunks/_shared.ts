@@ -6,6 +6,7 @@ import {
   codecsColumn,
   codecsSchema,
   DIVERSION_POLICIES,
+  FORWARDED_CALLER_IDS,
   HOST_DIRECTIONS,
   MAX_PORT,
   NUMBER_FORMATS,
@@ -91,6 +92,11 @@ export const trunkScalars = z.object({
     .enum(DIVERSION_POLICIES)
     .describe(
       "The Diversion a forwarded leg over the trunk carries: none, the newest hop's or every hop's."
+    ),
+  forwardedCallerId: z
+    .enum(FORWARDED_CALLER_IDS)
+    .describe(
+      "Whose number a forwarded leg over the trunk presents: the company's, or the original caller's with the company's in P-Asserted-Identity or P-Preferred-Identity."
     ),
   outboundProxy: z.string().nullable(),
   registerExpiryS: z.number().nullable(),
@@ -201,6 +207,7 @@ export function scalarsFromRow(row: TrunkRow): TrunkScalars {
     tlsVerify: row.tlsVerify === 1,
     qualify: row.qualify === 1,
     diversion: row.diversion,
+    forwardedCallerId: row.forwardedCallerId,
     outboundProxy: row.outboundProxy,
     registerExpiryS: row.registerExpiryS,
     registerRetryS: row.registerRetryS,

@@ -27,6 +27,7 @@ import { UNKNOWN_STATUS } from './_status.js';
 import {
   assertClirAllowed,
   assertCredentialsConsistency,
+  assertForwardedCallerIdAllowed,
   assertHasRegistrar,
   assertInboundAuthUsernameFree,
   assertNameAvailable,
@@ -99,6 +100,7 @@ async function insertTrunkRow(
       ...switchColumns(input),
       transport: resolved.transport,
       diversion: input.diversion ?? 'off',
+      forwardedCallerId: input.forwardedCallerId ?? 'own',
       outboundProxy: input.outboundProxy ?? null,
       registerExpiryS:
         input.authMode === 'registration'
@@ -183,6 +185,11 @@ export const create = defineOperation({
     assertTransportEnabled(transport);
     assertSrtpNeedsTls(input.srtp === true, transport);
     assertClirAllowed(input.clir ?? null, callerIdHeader);
+    assertForwardedCallerIdAllowed({
+      forwardedCallerId: input.forwardedCallerId ?? 'own',
+      callerIdHeader,
+      diversion: input.diversion ?? 'off'
+    });
     assertCredentialsConsistency(
       required,
       input.username !== undefined,

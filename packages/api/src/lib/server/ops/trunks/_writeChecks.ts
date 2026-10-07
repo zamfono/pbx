@@ -5,6 +5,8 @@ import {
   TRUNK_SECTION_PREFIX,
   type CallerIdHeader,
   type Db,
+  type DiversionPolicy,
+  type ForwardedCallerId,
   type HostDirection,
   type TrunkAuthMode,
   type TrunkTransport
@@ -71,6 +73,34 @@ export function assertClirAllowed(
     throw new OpError(
       HTTP_UNPROCESSABLE_CONTENT,
       "clir requires a 'pai' or 'both' callerIdHeader"
+    );
+  }
+}
+
+/**
+ * Throws 422 for a trunk whose forwarded legs would present the original caller (§9.4 "Forwarded
+ * calls") where the carrier could not tell the call apart from a spoofed one: on a layout that is
+ * not `from`, whose `From` or asserted identity is the presented number, or without a `Diversion`,
+ * by which carriers recognise the forwarding.
+ */
+export function assertForwardedCallerIdAllowed(trunk: {
+  forwardedCallerId: ForwardedCallerId;
+  callerIdHeader: CallerIdHeader;
+  diversion: DiversionPolicy;
+}): void {
+  if (trunk.forwardedCallerId === 'own') {
+    return;
+  }
+  if (trunk.callerIdHeader !== 'from') {
+    throw new OpError(
+      HTTP_UNPROCESSABLE_CONTENT,
+      `forwardedCallerId '${trunk.forwardedCallerId}' requires callerIdHeader 'from'`
+    );
+  }
+  if (trunk.diversion === 'off') {
+    throw new OpError(
+      HTTP_UNPROCESSABLE_CONTENT,
+      `forwardedCallerId '${trunk.forwardedCallerId}' requires diversion 'last' or 'all'`
     );
   }
 }

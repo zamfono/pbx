@@ -8,12 +8,8 @@ import type { Snapshot } from '../internal/snapshot.js';
 import type { ForwardTarget } from '../routing/targets.js';
 import type { Call } from './call.js';
 import { ringExternalLeg } from './externalLeg.js';
-import {
-  CONDITION_REASONS,
-  diversionFor,
-  recordingOf,
-  type ForwardLeg
-} from './forwardContext.js';
+import { CONDITION_REASONS, diversionFor } from './forwardContext.js';
+import { recordingOf, type ForwardLeg } from './forwardLeg.js';
 import { sipForwardLeg } from './forwardValues.js';
 import type { Pipeline } from './pipeline.js';
 import type { BatchLegs } from './ringGroupOriginate.js';

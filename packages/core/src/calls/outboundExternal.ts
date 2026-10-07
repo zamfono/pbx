@@ -11,12 +11,12 @@ import type { Call } from './call.js';
 import { concludeExhausted, concludeFinal } from './conclude.js';
 import { dialRoutes, type DialResult } from './dialAttempt.js';
 import { openCursor, routeWays } from './externalLegRoutes.js';
-import type { ForwardLeg } from './forwardContext.js';
+import type { ForwardLeg } from './forwardLeg.js';
 import type { Pipeline } from './pipeline.js';
 import type { TrunkChannels } from './trunkChannels.js';
 
 /** Who dials an external leg: the pipeline and its trunk channel count, and for a leg dialled
- * for a forward target, the hops that led to it (§9.4 "Forwarded calls"). */
+ * for a forward target or a blind transfer, the hops that led to it (§9.4 "Forwarded calls"). */
 type ExternalDialCtx = {
   pipeline: Pipeline;
   trunkChannels: TrunkChannels;

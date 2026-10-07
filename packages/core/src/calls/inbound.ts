@@ -17,8 +17,9 @@ import { SIP_DECLINE, SIP_SERVER_ERROR } from '../sipCodes.js';
 import { announce } from './announce.js';
 import { newCall, type Call } from './call.js';
 import { raiseLogLevel } from './callLogLevel.js';
-import type { Forwarder } from './forwardContext.js';
+import { noteNumberForward } from './forwardContext.js';
 import { dialForwardTarget } from './forwardDial.js';
+import type { Forwarder } from './forwardLeg.js';
 import { applyOooAndHours, targetIdentity } from './inboundSchedule.js';
 import { inboundBoundary } from './inboundTrunk.js';
 import { playMenu } from './menu.js';
@@ -155,8 +156,18 @@ async function enterCalled(
     await release(pipeline, call, SIP_SERVER_ERROR, 'failed');
     return;
   }
-  // §10.1 step 7: a DID's own target is dialled without a caller.
-  await enterTarget(pipeline, call, targetFromRow(targetRow), null);
+  // §10.1 step 7: a DID's or fallback's own target is dialled without a caller, the called number
+  // its forward's hop.
+  const target = targetFromRow(targetRow);
+  noteNumberForward(
+    snapshot,
+    call,
+    resolved.kind === 'did'
+      ? { didId: resolved.didId }
+      : { fallbackBlockId: resolved.blockId },
+    target
+  );
+  await enterTarget(pipeline, call, target, null);
 }
 
 /** A `from-trunk` StasisStart (§9.2): both numbers normalized with the delivering trunk's

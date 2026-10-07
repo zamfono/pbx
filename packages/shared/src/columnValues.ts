@@ -58,6 +58,16 @@ export type CallerIdHeader = (typeof CALLERID_HEADERS)[number];
 export const DIVERSION_POLICIES = ['off', 'last', 'all'] as const;
 export type DiversionPolicy = (typeof DIVERSION_POLICIES)[number];
 
+/** `trunks.forwarded_caller_id` (§9.4 "Forwarded calls"): what a forwarded or blind-transferred leg
+ * over the trunk presents, its own number, or the original caller's with the own number asserted
+ * (`P-Asserted-Identity`) or preferred (`P-Preferred-Identity`); `own` for a new trunk. */
+export const FORWARDED_CALLER_IDS = [
+  'own',
+  'original',
+  'originalPreferred'
+] as const;
+export type ForwardedCallerId = (typeof FORWARDED_CALLER_IDS)[number];
+
 /** `trunk_hosts.direction` (§9.4 "Hosts"). */
 export const HOST_DIRECTIONS = ['both', 'outbound', 'inbound'] as const;
 export type HostDirection = (typeof HOST_DIRECTIONS)[number];

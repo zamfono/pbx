@@ -12,9 +12,9 @@ import { type Call } from './call.js';
 import {
   diversionFor,
   type DivertingParty,
-  type Forwarder,
   type RedirectingReason
 } from './forwardContext.js';
+import type { Forwarder } from './forwardLeg.js';
 import type { Pipeline } from './pipeline.js';
 import { type Owner } from './release.js';
 import { runTarget } from './runTarget.js';

@@ -15,7 +15,7 @@ import {
 } from '../routing/targets.js';
 import { SIP_NOT_FOUND, SIP_TEMPORARILY_UNAVAILABLE } from '../sipCodes.js';
 import { extensionOf } from './extensionOwner.js';
-import { recordingOf, type ForwardLeg } from './forwardContext.js';
+import { recordingOf, type ForwardLeg } from './forwardLeg.js';
 import { resolveDialedContext } from './outboundLookup.js';
 
 /**
@@ -104,7 +104,7 @@ function didTarget(
       kind: 'external',
       number: target.number,
       clir: null,
-      // The DID forwards, diverting nobody.
+      // A party added with `*5` carries no forwarding context (§9.4 "Forwarded calls").
       forward: { diversions: [], headers: [], ...recordingOf(target) }
     };
   }

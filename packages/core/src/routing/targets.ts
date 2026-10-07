@@ -102,17 +102,28 @@ export function findForwardTarget(
   return targetFromRow(row);
 }
 
-/** The target of the tenant's own DID that an `external` target names, which is routed there
- * internally and never leaves through a trunk (§10.1 Outbound step 5), else `null`. */
-export function ownDidTarget(
+/** The tenant's own DID that an `external` target names, by its id, and the DID's target, which
+ * the call is routed to internally and never leaves through a trunk (§10.1 Outbound step 5), else
+ * `null`. */
+export function ownDid(
   snapshot: Snapshot,
   target: ForwardTarget
-): ForwardTarget | null {
+): { id: string; target: ForwardTarget } | null {
   if (target.kind !== 'external') {
     return null;
   }
   const did = snapshot.dids.find(row => row.number === target.number);
-  return did === undefined ? null : findForwardTarget(snapshot, did.targetId);
+  return did === undefined
+    ? null
+    : { id: did.id, target: findForwardTarget(snapshot, did.targetId) };
+}
+
+/** The target of the own DID that an `external` target names (`ownDid`), else `null`. */
+export function ownDidTarget(
+  snapshot: Snapshot,
+  target: ForwardTarget
+): ForwardTarget | null {
+  return ownDid(snapshot, target)?.target ?? null;
 }
 
 /** `user_forward_rules` for `userId`, keyed by condition, resolved to their `ForwardTarget`s. */

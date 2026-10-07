@@ -90,7 +90,7 @@ outside the stack; this recipe gets the call to OpenAI. OpenAI's guide:
    | `{{calledExtension}}`      | the extension of the user or ring group the call was for                                |
    | `{{calledName}}`           | that user's or ring group's name                                                        |
    | `{{forwardedByExtension}}` | the extension of the user or ring group that forwarded the call last                    |
-   | `{{forwardedByName}}`      | their name                                                                              |
+   | `{{forwardedByName}}`      | their name, or the label of the DID or number block whose target the agent is           |
    | `{{forwardReason}}`        | why: `outOfOffice`, `closed`, `unconditional`, `busy`, `noAnswer`, `unavailable`, `dnd` |
    | `{{hopCount}}`             | how many times the call was forwarded                                                   |
    | `{{callId}}`               | the call's id, as `calls.get` (`GET /api/v1/calls/{id}`) knows it                       |
@@ -116,7 +116,9 @@ outside the stack; this recipe gets the call to OpenAI. OpenAI's guide:
 5. What your webhook sees. The INVITE's request URI is
    `sip:<project id>@sip.api.openai.com:5061`, its `To` `<sip:<project id>@sip.api.openai.com>`,
    and its `From` the number the stack presents, as for any call over
-   the trunk: the forwarding user's own number, else the company's main number. It adds
+   the trunk: the forwarding user's own number, else the company's main number. The original
+   caller travels in a header, such as `{{callerNumber}}` (step 3); only a carrier trunk with
+   "CLIP no screening" puts it in `From` (`forwardedCallerId`, see `caller-id`). It adds
    - the target's headers, as step 3 sets them;
    - `Diversion`, as the trunk's `diversion` says: none for `off`; for `last` the user or ring
      group whose rule forwarded the call last; for `all` every forward, newest first, in one
@@ -131,7 +133,8 @@ outside the stack; this recipe gets the call to OpenAI. OpenAI's guide:
      and with `last` only the first entry, B's. The host is the stack's own address. To tell B's extension to your webhook, which
      `Diversion` never names, put `{{forwardedByExtension}}` in a header (step 3).
 
-   A call from a DID straight to the agent carries no `Diversion`, since nobody forwarded it.
+   A call from a DID straight to the agent names that DID: its number and label, reason
+   `unconditional`, in `Diversion` and `{{forwardedByName}}`.
 
 6. Test it: call the number, then read the call with `calls.get` (`GET /api/v1/calls/{id}`). Its
    trace has one `attempt` line with `"routeId": null`, the trunk's id and the outcome (`answered`,

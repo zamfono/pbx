@@ -34,6 +34,7 @@ import { mergeScalars, type Merged } from './_updateMerge.js';
 import {
   assertClirAllowed,
   assertCredentialsConsistency,
+  assertForwardedCallerIdAllowed,
   assertHasRegistrar,
   assertInboundAuthUsernameFree,
   assertNameAvailable,
@@ -67,6 +68,7 @@ async function assertUpdateAllowed(
   }
   assertSrtpNeedsTls(merged.srtp, merged.transport);
   assertClirAllowed(merged.clir, merged.callerIdHeader);
+  assertForwardedCallerIdAllowed(merged);
   assertCredentialsConsistency(
     credentialsRequired,
     merged.username !== null,
@@ -113,6 +115,7 @@ function trunkColumns(
     tlsVerify: merged.tlsVerify ? 1 : 0,
     qualify: merged.qualify ? 1 : 0,
     diversion: merged.diversion,
+    forwardedCallerId: merged.forwardedCallerId,
     outboundProxy: merged.outboundProxy,
     registerExpiryS: merged.registerExpiryS,
     registerRetryS: merged.registerRetryS,

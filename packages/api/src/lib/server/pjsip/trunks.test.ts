@@ -247,6 +247,15 @@ describe('renderTrunksConf connected line and redirecting', () => {
       }
     }
   });
+
+  // §9.4 "Forwarded calls": a `from` trunk's leg that presents the original caller carries the
+  // core's own `P-Asserted-Identity` or `P-Preferred-Identity`, which chan_pjsip neither replaces
+  // nor joins with one of its own while the endpoint sends no identity header.
+  test('a from endpoint sends no identity header of its own', () => {
+    const conf = renderTrunk(registrationTrunk);
+    expect(configValues(conf, 'send_pai')).toEqual([]);
+    expect(configValues(conf, 'send_rpid')).toEqual([]);
+  });
 });
 
 // §5.6, §9.4 "Inbound identification": an `inbound_auth` trunk's credential identifies a call from

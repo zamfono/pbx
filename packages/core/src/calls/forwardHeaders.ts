@@ -2,7 +2,7 @@
  * A `sip` target's custom headers as its forwarded trunk leg sends them (§9.4 "Header templates"):
  * one pure function from the target's templates and the call's placeholder values to the headers,
  * and the variables that add them to the leg at its originate (`trunkDial.ts`, through
- * `forwardContext.ts`'s `forwardVariables`), the one place a forwarded leg's headers are applied.
+ * `forwardLeg.ts`'s `forwardVariables`), the one place a forwarded leg's headers are applied.
  * The value syntax and each placeholder's maximum are `@zamfono/shared`'s, which `api` validates
  * a target's headers with.
  */

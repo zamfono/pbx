@@ -3,12 +3,12 @@ import { describe, expect, it } from 'vitest';
 
 import { DEFAULT_SIP_HEADERS } from '@zamfono/shared';
 
-import { forwardVariables } from './forwardContext.js';
 import {
   cutUtf8,
   renderForwardHeaders,
   type ForwardValues
 } from './forwardHeaders.js';
+import { forwardVariables } from './forwardLeg.js';
 
 // §9.4 "Header templates": a sip target's headers as its forwarded leg sends them.
 
@@ -109,7 +109,8 @@ describe('renderForwardHeaders', () => {
     expect(
       forwardVariables(
         { diversions: [], headers },
-        { policy: 'all', host: 'pbx.example', format: 'e164', country: 'US' }
+        { policy: 'all', host: 'pbx.example', format: 'e164', country: 'US' },
+        null
       )
     ).toEqual({
       'PJSIP_HEADER(add,X-Literal)': '${CALLERID(num)} $[1+1] ${SHELL(id)}'

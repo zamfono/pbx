@@ -76,7 +76,8 @@ async function startTransfereeCall(
         ? deposit(pipeline, child, onward.mailbox, 'transfer')
         : dispatchAction(pipeline, child, onward.resolved.action, {
             snapshot,
-            asUser: transferrerUserId
+            asUser: transferrerUserId,
+            blindTransfer: true
           })
   );
 }

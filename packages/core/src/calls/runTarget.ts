@@ -5,9 +5,10 @@ import { SIP_TEMPORARILY_UNAVAILABLE } from '../sipCodes.js';
 import { type Call } from './call.js';
 import {
   noteDiversion,
-  type Diversion,
-  type Forwarder
+  noteNumberForward,
+  type Diversion
 } from './forwardContext.js';
+import type { Forwarder } from './forwardLeg.js';
 import { enterTarget } from './inbound.js';
 import type { Pipeline } from './pipeline.js';
 import { endTargetOwner, type Owner } from './release.js';
@@ -52,16 +53,23 @@ export async function runTarget(
 
 /** An external target that is one of the tenant's own DIDs (§10.1 step 7): the DID's `target`
  * entered internally, as Outbound step 5 routes it, one hop on whatever its kind, so DIDs
- * forwarding to each other end at the hop limit. The DID forwards, so nobody's call is dialled. */
+ * forwarding to each other end at the hop limit. The DID forwards, so nobody's call is dialled,
+ * and an `external` or `sip` target records the DID's hop (§9.4 "Forwarded calls"). */
 export async function enterOwnDid(
   pipeline: Pipeline,
   call: Call,
-  target: ForwardTarget
+  did: { id: string; target: ForwardTarget }
 ): Promise<void> {
   if (call.hops + 1 > MAX_HOPS) {
     await endAtHopLimit(pipeline, call);
     return;
   }
   call.hops += 1;
-  await enterTarget(pipeline, call, target, null);
+  noteNumberForward(
+    await pipeline.deps.cache.get(),
+    call,
+    { didId: did.id },
+    did.target
+  );
+  await enterTarget(pipeline, call, did.target, null);
 }

@@ -112,5 +112,9 @@ export async function handleOutbound(
   call.log.event({ event: 'entry', dialAction: action.kind, dialed });
   markCallerInCall(pipeline, call, action);
 
-  await dispatchAction(pipeline, call, action, { snapshot, asUser });
+  await dispatchAction(pipeline, call, action, {
+    snapshot,
+    asUser,
+    ...(transfer === null ? {} : { blindTransfer: true })
+  });
 }

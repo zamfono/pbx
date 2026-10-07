@@ -3,7 +3,7 @@
  * Please do not edit it manually.
  */
 
-import type { AudioKind, AuditChannel, BackupRunStatus, BackupTargetKind, CallDirection, CallerIdHeader, CallLogLevel, CallStatus, DeviceKind, DeviceTransport, DiversionPolicy, HostDirection, Language, LogLevelOverride, MailKind, MaintenanceWork, NumberFormat, OAuthClientKind, PresenceStatus, QosRole, RingGroupForwardCondition, RingStrategy, SmtpSecurity, SsoProvider, TokenKind, TrunkAuthMode, TrunkTransport, UserForwardCondition, UserRole, WebhookStatus } from "../columnValues.js";
+import type { AudioKind, AuditChannel, BackupRunStatus, BackupTargetKind, CallDirection, CallerIdHeader, CallLogLevel, CallStatus, DeviceKind, DeviceTransport, DiversionPolicy, ForwardedCallerId, HostDirection, Language, LogLevelOverride, MailKind, MaintenanceWork, NumberFormat, OAuthClientKind, PresenceStatus, QosRole, RingGroupForwardCondition, RingStrategy, SmtpSecurity, SsoProvider, TokenKind, TrunkAuthMode, TrunkTransport, UserForwardCondition, UserRole, WebhookStatus } from "../columnValues.js";
 import type { ColumnType } from "kysely";
 import type { CountryCode } from "libphonenumber-js";
 
@@ -455,6 +455,7 @@ export interface Trunks {
   deletedAt: string | null;
   diversion: Generated<DiversionPolicy>;
   emergency: number;
+  forwardedCallerId: Generated<ForwardedCallerId>;
   id: string;
   inboundAuth: Generated<number>;
   inboundNumberFormat: Generated<NumberFormat>;

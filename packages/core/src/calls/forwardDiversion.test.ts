@@ -80,7 +80,8 @@ describe('diversionHeader', () => {
       cfb: 'user-busy',
       cfnr: 'no-answer',
       unavailable: 'unavailable',
-      dnd: 'do-not-disturb'
+      dnd: 'do-not-disturb',
+      deflection: 'deflection'
     } as const;
     for (const [reason, sent] of Object.entries(reasons)) {
       expect(

@@ -17,8 +17,9 @@ import {
   type TrunkRow
 } from './callerIdentity.js';
 import { raiseLogLevel } from './callLogLevel.js';
-import { forwardVariables, type ForwardLeg } from './forwardContext.js';
 import { diversionTrunk } from './forwardDiversion.js';
+import { originalCaller } from './forwardedCaller.js';
+import { forwardVariables, type ForwardLeg } from './forwardLeg.js';
 import { originateLeg } from './legOriginate.js';
 import type { Pipeline } from './pipeline.js';
 import type { TrunkLeg } from './provisional.js';
@@ -133,8 +134,9 @@ export type TrunkLegCtx = {
   trunk: TrunkRow;
   number: string;
   identity: AttemptIdentity;
-  /** A leg dialled for a forward target, `external` or `sip`: the hops that led to it, whose
-   * context it carries (§9.4 "Forwarded calls"); absent for a user's own dial. */
+  /** A leg dialled for a forward target, `external` or `sip`, or for a blind transfer: the hops
+   * that led to it, whose context it carries (§9.4 "Forwarded calls"); absent for a user's own
+   * dial. */
   forward?: ForwardLeg;
 };
 
@@ -177,15 +179,24 @@ export async function originateTrunkLeg(
     if (fromHost !== null && trunk.callerIdHeader !== 'from') {
       variables.SIPFROMDOMAIN = fromHost;
     }
+    let callerId = identity.number;
     if (ctx.forward !== undefined) {
-      // The one place a forwarded leg's `REDIRECTING` data, `Diversion` and custom headers are
-      // applied, the `Diversion` under this attempt's trunk's policy (§9.4 "Forwarded calls").
+      // The one place a forwarded leg's `REDIRECTING` data, `Diversion`, identity header and
+      // custom headers are applied, under this attempt's trunk's settings (§9.4 "Forwarded calls").
+      const diversion = diversionTrunk(trunk, snapshot, stackFqdn);
+      const original = originalCaller(call, {
+        trunk,
+        forward: ctx.forward,
+        identity,
+        diversion
+      });
+      if (original !== null) {
+        callerId = original.number;
+        variables['CALLERID(num)'] = original.number;
+      }
       Object.assign(
         variables,
-        forwardVariables(
-          ctx.forward,
-          diversionTrunk(trunk, snapshot, stackFqdn)
-        )
+        forwardVariables(ctx.forward, diversion, original?.identity ?? null)
       );
     }
     const channel = await originateLeg(
@@ -196,7 +207,7 @@ export async function originateTrunkLeg(
         endpoint: `PJSIP/${number}@${endpoint}`,
         app: 'zamfono',
         appArgs: `leg,${call.id}`,
-        callerId: identity.number,
+        callerId,
         variables: {
           ...channelLanguageVariable(snapshot.settings.language),
           ...variables

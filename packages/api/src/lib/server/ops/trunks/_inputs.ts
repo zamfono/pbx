@@ -4,6 +4,7 @@ import {
   CALLERID_HEADERS,
   codecsSchema,
   DIVERSION_POLICIES,
+  FORWARDED_CALLER_IDS,
   NUMBER_FORMATS,
   TRUNK_AUTH_MODES,
   TRUNK_TRANSPORTS
@@ -34,7 +35,9 @@ const FIELD = {
   qualify:
     "Probes an ip trunk's first host with OPTIONS every 60 seconds for its status; default true; false, for an endpoint that answers none, reads unmonitored and is always tried.",
   diversion:
-    'What a call forwarded out over this trunk tells the far end about who forwarded it: off (default) nothing, last the newest forward, all every forward.',
+    'What a call forwarded or blind-transferred out over this trunk tells the far end about who forwarded it: off (default) nothing, last the newest forward, all every forward (see zamfono.help caller-id).',
+  forwardedCallerId:
+    "Whose number a call forwarded or blind-transferred out over this trunk presents: own (default) the company's; original the outside caller's in From with the company's in P-Asserted-Identity, originalPreferred the same with P-Preferred-Identity, for a carrier's booked CLIP no screening; needs callerIdHeader from and diversion last or all (see zamfono.help caller-id).",
   outboundProxy:
     'The outbound proxy every request goes through: a sip: or sips: URI such as sip:proxy.example.com, written with ;lr where it lacks it.',
   registerExpiryS: 'Registration expiry in seconds; registration trunks only.',
@@ -45,7 +48,7 @@ const FIELD = {
   callerIdFormat:
     'How the presented caller number is sent: e164 (default) or national.',
   callerIdHeader:
-    'Where the presented number goes: from (default) in From; pai in P-Asserted-Identity with From the account identity (needs username); both in From and P-Asserted-Identity.',
+    'Where the presented number goes: from (default) in From; pai in P-Asserted-Identity with From the account identity (needs username); both in From and P-Asserted-Identity (see zamfono.help caller-id).',
   clir: 'Withholds the caller number on calls over this trunk; null inherits settings.clir; true needs callerIdHeader pai or both.',
   codecs:
     "The trunk's ordered codec offer; left out or null: the tenant's settings.codecs.",
@@ -75,6 +78,12 @@ export const createInputSchema = z
     // Default 'off': a new trunk's forwarded legs carry no `Diversion` until the admin opts in
     // (§9.4 "Forwarded calls").
     diversion: z.enum(DIVERSION_POLICIES).optional().describe(FIELD.diversion),
+    // Default 'own': a new trunk's forwarded legs present the company's number (§9.4 "Forwarded
+    // calls").
+    forwardedCallerId: z
+      .enum(FORWARDED_CALLER_IDS)
+      .optional()
+      .describe(FIELD.forwardedCallerId),
     outboundProxy: z.string().min(1).optional().describe(FIELD.outboundProxy),
     registerExpiryS: timeoutSeconds.optional().describe(FIELD.registerExpiryS),
     registerRetryS: timeoutSeconds.optional().describe(FIELD.registerRetryS),
@@ -117,6 +126,10 @@ export const updateInputSchema = z
     tlsVerify: z.boolean().optional().describe(FIELD.tlsVerify),
     qualify: z.boolean().optional().describe(FIELD.qualify),
     diversion: z.enum(DIVERSION_POLICIES).optional().describe(FIELD.diversion),
+    forwardedCallerId: z
+      .enum(FORWARDED_CALLER_IDS)
+      .optional()
+      .describe(FIELD.forwardedCallerId),
     outboundProxy: z
       .string()
       .min(1)

@@ -3,7 +3,7 @@
  * "Forwarded calls", RFC 5806): the number each hop names, the party's own and never an
  * extension, and the header the core writes itself, chan_pjsip's own being off on every trunk
  * endpoint (`send_diversion = no`). Applied beside the leg's other headers by
- * `forwardContext.ts`'s `forwardVariables`.
+ * `forwardLeg.ts`'s `forwardVariables`.
  */
 import {
   isE164,
@@ -30,7 +30,8 @@ const DIVERSION_REASONS = {
   cfb: 'user-busy',
   cfnr: 'no-answer',
   unavailable: 'unavailable',
-  dnd: 'do-not-disturb'
+  dnd: 'do-not-disturb',
+  deflection: 'deflection'
 } as const satisfies Record<RedirectingReason, string>;
 
 // A display name's cut, as `{{forwardedByName}}`'s (§9.4 "Header templates").
@@ -67,7 +68,8 @@ function ringGroupDid(snapshot: Snapshot, ringGroupId: string): string | null {
 }
 
 /** `party`'s own number, before the main number stands in for it: a user's primary number, a
- * ring group's DID, a menu's called number of an inbound call in the international form. */
+ * ring group's DID, a DID's own, a menu's or a fallback's called number of an inbound call, each
+ * in the international form. */
 function partyDid(
   snapshot: Snapshot,
   call: Call,
@@ -79,6 +81,10 @@ function partyDid(
   }
   if ('ringGroupId' in party) {
     return ringGroupDid(snapshot, party.ringGroupId);
+  }
+  if ('didId' in party) {
+    const number = didNumber(snapshot, party.didId);
+    return number !== null && isE164(number) ? number : null;
   }
   return call.direction === 'inbound' && isE164(call.to) ? call.to : null;
 }
