@@ -11,8 +11,11 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-07
+
 ### Upgrade notes
 
+- Owners and admins set up an authenticator app or passkey at their next password sign-in; a script that signs in by password as one needs the second step. Personal access tokens and existing sessions are unaffected.
 - API and MCP clients: a user's `email` and `extension` can now be `null`, and so can `setupLink` in the `POST /users` response.
 
 ### Added
@@ -627,7 +630,8 @@ The first 0.2 release; its `v0.2.0` tag was never published.
 
 The first tagged version, before any deployment.
 
-[Unreleased]: https://github.com/zamfono/pbx/compare/v0.3.2...HEAD
+[Unreleased]: https://github.com/zamfono/pbx/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/zamfono/pbx/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/zamfono/pbx/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/zamfono/pbx/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/zamfono/pbx/compare/v0.2.1...v0.3.0
