@@ -5,10 +5,9 @@
 <script lang="ts">
   import Smartphone from '@lucide/svelte/icons/smartphone';
 
+  import { demoTotp } from '#lib/api/totp.js';
   import { now as demoNow } from '#lib/clock.svelte.js';
   import { t } from '#lib/i18n/index.svelte.js';
-
-  import { demoTotp } from './mfa';
 
   type Props = {
     secret: string;

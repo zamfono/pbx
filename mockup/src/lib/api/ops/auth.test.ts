@@ -1,9 +1,12 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
+import { now } from '#lib/clock.svelte.js';
+
 import { ApiError } from '../errors';
 import { seed } from '../seed';
 import { U } from '../seed/ids';
 import { store } from '../store.svelte';
+import { demoTotp, existingSecret } from '../totp';
 import { call, type Actor } from './core';
 
 import './areas/auth';
@@ -30,6 +33,13 @@ function refusal(run: () => unknown): ApiError {
 }
 
 const mfaOf = (id: string) => store.db.users.find(user => user.id === id)?.mfa;
+
+const SECRET = 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP';
+/** The code the demo authenticator shows for `secret` now. */
+const codeFor = (secret: string): string => demoTotp(secret, now()).code;
+/** A six-digit code that is not the current one for `secret`. */
+const wrongCode = (secret: string): string =>
+  String((Number(codeFor(secret)) + 500_000) % 1_000_000).padStart(6, '0');
 
 describe('auth.* (own second factors)', () => {
   beforeEach(() => {
@@ -58,7 +68,8 @@ describe('auth.* (own second factors)', () => {
   it('issues ten recovery codes with the first method, none with a later one', () => {
     const first = as<MfaChangeResult>(mira, 'auth.totpConfirm', {
       userId: U.mira,
-      code: '123456'
+      secret: SECRET,
+      code: codeFor(SECRET)
     });
     expect(first.codes).toHaveLength(10);
     expect(first.codes?.[0]).toMatch(/^[A-Z2-7]{4}(-[A-Z2-7]{4}){3}$/u);
@@ -76,12 +87,38 @@ describe('auth.* (own second factors)', () => {
     expect(mfaOf(U.mira)?.passkeys).toBe(1);
   });
 
-  it('refuses a malformed authenticator code', () => {
+  it('confirms a new authenticator app only with the code it shows', () => {
+    for (const code of ['12ab56', wrongCode(SECRET)]) {
+      expect(
+        refusal(() =>
+          as(mira, 'auth.totpConfirm', { userId: U.mira, secret: SECRET, code })
+        ).code
+      ).toBe('auth.invalidCode');
+    }
+    as(mira, 'auth.totpConfirm', {
+      userId: U.mira,
+      secret: SECRET,
+      code: codeFor(SECRET)
+    });
+    expect(mfaOf(U.mira)?.totp).toBe(true);
+  });
+
+  it('passes the second step only with the code of the person’s own app', () => {
+    const secret = existingSecret(U.lea);
     expect(
       refusal(() =>
-        as(mira, 'auth.totpConfirm', { userId: U.mira, code: '12ab56' })
+        as(lea, 'auth.secondFactor', {
+          userId: U.lea,
+          method: 'totp',
+          code: wrongCode(secret)
+        })
       ).code
     ).toBe('auth.invalidCode');
+    as(lea, 'auth.secondFactor', {
+      userId: U.lea,
+      method: 'totp',
+      code: codeFor(secret)
+    });
   });
 
   it('keeps the last method of a person who must have one', () => {
@@ -98,7 +135,11 @@ describe('auth.* (own second factors)', () => {
   });
 
   it('removes the recovery codes with the last method of a person who need not keep one', () => {
-    as(mira, 'auth.totpConfirm', { userId: U.mira, code: '123456' });
+    as(mira, 'auth.totpConfirm', {
+      userId: U.mira,
+      secret: SECRET,
+      code: codeFor(SECRET)
+    });
     as(mira, 'auth.totpRemove', { userId: U.mira });
     expect(mfaOf(U.mira)).toEqual({
       totp: false,

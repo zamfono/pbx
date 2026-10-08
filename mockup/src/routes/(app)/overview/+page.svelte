@@ -39,7 +39,12 @@
   import { secondsSince } from '#lib/components/calls/clock.svelte.js';
   import { localDate } from '#lib/components/calls/dates.js';
   import DialBox from '#lib/components/calls/DialBox.svelte';
-  import { cameIn, isMissed, partyName } from '#lib/components/calls/labels.js';
+  import {
+    cameIn,
+    isMissed,
+    liveCounterpart,
+    partyName
+  } from '#lib/components/calls/labels.js';
   import PartyLabel from '#lib/components/calls/PartyLabel.svelte';
   import TimeChart from '#lib/components/calls/TimeChart.svelte';
   import {
@@ -229,9 +234,9 @@
           <span class="pulse"></span>
           {t('calls.overview.onCall', {
             name: partyName(
-              myLive[0]?.direction === 'inbound'
-                ? (myLive[0]?.from ?? '')
-                : (myLive[0]?.to ?? '')
+              myLive[0] === undefined
+                ? ''
+                : liveCounterpart(myLive[0], actor.id)
             ),
             duration: formatDuration(
               secondsSince(myLive[0]?.startedAt ?? demoNowDate().toISOString())

@@ -2,7 +2,7 @@
   The sign-in (`/oauth/authorize` of the API): e-mail and password, the SSO button when a provider
   is configured, then the second step for a person with a second factor, or the first-time
   enrolment for one who must have one and has none, with its recovery codes. The demo panel signs
-  in as a persona; any password is accepted for them.
+  in as a persona; any password is accepted for them except the fixed wrong ones.
 -->
 <script lang="ts">
   import ArrowLeft from '@lucide/svelte/icons/arrow-left';
@@ -19,6 +19,7 @@
   } from '#lib/api/ops/areas/auth.js';
   import { PERSONAS, type PersonaKey } from '#lib/api/seed/ids.js';
   import { store } from '#lib/api/store.svelte.js';
+  import { existingSecret } from '#lib/api/totp.js';
   import type { User } from '#lib/api/types.js';
   import { now as demoNow } from '#lib/clock.svelte.js';
   import { t } from '#lib/i18n/index.svelte.js';
@@ -34,7 +35,7 @@
   import DemoPanel from './DemoPanel.svelte';
   import {
     callAs,
-    existingSecret,
+    demoPasswordAccepted,
     mfaChangedToast,
     newTotpSecret,
     ssoHost,
@@ -154,7 +155,7 @@
       if (
         row === undefined ||
         persona === undefined ||
-        password === '' ||
+        !demoPasswordAccepted(password) ||
         locked
       ) {
         loginError = t('auth.login.invalid');
@@ -215,6 +216,7 @@
       enrolled(
         callAs<MfaChangeResult>(user, 'auth.totpConfirm', {
           userId: user.id,
+          secret: enrolSecret,
           code: value
         }),
         t('auth.toast.totpAdded'),
@@ -425,7 +427,9 @@
           />
         {/if}
         <p class="demo-intro">
-          {step === 'codes' ? t('auth.demo.codesNote') : t('auth.demo.anyCode')}
+          {step === 'codes'
+            ? t('auth.demo.codesNote')
+            : t('auth.demo.codeHint')}
         </p>
         <button type="button" class="demo-link" onclick={back}
           ><ArrowLeft size={14} /> {t('auth.demo.backToPersonas')}</button

@@ -33,7 +33,8 @@ export default {
     'auth.verify.totpIntro':
       'Geben Sie den 6-stelligen Code aus Ihrer Authenticator-App ein.',
     'auth.verify.codeLabel': 'Code',
-    'auth.verify.demoHint': 'Demo: Jeder 6-stellige Code wird akzeptiert.',
+    'auth.verify.demoHint':
+      'Demo: Es gilt der Code, den die Authenticator-App der Demo anzeigt.',
     'auth.verify.passkeyIntro':
       'Bestätigen Sie mit Fingerabdruck, Gesichtserkennung, der Bildschirmsperre oder Ihrem Sicherheitsschlüssel.',
     'auth.verify.usePasskey': 'Passkey verwenden',
@@ -85,7 +86,8 @@ export default {
 
     'auth.demo.title': 'Demo-Zugänge',
     'auth.demo.stepTitle': 'Demo-Hilfen',
-    'auth.demo.intro': 'Mit einem Klick anmelden – jedes Passwort passt.',
+    'auth.demo.intro':
+      'Mit einem Klick anmelden. Jedes Passwort passt außer „falsch“.',
     'auth.demo.method.totp': 'Authenticator',
     'auth.demo.method.passkeys': '{count}× Passkey',
     'auth.demo.method.none': 'ohne Zwei-Faktor',
@@ -96,8 +98,8 @@ export default {
     'auth.demo.authenticator': 'Authenticator-App auf dem Handy',
     'auth.demo.useCode': 'Code einsetzen',
     'auth.demo.secondsLeft': 'Noch {seconds} Sekunden gültig',
-    'auth.demo.anyCode':
-      'Demo: Jeder 6-stellige Code wird akzeptiert; Passkeys werden simuliert.',
+    'auth.demo.codeHint':
+      'Demo: Es gilt der Code, den die Authenticator-App der Demo anzeigt; Passkeys werden simuliert.',
     'auth.demo.codesNote':
       'Demo: Die Codes sind zufällig erzeugt. Nach dem Haken bei „gespeichert“ geht es weiter.',
     'auth.demo.backToPersonas': 'Zurück zu den Demo-Zugängen',
@@ -181,7 +183,7 @@ export default {
     'security.gate.title': 'Zwei-Faktor-Anmeldung',
     'security.gate.intro':
       'Melden Sie sich erneut an, um zu verwalten, wie Sie Ihre Anmeldungen bestätigen. Danach bleibt diese Seite 10 Minuten offen.',
-    'security.gate.demoHint': 'Demo: Jedes Passwort passt.',
+    'security.gate.demoHint': 'Demo: Jedes Passwort passt außer „falsch“.',
     'security.session.signedInAs':
       'Angemeldet als {email} für die nächsten 10 Minuten.',
     'security.session.left': 'Noch {time} Minuten',
@@ -258,7 +260,8 @@ export default {
     'auth.verify.totpIntro':
       'Enter the 6-digit code from your authenticator app.',
     'auth.verify.codeLabel': 'Code',
-    'auth.verify.demoHint': 'Demo: any 6-digit code is accepted.',
+    'auth.verify.demoHint':
+      'Demo: enter the code the demo’s authenticator app shows.',
     'auth.verify.passkeyIntro':
       'Confirm with your fingerprint, face, screen lock or security key.',
     'auth.verify.usePasskey': 'Use a passkey',
@@ -307,7 +310,8 @@ export default {
 
     'auth.demo.title': 'Demo accounts',
     'auth.demo.stepTitle': 'Demo helpers',
-    'auth.demo.intro': 'Sign in with one click – any password works.',
+    'auth.demo.intro':
+      'Sign in with one click. Any password works except “wrong”.',
     'auth.demo.method.totp': 'Authenticator',
     'auth.demo.method.passkeys': '{count}× passkey',
     'auth.demo.method.none': 'no second factor',
@@ -317,8 +321,8 @@ export default {
     'auth.demo.authenticator': 'Authenticator app on the phone',
     'auth.demo.useCode': 'Use code',
     'auth.demo.secondsLeft': 'Valid for {seconds} more seconds',
-    'auth.demo.anyCode':
-      'Demo: any 6-digit code is accepted; passkeys are simulated.',
+    'auth.demo.codeHint':
+      'Demo: enter the code the demo’s authenticator app shows; passkeys are simulated.',
     'auth.demo.codesNote':
       'Demo: the codes are random. Tick “saved” to continue.',
     'auth.demo.backToPersonas': 'Back to the demo accounts',
@@ -399,7 +403,7 @@ export default {
     'security.gate.title': 'Two-factor sign-in',
     'security.gate.intro':
       'Sign in again to manage how you confirm your sign-ins. This page then stays open for 10 minutes.',
-    'security.gate.demoHint': 'Demo: any password works.',
+    'security.gate.demoHint': 'Demo: any password works except “wrong”.',
     'security.session.signedInAs':
       'Signed in as {email} for the next 10 minutes.',
     'security.session.left': '{time} minutes left',

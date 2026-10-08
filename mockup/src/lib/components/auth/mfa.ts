@@ -1,41 +1,21 @@
 /**
- * Helpers of the sign-in and security screens: the simulated authenticator app (secret, otpauth
- * URI, the code it shows, a QR code drawn from the URI), the SSO button label, and running an
- * `auth.*` operation as the person signing in — before the session names them.
+ * Helpers of the sign-in and security screens: a new authenticator secret, its otpauth URI and a
+ * QR code drawn from it (the codes come from `#lib/api/totp.js`), the SSO button label, and
+ * running an `auth.*` operation as the person signing in — before the session names them.
  */
 import { ApiError } from '#lib/api/errors.js';
 import { call } from '#lib/api/ops/core.js';
+import { BASE32, SECRET_LENGTH, sequence } from '#lib/api/totp.js';
 import type { Settings, User } from '#lib/api/types.js';
 import { t } from '#lib/i18n/index.svelte.js';
 import { toast } from '#lib/state/ui.svelte.js';
 
-const BASE32 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-/** 160 bits as base32 (§5.2): 32 characters. */
-const SECRET_LENGTH = 32;
-const TOTP_STEP_MS = 30_000;
-const TOTP_DIGITS = 6;
+/** The passwords the demo refuses, to show a failed sign-in; every other password signs in. */
+const WRONG_PASSWORDS = ['falsch', 'wrong'];
 
-/** FNV-1a, enough to derive stable demo values from a string. */
-function hash(text: string, seed = 0x811c9dc5): number {
-  let value = seed >>> 0;
-  for (let index = 0; index < text.length; index += 1) {
-    value ^= text.charCodeAt(index);
-    value = Math.imul(value, 0x01000193) >>> 0;
-  }
-  return value;
-}
-
-/** A pseudo-random sequence seeded by `text` (mulberry32). */
-function sequence(text: string): () => number {
-  let state = hash(text);
-  return () => {
-    state = (state + 0x6d2b79f5) >>> 0;
-    let mixed = state;
-    mixed = Math.imul(mixed ^ (mixed >>> 15), mixed | 1);
-    mixed ^= mixed + Math.imul(mixed ^ (mixed >>> 7), mixed | 61);
-    return ((mixed ^ (mixed >>> 14)) >>> 0) / 4_294_967_296;
-  };
-}
+/** Whether the demo accepts `password` for a sign-in. */
+export const demoPasswordAccepted = (password: string): boolean =>
+  password !== '' && !WRONG_PASSWORDS.includes(password.trim().toLowerCase());
 
 /** A fresh authenticator secret: 160 random bits as base32. */
 export function newTotpSecret(): string {
@@ -48,15 +28,6 @@ export function newTotpSecret(): string {
 export const groupedSecret = (secret: string): string =>
   secret.match(/.{1,4}/gu)?.join(' ') ?? secret;
 
-/** The stand-in secret of an authenticator app set up before this demo started. */
-export const existingSecret = (userId: string): string => {
-  const next = sequence(`totp:${userId}`);
-  return Array.from(
-    { length: SECRET_LENGTH },
-    () => BASE32[Math.floor(next() * BASE32.length)]
-  ).join('');
-};
-
 /** `otpauth://totp/<issuer>:<email>`, the issuer being the company name (§5.2). */
 export function otpauthUri(
   companyName: string,
@@ -65,22 +36,6 @@ export function otpauthUri(
 ): string {
   const issuer = encodeURIComponent(companyName);
   return `otpauth://totp/${issuer}:${encodeURIComponent(email)}?secret=${secret}&issuer=${issuer}&algorithm=SHA1&digits=6&period=30`;
-}
-
-/** The six digits the demo authenticator shows for `secret` at `now`, and the seconds left. */
-export function demoTotp(
-  secret: string,
-  now: number
-): { code: string; secondsLeft: number } {
-  const step = Math.floor(now / TOTP_STEP_MS);
-  const code = String(hash(`${secret}:${step}`) % 10 ** TOTP_DIGITS).padStart(
-    TOTP_DIGITS,
-    '0'
-  );
-  return {
-    code,
-    secondsLeft: Math.ceil((TOTP_STEP_MS - (now % TOTP_STEP_MS)) / 1000)
-  };
 }
 
 const QR_SIZE = 29;

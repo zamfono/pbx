@@ -21,6 +21,7 @@
     isExpert,
     session
   } from '#lib/state/session.svelte.js';
+  import { setExpertPage } from '#lib/ui/expertPage.js';
 
   let { children }: { children: Snippet } = $props();
   let sidebarOpen = $state(false);
@@ -32,6 +33,8 @@
       )
     )
   );
+  setExpertPage(() => current?.expertOnly === true);
+
   const allowed = $derived(
     current !== undefined &&
       visiblePages(currentActor().role, isExpert()).some(

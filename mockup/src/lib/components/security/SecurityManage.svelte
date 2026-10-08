@@ -71,7 +71,7 @@
     busy = 'totp';
     const result = await run<MfaChangeResult>(
       'auth.totpConfirm',
-      { userId: user.id, code },
+      { userId: user.id, secret: setupSecret ?? '', code },
       { quietErrors: true }
     );
     busy = null;
@@ -280,7 +280,7 @@
             account={user.email ?? ''}
             onuse={value => (setupCode = value)}
           />
-          <p class="xs faint">{t('auth.demo.anyCode')}</p>
+          <p class="xs faint">{t('auth.demo.codeHint')}</p>
         </div>
       </div>
     {:else}

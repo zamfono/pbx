@@ -54,7 +54,7 @@
         >
           <Glyph size={18} />
           <span class="grow">{t(page.label)}</span>
-          {#if page.expertOnly}<ExpertTag />{/if}
+          {#if page.expertOnly}<ExpertTag always />{/if}
         </a>
       {/each}
     </div>

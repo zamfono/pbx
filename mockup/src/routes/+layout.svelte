@@ -8,7 +8,7 @@
   import '#lib/api/ops/index.js';
   import '#lib/fields/index.js';
 
-  import type { Snippet } from 'svelte';
+  import { untrack, type Snippet } from 'svelte';
 
   import { PERSONAS } from '#lib/api/seed/ids.js';
   import { t } from '#lib/i18n/index.svelte.js';
@@ -29,19 +29,23 @@
   applyTheme();
   startSimulator();
 
+  // A demo link applies when the address changes; switching persona in the demo bar afterwards
+  // must not send the tab back to the link's person.
   $effect(() => {
     const as = router.route.query.get('as');
-    const persona = PERSONAS.find(candidate => candidate.key === as);
-    if (
-      persona !== undefined &&
-      (!session.signedIn || session.persona !== persona.key)
-    ) {
-      switchPersona(persona.key);
-    }
     const expert = router.route.query.get('expert');
-    if (expert !== null) {
-      setExpert(expert === '1');
-    }
+    untrack(() => {
+      const persona = PERSONAS.find(candidate => candidate.key === as);
+      if (
+        persona !== undefined &&
+        (!session.signedIn || session.persona !== persona.key)
+      ) {
+        switchPersona(persona.key);
+      }
+      if (expert !== null) {
+        setExpert(expert === '1');
+      }
+    });
   });
 
   // The sign-in screens and the guide set their own title.

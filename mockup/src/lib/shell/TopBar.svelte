@@ -1,6 +1,7 @@
 <!--
   The top bar: menu (phones), company, search (`search.query`), own presence with DND
-  (`users.setPresence`), event bell, language, theme, Expert mode, Mucki, avatar menu.
+  (`users.setPresence`), event bell, language, theme, Expert mode (admins and owners), Mucki,
+  avatar menu.
 -->
 <script lang="ts">
   import Bot from '@lucide/svelte/icons/bot';
@@ -109,18 +110,20 @@
     >
       {@render themeGlyph()}
     </button>
-    <button
-      type="button"
-      class="expert"
-      class:on={isExpert()}
-      aria-pressed={isExpert()}
-      title={t('topbar.expertHelp')}
-      onclick={() => setExpert(!isExpert())}
-    >
-      <FlaskConical size={15} />
-      <span class="expert-label">{t('topbar.expert')}</span>
-      <span class="sw" aria-hidden="true"><span></span></span>
-    </button>
+    {#if actor.role !== 'user'}
+      <button
+        type="button"
+        class="expert"
+        class:on={isExpert()}
+        aria-pressed={isExpert()}
+        title={t('topbar.expertHelp')}
+        onclick={() => setExpert(!isExpert())}
+      >
+        <FlaskConical size={15} />
+        <span class="expert-label">{t('topbar.expert')}</span>
+        <span class="sw" aria-hidden="true"><span></span></span>
+      </button>
+    {/if}
     {#if !session.muckiOpen}
       <button
         type="button"

@@ -10,6 +10,7 @@
   import type { CallLogLine, CallStatus } from '#lib/api/types.js';
   import ForwardTargetLabel from '#lib/components/ForwardTargetLabel.svelte';
   import { formatDuration, t } from '#lib/i18n/index.svelte.js';
+  import { isExpert } from '#lib/state/session.svelte.js';
   import Avatar from '#lib/ui/Avatar.svelte';
   import Icon from '#lib/ui/Icon.svelte';
 
@@ -126,7 +127,9 @@
         {#if step.view.target}<span class="target"
             ><ForwardTargetLabel target={step.view.target} /></span
           >{/if}
-        {#if step.view.note}<span class="note mono">{step.view.note}</span>{/if}
+        {#if step.view.note && isExpert()}<span class="note mono"
+            >{step.view.note}</span
+          >{/if}
       </span>
     </li>
   {:else}

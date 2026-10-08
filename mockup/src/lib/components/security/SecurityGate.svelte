@@ -1,6 +1,7 @@
 <!--
   The fresh sign-in that opens the security page (§5.2): e-mail and password, then the second step
-  where the person has a second factor — or SSO. Demo: any password for the person's own address.
+  where the person has a second factor — or SSO. Demo: any password for the person's own address
+  except the fixed wrong ones.
 -->
 <script lang="ts">
   import ArrowLeft from '@lucide/svelte/icons/arrow-left';
@@ -9,9 +10,10 @@
 
   import { hasMfa } from '#lib/api/ops/areas/auth.js';
   import { store } from '#lib/api/store.svelte.js';
+  import { existingSecret } from '#lib/api/totp.js';
   import type { User } from '#lib/api/types.js';
   import DemoAuthenticator from '#lib/components/auth/DemoAuthenticator.svelte';
-  import { existingSecret, ssoName } from '#lib/components/auth/mfa.js';
+  import { demoPasswordAccepted, ssoName } from '#lib/components/auth/mfa.js';
   import SecondFactorStep from '#lib/components/auth/SecondFactorStep.svelte';
   import { t } from '#lib/i18n/index.svelte.js';
   import Button from '#lib/ui/Button.svelte';
@@ -39,7 +41,7 @@
       busy = false;
       if (
         email.trim().toLowerCase() !== (user.email ?? '').toLowerCase() ||
-        password === ''
+        !demoPasswordAccepted(password)
       ) {
         error = t('auth.login.invalid');
         return;

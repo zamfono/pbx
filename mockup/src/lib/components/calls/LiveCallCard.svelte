@@ -38,6 +38,7 @@
     connected,
     DIRECTION_ICON,
     legParty,
+    liveCounterpart,
     partyName,
     ringsFor
   } from './labels';
@@ -107,7 +108,7 @@
         .map(leg => partyNameOf(leg));
       return names.length > 0
         ? names.join(' & ')
-        : partyName(call.direction === 'inbound' ? call.from : call.to);
+        : partyName(liveCounterpart(call, me));
     }
     return `${partyName(call.from)} → ${partyName(call.to)}`;
   });

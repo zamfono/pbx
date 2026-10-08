@@ -137,7 +137,7 @@ Switch to **Mira** and narrow the window below 760 px, or open the link on an ac
 3. **Ich → Weiterleitung**: rules as cards, "nach 20 Sekunden aufs Handy".
 4. **Ich → Abwesenheit & Zeiten**: plan next week's vacation.
 5. Point out what she cannot do: no admin pages in the menu, no call recordings (not even her own),
-   no SIP targets for forwarding. Mucki explains the same limits when asked.
+   no SIP targets for forwarding, no Expert mode. Mucki explains the same limits when asked.
 
 ### E. The owner (5 minutes, Lea)
 
@@ -220,7 +220,7 @@ exact operation it called with its input and result, which is good for technical
 | The phone line drops                         | About 75 s after the demo starts, **Nordwind SIP** becomes unreachable once: running external calls end as interrupted, no new ones arrive, colleagues keep calling each other. Use it for prompt 5, or **SIP-Trunks → Neu anmelden**. It recovers by itself after 5 minutes. |
 | Calls and presence change by themselves      | That is the live simulation. Pause it in the demo bar while explaining a busy screen.                                                                                                                                                                                         |
 | Voices                                       | Voicemails and recordings are synthesised; the callers are fictional. Recordings are stereo: left the colleague, right the other party (switchable in the player).                                                                                                            |
-| Passwords and codes                          | Any password works for the demo accounts; any six digits pass the second factor (or use **Code einsetzen**).                                                                                                                                                                  |
+| Passwords and codes                          | Any password works for the demo accounts except **wrong** or **falsch**, which shows the failed sign-in. The second step takes only the code the demo authenticator app beside it shows (**Code einsetzen** fills it in); anything else is refused.                           |
 | E-mails, Ringotel, backups, updates          | Nothing leaves the browser. Mails show a confirmation, backups and updates take a few seconds and succeed.                                                                                                                                                                    |
 | Audio library                                | Every greeting, mailbox greeting, announcement and hold-music track plays; click the waveform to jump. The hold music is the opsound set Zamfono ships (CC BY-SA, credited in the admin guide). Uploads play until the page is reloaded.                                      |
 | The data looks messy after a try-out         | **Demo zurücksetzen**.                                                                                                                                                                                                                                                        |

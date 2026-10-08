@@ -146,7 +146,7 @@ Zu **Mira** wechseln und das Fenster unter 760 px verkleinern oder den Link auf 
 3. **Ich → Weiterleitung**: Regeln als Karten, „nach 20 Sekunden aufs Handy“.
 4. **Ich → Abwesenheit & Zeiten**: den Urlaub nächste Woche eintragen.
 5. Zeigen, was sie nicht kann: keine Admin-Seiten im Menü, keine Gesprächsaufnahmen (auch nicht die
-   eigenen), keine SIP-Ziele für Weiterleitungen. Mucki erklärt auf Nachfrage dieselben Grenzen.
+   eigenen), keine SIP-Ziele für Weiterleitungen, kein Expertenmodus. Mucki erklärt auf Nachfrage dieselben Grenzen.
 
 ### E. Die Inhaberin (5 Minuten, Lea)
 
@@ -232,7 +232,7 @@ Publikum.
 | Die Telefonleitung fällt aus                              | Etwa 75 s nach Demostart ist **Nordwind SIP** einmal nicht erreichbar: Laufende externe Gespräche enden als unterbrochen, neue kommen nicht an, intern telefonieren die Kolleg:innen weiter. Für Wortlaut 5 nutzen oder **SIP-Trunks → Neu anmelden**. Nach 5 Minuten erholt sich die Leitung von selbst. |
 | Anrufe und Status ändern sich von allein                  | Das ist die Live-Simulation. In der Demo-Leiste pausieren, während man eine volle Seite erklärt.                                                                                                                                                                                                          |
 | Stimmen                                                   | Mailbox-Nachrichten und Aufnahmen sind synthetisch, die Anrufer erfunden. Aufnahmen sind stereo: links die Kollegin oder der Kollege, rechts die Gegenseite (im Player umschaltbar).                                                                                                                      |
-| Passwörter und Codes                                      | Für die Demo-Zugänge funktioniert jedes Passwort; beliebige sechs Ziffern bestehen den zweiten Faktor (oder **Code einsetzen**).                                                                                                                                                                          |
+| Passwörter und Codes                                      | Für die Demo-Zugänge passt jedes Passwort außer **falsch** oder **wrong**; damit lässt sich die fehlgeschlagene Anmeldung zeigen. Der zweite Schritt nimmt nur den Code, den die Authenticator-App der Demo daneben anzeigt (**Code einsetzen** trägt ihn ein); alles andere wird abgelehnt.              |
 | E-Mails, Ringotel, Backups, Updates                       | Nichts verlässt den Browser. E-Mails zeigen eine Bestätigung, Backups und Updates dauern ein paar Sekunden und gelingen.                                                                                                                                                                                  |
 | Audiodateien                                              | Jede Begrüßung, Mailbox-Ansage, Ansage und Wartemusik spielt ab; ein Klick in die Wellenform springt an die Stelle. Die Wartemusik ist das opsound-Paket, das Zamfono mitliefert (CC BY-SA, im Admin-Handbuch genannt). Uploads spielen, bis die Seite neu geladen wird.                                  |
 | Nach dem Ausprobieren sehen die Daten wild aus            | **Demo zurücksetzen**.                                                                                                                                                                                                                                                                                    |

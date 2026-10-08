@@ -7,10 +7,12 @@
  *
  * Rules: owners and admins must keep a second factor, every user once `mfaRequiredForAll` is set;
  * the first method set up issues ten single-use recovery codes; removing the last method of a
- * person who need not keep one removes the recovery codes with it.
+ * person who need not keep one removes the recovery codes with it. An authenticator code must be
+ * the one the demo's simulated app shows (`#lib/api/totp.js`).
  */
 import { conflict, forbidden, invalid, notFound } from '../../errors';
 import { newId } from '../../ids';
+import { existingSecret, totpMatches } from '../../totp';
 import type { Db, Passkey, User } from '../../types';
 import { defineOp, type Ctx } from '../core';
 
@@ -139,8 +141,8 @@ defineOp<Own, MfaStatus>({
 });
 
 /**
- * The second step of a sign-in: an authenticator code (any six digits in the demo), a passkey
- * (the browser's prompt, simulated), or a recovery code, which is used up.
+ * The second step of a sign-in: the code the person's authenticator app shows, a passkey (the
+ * browser's prompt, simulated), or a recovery code, which is used up.
  */
 defineOp<
   Own & {
@@ -158,7 +160,11 @@ defineOp<
     if (input.method === 'totp') {
       if (
         !user.mfa.totp ||
-        !/^\d{6}$/u.test((input.code ?? '').replaceAll(/\s/gu, ''))
+        !totpMatches(
+          existingSecret(user.id),
+          input.code ?? '',
+          Date.parse(ctx.now)
+        )
       ) {
         throw invalid('code', 'auth.invalidCode', 'incorrect code');
       }
@@ -194,13 +200,16 @@ defineOp<
   }
 });
 
-/** Confirms a new or replacing authenticator app with its first code (any six digits in the demo). */
-defineOp<Own & { code: string }, MfaChangeResult>({
+/**
+ * Confirms a new or replacing authenticator app with the code it shows for `secret`, the secret of
+ * the setup in progress (the API keeps it in the setup's session).
+ */
+defineOp<Own & { secret: string; code: string }, MfaChangeResult>({
   name: 'auth.totpConfirm',
   minRole: 'user',
   scope: own,
   run: (ctx, input) => {
-    if (!/^\d{6}$/u.test(input.code.replaceAll(/\s/gu, ''))) {
+    if (!totpMatches(input.secret, input.code, Date.parse(ctx.now))) {
       throw invalid('code', 'auth.invalidCode', 'incorrect code');
     }
     return added(ctx, input.userId, user =>

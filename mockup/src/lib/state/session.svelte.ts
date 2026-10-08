@@ -125,8 +125,9 @@ export function currentActor(): Actor {
   };
 }
 
+/** Expert mode is for admins and owners; a `user` has no technical settings to reveal. */
 export function isExpert(): boolean {
-  return session.expert[session.persona];
+  return currentActor().role !== 'user' && session.expert[session.persona];
 }
 
 export function setExpert(on: boolean): void {

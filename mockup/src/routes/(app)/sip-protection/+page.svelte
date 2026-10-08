@@ -275,7 +275,7 @@
             />
           {/snippet}
         </FormField>
-        <div>
+        <div class="add-action">
           <Button
             variant="primary"
             size="sm"
@@ -407,19 +407,17 @@
   .table-pad {
     padding: var(--space-2) var(--space-3) var(--space-3);
   }
+  /* Address and note side by side, top-aligned (only the address has help text), the button below. */
   .add {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     gap: var(--space-3);
-    align-items: flex-end;
+    align-items: start;
     margin-bottom: var(--space-4);
     padding-bottom: var(--space-4);
     border-bottom: 1px solid var(--line);
   }
-  .add > :global(*) {
-    flex: 1 1 200px;
-  }
-  .add > div:last-child {
-    flex: 0 0 auto;
+  .add-action {
+    grid-column: 1 / -1;
   }
 </style>

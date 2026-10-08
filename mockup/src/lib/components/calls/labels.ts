@@ -187,6 +187,21 @@ export function counterpartOf(call: CallLike, userId: string | null): string {
     : call.toUri;
 }
 
+/** The other party of live call `call` from `userId`'s side: the caller of an inbound call, the
+ * callee of an outbound one, and of an internal call whichever end is not `userId`. */
+export function liveCounterpart(
+  call: Pick<LiveCall, 'direction' | 'from' | 'to'>,
+  userId: string
+): string {
+  if (call.direction === 'inbound') {
+    return call.from;
+  }
+  if (call.direction === 'outbound') {
+    return call.to;
+  }
+  return party(call.from).userId === userId ? call.to : call.from;
+}
+
 /** Whether `call` came in from `userId`'s side (they were called). */
 export function cameIn(call: CallLike, userId: string | null): boolean {
   if (call.direction === 'internal') {
@@ -289,7 +304,7 @@ export type TraceView = {
   text: string;
   /** A forward target to render beside the text. */
   target?: ForwardTarget;
-  /** Raw technical detail, shown muted. */
+  /** Raw technical detail, shown muted in Expert mode. */
   note?: string;
 };
 
