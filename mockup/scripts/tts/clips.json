@@ -13,7 +13,8 @@
     "schusterVm": { "voice": "echo", "direction": "Arzt, spricht knapp und sachlich auf eine Mailbox" },
     "kayaVm": { "voice": "shimmer", "direction": "kreative Selbstständige, fröhlich, spricht auf eine Mailbox" },
     "maierVm": { "voice": "sage", "direction": "Geschäftsführerin, besorgt aber gefasst, spricht auf eine Mailbox" },
-    "lindner": { "voice": "alloy", "direction": "Privatperson, kurz angebunden, spricht auf eine Mailbox und legt schnell auf" }
+    "lindner": { "voice": "alloy", "direction": "Privatperson, kurz angebunden, spricht auf eine Mailbox und legt schnell auf" },
+    "ansage": { "voice": "marin", "style": "announcer", "direction": "Telefonansage einer Münchner Steuerkanzlei: professionelle Sprecherin, warm, klar und freundlich, ruhiges Tempo, deutliche Aussprache" }
   },
   "voicemails": {
     "vm-support-yilmaz": [
@@ -96,5 +97,14 @@
         { "who": "kaya", "text": "Super, vielen Dank!", "gap": 0.1 }
       ]
     }
+  },
+  "library": {
+    "greeting-empfang": { "who": "ansage", "text": "Brandt und Partner Steuerberatung, grüß Gott. Einen Moment bitte, wir verbinden Sie mit unserem Empfang." },
+    "greeting-support": { "who": "ansage", "text": "Willkommen beim Mandanten-Support von Brandt und Partner. Bitte bleiben Sie kurz in der Leitung, gleich ist jemand für Sie da." },
+    "vm-greeting-empfang": { "who": "ansage", "text": "Sie sind verbunden mit Brandt und Partner Steuerberatung. Im Moment ist leider niemand erreichbar. Bitte hinterlassen Sie Ihren Namen und Ihre Rufnummer nach dem Signalton. Wir rufen Sie gerne zurück." },
+    "vm-greeting-support": { "who": "ansage", "text": "Hier ist der Mandanten-Support von Brandt und Partner. Wir sind gerade im Gespräch oder außerhalb unserer Servicezeiten, Montag bis Freitag von neun bis siebzehn Uhr. Bitte nennen Sie uns Ihr Anliegen und Ihre Mandantennummer. Wir melden uns so bald wie möglich." },
+    "announcement-menu": { "who": "ansage", "text": "Herzlich willkommen bei Brandt und Partner Steuerberatung in München. Für die Steuerberatung drücken Sie bitte die Eins. Für die Buchhaltung die Zwei. Für den Mandanten-Support die Drei. Unseren Empfang erreichen Sie mit der Null." },
+    "announcement-holiday": { "who": "ansage", "text": "Vielen Dank für Ihren Anruf bei Brandt und Partner. Zwischen den Jahren, vom achtundzwanzigsten Dezember bis zum zweiten Januar, ist unsere Kanzlei geschlossen. Ab dem dritten Januar sind wir wieder gerne für Sie da. Wir wünschen Ihnen schöne Feiertage und einen guten Start ins neue Jahr." },
+    "announcement-closed": { "who": "ansage", "text": "Vielen Dank für Ihren Anruf bei Brandt und Partner. Sie rufen außerhalb unserer Bürozeiten an. Sie erreichen uns montags bis donnerstags von acht bis siebzehn Uhr dreißig, mit einer Mittagspause von halb eins bis halb zwei, und freitags von acht bis vierzehn Uhr. Vielen Dank und auf Wiederhören." }
   }
 }

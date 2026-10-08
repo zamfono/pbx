@@ -2,7 +2,8 @@
   The audio library (`audio.*`, admin): greetings, hold music, mailbox greetings and
   announcements, grouped by kind, with where each is used. Uploads take a WAV or MP3 file of at
   most 50 MB, which the phone system converts for playback; afterwards only the label changes.
-  The demo has no sound files for its sample assets; a file uploaded in this session plays.
+  Every asset plays: the seeded ones their demo clip, an upload its file while this browser
+  session lasts.
 -->
 <script module lang="ts">
   import { SvelteMap } from 'svelte/reactivity';
@@ -26,6 +27,7 @@
   import type { Component } from 'svelte';
 
   import { errorText, read, run } from '#lib/actions.svelte.js';
+  import { clipPeaks, clipUrl } from '#lib/api/audio.js';
   import {
     audioReferences,
     MAX_UPLOAD_BYTES,
@@ -76,10 +78,18 @@
     }))
   );
 
-  /** A stable pseudo-waveform per asset: the demo has no sample data to draw. */
-  function bars(id: string): number[] {
+  /** What asset `asset` plays: its upload in this session, else its demo clip. */
+  const urlOf = (asset: AudioAsset): string | undefined =>
+    sessionClips.get(asset.id) ?? clipUrl(asset.clip) ?? undefined;
+
+  /** The asset's waveform, or a stable pseudo-waveform for an upload. */
+  function bars(asset: AudioAsset): number[] {
+    const peaks = clipPeaks(asset.clip);
+    if (peaks !== null && peaks.length === BARS) {
+      return peaks.map(level => Math.max(0.08, level));
+    }
     let hash = 0;
-    for (const char of id) {
+    for (const char of asset.id) {
       hash = (Math.imul(hash, 31) + char.charCodeAt(0)) >>> 0;
     }
     return Array.from({ length: BARS }, (_, index) => {
@@ -100,7 +110,7 @@
   let progress = $state(0);
 
   async function toggle(asset: AudioAsset): Promise<void> {
-    const url = sessionClips.get(asset.id);
+    const url = urlOf(asset);
     if (player === undefined || url === undefined) {
       return;
     }
@@ -113,6 +123,29 @@
       progress = 0;
     }
     playingId = asset.id;
+    await player.play();
+  }
+
+  /** Plays asset `asset` from where its waveform was clicked. */
+  async function seek(asset: AudioAsset, event: MouseEvent): Promise<void> {
+    const url = urlOf(asset);
+    if (player === undefined || url === undefined) {
+      return;
+    }
+    const box = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    const fraction = Math.min(
+      1,
+      Math.max(0, (event.clientX - box.left) / box.width)
+    );
+    if (playingId !== asset.id) {
+      player.src = url;
+      playingId = asset.id;
+      await new Promise(resolve =>
+        player?.addEventListener('loadedmetadata', resolve, { once: true })
+      );
+    }
+    player.currentTime = fraction * player.duration;
+    progress = fraction;
     await player.play();
   }
 
@@ -297,7 +330,7 @@
       {:else}
         <ul class="assets">
           {#each section.items as asset (asset.id)}
-            {@const clip = sessionClips.get(asset.id)}
+            {@const clip = urlOf(asset)}
             {@const refs = audioReferences(store.db, asset.id)}
             {@const isPlaying = playingId === asset.id && !paused}
             <li class:flash={router.highlight === asset.id}>
@@ -328,25 +361,33 @@
                     >
                   {/if}
                 </div>
-                <svg
-                  class="wave"
-                  class:live={clip !== undefined}
-                  viewBox="0 0 {BARS * 4} 24"
-                  preserveAspectRatio="none"
-                  aria-hidden="true"
+                <button
+                  type="button"
+                  class="seek"
+                  disabled={clip === undefined}
+                  aria-label="{t('audio.seek')}: {asset.label}"
+                  onclick={event => seek(asset, event)}
                 >
-                  {#each bars(asset.id) as height, index (index)}
-                    <rect
-                      x={index * 4}
-                      y={12 - height * 11}
-                      width="2.4"
-                      height={height * 22}
-                      rx="1.2"
-                      class:done={playingId === asset.id &&
-                        index / BARS < progress}
-                    />
-                  {/each}
-                </svg>
+                  <svg
+                    class="wave"
+                    class:live={clip !== undefined}
+                    viewBox="0 0 {BARS * 4} 24"
+                    preserveAspectRatio="none"
+                    aria-hidden="true"
+                  >
+                    {#each bars(asset) as height, index (index)}
+                      <rect
+                        x={index * 4}
+                        y={12 - height * 11}
+                        width="2.4"
+                        height={height * 22}
+                        rx="1.2"
+                        class:done={playingId === asset.id &&
+                          index / BARS < progress}
+                      />
+                    {/each}
+                  </svg>
+                </button>
                 <div class="meta xs muted">
                   <span class="nums">{formatDuration(asset.durationS)}</span>
                   <span aria-hidden="true">·</span>
@@ -629,7 +670,20 @@
     gap: var(--space-2);
     min-width: 0;
   }
+  .seek {
+    display: block;
+    width: 100%;
+    max-width: 260px;
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+  }
+  .seek:disabled {
+    cursor: default;
+  }
   .wave {
+    display: block;
     width: 100%;
     max-width: 260px;
     height: 20px;

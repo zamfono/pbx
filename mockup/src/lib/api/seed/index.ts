@@ -47,7 +47,7 @@ import {
 import { plus } from './time';
 
 type ClipInfo = {
-  kind: 'voicemail' | 'recording';
+  kind: 'voicemail' | 'recording' | 'prompt' | 'music';
   channels: number;
   durationS: number;
 };

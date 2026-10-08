@@ -1191,7 +1191,8 @@ defineOp<
       durationS: Math.max(1, Math.round(input.upload.durationS ?? 9)),
       bundled: false,
       createdAt: ctx.now,
-      deletedAt: null
+      deletedAt: null,
+      clip: null
     };
     ctx.db.audio.push(asset);
     const previous = user.mailboxAudioId;

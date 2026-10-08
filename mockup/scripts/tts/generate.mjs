@@ -1,6 +1,7 @@
 /**
- * Generates the demo's voicemail and call-recording audio from scripts/tts/clips.json with
- * OpenAI's `gpt-audio-1.5` (chat completions with audio output), one request per spoken line.
+ * Generates the demo's speech from scripts/tts/clips.json with OpenAI's `gpt-audio-1.5` (chat
+ * completions with audio output), one request per spoken line: voicemails, call recordings, and
+ * the audio library's greetings, mailbox greetings and announcements.
  *
  * Recordings follow Zamfono's stereo mapping (spec §10.2 "Channels and stereo mapping"): left is
  * the recorded user's voice, right is everything they heard. Lines sit on a timeline, so callers
@@ -8,10 +9,12 @@
  * `cut` cuts the previous speaker off where this line starts, `over` (0–1) drops a short
  * back-channel ("mhm") into the previous line without moving the timeline. The recorded user's
  * side is wideband (their own device), the far side band-limited like the phone network.
- * Voicemails are mono, band-limited.
+ * Voicemails are mono, band-limited. The library's prompts are the company's own studio recordings:
+ * one announcer (`style: "announcer"`), mono, wideband.
  *
- * Output: src/lib/assets/audio/<key>.mp3 and manifest.json (durations). Spoken lines are cached in
- * scripts/tts/.cache/ by content hash, so editing the timing re-mixes without new requests.
+ * Output: src/lib/assets/audio/<key>.mp3 and their manifest.json entries (durations; the library's
+ * waveforms). Spoken lines are cached in scripts/tts/.cache/ by content hash, so editing the timing
+ * re-mixes without new requests.
  *
  * Usage: OPENAI_API_KEY=… node scripts/tts/generate.mjs
  */
@@ -20,10 +23,11 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { outDir, peaksOf, probe, updateManifest } from '../audio-manifest.mjs';
+
 const root = new URL('../../', import.meta.url).pathname;
-const outDir = join(root, 'src/lib/assets/audio');
 const cacheDir = join(root, 'scripts/tts/.cache');
-const { cast, voicemails, recordings } = JSON.parse(
+const { cast, voicemails, recordings, library } = JSON.parse(
   readFileSync(join(root, 'scripts/tts/clips.json'), 'utf8')
 );
 const apiKey = process.env.OPENAI_API_KEY;
@@ -42,10 +46,14 @@ if (!apiKey) {
   process.exit(1);
 }
 
-const systemPrompt = direction =>
-  'Du bist Sprecherin oder Sprecher in einem Hörspiel. Lies den Text des Nutzers exakt vor, Wort für Wort, ' +
-  'ohne etwas hinzuzufügen, wegzulassen oder zu kommentieren. Sprich natürliches Deutsch wie in einem echten ' +
-  `Telefonat, mit natürlichen Pausen und Betonung, keine Ansagerstimme. Rolle: ${direction}.`;
+const systemPrompt = person =>
+  person.style === 'announcer'
+    ? 'Du bist professionelle Sprecherin für Telefonansagen. Lies den Text des Nutzers exakt vor, Wort für Wort, ' +
+      'ohne etwas hinzuzufügen, wegzulassen oder zu kommentieren. Sprich wie in einer Studioaufnahme: klar, ' +
+      `freundlich, gleichmäßig, mit kurzen Pausen zwischen den Sätzen. Rolle: ${person.direction}.`
+    : 'Du bist Sprecherin oder Sprecher in einem Hörspiel. Lies den Text des Nutzers exakt vor, Wort für Wort, ' +
+      'ohne etwas hinzuzufügen, wegzulassen oder zu kommentieren. Sprich natürliches Deutsch wie in einem echten ' +
+      `Telefonat, mit natürlichen Pausen und Betonung, keine Ansagerstimme. Rolle: ${person.direction}.`;
 
 async function speak(who, text) {
   const person = cast[who];
@@ -63,7 +71,7 @@ async function speak(who, text) {
         modalities: ['text', 'audio'],
         audio: { voice: person.voice, format: 'wav' },
         messages: [
-          { role: 'system', content: systemPrompt(person.direction) },
+          { role: 'system', content: systemPrompt(person) },
           { role: 'user', content: `Lies genau diesen Text vor, sonst nichts:\n«${text}»` }
         ]
       })
@@ -89,11 +97,6 @@ async function speak(who, text) {
   }
   throw new Error(`could not speak line of ${who}: ${text}`);
 }
-
-const probe = file =>
-  Number(
-    execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=nw=1:nk=1', file]).toString()
-  );
 
 /** Places a recording's lines on a timeline: start, length (after a cut) and channel. */
 async function timeline(recording) {
@@ -167,6 +170,17 @@ async function buildVoicemail(key, lines) {
   ]);
 }
 
+/** A library prompt: one line, a breath of silence around it, wideband mono. */
+async function buildPrompt(key, line) {
+  const file = await speak(line.who, line.text);
+  execFileSync('ffmpeg', [
+    '-y', '-loglevel', 'error',
+    '-i', file,
+    '-af', 'aresample=24000,aformat=channel_layouts=mono,adelay=300:all=1,apad=pad_dur=0.5,highpass=f=70,loudnorm=I=-18:TP=-2',
+    '-ac', '1', '-ar', '24000', '-b:a', '48k', join(outDir, `${key}.mp3`)
+  ]);
+}
+
 mkdirSync(outDir, { recursive: true });
 mkdirSync(cacheDir, { recursive: true });
 const manifest = {};
@@ -180,4 +194,10 @@ for (const [key, recording] of Object.entries(recordings)) {
   manifest[key] = { kind: 'recording', channels: 2, durationS: Math.round(probe(join(outDir, `${key}.mp3`))) };
   console.log(`${key}: ${manifest[key].durationS}s`);
 }
-writeFileSync(join(outDir, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
+for (const [key, line] of Object.entries(library)) {
+  await buildPrompt(key, line);
+  const file = join(outDir, `${key}.mp3`);
+  manifest[key] = { kind: 'prompt', channels: 1, durationS: Math.round(probe(file)), peaks: peaksOf(file) };
+  console.log(`${key}: ${manifest[key].durationS}s`);
+}
+updateManifest(manifest);

@@ -53,7 +53,7 @@ export function seedSettings(): Settings {
     codecs: ['opus', 'g722', 'alaw'],
     clir: false,
     rejectAnonymous: false,
-    holdMohAudioId: AUDIO.mohLounge,
+    holdMohAudioId: AUDIO.mohColdDay,
     voicemailMaxS: 180,
     parkingTimeoutS: 300,
     callLogLevel: 'events',

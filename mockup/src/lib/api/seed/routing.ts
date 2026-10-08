@@ -2,6 +2,7 @@
  * Seed: how calls reach Brandt & Partner — ring groups, the main menu, numbers, the trunk, routes,
  * opening hours, out-of-office rules, audio, parking, blocklist and contacts.
  */
+import manifest from '#lib/assets/audio/manifest.json';
 import {
   now as demoNow,
   localDate,
@@ -71,7 +72,7 @@ export function seedRingGroups(): RingGroup[] {
         { kind: 'user', id: U.sophie }
       ],
       greetingAudioId: AUDIO.greetingEmpfang,
-      mohAudioId: AUDIO.mohLounge,
+      mohAudioId: AUDIO.mohColdDay,
       mailboxEnabled: true,
       mailboxAudioId: AUDIO.vmEmpfang,
       createdAt: daysAgo(380)
@@ -85,7 +86,7 @@ export function seedRingGroups(): RingGroup[] {
       members: [{ kind: 'userGroup', id: UG.beratung }],
       ringTimeoutS: 15,
       ringTotalS: 60,
-      mohAudioId: AUDIO.mohPiano,
+      mohAudioId: AUDIO.mohRobotDity,
       recordCalls: true,
       createdAt: daysAgo(380)
     },
@@ -96,7 +97,7 @@ export function seedRingGroups(): RingGroup[] {
       ext: '003',
       strategy: 'simultaneous',
       members: [{ kind: 'userGroup', id: UG.buchhaltung }],
-      mohAudioId: AUDIO.mohAcoustic,
+      mohAudioId: AUDIO.mohSimplicity,
       createdAt: daysAgo(380)
     },
     {
@@ -114,7 +115,7 @@ export function seedRingGroups(): RingGroup[] {
       ringTimeoutS: 20,
       ringTotalS: 45,
       greetingAudioId: AUDIO.greetingSupport,
-      mohAudioId: AUDIO.mohJazz,
+      mohAudioId: AUDIO.mohSystem,
       mailboxEnabled: true,
       mailboxAudioId: AUDIO.vmSupport,
       mailboxMaxMessages: 200,
@@ -369,45 +370,106 @@ export function seedOooRules(): OooRule[] {
   ];
 }
 
+/**
+ * The audio library. The bundled hold music is the opsound set the product seeds, labelled the way
+ * packages/api labels it (`Artist — Track`); every asset plays its demo clip (manifest.json).
+ */
 export function seedAudio(): AudioAsset[] {
+  const durations = manifest as Record<string, { durationS: number }>;
   const asset = (
     id: string,
     kind: AudioAsset['kind'],
     label: string,
-    durationS: number,
+    clip: string,
     bundled = false
   ): AudioAsset => ({
     id,
     kind,
     label,
-    durationS,
+    durationS: durations[clip]?.durationS ?? 0,
     bundled,
     createdAt: daysAgo(bundled ? 400 : 200),
-    deletedAt: null
+    deletedAt: null,
+    clip
   });
   return [
-    asset(AUDIO.greetingEmpfang, 'greeting', 'Begrüßung Empfang', 7),
-    asset(AUDIO.greetingSupport, 'greeting', 'Begrüßung Mandanten-Support', 9),
-    asset(AUDIO.mohLounge, 'moh', 'Lounge', 184, true),
-    asset(AUDIO.mohPiano, 'moh', 'Piano', 212, true),
-    asset(AUDIO.mohAcoustic, 'moh', 'Acoustic', 167, true),
-    asset(AUDIO.mohAmbient, 'moh', 'Ambient', 240, true),
-    asset(AUDIO.mohJazz, 'moh', 'Jazz', 198, true),
-    asset(AUDIO.vmEmpfang, 'vmGreeting', 'Mailbox Empfang', 11),
-    asset(AUDIO.vmSupport, 'vmGreeting', 'Mailbox Mandanten-Support', 12),
+    asset(
+      AUDIO.greetingEmpfang,
+      'greeting',
+      'Begrüßung Empfang',
+      'greeting-empfang'
+    ),
+    asset(
+      AUDIO.greetingSupport,
+      'greeting',
+      'Begrüßung Mandanten-Support',
+      'greeting-support'
+    ),
+    asset(
+      AUDIO.mohColdDay,
+      'moh',
+      'Macroform — Cold Day',
+      'moh-macroform-cold_day',
+      true
+    ),
+    asset(
+      AUDIO.mohRobotDity,
+      'moh',
+      'Macroform — Robot Dity',
+      'moh-macroform-robot_dity',
+      true
+    ),
+    asset(
+      AUDIO.mohSimplicity,
+      'moh',
+      'Macroform — The Simplicity',
+      'moh-macroform-the_simplicity',
+      true
+    ),
+    asset(
+      AUDIO.mohMorningCoffee,
+      'moh',
+      'Manolo Camp — Morning Coffee',
+      'moh-manolo_camp-morning_coffee',
+      true
+    ),
+    asset(
+      AUDIO.mohSystem,
+      'moh',
+      'Reno Project — System',
+      'moh-reno_project-system',
+      true
+    ),
+    asset(
+      AUDIO.vmEmpfang,
+      'vmGreeting',
+      'Mailbox Empfang',
+      'vm-greeting-empfang'
+    ),
+    asset(
+      AUDIO.vmSupport,
+      'vmGreeting',
+      'Mailbox Mandanten-Support',
+      'vm-greeting-support'
+    ),
     asset(
       AUDIO.annMenu,
       'announcement',
       'Hauptmenü: Willkommen bei Brandt & Partner',
-      18
+      'announcement-menu'
     ),
     asset(
       AUDIO.annHoliday,
       'announcement',
       'Betriebsferien zwischen den Jahren',
-      14
+      'announcement-holiday'
     ),
-    asset(AUDIO.annClosed, 'announcement', 'Außerhalb der Bürozeiten', 12)
+    asset(
+      AUDIO.annClosed,
+      'announcement',
+      'Außerhalb der Bürozeiten',
+      'announcement-closed'
+    )
   ];
 }
 

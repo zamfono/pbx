@@ -464,6 +464,8 @@ export type AudioAsset = {
   bundled: boolean;
   createdAt: string;
   deletedAt: string | null;
+  /** Mock-internal: the demo audio clip it plays; null for an upload (its file lives in the session). */
+  clip: string | null;
 };
 
 export type ContactPhone = { label: string; number: string };

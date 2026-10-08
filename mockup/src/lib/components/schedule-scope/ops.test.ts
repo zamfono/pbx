@@ -142,7 +142,7 @@ describe('menus', () => {
   it('needs an announcement as greeting', () => {
     const input = {
       name: 'Neu',
-      audioId: AUDIO.mohJazz,
+      audioId: AUDIO.mohSystem,
       fallbackTarget: { kind: 'ringGroup', ringGroupId: RG.empfang }
     };
     expect(refusal(() => call('menus.create', input, as(jonas))).code).toBe(
@@ -248,7 +248,7 @@ describe('audio', () => {
 
   it('refuses a delete while anything plays the asset', () => {
     const refs = refusal(() =>
-      call('audio.delete', { id: AUDIO.mohLounge }, as(jonas))
+      call('audio.delete', { id: AUDIO.mohColdDay }, as(jonas))
     ).refs;
     expect(refs.map(ref => ref.kind).toSorted()).toEqual([
       'ringGroup',
@@ -260,7 +260,7 @@ describe('audio', () => {
       ).refs.map(ref => ref.kind)
     ).toEqual(['openingHours']);
     expect(() =>
-      call('audio.delete', { id: AUDIO.mohAmbient }, as(jonas))
+      call('audio.delete', { id: AUDIO.mohMorningCoffee }, as(jonas))
     ).not.toThrow();
   });
 });

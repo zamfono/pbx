@@ -124,7 +124,8 @@ defineOp<{ kind: AudioKind; label: string; upload: AudioUpload }, AudioAsset>({
       durationS: Math.max(1, Math.round(input.upload.durationS)),
       bundled: false,
       createdAt: ctx.now,
-      deletedAt: null
+      deletedAt: null,
+      clip: null
     };
     ctx.insert('audio', row);
     ctx.audit({

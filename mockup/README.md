@@ -27,6 +27,16 @@ target (`root@demo.zamfono.com`).
 Demo links take a persona and Expert mode: `/users?as=lea&expert=1` (`lea` owner, `jonas` admin,
 `mira` user).
 
+## Audio
+
+`src/lib/assets/audio/` holds every clip the mockup plays, with `manifest.json` (kind, channels,
+length, the audio library's waveforms) and `CREDITS.md`:
+
+- speech (voicemails, call recordings, the library's greetings and announcements):
+  `OPENAI_API_KEY=… node scripts/tts/generate.mjs`, from `scripts/tts/clips.json`;
+- hold music, the opsound set the product bundles: `node scripts/moh/import.mjs <dir>` (download
+  instructions in the script).
+
 ## Fidelity rule
 
 The mockup shows nothing the API cannot do and hides nothing it can configure. Every action is an
