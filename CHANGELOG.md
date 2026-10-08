@@ -11,6 +11,8 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-10-08
+
 ### Added
 
 - Trunk option `forwardedCallerId` ("CLIP no screening"): forwarded and blind-transferred calls show the original caller, with the company's number in `P-Asserted-Identity` or `P-Preferred-Identity`.
@@ -638,7 +640,8 @@ The first 0.2 release; its `v0.2.0` tag was never published.
 
 The first tagged version, before any deployment.
 
-[Unreleased]: https://github.com/zamfono/pbx/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/zamfono/pbx/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/zamfono/pbx/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/zamfono/pbx/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/zamfono/pbx/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/zamfono/pbx/compare/v0.3.0...v0.3.1
