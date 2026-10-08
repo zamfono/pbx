@@ -91,7 +91,10 @@
     display: flex;
     min-height: 0;
   }
+  /* Positioned, so a page's absolutely positioned parts (screen-reader text, a switch's input)
+     stay in this scroll container and never lengthen the document behind it. */
   .main {
+    position: relative;
     flex: 1;
     min-width: 0;
     overflow-y: auto;
