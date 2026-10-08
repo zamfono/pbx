@@ -1,6 +1,7 @@
 <!--
   A labelled form field: label, Expert tag, help text, inline error. `display` renders a value an
-  owner sets as plain read-only text for an admin.
+  owner sets as plain read-only text for an admin. `flash` scrolls it into view and highlights it
+  once (a search result opened it).
 -->
 <script lang="ts">
   import type { Snippet } from 'svelte';
@@ -15,6 +16,7 @@
     expert?: boolean;
     required?: boolean;
     inline?: boolean;
+    flash?: boolean;
     children: Snippet;
   };
 
@@ -26,11 +28,25 @@
     expert = false,
     required = false,
     inline = false,
+    flash = false,
     children
   }: Props = $props();
+  let element = $state<HTMLDivElement>();
+
+  $effect(() => {
+    if (flash) {
+      element?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+  });
 </script>
 
-<div class="field" class:inline class:invalid={error !== null}>
+<div
+  class="field"
+  class:inline
+  class:invalid={error !== null}
+  class:flash
+  bind:this={element}
+>
   <div class="label-row">
     <label for={id}
       >{label}{#if required}<span class="req" aria-hidden="true">*</span
@@ -52,6 +68,12 @@
     flex-direction: column;
     gap: 6px;
     min-width: 0;
+  }
+  /* The highlight reaches a little past the field, without moving it. */
+  .field.flash {
+    margin: -6px -8px;
+    padding: 6px 8px;
+    border-radius: var(--radius-sm);
   }
   .inline {
     display: grid;

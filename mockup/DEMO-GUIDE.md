@@ -207,6 +207,9 @@ exact operation it called with its input and result, which is good for technical
 - **Explains itself.** The call trace answers "why did that happen?" without a technician.
 - **Calm by default, complete in Expert mode.** Office managers see the essentials; an IT partner
   finds every option.
+- **Search finds settings, not just people.** Type "Notruf" or "TLS" in the top bar: it lists the
+  matching settings with where they live and jumps straight to the field. An Expert setting is found
+  with the mode off too; opening it switches Expert mode on.
 - **AI assistant built in**, acting as the person, with the same rights and the same safety nets;
   any MCP client (Claude, Codex) can connect the same way.
 - **Security**: two-factor sign-in with authenticator or passkeys, Microsoft sign-in, SIP brute-force

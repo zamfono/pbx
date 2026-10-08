@@ -218,6 +218,9 @@ Publikum.
 - **Erklärt sich selbst.** Der Anrufverlauf beantwortet „Warum ist das passiert?“ ohne Techniker.
 - **Ruhig im Alltag, vollständig im Expertenmodus.** Die Büroleitung sieht das Wesentliche, ein
   IT-Partner findet jede Option.
+- **Die Suche findet auch Einstellungen.** „Notruf“ oder „TLS“ oben eintippen: Sie zeigt die
+  passenden Einstellungen samt Ort und springt direkt zum Feld. Eine Experten-Einstellung findet
+  sie auch bei ausgeschaltetem Modus; beim Öffnen schaltet sie den Expertenmodus ein.
 - **KI-Assistent eingebaut**, der als die Person handelt, mit denselben Rechten und demselben
   Sicherheitsnetz; jeder MCP-Client (Claude, Codex) kann sich genauso verbinden.
 - **Sicherheit**: Anmeldung mit zwei Faktoren per Authenticator oder Passkeys, Anmeldung mit

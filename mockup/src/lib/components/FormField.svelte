@@ -1,13 +1,15 @@
 <!--
   A registry-driven form field: label, help and Expert tag from the field registry, hidden when
   the person may not see it or Expert mode is off. The child snippet receives whether the field is
-  editable, so a display-only value renders as plain text.
+  editable, so a display-only value renders as plain text. A search result for it highlights it
+  (`field:<entity>.<key>`).
 -->
 <script lang="ts">
   import type { Snippet } from 'svelte';
 
   import { fieldAccess } from '#lib/fields/registry.js';
   import { has, t } from '#lib/i18n/index.svelte.js';
+  import { router } from '#lib/state/router.svelte.js';
   import { currentActor, isExpert } from '#lib/state/session.svelte.js';
   import Field from '#lib/ui/Field.svelte';
 
@@ -50,6 +52,7 @@
     expert={access.expert}
     {inline}
     {required}
+    flash={router.highlight === `field:${entity}.${key}`}
   >
     {@render children(access.editable)}
   </Field>

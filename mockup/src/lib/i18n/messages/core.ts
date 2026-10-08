@@ -107,6 +107,31 @@ export default {
     'nav.ringotel': 'Ringotel-Einrichtung',
     'nav.sipProtection': 'SIP-Schutz',
 
+    'search.keywords.me':
+      'Weiterleitung, Urlaub, Abwesenheit, Mailbox-Ansage, Geräte, Passkey, Zwei-Faktor',
+    'search.keywords.ringGroups': 'Sammelruf, Hunt Group, Team, Warteschlange',
+    'search.keywords.menus': 'IVR, Tastenmenü, Sprachdialog',
+    'search.keywords.audio':
+      'Wartemusik, Ansagen, Begrüßungen, Mailbox-Ansage, MOH',
+    'search.keywords.numbers': 'DID, Durchwahlen, Nummernblock, Hauptnummer',
+    'search.keywords.companyHours':
+      'Geschäftszeiten, Feiertage, Betriebsferien, Abwesenheit',
+    'search.keywords.outboundRoutes': 'Wahlregeln, Präfix, ausgehende Anrufe',
+    'search.keywords.trunks': 'Anbieter, Provider, Leitung, Notruf-Trunk',
+    'search.keywords.parking': 'Parken, Halten',
+    'search.keywords.blocklist': 'Spam, Werbeanrufe, Nummern sperren',
+    'search.keywords.settings':
+      'SMTP, Mailserver, SSO, Notrufnummern, Funktionscodes, Zwei-Faktor, Aufbewahrung',
+    'search.keywords.mailTemplates': 'E-Mail, Benachrichtigungen',
+    'search.keywords.integrations':
+      'Webhooks, MCP, KI-Assistent, Claude, Codex, REST-API, Zugangstoken',
+    'search.keywords.backups': 'Sicherung, Wiederherstellung, restic',
+    'search.keywords.audit': 'Protokoll, Rückgängig, Verlauf, Änderungen',
+    'search.keywords.system': 'Update, Version, Wartung',
+    'search.keywords.ringotel': 'App, Softphone, Handy',
+    'search.keywords.sipProtection':
+      'Fail2ban, Brute-Force, Sperren, Freigaben, Allowlist',
+
     'topbar.menu': 'Menü',
     'topbar.language': 'Sprache: Deutsch (zu Englisch wechseln)',
     'topbar.theme': 'Darstellung: {theme}',
@@ -166,7 +191,10 @@ export default {
     'demo.time.moment.vacation.desc':
       'Abwesenheit aktiv: seine Anrufe gehen an Daniel',
 
-    'search.placeholder': 'Personen, Gruppen, Kontakte suchen …',
+    'search.placeholder': 'Personen, Seiten, Einstellungen suchen …',
+    'search.group.directory': 'Personen & Kontakte',
+    'search.group.pages': 'Seiten',
+    'search.group.settings': 'Einstellungen',
 
     'events.title': 'Ereignisse',
     'events.subtitle': 'Was gerade in Ihrer Telefonanlage passiert',
@@ -373,6 +401,30 @@ export default {
     'nav.ringotel': 'Ringotel setup',
     'nav.sipProtection': 'SIP protection',
 
+    'search.keywords.me':
+      'Forwarding, vacation, out of office, voicemail greeting, devices, passkey, two-factor',
+    'search.keywords.ringGroups': 'Hunt group, team, queue',
+    'search.keywords.menus': 'IVR, auto attendant, keypad menu',
+    'search.keywords.audio':
+      'Hold music, announcements, greetings, voicemail greeting, MOH',
+    'search.keywords.numbers': 'DID, direct dial, number block, main number',
+    'search.keywords.companyHours':
+      'Business hours, holidays, closures, out of office',
+    'search.keywords.outboundRoutes': 'Dial rules, prefix, outgoing calls',
+    'search.keywords.trunks': 'Provider, carrier, line, emergency trunk',
+    'search.keywords.parking': 'Park, hold',
+    'search.keywords.blocklist': 'Spam, robocalls, block numbers',
+    'search.keywords.settings':
+      'SMTP, mail server, SSO, emergency numbers, feature codes, two-factor, retention',
+    'search.keywords.mailTemplates': 'E-mail, notifications',
+    'search.keywords.integrations':
+      'Webhooks, MCP, AI assistant, Claude, Codex, REST API, access tokens',
+    'search.keywords.backups': 'Backup, restore, restic',
+    'search.keywords.audit': 'Log, undo, history, changes',
+    'search.keywords.system': 'Update, version, maintenance',
+    'search.keywords.ringotel': 'App, softphone, mobile',
+    'search.keywords.sipProtection': 'Fail2ban, brute force, bans, allowlist',
+
     'topbar.menu': 'Menu',
     'topbar.language': 'Language: English (switch to German)',
     'topbar.theme': 'Appearance: {theme}',
@@ -431,7 +483,10 @@ export default {
     'demo.time.moment.vacation.desc':
       'Out of office active: his calls go to Daniel',
 
-    'search.placeholder': 'Search people, groups, contacts …',
+    'search.placeholder': 'Search people, pages, settings …',
+    'search.group.directory': 'People & contacts',
+    'search.group.pages': 'Pages',
+    'search.group.settings': 'Settings',
 
     'events.title': 'Events',
     'events.subtitle': 'What is happening in your phone system right now',
