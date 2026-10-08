@@ -1,19 +1,20 @@
 <!--
-  Marks a field or section only Expert mode shows. Hidden on a page that exists only in Expert
-  mode (`expertPage.ts`), unless `always` (the navigation, which marks such a page itself).
+  Marks a field or section only Expert mode shows. Hidden inside an Expert scope, an Expert-only
+  page or an Expert card (`expertScope.ts`), unless `always` (the navigation, which marks such a
+  page itself, and the card's own title).
 -->
 <script lang="ts">
   import FlaskConical from '@lucide/svelte/icons/flask-conical';
 
   import { t } from '#lib/i18n/index.svelte.js';
 
-  import { expertPage } from './expertPage';
+  import { expertScope } from './expertScope';
 
   let { always = false }: { always?: boolean } = $props();
-  const onExpertPage = expertPage();
+  const inExpertScope = expertScope();
 </script>
 
-{#if always || !onExpertPage()}
+{#if always || !inExpertScope()}
   <span class="tag"
     ><FlaskConical size={11} strokeWidth={2.5} />{t('common.expert')}</span
   >

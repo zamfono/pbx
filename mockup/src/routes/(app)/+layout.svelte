@@ -21,13 +21,13 @@
     isExpert,
     session
   } from '#lib/state/session.svelte.js';
-  import { setExpertPage } from '#lib/ui/expertPage.js';
+  import { setExpertScope } from '#lib/ui/expertScope.js';
 
   let { children }: { children: Snippet } = $props();
   let sidebarOpen = $state(false);
 
   const current = $derived(pageAt(router.route.path));
-  setExpertPage(() => current?.expertOnly === true);
+  setExpertScope(() => current?.expertOnly === true);
 
   const allowed = $derived(
     current !== undefined &&

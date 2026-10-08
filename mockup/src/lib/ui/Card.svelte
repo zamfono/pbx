@@ -1,10 +1,12 @@
 <!--
-  A content card: optional header (icon, title, description, actions) and body.
+  A content card: optional header (icon, title, description, actions) and body. An Expert card
+  carries the Expert tag in its title, and nothing inside it is tagged again.
 -->
 <script lang="ts">
   import type { IconNode } from '@lucide/svelte';
   import type { Component, Snippet } from 'svelte';
 
+  import { expertScope, setExpertScope } from './expertScope';
   import ExpertTag from './ExpertTag.svelte';
   import Icon from './Icon.svelte';
 
@@ -31,6 +33,9 @@
     actions,
     children
   }: Props = $props();
+
+  const inExpertScope = expertScope();
+  setExpertScope(() => expert || inExpertScope());
 </script>
 
 <section class="card {tone}" class:padded {id}>
@@ -40,7 +45,7 @@
       <div class="titles">
         {#if title}
           <h3 class="row" style="--gap: 8px">
-            {title}{#if expert}<ExpertTag />{/if}
+            {title}{#if expert && !inExpertScope()}<ExpertTag always />{/if}
           </h3>
         {/if}
         {#if description}<p class="desc">{description}</p>{/if}
