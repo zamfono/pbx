@@ -15,8 +15,9 @@ npm test             # vitest
 npm run snapshot:api # refresh src/lib/fields/apiOperations.json from packages/api
 ```
 
-Presenting it? See [DEMO-GUIDE.md](DEMO-GUIDE.md): preparation, the cast, story lines, every Mucki
-prompt and recovery tips. The mockup shows it in the demo bar and at `/guide`; a code span holding
+Presenting it? See [DEMO-GUIDE.md](DEMO-GUIDE.md) ([German](DEMO-GUIDE.de.md); keep both in step):
+preparation, the cast, story lines, every Mucki prompt and recovery tips. The mockup shows it in
+its current language in the demo bar and at `/guide`; a code span holding
 an app path (`/history?as=jonas`) becomes a link into the mockup there.
 
 `scripts/deploy.sh` installs Caddy and rsync on the server when missing, uploads `build/` to

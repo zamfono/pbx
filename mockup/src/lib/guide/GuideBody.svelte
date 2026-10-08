@@ -1,11 +1,11 @@
 <!--
-  The demo guide's contents and text, for the demo bar's panel and the /guide page. Its contents
-  scroll the guide's own scroller to a section.
+  The demo guide in the mockup's language, for the demo bar's panel and the /guide page. Its
+  contents scroll the guide's own scroller to a section.
 -->
 <script lang="ts">
-  import { t } from '#lib/i18n/index.svelte.js';
+  import { i18n, t } from '#lib/i18n/index.svelte.js';
 
-  import { guideHtml, guideSections } from './guide.js';
+  import { guides } from './guide.js';
 
   let {
     scroller,
@@ -17,6 +17,7 @@
     onroute?: () => void;
   } = $props();
   let content = $state<HTMLDivElement>();
+  const guide = $derived(guides[i18n.locale]);
 
   function jump(id: string): void {
     const target = content?.querySelector(`#${id}`);
@@ -30,7 +31,7 @@
 </script>
 
 <nav aria-label={t('demo.guide.contents')}>
-  {#each guideSections as section, index (section.id)}
+  {#each guide.sections as section, index (section.id)}
     <button type="button" onclick={() => jump(section.id)}>
       <span class="nums">{index + 1}</span>
       {section.title}
@@ -48,7 +49,7 @@
   }}
 >
   <!-- eslint-disable-next-line svelte/no-at-html-tags -- the repository's own guide -->
-  {@html guideHtml}
+  {@html guide.html}
 </div>
 
 <style>

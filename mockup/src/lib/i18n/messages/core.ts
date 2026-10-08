@@ -136,8 +136,7 @@ export default {
     'demo.collapse': 'Demo-Leiste einklappen',
     'demo.guide': 'Leitfaden',
     'demo.guide.title': 'Leitfaden für Vorführende',
-    'demo.guide.subtitle':
-      'Vorbereitung, Rollen, Abläufe, Mucki, Antworten · auf Englisch',
+    'demo.guide.subtitle': 'Vorbereitung, Besetzung, Abläufe, Mucki, Antworten',
     'demo.guide.contents': 'Inhalt',
     'demo.guide.close': 'Leitfaden schließen',
     'demo.guide.page': 'Als eigene Seite öffnen',

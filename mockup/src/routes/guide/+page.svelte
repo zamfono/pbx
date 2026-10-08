@@ -1,15 +1,16 @@
 <!--
-  The demo guide on a page of its own, for reading ahead of a demo; its links into the mockup open
-  the mockup in this tab.
+  The demo guide on a page of its own, for reading ahead of a demo, in either language; its links
+  into the mockup open the mockup in this tab.
 -->
 <script lang="ts">
   import ArrowRight from '@lucide/svelte/icons/arrow-right';
 
-  import { guideTitle } from '#lib/guide/guide.js';
   import GuideBody from '#lib/guide/GuideBody.svelte';
   import { t } from '#lib/i18n/index.svelte.js';
   import Logo from '#lib/shell/Logo.svelte';
   import { href } from '#lib/state/router.svelte.js';
+  import { session, setLocale } from '#lib/state/session.svelte.js';
+  import Segmented from '#lib/ui/Segmented.svelte';
 </script>
 
 <svelte:head>
@@ -22,7 +23,19 @@
       <Logo size={30} color="var(--demo-accent)" />
       <div class="titles">
         <h1>{t('demo.guide.title')}</h1>
-        <p>{guideTitle}</p>
+        <p>{t('demo.guide.subtitle')}</p>
+      </div>
+      <div class="language">
+        <Segmented
+          size="sm"
+          value={session.locale}
+          options={[
+            { value: 'de', label: 'DE' },
+            { value: 'en', label: 'EN' }
+          ]}
+          onchange={setLocale}
+          ariaLabel={t('account.language')}
+        />
       </div>
       <a class="open" href={href('/')}
         >{t('demo.guide.openDemo')} <ArrowRight size={15} /></a
@@ -74,6 +87,9 @@
     color: var(--demo-accent);
     font-size: var(--text-sm);
     font-weight: 700;
+  }
+  .language {
+    color: var(--text);
   }
   .open {
     display: inline-flex;
