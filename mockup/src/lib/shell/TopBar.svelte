@@ -201,7 +201,8 @@
     max-width: 520px;
     min-width: 0;
   }
-  .search-toggle {
+  /* Wide screens show the search field itself; `.tool` sets display, so the toggle needs both classes. */
+  .tool.search-toggle {
     display: none;
   }
   .search-row {
@@ -305,7 +306,7 @@
     .search {
       display: none;
     }
-    .search-toggle {
+    .tool.search-toggle {
       display: grid;
     }
   }
