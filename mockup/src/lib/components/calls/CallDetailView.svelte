@@ -80,6 +80,14 @@
       ? (trunkById(String(trunkLine.trunkId))?.name ?? 'Trunk')
       : formatPhone(numberOf(call.toUri))
   );
+  /** The SIP dialogs' Call-IDs, one per leg, from the captured messages (§7 level `sip`). */
+  const sipCallIds = $derived([
+    ...new Set(
+      call.sipTrace
+        .map(message => /^Call-ID:\s*(.+)$/imu.exec(message.raw)?.[1]?.trim())
+        .filter((id): id is string => id !== undefined)
+    )
+  ]);
   const rawLog = $derived(
     call.log.map(line => JSON.stringify(line)).join('\n')
   );
@@ -252,6 +260,10 @@
               <dt>{t('calls.detail.idLabel.callId')}</dt>
               <dd><code>{call.id}</code></dd>
             </div>
+            {#each sipCallIds as sipCallId (sipCallId)}<div>
+                <dt>{t('calls.detail.idLabel.sipCallId')}</dt>
+                <dd><code>{sipCallId}</code></dd>
+              </div>{/each}
             {#if call.parentCallId}<div>
                 <dt>{t('calls.detail.idLabel.parentCallId')}</dt>
                 <dd><code>{call.parentCallId}</code></dd>

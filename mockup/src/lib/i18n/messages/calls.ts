@@ -6,6 +6,7 @@ import type { Messages } from '../index.svelte';
 export default {
   de: {
     'calls.detail.idLabel.callId': 'Anruf-ID',
+    'calls.detail.idLabel.sipCallId': 'SIP-Call-ID',
     'calls.detail.idLabel.parentCallId': 'Übergeordneter Anruf',
     'calls.detail.idLabel.fromUri': 'Von (SIP-URI)',
     'calls.detail.idLabel.toUri': 'An (SIP-URI)',
@@ -540,6 +541,7 @@ export default {
   },
   en: {
     'calls.detail.idLabel.callId': 'Call ID',
+    'calls.detail.idLabel.sipCallId': 'SIP Call-ID',
     'calls.detail.idLabel.parentCallId': 'Parent call',
     'calls.detail.idLabel.fromUri': 'From (SIP URI)',
     'calls.detail.idLabel.toUri': 'To (SIP URI)',
