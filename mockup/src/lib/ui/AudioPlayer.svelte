@@ -1,6 +1,7 @@
 <!--
   Plays a voicemail or recording. Recordings are stereo (§10.2): left the recorded person, right
-  what they heard; the player can solo either side.
+  what they heard. "Both" plays them as recorded, one side per ear; a solo side plays on both
+  ears.
 -->
 <script lang="ts">
   import Download from '@lucide/svelte/icons/download';
@@ -37,36 +38,46 @@
   let channel = $state<'both' | 'left' | 'right'>('both');
 
   let context: AudioContext | null = null;
-  let leftGain: GainNode | null = null;
-  let rightGain: GainNode | null = null;
+  /** Gain from each recorded side (left, right) to each output ear. */
+  let routes: {
+    leftToLeft: GainNode;
+    leftToRight: GainNode;
+    rightToLeft: GainNode;
+    rightToRight: GainNode;
+  } | null = null;
 
   function ensureGraph(): void {
     if (!stereo || context !== null || audio === undefined) {
       return;
     }
-    context = new AudioContext();
-    const source = context.createMediaElementSource(audio);
-    const splitter = context.createChannelSplitter(2);
-    const merger = context.createChannelMerger(2);
-    leftGain = context.createGain();
-    rightGain = context.createGain();
+    const graph = new AudioContext();
+    context = graph;
+    const source = graph.createMediaElementSource(audio);
+    const splitter = graph.createChannelSplitter(2);
+    const merger = graph.createChannelMerger(2);
+    const route = (from: number, to: number): GainNode => {
+      const gain = graph.createGain();
+      splitter.connect(gain, from);
+      gain.connect(merger, 0, to);
+      return gain;
+    };
     source.connect(splitter);
-    splitter.connect(leftGain, 0);
-    splitter.connect(rightGain, 1);
-    leftGain.connect(merger, 0, 0);
-    leftGain.connect(merger, 0, 1);
-    rightGain.connect(merger, 0, 0);
-    rightGain.connect(merger, 0, 1);
-    merger.connect(context.destination);
+    routes = {
+      leftToLeft: route(0, 0),
+      leftToRight: route(0, 1),
+      rightToLeft: route(1, 0),
+      rightToRight: route(1, 1)
+    };
+    merger.connect(graph.destination);
     applyChannel();
   }
 
   function applyChannel(): void {
-    if (leftGain && rightGain) {
-      leftGain.gain.value =
-        channel === 'right' ? 0 : channel === 'both' ? 0.5 : 1;
-      rightGain.gain.value =
-        channel === 'left' ? 0 : channel === 'both' ? 0.5 : 1;
+    if (routes !== null) {
+      routes.leftToLeft.gain.value = channel === 'right' ? 0 : 1;
+      routes.leftToRight.gain.value = channel === 'left' ? 1 : 0;
+      routes.rightToLeft.gain.value = channel === 'right' ? 1 : 0;
+      routes.rightToRight.gain.value = channel === 'left' ? 0 : 1;
     }
   }
 
