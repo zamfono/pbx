@@ -114,7 +114,9 @@
     color: var(--text-faint);
   }
   /* The two ends' lifelines, unbroken from row to row. */
+  /* Positioned, so the screen-reader label stays inside its row. */
   .flow {
+    position: relative;
     min-width: 0;
     padding: 2px var(--space-2) 4px;
     background:
