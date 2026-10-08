@@ -414,7 +414,8 @@ function outboundCall(index: number, startedAt: string, userId: string): Draft {
       endedAt,
       log,
       qos: userId === U.jonas && answered ? qosFor(id) : [],
-      sipTrace: userId === U.jonas && answered ? sipTraceFor(callee.number) : []
+      sipTrace:
+        userId === U.jonas && answered ? sipTraceFor(id, callee.number) : []
     })
   };
   if (answered && RECORDING_USERS.has(userId)) {
@@ -475,15 +476,173 @@ function internalCall(
   };
 }
 
-function sipTraceFor(number: string): string[] {
+/** A SIP message: start line, headers, `Content-Length` and the body, if any. */
+function sipMessage(
+  arrow: '→' | '←',
+  startLine: string,
+  headers: string[],
+  body: string[] = []
+): string {
+  // Content-Length counts the body's bytes, its lines ending in CRLF.
+  const length = body.reduce((sum, row) => sum + row.length + 2, 0);
+  const head = [
+    ...headers,
+    ...(body.length > 0 ? ['Content-Type: application/sdp'] : []),
+    `Content-Length: ${length}`
+  ];
   return [
-    `→ INVITE sip:${number}@sip.nordwind-telecom.example SIP/2.0\nVia: SIP/2.0/TLS 203.0.113.24:5061;branch=z9hG4bK-524287-1\nFrom: <sip:+498945200@sip.nordwind-telecom.example>;tag=8a1c\nTo: <sip:${number}@sip.nordwind-telecom.example>\nP-Asserted-Identity: <sip:+498945200@sip.nordwind-telecom.example>\nContent-Type: application/sdp`,
-    '← SIP/2.0 100 Trying',
-    '← SIP/2.0 180 Ringing',
-    '← SIP/2.0 200 OK\nContent-Type: application/sdp\nm=audio 30412 RTP/SAVP 9 8 101',
-    '→ ACK',
-    '← BYE',
-    '→ SIP/2.0 200 OK'
+    `${arrow} ${startLine}`,
+    ...head,
+    ...(body.length > 0 ? ['', ...body] : [])
+  ].join('\n');
+}
+
+/**
+ * The SIP messages of an answered outbound call over Nordwind SIP (§7 level `sip`): a
+ * registration trunk over TLS with SRTP, so the first INVITE is challenged and sent again with
+ * credentials; caller-ID in `From` (`callerIdHeader` `from`); the tenant's codecs offered, G.722
+ * chosen; the caller hangs up.
+ */
+function sipTraceFor(id: string, number: string): string[] {
+  const hex = id.replaceAll('-', '');
+  const local = '203.0.113.24';
+  const provider = 'sip.nordwind-telecom.example';
+  const account = 'brandtpartner-089452';
+  const from = `<sip:${NUM.main}@${provider}>;tag=${hex.slice(0, 8)}`;
+  const toUri = `<sip:${number}@${provider}>`;
+  const to = `${toUri};tag=as${hex.slice(8, 16)}`;
+  const callId = `${hex.slice(0, 16)}@${local}`;
+  const via = (branch: string): string =>
+    `Via: SIP/2.0/TLS ${local}:5061;rport;branch=z9hG4bKPj${hex.slice(16, 24)}${branch};alias`;
+  const viaBack = (branch: string): string =>
+    `${via(branch)};received=${local};rport=5061`;
+  const contact = `Contact: <sip:${account}@${local}:5061;transport=TLS>`;
+  const ours = ['User-Agent: Zamfono 0.4.1'];
+  const theirs = ['Server: Nordwind SBC 7.2'];
+  const allow =
+    'Allow: OPTIONS, REGISTER, SUBSCRIBE, NOTIFY, PUBLISH, INVITE, ACK, BYE, CANCEL, UPDATE, PRACK, MESSAGE, REFER';
+  const nonce = `${hex.slice(4, 20)}${hex.slice(0, 8)}`;
+  const offer = [
+    'v=0',
+    `o=- ${parseInt(hex.slice(0, 7), 16)} 2 IN IP4 ${local}`,
+    's=Zamfono',
+    `c=IN IP4 ${local}`,
+    't=0 0',
+    'm=audio 13858 RTP/SAVP 107 9 8 101',
+    `a=crypto:1 AES_CM_128_HMAC_SHA1_80 inline:${btoa(hex.slice(0, 30))}`,
+    'a=rtpmap:107 opus/48000/2',
+    'a=fmtp:107 useinbandfec=1',
+    'a=rtpmap:9 G722/8000',
+    'a=rtpmap:8 PCMA/8000',
+    'a=rtpmap:101 telephone-event/8000',
+    'a=fmtp:101 0-16',
+    'a=ptime:20',
+    'a=maxptime:150',
+    'a=sendrecv'
+  ];
+  const answer = [
+    'v=0',
+    `o=NordwindSBC ${parseInt(hex.slice(8, 15), 16)} 1 IN IP4 198.51.100.40`,
+    's=SBC',
+    'c=IN IP4 198.51.100.40',
+    't=0 0',
+    'm=audio 30412 RTP/SAVP 9 101',
+    `a=crypto:1 AES_CM_128_HMAC_SHA1_80 inline:${btoa(hex.slice(2, 32))}`,
+    'a=rtpmap:9 G722/8000',
+    'a=rtpmap:101 telephone-event/8000',
+    'a=fmtp:101 0-16',
+    'a=ptime:20',
+    'a=sendrecv'
+  ];
+  const dialog = (cseq: string, toHeader: string): string[] => [
+    `From: ${from}`,
+    `To: ${toHeader}`,
+    `Call-ID: ${callId}`,
+    `CSeq: ${cseq}`
+  ];
+  const invite = (cseq: number, branch: string, auth: string[]): string =>
+    sipMessage(
+      '→',
+      `INVITE sip:${number}@${provider} SIP/2.0`,
+      [
+        via(branch),
+        'Max-Forwards: 70',
+        ...dialog(`${cseq} INVITE`, toUri),
+        contact,
+        ...auth,
+        allow,
+        'Supported: 100rel, timer, replaces, norefersub',
+        'Session-Expires: 1800',
+        'Min-SE: 90',
+        ...ours
+      ],
+      offer
+    );
+  const reply = (
+    status: string,
+    branch: string,
+    cseq: string,
+    toHeader: string,
+    extra: string[] = [],
+    body: string[] = []
+  ): string =>
+    sipMessage(
+      '←',
+      `SIP/2.0 ${status}`,
+      [viaBack(branch), ...dialog(cseq, toHeader), ...extra, ...theirs],
+      body
+    );
+  const realm = `realm="${provider}"`;
+  return [
+    invite(1, 'a1', []),
+    reply('100 Trying', 'a1', '1 INVITE', toUri),
+    reply('407 Proxy Authentication Required', 'a1', '1 INVITE', to, [
+      `Proxy-Authenticate: Digest ${realm}, nonce="${nonce}", algorithm=MD5, qop="auth"`
+    ]),
+    sipMessage('→', `ACK sip:${number}@${provider} SIP/2.0`, [
+      via('a1'),
+      'Max-Forwards: 70',
+      ...dialog('1 ACK', to),
+      ...ours
+    ]),
+    invite(2, 'b2', [
+      `Proxy-Authorization: Digest username="${account}", ${realm}, nonce="${nonce}", uri="sip:${number}@${provider}", response="${hex.slice(0, 32)}", algorithm=MD5, cnonce="${hex.slice(20, 28)}", qop=auth, nc=00000001`
+    ]),
+    reply('100 Trying', 'b2', '2 INVITE', toUri),
+    reply('180 Ringing', 'b2', '2 INVITE', to, [
+      `Contact: <sip:${number}@198.51.100.40:5061;transport=tls>`
+    ]),
+    reply(
+      '200 OK',
+      'b2',
+      '2 INVITE',
+      to,
+      [
+        `Contact: <sip:${number}@198.51.100.40:5061;transport=tls>`,
+        allow,
+        'Supported: timer',
+        'Session-Expires: 1800;refresher=uac',
+        'Require: timer'
+      ],
+      answer
+    ),
+    sipMessage(
+      '→',
+      `ACK sip:${number}@198.51.100.40:5061;transport=tls SIP/2.0`,
+      [via('c3'), 'Max-Forwards: 70', ...dialog('2 ACK', to), ...ours]
+    ),
+    sipMessage(
+      '→',
+      `BYE sip:${number}@198.51.100.40:5061;transport=tls SIP/2.0`,
+      [
+        via('d4'),
+        'Max-Forwards: 70',
+        ...dialog('3 BYE', to),
+        'Reason: Q.850;cause=16;text="Normal Clearing"',
+        ...ours
+      ]
+    ),
+    reply('200 OK', 'd4', '3 BYE', to)
   ];
 }
 
