@@ -13,7 +13,7 @@ and undo, so the demo is honest about what the product does.
 
 | Check                 | Why                                                                                                                                                                                                                                                                                                 |
 | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Open the mockup       | The hosted link (https://claude.ai/artifact/JxE4f374F9QK29SXze2K9W, shared on request), or `docs/mockup/index.html` straight from disk. Both work offline once loaded.                                                                                                                              |
+| Open the mockup       | https://demo.zamfono.com in a current browser. The guide is in the demo bar (**Leitfaden**) and at https://demo.zamfono.com/guide.                                                                                                                                                                  |
 | **Demo zurücksetzen** | In the dark demo bar at the top. Starts from a clean Brandt & Partner with today's call history. Do this before every demo.                                                                                                                                                                         |
 | Language              | Avatar menu → **Sprache** DE/EN. German is the default and the main story language.                                                                                                                                                                                                                 |
 | Theme                 | Avatar menu → **Darstellung**. Light usually projects better; dark looks great on a laptop.                                                                                                                                                                                                         |
@@ -29,14 +29,15 @@ nice "admin changes it, employee sees it" moment.
 
 The striped bar at the very top is not part of the product; tell the audience so.
 
-| Control                                                    | What it does                                                                                          |
-| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| **Lea · Inhaberin / Jonas · Admin / Mira · Mitarbeiterin** | Switch the signed-in person instantly, without signing out. Each keeps their own Mucki chat.          |
-| Clock chip                                                 | The demo's date and time. Lime while a demo moment is set. Opens the **Demo-Zeitpunkt** menu (below). |
-| **Live-Simulation pausieren**                              | Freezes incoming calls, presence changes and other live events, e.g. while you explain a screen.      |
-| **Demo zurücksetzen**                                      | Restores the starting data and clears all Mucki conversations.                                        |
-| **Abmelden**                                               | Back to the sign-in screen.                                                                           |
-| Chevron                                                    | Collapses the bar to a small tab.                                                                     |
+| Control                                                    | What it does                                                                                                          |
+| ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| **Lea · Inhaberin / Jonas · Admin / Mira · Mitarbeiterin** | Switch the signed-in person instantly, without signing out. Each keeps their own Mucki chat.                          |
+| Clock chip                                                 | The demo's date and time. Lime while a demo moment is set. Opens the **Demo-Zeitpunkt** menu (below).                 |
+| **Leitfaden**                                              | Opens this guide beside the mockup. Its links (`/history?as=jonas`) open the page they name, as the person they name. |
+| **Live-Simulation pausieren**                              | Freezes incoming calls, presence changes and other live events, e.g. while you explain a screen.                      |
+| **Demo zurücksetzen**                                      | Restores the starting data and clears all Mucki conversations.                                                        |
+| **Abmelden**                                               | Back to the sign-in screen.                                                                                           |
+| Chevron                                                    | Collapses the bar to a small tab.                                                                                     |
 
 ### Demo moments
 
@@ -56,7 +57,7 @@ Moments other than **Jetzt** are clearly marked: the clock chip turns lime, so n
 demo time for the real one.
 
 Deep links take a person and Expert mode, handy for prepared bookmarks:
-`#/history?as=jonas`, `#/settings?as=lea&expert=1`, `#/me/forwarding?as=mira`.
+`/history?as=jonas`, `/settings?as=lea&expert=1`, `/me/forwarding?as=mira`.
 
 ## 3. The cast
 
@@ -225,7 +226,6 @@ exact operation it called with its input and result, which is good for technical
 | The data looks messy after a try-out         | **Demo zurücksetzen**.                                                                                                                                                                                                                                                        |
 | A tab shows a different person than expected | Each tab keeps its own person; use the demo bar or a `?as=` link.                                                                                                                                                                                                             |
 | Changes vanish after closing the browser     | The demo keeps its state in the browser's storage; private windows or blocked site data start fresh each time. It still works, it just doesn't remember.                                                                                                                      |
-| Download buttons do nothing                  | The hosted viewer blocks file downloads (audio, recovery codes). They work when the mockup is opened from disk.                                                                                                                                                               |
 | Mucki was interrupted (reload mid-answer)    | The card shows "Unterbrochen"; ask again or start **Neues Gespräch**.                                                                                                                                                                                                         |
 
 ## 8. Questions prospects ask

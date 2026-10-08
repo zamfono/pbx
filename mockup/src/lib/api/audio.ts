@@ -1,6 +1,6 @@
 /**
- * The demo audio clips, inlined into the build as data URLs: what a voicemail or recording plays.
- * The real API hands out 5-minute signed download links instead (§10.5); the player shows that.
+ * The demo audio clips, files of the build: what a voicemail or recording plays. The real API hands
+ * out 5-minute signed download links (§10.5).
  */
 const files = import.meta.glob<string>('/src/lib/assets/audio/*.mp3', {
   eager: true,

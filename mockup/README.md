@@ -1,23 +1,29 @@
 # Zamfono UI mockup
 
-A clickable, self-contained mockup of the Zamfono tenant UI for internal testing and customer demos
-(design: `docs/superpowers/specs/2026-10-08-ui-mockup-design.md`). SvelteKit with the hash router,
-Svelte 5 and TypeScript, built by adapter-static into one HTML file, `docs/mockup/index.html`
-(`output.bundleStrategy: 'inline'`; fonts and audio inlined), which opens from disk.
+A clickable mockup of the Zamfono tenant UI for internal testing and customer demos, served at
+https://demo.zamfono.com (design: `docs/superpowers/specs/2026-10-08-ui-mockup-design.md`). A
+single-page SvelteKit app in Svelte 5 and TypeScript, built by adapter-static into `build/`, where
+every route is the fallback `index.html`. It runs entirely in the browser.
 
 ```bash
 npm install
 npm run dev          # http://localhost:5173
-npm run build        # → ../docs/mockup/index.html (one file)
+npm run build        # → build/
+npm run deploy       # build, then publish to demo.zamfono.com (scripts/deploy.sh, deploy/Caddyfile)
 npm run check        # svelte-kit sync + svelte-check, warnings fail
 npm test             # vitest
 npm run snapshot:api # refresh src/lib/fields/apiOperations.json from packages/api
 ```
 
 Presenting it? See [DEMO-GUIDE.md](DEMO-GUIDE.md): preparation, the cast, story lines, every Mucki
-prompt and recovery tips.
+prompt and recovery tips. The mockup shows it in the demo bar and at `/guide`; a code span holding
+an app path (`/history?as=jonas`) becomes a link into the mockup there.
 
-Demo links take a persona and Expert mode: `#/users?as=lea&expert=1` (`lea` owner, `jonas` admin,
+`scripts/deploy.sh` installs Caddy and rsync on the server when missing, uploads `build/` to
+`/srv/demo` and the Caddyfile to `/etc/caddy/`, and reloads Caddy; `DEPLOY_HOST` overrides the SSH
+target (`root@demo.zamfono.com`).
+
+Demo links take a persona and Expert mode: `/users?as=lea&expert=1` (`lea` owner, `jonas` admin,
 `mira` user).
 
 ## Fidelity rule
@@ -84,7 +90,7 @@ See `src/lib/api/ops/areas/blockedNumbers.ts`.
 
 See `src/routes/(app)/blocklist/+page.svelte`.
 
-- Route params come from `page.params` (`$app/state`); app links are `#/…` (`href()`), navigation
+- Route params come from `page.params` (`$app/state`); app links are site paths (`href()`), navigation
   is `go()` from `#lib/state/router.svelte.js`.
 - Read with `read(op, input, fallback)` inside `$derived` (re-runs on every store change); write
   with `await run(op, input, { success: 'i18n.key' })`. Never mutate `store.db` from a page.
@@ -98,7 +104,7 @@ See `src/routes/(app)/blocklist/+page.svelte`.
 - Hide actions an operation would refuse for this person (`allowed(op, input, actor)` from
   `#lib/api/ops/core.js`).
 - Layout: `PageHeader`, `Card`, `DataTable` (becomes cards on phones), `Drawer` for create/edit,
-  `Tabs` for sub-pages (`hrefFor` with `#/…/:tab`), `.stack`, `.row`, `.grid-2`, `.grid-3`.
+  `Tabs` for sub-pages (`hrefFor` with `/…/:tab`), `.stack`, `.row`, `.grid-2`, `.grid-3`.
   Every page works at 375 px wide.
 - Colours, radii and spacing only from `src/styles/tokens.css`; no hard-coded colours. Light and
   dark both.

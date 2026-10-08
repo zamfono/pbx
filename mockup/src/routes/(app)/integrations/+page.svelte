@@ -188,7 +188,7 @@
     <div class="mucki">
       <span class="mucki-icon"><WandSparkles size={18} /></span>
       <p class="small">{t('integrations.mcp.mucki')}</p>
-      <Button size="sm" variant="ghost" icon={ScrollText} href="#/audit"
+      <Button size="sm" variant="ghost" icon={ScrollText} href="/audit"
         >{t('nav.audit')}</Button
       >
     </div>
@@ -330,7 +330,7 @@
       description={t('integrations.tokens.body')}
       icon={KeyRound}
     >
-      <Button size="sm" variant="soft" icon={KeyRound} href="#/me/tokens"
+      <Button size="sm" variant="soft" icon={KeyRound} href="/me/tokens"
         >{t('integrations.tokens.open')}</Button
       >
     </Card>

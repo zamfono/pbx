@@ -1,7 +1,7 @@
 /**
  * The light markdown of Mucki's replies, parsed into blocks a component renders without `{@html}`:
  * paragraphs, bulleted and numbered lists; inline **bold**, `code`, line breaks and links. A link
- * to `#/path` opens that page of the app.
+ * to `/path` opens that page of the app.
  */
 
 export type Inline =
@@ -42,7 +42,7 @@ export function parseInline(text: string): Inline[] {
         const link = LINK.exec(part);
         if (link !== null) {
           const href = link[2] ?? '';
-          const app = href.startsWith('#/');
+          const app = href.startsWith('/');
           const safe = app || /^https?:\/\//u.test(href);
           out.push(
             safe

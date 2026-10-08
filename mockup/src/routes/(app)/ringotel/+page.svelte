@@ -165,7 +165,7 @@
             size="sm"
             variant="ghost"
             icon={KeyRound}
-            href="#/settings/ringotel">{t('ringotel.toSettings')}</Button
+            href="/settings/ringotel">{t('ringotel.toSettings')}</Button
           >
         </div>
       </Card>

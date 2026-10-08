@@ -1,6 +1,6 @@
 <!--
   The app root: global styles, the operations and field registries, the simulator, theme, page
-  title, demo links (`#/users?as=lea&expert=1`), and the app-wide dialogs and toasts.
+  title, demo links (`/users?as=lea&expert=1`), and the app-wide dialogs and toasts.
 -->
 <script lang="ts">
   import '../styles/tokens.css';
@@ -44,10 +44,10 @@
     }
   });
 
-  // The sign-in screens set their own title.
+  // The sign-in screens and the guide set their own title.
   $effect(() => {
     const path = router.route.path;
-    if (!session.signedIn || path.startsWith('/auth/')) {
+    if (!session.signedIn || path.startsWith('/auth/') || path === '/guide') {
       return;
     }
     const current = PAGES.find(candidate =>

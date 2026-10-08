@@ -21,7 +21,7 @@ export type UserMessage = { kind: 'user'; id: string; text: string };
 export type AssistantMessage = {
   kind: 'assistant';
   id: string;
-  /** Light markdown: **bold**, `code`, lists, [links](#/path). */
+  /** Light markdown: **bold**, `code`, lists, [links](/path). */
   text: string;
   streaming?: boolean;
   /** Quick replies of a question; dropped once answered. */

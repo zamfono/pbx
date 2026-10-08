@@ -286,7 +286,7 @@
 <div class="stack" style="--gap: 24px">
   <Card title={t('backups.schedule.title')} icon={CalendarClock}>
     {#snippet actions()}
-      <Button size="sm" variant="ghost" href="#/settings/updates"
+      <Button size="sm" variant="ghost" href="/settings/updates"
         >{t('backups.schedule.change')}</Button
       >
     {/snippet}

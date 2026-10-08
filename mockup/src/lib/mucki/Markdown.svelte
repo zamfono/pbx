@@ -13,7 +13,7 @@
 
   function open(event: MouseEvent, href: string): void {
     event.preventDefault();
-    go(href.slice(1));
+    go(href);
     onnavigate?.();
   }
 </script>

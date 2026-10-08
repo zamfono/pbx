@@ -57,7 +57,7 @@
     aria-label={t('topbar.menu')}
     onclick={onmenu}><Menu size={20} /></button
   >
-  <a class="brand" href="#/overview">
+  <a class="brand" href="/overview">
     <Logo size={30} />
     <span class="brand-text">
       <span class="product">zamfono</span>

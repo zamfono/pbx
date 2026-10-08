@@ -1,7 +1,7 @@
 /**
- * Navigation on SvelteKit's hash router: `router.route` is the current path, its segments and
- * query, read from `page`; `go` navigates with `goto`; `highlight` names a row a "Show me" link
- * flashes once. Links in the app are `#/…` (`href`).
+ * Navigation: `router.route` is the current path, its segments and query, read from `page`; `go`
+ * navigates with `goto`; `highlight` names a row a "Show me" link flashes once. Links in the app
+ * are site paths (`href`).
  */
 import { goto } from '$app/navigation';
 import { page } from '$app/state';
@@ -14,15 +14,11 @@ export type Route = {
 
 const highlightState = $state<{ id: string | null }>({ id: null });
 
-/** The app route of the hash router: `#/users/42?as=lea` is path `/users/42`, query `as=lea`. */
-function parse(url: { hash: string; pathname: string; search: string }): Route {
-  const [path = '/', search = ''] = url.hash.startsWith('#/')
-    ? url.hash.slice(1).split('?')
-    : [url.pathname || '/', url.search.replace(/^\?/u, '')];
+function parse(url: { pathname: string; search: string }): Route {
   return {
-    path,
-    segments: path.split('/').filter(Boolean),
-    query: new URLSearchParams(search)
+    path: url.pathname,
+    segments: url.pathname.split('/').filter(Boolean),
+    query: new URLSearchParams(url.search)
   };
 }
 
@@ -60,8 +56,9 @@ export function go(
   void goto(href(path), { replaceState: options.replace === true });
 }
 
+/** The link to app path `path`; the mockup is served at the site's root. */
 export function href(path: string): string {
-  return `#${path}`;
+  return path;
 }
 
 /** Matches `pattern` (`/users/:id/:tab?`) against `path`; params or null. */

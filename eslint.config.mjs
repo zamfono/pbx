@@ -16,8 +16,7 @@ export default defineConfig(
       '**/.svelte-kit/**',
       // The UI mockup is a standalone project outside the workspaces and their TypeScript projects;
       // its own `npm run check` and `npm test` gate it (mockup/README.md).
-      'mockup/**',
-      'docs/mockup/**'
+      'mockup/**'
     ]
   },
   eslint.configs.all,

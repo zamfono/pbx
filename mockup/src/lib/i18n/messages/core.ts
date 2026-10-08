@@ -134,6 +134,14 @@ export default {
     'demo.reset.action': 'Demo zurücksetzen',
     'demo.signOut': 'Abmelden',
     'demo.collapse': 'Demo-Leiste einklappen',
+    'demo.guide': 'Leitfaden',
+    'demo.guide.title': 'Leitfaden für Vorführende',
+    'demo.guide.subtitle':
+      'Vorbereitung, Rollen, Abläufe, Mucki, Antworten · auf Englisch',
+    'demo.guide.contents': 'Inhalt',
+    'demo.guide.close': 'Leitfaden schließen',
+    'demo.guide.page': 'Als eigene Seite öffnen',
+    'demo.guide.openDemo': 'Zur Demo',
     'demo.time.title': 'Demo-Zeitpunkt',
     'demo.time.simulatedTitle':
       'Die Demo läuft zu einem gewählten Zeitpunkt, nicht in Echtzeit',
@@ -393,6 +401,13 @@ export default {
     'demo.reset.action': 'Reset demo',
     'demo.signOut': 'Sign out',
     'demo.collapse': 'Collapse demo bar',
+    'demo.guide': 'Guide',
+    'demo.guide.title': 'Guide for demo operators',
+    'demo.guide.subtitle': 'Preparation, cast, story lines, Mucki, answers',
+    'demo.guide.contents': 'Contents',
+    'demo.guide.close': 'Close guide',
+    'demo.guide.page': 'Open as a page',
+    'demo.guide.openDemo': 'Open the demo',
     'demo.time.title': 'Demo moment',
     'demo.time.simulatedTitle':
       'The demo runs at a chosen moment, not in real time',

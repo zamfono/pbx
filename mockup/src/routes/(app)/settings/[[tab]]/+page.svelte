@@ -257,7 +257,7 @@
 
 <PageHeader title={t('nav.settings')} subtitle={t('settings.subtitle')} />
 
-<Tabs {tabs} {active} hrefFor={id => `#/settings/${id}`} />
+<Tabs {tabs} {active} hrefFor={id => `/settings/${id}`} />
 
 {#if settings !== null}
   {#if active === 'general'}
@@ -785,7 +785,7 @@
         </div>
         <p class="small muted">{t('settings.mail.templatesHint')}</p>
         <div>
-          <Button size="sm" variant="soft" href="#/mail-templates" icon={Mail}
+          <Button size="sm" variant="soft" href="/mail-templates" icon={Mail}
             >{t('nav.mailTemplates')}</Button
           >
         </div>
@@ -1078,7 +1078,7 @@
           {/snippet}
         </FormField>
         <div>
-          <Button size="sm" variant="soft" href="#/system" icon={RefreshCw}
+          <Button size="sm" variant="soft" href="/system" icon={RefreshCw}
             >{t('nav.system')}</Button
           >
         </div>
@@ -1105,7 +1105,7 @@
           {/snippet}
         </FormField>
         <div>
-          <Button size="sm" variant="soft" href="#/backups" icon={CalendarClock}
+          <Button size="sm" variant="soft" href="/backups" icon={CalendarClock}
             >{t('nav.backups')}</Button
           >
         </div>
@@ -1182,7 +1182,7 @@
         {/if}
         {#if isOwner}
           <div>
-            <Button size="sm" variant="soft" href="#/ringotel" icon={Cloud}
+            <Button size="sm" variant="soft" href="/ringotel" icon={Cloud}
               >{t('nav.ringotel')}</Button
             >
           </div>

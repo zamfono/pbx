@@ -14,6 +14,3 @@ packages/shared/src/generated/db.d.ts
 docs/ringotel.yaml
 # Hand-aligned operator files that mirror the listings in the specification (§6.3).
 deploy/compose*.yaml
-
-# The UI mockup's build output: one generated file with its scripts, styles, fonts and audio inlined.
-docs/mockup/

@@ -191,7 +191,7 @@
                   onclick={startUpdate}>{t('system.update.now')}</Button
                 >
                 {#if !backupFresh}
-                  <Button variant="ghost" icon={DatabaseBackup} href="#/backups"
+                  <Button variant="ghost" icon={DatabaseBackup} href="/backups"
                     >{t('system.update.toBackups')}</Button
                   >
                 {/if}
@@ -301,7 +301,7 @@
             })}
           </p>
         {/if}
-        <a class="more small" href="#/settings/updates"
+        <a class="more small" href="/settings/updates"
           >{t('system.goSettings')}<ArrowRight size={13} /></a
         >
       </Card>
@@ -322,7 +322,7 @@
             <span class="small muted">{info.mail.error?.message ?? ''}</span>
           {/if}
         </div>
-        <a class="more small" href="#/settings/mail"
+        <a class="more small" href="/settings/mail"
           >{t('system.goSettings')}<ArrowRight size={13} /></a
         >
       </Card>

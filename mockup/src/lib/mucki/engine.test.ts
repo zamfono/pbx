@@ -149,7 +149,7 @@ describe('parse', () => {
 describe('markdown', () => {
   test('paragraphs, lists and inline marks', () => {
     const blocks = parseMarkdown(
-      'Hallo **Tom**, siehe `users.create`.\n\n- eins\n- [Nutzer](#/users)\n\n1. a\n2. b'
+      'Hallo **Tom**, siehe `users.create`.\n\n- eins\n- [Nutzer](/users)\n\n1. a\n2. b'
     );
     expect(blocks.map(block => block.type)).toEqual(['p', 'ul', 'ol']);
     expect(blocks[0]).toEqual({
@@ -163,10 +163,7 @@ describe('markdown', () => {
       ]
     });
     expect(blocks[1]).toMatchObject({
-      items: [
-        [{ text: 'eins' }],
-        [{ type: 'link', href: '#/users', app: true }]
-      ]
+      items: [[{ text: 'eins' }], [{ type: 'link', href: '/users', app: true }]]
     });
   });
 

@@ -1,8 +1,9 @@
 <!--
-  The demo bar: visibly not part of the product. Switch persona, pause the simulator, reset the
-  demo, sign out.
+  The demo bar: visibly not part of the product. Switch persona, set the demo's time, open the
+  operators' guide, pause the simulator, reset the demo, sign out.
 -->
 <script lang="ts">
+  import BookOpen from '@lucide/svelte/icons/book-open';
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import ChevronUp from '@lucide/svelte/icons/chevron-up';
   import LogOut from '@lucide/svelte/icons/log-out';
@@ -26,6 +27,9 @@
   import { confirmDialog } from '#lib/state/ui.svelte.js';
 
   import DemoClock from './DemoClock.svelte';
+  import DemoGuide from './DemoGuide.svelte';
+
+  let guideOpen = $state(false);
 </script>
 
 <div class="demo" class:collapsed={session.demoBarCollapsed}>
@@ -67,6 +71,18 @@
     </div>
     <DemoClock />
     <div class="spacer"></div>
+    <button
+      type="button"
+      class="ctl"
+      class:on={guideOpen}
+      title={t('demo.guide.title')}
+      aria-label={t('demo.guide.title')}
+      aria-expanded={guideOpen}
+      onclick={() => (guideOpen = !guideOpen)}
+    >
+      <BookOpen size={13} />
+      <span class="hide-sm">{t('demo.guide')}</span>
+    </button>
     <button
       type="button"
       class="ctl"
@@ -134,6 +150,8 @@
     </button>
   {/if}
 </div>
+
+<DemoGuide open={guideOpen} onclose={() => (guideOpen = false)} />
 
 <style>
   .demo {
@@ -234,6 +252,10 @@
   }
   .ctl:hover {
     background: rgb(255 255 255 / 16%);
+  }
+  .ctl.on {
+    background: var(--demo-accent);
+    color: var(--on-lime);
   }
   .ctl.icon {
     padding: 4px 6px;

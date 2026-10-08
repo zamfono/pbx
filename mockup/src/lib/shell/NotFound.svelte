@@ -18,6 +18,6 @@
   body={forbidden ? t('notFound.forbiddenBody') : t('notFound.body')}
 >
   {#snippet action()}
-    <Button variant="primary" href="#/overview">{t('nav.overview')}</Button>
+    <Button variant="primary" href="/overview">{t('nav.overview')}</Button>
   {/snippet}
 </EmptyState>

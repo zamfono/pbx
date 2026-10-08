@@ -277,7 +277,7 @@
           </div>
           <div class="meta">
             {#if href !== null}
-              <a class="entity" href="#{href}"
+              <a class="entity" {href}
                 >{entityLabel(entry.entityKind, entry.entityId)}<ArrowRight
                   size={13}
                 /></a

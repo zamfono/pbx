@@ -1,0 +1,26 @@
+# The mockup's site on demo.zamfono.com, installed as /etc/caddy/Caddyfile by scripts/deploy.sh.
+# Caddy obtains and renews the certificate itself; the host's firewall must let 80 and 443 in.
+
+demo.zamfono.com {
+	root * /srv/demo
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		# A demo with a made-up company: kept out of search results.
+		X-Robots-Tag "noindex, nofollow"
+		-Server
+	}
+
+	# Content-hashed file names: a changed file is a new name.
+	@immutable path /_app/immutable/*
+	header @immutable Cache-Control "public, max-age=31536000, immutable"
+	@mutable not path /_app/immutable/*
+	header @mutable Cache-Control "no-cache"
+
+	# Every app route is the single-page app's index.html.
+	try_files {path} /index.html
+	file_server
+}
