@@ -5,7 +5,7 @@
   import { store } from '#lib/api/store.svelte.js';
   import { t } from '#lib/i18n/index.svelte.js';
   import { SECTIONS, visiblePages } from '#lib/nav.js';
-  import { router } from '#lib/state/router.svelte.js';
+  import { href, router } from '#lib/state/router.svelte.js';
   import { currentActor, isExpert } from '#lib/state/session.svelte.js';
   import ExpertTag from '#lib/ui/ExpertTag.svelte';
 
@@ -50,7 +50,7 @@
         <a
           class="item"
           class:on={page.id === activeId}
-          href={`#${page.patterns[0]?.split('/:')[0]}`}
+          href={href(page.patterns[0]?.split('/:')[0] ?? '/')}
         >
           <Glyph size={18} />
           <span class="grow">{t(page.label)}</span>

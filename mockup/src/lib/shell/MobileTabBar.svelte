@@ -6,7 +6,7 @@
 
   import { t } from '#lib/i18n/index.svelte.js';
   import { PAGES } from '#lib/nav.js';
-  import { router } from '#lib/state/router.svelte.js';
+  import { href, router } from '#lib/state/router.svelte.js';
   import { session } from '#lib/state/session.svelte.js';
 
   const tabs = PAGES.filter(page => page.tab === true);
@@ -16,7 +16,7 @@
   {#each tabs as page (page.id)}
     {@const Glyph = page.icon}
     {@const base = page.patterns[0]?.split('/:')[0] ?? '/'}
-    <a href={`#${base}`} class:on={router.route.path.startsWith(base)}>
+    <a href={href(base)} class:on={router.route.path.startsWith(base)}>
       <Glyph size={21} />
       <span>{t(`${page.label}.short`)}</span>
     </a>

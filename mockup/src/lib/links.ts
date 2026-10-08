@@ -2,6 +2,7 @@
  * Where an entity lives in the app, for links from refusals, the audit log, call traces and Mucki.
  */
 import type { BlockingRef } from '#lib/api/errors.js';
+import { href } from '#lib/state/router.svelte.js';
 
 const PATHS: Record<string, (id: string) => string> = {
   user: id => `/users/${id}`,
@@ -39,5 +40,5 @@ export function entityPath(kind: string, id: string): string | null {
 
 export function refHref(ref: BlockingRef): string | null {
   const path = entityPath(ref.kind, ref.id);
-  return path === null ? null : `#${path}`;
+  return path === null ? null : href(path);
 }
