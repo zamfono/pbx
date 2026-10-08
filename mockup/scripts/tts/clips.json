@@ -1,39 +1,103 @@
 {
   "cast": {
-    "felix": { "voice": "cedar", "direction": "ruhiger, freundlicher Steuerberater um die 50, spricht überlegt" },
-    "schuster": { "voice": "echo", "direction": "Arzt Anfang 60, etwas ungeduldig, aber höflich" },
-    "laura": { "voice": "marin", "direction": "junge, kompetente Steuerberaterin, lebhaft und zugewandt" },
-    "maier": { "voice": "sage", "direction": "Geschäftsführerin eines Autohauses, direkt und zügig" },
-    "daniel": { "voice": "ash", "direction": "Steuerfachwirt Mitte 30, locker und hilfsbereit" },
-    "bauer": { "voice": "verse", "direction": "Handwerksmeister mit bayerischer Färbung, gemütlich, leicht genervt von Papierkram" },
-    "lea": { "voice": "coral", "direction": "souveräne Kanzleiinhaberin Mitte 40, warm und präzise" },
-    "kaya": { "voice": "shimmer", "direction": "kreative Selbstständige Ende 20, schnell und begeistert" },
-    "yilmaz": { "voice": "ballad", "direction": "Inhaber einer Gebäudereinigung, spricht auf eine Mailbox, etwas gehetzt, Straßengeräusche-Stimmung" },
-    "huber": { "voice": "verse", "direction": "älterer Bäckermeister mit bayerischer Färbung, spricht auf eine Mailbox" },
-    "schusterVm": { "voice": "echo", "direction": "Arzt, spricht knapp und sachlich auf eine Mailbox" },
-    "kayaVm": { "voice": "shimmer", "direction": "kreative Selbstständige, fröhlich, spricht auf eine Mailbox" },
-    "maierVm": { "voice": "sage", "direction": "Geschäftsführerin, besorgt aber gefasst, spricht auf eine Mailbox" },
-    "lindner": { "voice": "alloy", "direction": "Privatperson, kurz angebunden, spricht auf eine Mailbox und legt schnell auf" },
-    "ansage": { "voice": "marin", "style": "announcer", "direction": "Telefonansage einer Münchner Steuerkanzlei: professionelle Sprecherin, warm, klar und freundlich, ruhiges Tempo, deutliche Aussprache" }
+    "felix": {
+      "voice": "cedar",
+      "direction": "ruhiger, freundlicher Steuerberater um die 50, spricht überlegt"
+    },
+    "schuster": {
+      "voice": "echo",
+      "direction": "Arzt Anfang 60, etwas ungeduldig, aber höflich"
+    },
+    "laura": {
+      "voice": "marin",
+      "direction": "junge, kompetente Steuerberaterin, lebhaft und zugewandt"
+    },
+    "maier": {
+      "voice": "sage",
+      "direction": "Geschäftsführerin eines Autohauses, direkt und zügig"
+    },
+    "daniel": {
+      "voice": "ash",
+      "direction": "Steuerfachwirt Mitte 30, locker und hilfsbereit"
+    },
+    "bauer": {
+      "voice": "verse",
+      "direction": "Handwerksmeister mit bayerischer Färbung, gemütlich, leicht genervt von Papierkram"
+    },
+    "lea": {
+      "voice": "coral",
+      "direction": "souveräne Kanzleiinhaberin Mitte 40, warm und präzise"
+    },
+    "kaya": {
+      "voice": "shimmer",
+      "direction": "kreative Selbstständige Ende 20, schnell und begeistert"
+    },
+    "yilmaz": {
+      "voice": "ballad",
+      "direction": "Inhaber einer Gebäudereinigung, spricht auf eine Mailbox, etwas gehetzt, Straßengeräusche-Stimmung"
+    },
+    "huber": {
+      "voice": "verse",
+      "direction": "älterer Bäckermeister mit bayerischer Färbung, spricht auf eine Mailbox"
+    },
+    "schusterVm": {
+      "voice": "echo",
+      "direction": "Arzt, spricht knapp und sachlich auf eine Mailbox"
+    },
+    "kayaVm": {
+      "voice": "shimmer",
+      "direction": "kreative Selbstständige, fröhlich, spricht auf eine Mailbox"
+    },
+    "maierVm": {
+      "voice": "sage",
+      "direction": "Geschäftsführerin, besorgt aber gefasst, spricht auf eine Mailbox"
+    },
+    "lindner": {
+      "voice": "alloy",
+      "direction": "Privatperson, kurz angebunden, spricht auf eine Mailbox und legt schnell auf"
+    },
+    "ansage": {
+      "voice": "marin",
+      "style": "announcer",
+      "direction": "Telefonansage einer Münchner Steuerkanzlei: professionelle Sprecherin, warm, klar und freundlich, ruhiges Tempo, deutliche Aussprache"
+    }
   },
   "voicemails": {
     "vm-support-yilmaz": [
-      { "who": "yilmaz", "text": "Ja, guten Tag, hier ist Kemal Yilmaz von Yilmaz Gebäudereinigung, Mandantennummer, äh, vierzig siebzehn. Ich ruf an wegen der Umsatzsteuervoranmeldung für September, das Finanzamt hat da eine Rückfrage geschickt, und ich weiß ehrlich gesagt nicht genau, was die wollen. Könnten Sie mich bitte zurückrufen? Null eins sieben eins, fünf fünf fünf, null eins zwei drei. Danke, und, äh, schönen Tag noch." }
+      {
+        "who": "yilmaz",
+        "text": "Ja, guten Tag, hier ist Kemal Yilmaz von Yilmaz Gebäudereinigung, Mandantennummer, äh, vierzig siebzehn. Ich ruf an wegen der Umsatzsteuervoranmeldung für September, das Finanzamt hat da eine Rückfrage geschickt, und ich weiß ehrlich gesagt nicht genau, was die wollen. Könnten Sie mich bitte zurückrufen? Null eins sieben eins, fünf fünf fünf, null eins zwei drei. Danke, und, äh, schönen Tag noch."
+      }
     ],
     "vm-empfang-huber": [
-      { "who": "huber", "text": "Ja, grüß Gott, Huber hier, Bäckerei Huber. Es geht um die Lohnabrechnung für unsere neue Aushilfe, die fängt am Ersten an. Was brauchen Sie da noch von mir, Steuer-ID und so? Rufen S' mich einfach im Büro zurück. Danke, servus." }
+      {
+        "who": "huber",
+        "text": "Ja, grüß Gott, Huber hier, Bäckerei Huber. Es geht um die Lohnabrechnung für unsere neue Aushilfe, die fängt am Ersten an. Was brauchen Sie da noch von mir, Steuer-ID und so? Rufen S' mich einfach im Büro zurück. Danke, servus."
+      }
     ],
     "vm-felix-schuster": [
-      { "who": "schusterVm", "text": "Herr Dr. Hartmann, Schuster hier. Ich wollte nur den Termin für den Jahresabschluss bestätigen, Donnerstag vierzehn Uhr passt. Falls sich was ändert, schreiben Sie mir kurz. Danke, bis dann." }
+      {
+        "who": "schusterVm",
+        "text": "Herr Dr. Hartmann, Schuster hier. Ich wollte nur den Termin für den Jahresabschluss bestätigen, Donnerstag vierzehn Uhr passt. Falls sich was ändert, schreiben Sie mir kurz. Danke, bis dann."
+      }
     ],
     "vm-mira-kaya": [
-      { "who": "kayaVm", "text": "Hallo Frau Kovač, Elif Kaya hier, vom Kaya Design Studio. Also, die fehlenden Belege für Juli hab ich jetzt endlich zusammen, ich lad die heute Abend ins Portal hoch. Sagen Sie einfach Bescheid, wenn noch was fehlt. Liebe Grüße!" }
+      {
+        "who": "kayaVm",
+        "text": "Hallo Frau Kovač, Elif Kaya hier, vom Kaya Design Studio. Also, die fehlenden Belege für Juli hab ich jetzt endlich zusammen, ich lad die heute Abend ins Portal hoch. Sagen Sie einfach Bescheid, wenn noch was fehlt. Liebe Grüße!"
+      }
     ],
     "vm-lea-maier": [
-      { "who": "maierVm", "text": "Guten Morgen Frau Brandt, Sabine Maier vom Autohaus Maier. Wir haben heute Post bekommen, äh, eine Betriebsprüfung ist für November angekündigt. Ich würde das gern zeitnah mit Ihnen besprechen. Melden Sie sich bitte, wenn Sie einen Moment haben. Danke." }
+      {
+        "who": "maierVm",
+        "text": "Guten Morgen Frau Brandt, Sabine Maier vom Autohaus Maier. Wir haben heute Post bekommen, äh, eine Betriebsprüfung ist für November angekündigt. Ich würde das gern zeitnah mit Ihnen besprechen. Melden Sie sich bitte, wenn Sie einen Moment haben. Danke."
+      }
     ],
     "vm-short-lindner": [
-      { "who": "lindner", "text": "Ja, hallo, hier ist Claudia Lindner. Ich, ähm, ich probier's später nochmal. Tschüss." }
+      {
+        "who": "lindner",
+        "text": "Ja, hallo, hier ist Claudia Lindner. Ich, ähm, ich probier's später nochmal. Tschüss."
+      }
     ]
   },
   "recordings": {
@@ -41,15 +105,43 @@
       "left": "felix",
       "lines": [
         { "who": "felix", "text": "Brandt und Partner, Hartmann, guten Tag." },
-        { "who": "schuster", "text": "Ja, Herr Dr. Hartmann, Schuster hier, grüß Sie. Haben Sie zwei Minuten wegen der Praxisübergabe?", "gap": 0.2 },
-        { "who": "felix", "text": "Natürlich, Herr Dr. Schuster, ich hab mir die Zahlen gestern Abend noch angesehen. Also, wenn Sie die Praxis zum ersten Juli übergeben, dann sollten wir den Veräußerungsgewinn sauber vom laufenden Gewinn trennen, weil …" },
+        {
+          "who": "schuster",
+          "text": "Ja, Herr Dr. Hartmann, Schuster hier, grüß Sie. Haben Sie zwei Minuten wegen der Praxisübergabe?",
+          "gap": 0.2
+        },
+        {
+          "who": "felix",
+          "text": "Natürlich, Herr Dr. Schuster, ich hab mir die Zahlen gestern Abend noch angesehen. Also, wenn Sie die Praxis zum ersten Juli übergeben, dann sollten wir den Veräußerungsgewinn sauber vom laufenden Gewinn trennen, weil …"
+        },
         { "who": "schuster", "text": "Mhm.", "over": 0.45 },
-        { "who": "schuster", "text": "Und der Freibetrag, den Sie neulich erwähnt hatten, gilt der denn für mich?", "gap": -1.1, "cut": true },
-        { "who": "felix", "text": "Genau, da wollt ich grad hin. Ja, der gilt für Sie, weil Sie das fünfundfünfzigste Lebensjahr vollendet haben. Den kann man allerdings nur einmal im Leben beantragen.", "gap": 0.15 },
+        {
+          "who": "schuster",
+          "text": "Und der Freibetrag, den Sie neulich erwähnt hatten, gilt der denn für mich?",
+          "gap": -1.1,
+          "cut": true
+        },
+        {
+          "who": "felix",
+          "text": "Genau, da wollt ich grad hin. Ja, der gilt für Sie, weil Sie das fünfundfünfzigste Lebensjahr vollendet haben. Den kann man allerdings nur einmal im Leben beantragen.",
+          "gap": 0.15
+        },
         { "who": "schuster", "text": "Ah, gut.", "over": 0.55 },
-        { "who": "schuster", "text": "Einmal im Leben, na, dann sollten wir den wohl jetzt nehmen.", "gap": -0.3 },
-        { "who": "felix", "text": "Das würde ich auch so sehen. Ich schick Ihnen bis Freitag eine kurze Übersicht mit beiden Varianten.", "gap": 0.3 },
-        { "who": "schuster", "text": "Wunderbar. Vielen Dank, Herr Doktor.", "gap": 0.1 },
+        {
+          "who": "schuster",
+          "text": "Einmal im Leben, na, dann sollten wir den wohl jetzt nehmen.",
+          "gap": -0.3
+        },
+        {
+          "who": "felix",
+          "text": "Das würde ich auch so sehen. Ich schick Ihnen bis Freitag eine kurze Übersicht mit beiden Varianten.",
+          "gap": 0.3
+        },
+        {
+          "who": "schuster",
+          "text": "Wunderbar. Vielen Dank, Herr Doktor.",
+          "gap": 0.1
+        },
         { "who": "felix", "text": "Gern. Auf Wiederhören.", "gap": -0.2 }
       ]
     },
@@ -57,13 +149,38 @@
       "left": "laura",
       "lines": [
         { "who": "laura", "text": "Brandt und Partner, Laura Fischer, hallo?" },
-        { "who": "maier", "text": "Hallo Frau Fischer, Maier vom Autohaus. Kurze Frage zum neuen Firmenwagen: Lohnt sich für uns das Fahrtenbuch, oder nehmen wir einfach die Ein-Prozent-Regelung?", "gap": 0.25 },
-        { "who": "laura", "text": "Gute Frage. Was ist es denn für ein Auto, ein Verbrenner oder …", "gap": 0.4 },
-        { "who": "maier", "text": "Elektro, ein Elektro.", "gap": -0.5, "cut": true },
-        { "who": "laura", "text": "Ah, super, dann ist es ziemlich eindeutig. Beim Elektroauto wird der Listenpreis nur zu einem Viertel angesetzt, da ist die Pauschale meistens günstiger als gedacht.", "gap": 0.2 },
+        {
+          "who": "maier",
+          "text": "Hallo Frau Fischer, Maier vom Autohaus. Kurze Frage zum neuen Firmenwagen: Lohnt sich für uns das Fahrtenbuch, oder nehmen wir einfach die Ein-Prozent-Regelung?",
+          "gap": 0.25
+        },
+        {
+          "who": "laura",
+          "text": "Gute Frage. Was ist es denn für ein Auto, ein Verbrenner oder …",
+          "gap": 0.4
+        },
+        {
+          "who": "maier",
+          "text": "Elektro, ein Elektro.",
+          "gap": -0.5,
+          "cut": true
+        },
+        {
+          "who": "laura",
+          "text": "Ah, super, dann ist es ziemlich eindeutig. Beim Elektroauto wird der Listenpreis nur zu einem Viertel angesetzt, da ist die Pauschale meistens günstiger als gedacht.",
+          "gap": 0.2
+        },
         { "who": "maier", "text": "Ach was.", "over": 0.6 },
-        { "who": "maier", "text": "Und was ist mit dem Laden zu Hause? Der Kollege lädt ja auch privat.", "gap": 0.3 },
-        { "who": "laura", "text": "Das können Sie ihm mit einer monatlichen Pauschale erstatten, steuerfrei. Ich schick Ihnen eine Beispielrechnung für beide Varianten, dann sehen Sie's schwarz auf weiß.", "gap": 0.25 },
+        {
+          "who": "maier",
+          "text": "Und was ist mit dem Laden zu Hause? Der Kollege lädt ja auch privat.",
+          "gap": 0.3
+        },
+        {
+          "who": "laura",
+          "text": "Das können Sie ihm mit einer monatlichen Pauschale erstatten, steuerfrei. Ich schick Ihnen eine Beispielrechnung für beide Varianten, dann sehen Sie's schwarz auf weiß.",
+          "gap": 0.25
+        },
         { "who": "maier", "text": "Perfekt. Danke Ihnen!", "gap": -0.15 },
         { "who": "laura", "text": "Sehr gern, tschüss!", "gap": 0.1 }
       ]
@@ -72,14 +189,43 @@
       "left": "daniel",
       "lines": [
         { "who": "daniel", "text": "Daniel Roth, Brandt und Partner, hallo?" },
-        { "who": "bauer", "text": "Servus Herr Roth, Bauer hier. Sie, mir ist da eine Rechnung von einem Lieferanten reingekommen, da steht keine Steuernummer drauf, gar nix. Kann ich da trotzdem die Vorsteuer ziehen?", "gap": 0.3 },
+        {
+          "who": "bauer",
+          "text": "Servus Herr Roth, Bauer hier. Sie, mir ist da eine Rechnung von einem Lieferanten reingekommen, da steht keine Steuernummer drauf, gar nix. Kann ich da trotzdem die Vorsteuer ziehen?",
+          "gap": 0.3
+        },
         { "who": "daniel", "text": "Mhm.", "over": 0.5 },
-        { "who": "daniel", "text": "Leider nein. Ohne Steuernummer oder Umsatzsteuer-ID ist die Rechnung nicht ordnungsgemäß, und dann …", "gap": 0.35 },
-        { "who": "bauer", "text": "Ja, Herrgott, immer der Papierkram.", "gap": -0.9, "cut": true },
-        { "who": "daniel", "text": "Ich weiß, ich weiß. Aber das ist schnell gelöst: Bitten Sie den Lieferanten einfach um eine korrigierte Rechnung.", "gap": 0.15 },
-        { "who": "bauer", "text": "Und bis dahin buch ich die erst mal ohne Vorsteuer?", "gap": 0.3 },
-        { "who": "daniel", "text": "Genau, und sobald die Korrektur da ist, holen wir den Abzug nach.", "gap": 0.2 },
-        { "who": "bauer", "text": "Passt. Danke Ihnen, pfiat di.", "gap": -0.1 },
+        {
+          "who": "daniel",
+          "text": "Leider nein. Ohne Steuernummer oder Umsatzsteuer-ID ist die Rechnung nicht ordnungsgemäß, und dann …",
+          "gap": 0.35
+        },
+        {
+          "who": "bauer",
+          "text": "Ja, Herrgott, immer der Papierkram.",
+          "gap": -0.9,
+          "cut": true
+        },
+        {
+          "who": "daniel",
+          "text": "Ich weiß, ich weiß. Aber das ist schnell gelöst: Bitten Sie den Lieferanten einfach um eine korrigierte Rechnung.",
+          "gap": 0.15
+        },
+        {
+          "who": "bauer",
+          "text": "Und bis dahin buch ich die erst mal ohne Vorsteuer?",
+          "gap": 0.3
+        },
+        {
+          "who": "daniel",
+          "text": "Genau, und sobald die Korrektur da ist, holen wir den Abzug nach.",
+          "gap": 0.2
+        },
+        {
+          "who": "bauer",
+          "text": "Passt. Danke Ihnen, pfiat di.",
+          "gap": -0.1
+        },
         { "who": "daniel", "text": "Ciao, schönen Tag!", "gap": -0.2 }
       ]
     },
@@ -87,24 +233,70 @@
       "left": "lea",
       "lines": [
         { "who": "lea", "text": "Brandt und Partner, Lea Brandt, guten Tag." },
-        { "who": "kaya", "text": "Hallo Frau Brandt, Elif Kaya! Ich überleg gerade, ob ich aus der Kleinunternehmerregelung rausgehe, mein Umsatz wächst nämlich ziemlich, und …", "gap": 0.25 },
-        { "who": "lea", "text": "Das ist doch ein gutes Zeichen!", "gap": -0.6 },
-        { "who": "kaya", "text": "Ja, total, also, ich will auch bald neue Rechner kaufen.", "gap": 0.1 },
-        { "who": "lea", "text": "Dann kann sich der Wechsel schon vorher lohnen, wegen der Vorsteuer. Ab fünfundzwanzigtausend Euro Vorjahresumsatz geht's ohnehin nicht mehr, aber freiwillig …", "gap": 0.3 },
+        {
+          "who": "kaya",
+          "text": "Hallo Frau Brandt, Elif Kaya! Ich überleg gerade, ob ich aus der Kleinunternehmerregelung rausgehe, mein Umsatz wächst nämlich ziemlich, und …",
+          "gap": 0.25
+        },
+        {
+          "who": "lea",
+          "text": "Das ist doch ein gutes Zeichen!",
+          "gap": -0.6
+        },
+        {
+          "who": "kaya",
+          "text": "Ja, total, also, ich will auch bald neue Rechner kaufen.",
+          "gap": 0.1
+        },
+        {
+          "who": "lea",
+          "text": "Dann kann sich der Wechsel schon vorher lohnen, wegen der Vorsteuer. Ab fünfundzwanzigtausend Euro Vorjahresumsatz geht's ohnehin nicht mehr, aber freiwillig …",
+          "gap": 0.3
+        },
         { "who": "kaya", "text": "Mhm, mhm.", "over": 0.4 },
-        { "who": "kaya", "text": "Okay, und wie lang bin ich dann gebunden?", "gap": -0.7, "cut": true },
-        { "who": "lea", "text": "Fünf Jahre. Genau deshalb rechnen wir das einmal sauber durch. Ich leg Ihnen einen Termin für nächste Woche an.", "gap": 0.2 },
+        {
+          "who": "kaya",
+          "text": "Okay, und wie lang bin ich dann gebunden?",
+          "gap": -0.7,
+          "cut": true
+        },
+        {
+          "who": "lea",
+          "text": "Fünf Jahre. Genau deshalb rechnen wir das einmal sauber durch. Ich leg Ihnen einen Termin für nächste Woche an.",
+          "gap": 0.2
+        },
         { "who": "kaya", "text": "Super, vielen Dank!", "gap": 0.1 }
       ]
     }
   },
   "library": {
-    "greeting-empfang": { "who": "ansage", "text": "Brandt und Partner Steuerberatung, grüß Gott. Einen Moment bitte, wir verbinden Sie mit unserem Empfang." },
-    "greeting-support": { "who": "ansage", "text": "Willkommen beim Mandanten-Support von Brandt und Partner. Bitte bleiben Sie kurz in der Leitung, gleich ist jemand für Sie da." },
-    "vm-greeting-empfang": { "who": "ansage", "text": "Sie sind verbunden mit Brandt und Partner Steuerberatung. Im Moment ist leider niemand erreichbar. Bitte hinterlassen Sie Ihren Namen und Ihre Rufnummer nach dem Signalton. Wir rufen Sie gerne zurück." },
-    "vm-greeting-support": { "who": "ansage", "text": "Hier ist der Mandanten-Support von Brandt und Partner. Wir sind gerade im Gespräch oder außerhalb unserer Servicezeiten, Montag bis Freitag von neun bis siebzehn Uhr. Bitte nennen Sie uns Ihr Anliegen und Ihre Mandantennummer. Wir melden uns so bald wie möglich." },
-    "announcement-menu": { "who": "ansage", "text": "Herzlich willkommen bei Brandt und Partner Steuerberatung in München. Für die Steuerberatung drücken Sie bitte die Eins. Für die Buchhaltung die Zwei. Für den Mandanten-Support die Drei. Unseren Empfang erreichen Sie mit der Null." },
-    "announcement-holiday": { "who": "ansage", "text": "Vielen Dank für Ihren Anruf bei Brandt und Partner. Zwischen den Jahren, vom achtundzwanzigsten Dezember bis zum zweiten Januar, ist unsere Kanzlei geschlossen. Ab dem dritten Januar sind wir wieder gerne für Sie da. Wir wünschen Ihnen schöne Feiertage und einen guten Start ins neue Jahr." },
-    "announcement-closed": { "who": "ansage", "text": "Vielen Dank für Ihren Anruf bei Brandt und Partner. Sie rufen außerhalb unserer Bürozeiten an. Sie erreichen uns montags bis donnerstags von acht bis siebzehn Uhr dreißig, mit einer Mittagspause von halb eins bis halb zwei, und freitags von acht bis vierzehn Uhr. Vielen Dank und auf Wiederhören." }
+    "greeting-empfang": {
+      "who": "ansage",
+      "text": "Brandt und Partner Steuerberatung, grüß Gott. Einen Moment bitte, wir verbinden Sie mit unserem Empfang."
+    },
+    "greeting-support": {
+      "who": "ansage",
+      "text": "Willkommen beim Mandanten-Support von Brandt und Partner. Bitte bleiben Sie kurz in der Leitung, gleich ist jemand für Sie da."
+    },
+    "vm-greeting-empfang": {
+      "who": "ansage",
+      "text": "Sie sind verbunden mit Brandt und Partner Steuerberatung. Im Moment ist leider niemand erreichbar. Bitte hinterlassen Sie Ihren Namen und Ihre Rufnummer nach dem Signalton. Wir rufen Sie gerne zurück."
+    },
+    "vm-greeting-support": {
+      "who": "ansage",
+      "text": "Hier ist der Mandanten-Support von Brandt und Partner. Wir sind gerade im Gespräch oder außerhalb unserer Servicezeiten, Montag bis Freitag von neun bis siebzehn Uhr. Bitte nennen Sie uns Ihr Anliegen und Ihre Mandantennummer. Wir melden uns so bald wie möglich."
+    },
+    "announcement-menu": {
+      "who": "ansage",
+      "text": "Herzlich willkommen bei Brandt und Partner Steuerberatung in München. Für die Steuerberatung drücken Sie bitte die Eins. Für die Buchhaltung die Zwei. Für den Mandanten-Support die Drei. Unseren Empfang erreichen Sie mit der Null."
+    },
+    "announcement-holiday": {
+      "who": "ansage",
+      "text": "Vielen Dank für Ihren Anruf bei Brandt und Partner. Zwischen den Jahren, vom achtundzwanzigsten Dezember bis zum zweiten Januar, ist unsere Kanzlei geschlossen. Ab dem dritten Januar sind wir wieder gerne für Sie da. Wir wünschen Ihnen schöne Feiertage und einen guten Start ins neue Jahr."
+    },
+    "announcement-closed": {
+      "who": "ansage",
+      "text": "Vielen Dank für Ihren Anruf bei Brandt und Partner. Sie rufen außerhalb unserer Bürozeiten an. Sie erreichen uns montags bis donnerstags von acht bis siebzehn Uhr dreißig, mit einer Mittagspause von halb eins bis halb zwei, und freitags von acht bis vierzehn Uhr. Vielen Dank und auf Wiederhören."
+    }
   }
 }

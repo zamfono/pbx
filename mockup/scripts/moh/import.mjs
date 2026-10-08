@@ -24,7 +24,9 @@ const TRACKS = [
 
 const source = process.argv[2];
 if (source === undefined) {
-  console.error('usage: node scripts/moh/import.mjs <directory with the .g722 files>');
+  console.error(
+    'usage: node scripts/moh/import.mjs <directory with the .g722 files>'
+  );
   process.exit(1);
 }
 
@@ -32,11 +34,27 @@ const entries = {};
 for (const track of TRACKS) {
   const file = join(outDir, `moh-${track}.mp3`);
   execFileSync('ffmpeg', [
-    '-y', '-loglevel', 'error',
-    '-f', 'g722', '-i', join(source, `${track}.g722`),
-    '-ac', '1', '-ar', '16000', '-b:a', '40k', file
+    '-y',
+    '-loglevel',
+    'error',
+    '-f',
+    'g722',
+    '-i',
+    join(source, `${track}.g722`),
+    '-ac',
+    '1',
+    '-ar',
+    '16000',
+    '-b:a',
+    '40k',
+    file
   ]);
-  entries[`moh-${track}`] = { kind: 'music', channels: 1, durationS: Math.round(probe(file)), peaks: peaksOf(file) };
+  entries[`moh-${track}`] = {
+    kind: 'music',
+    channels: 1,
+    durationS: Math.round(probe(file)),
+    peaks: peaksOf(file)
+  };
   console.log(`moh-${track}: ${entries[`moh-${track}`].durationS}s`);
 }
 updateManifest(entries);

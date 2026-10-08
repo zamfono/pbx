@@ -16,19 +16,51 @@ const BARS = 36;
 
 export const probe = file =>
   Number(
-    execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=nw=1:nk=1', file]).toString()
+    execFileSync('ffprobe', [
+      '-v',
+      'error',
+      '-show_entries',
+      'format=duration',
+      '-of',
+      'default=nw=1:nk=1',
+      file
+    ]).toString()
   );
 
 /** The file's loudness in `BARS` slices, 0–1 relative to its loudest slice. */
 export function peaksOf(file) {
-  const raw = execFileSync('ffmpeg', ['-loglevel', 'error', '-i', file, '-ac', '1', '-ar', '8000', '-f', 's16le', 'pipe:1'], {
-    maxBuffer: 1 << 28
-  });
-  const samples = new Int16Array(raw.buffer, raw.byteOffset, Math.floor(raw.length / 2));
+  const raw = execFileSync(
+    'ffmpeg',
+    [
+      '-loglevel',
+      'error',
+      '-i',
+      file,
+      '-ac',
+      '1',
+      '-ar',
+      '8000',
+      '-f',
+      's16le',
+      'pipe:1'
+    ],
+    {
+      maxBuffer: 1 << 28
+    }
+  );
+  const samples = new Int16Array(
+    raw.buffer,
+    raw.byteOffset,
+    Math.floor(raw.length / 2)
+  );
   const size = Math.max(1, Math.floor(samples.length / BARS));
   const levels = Array.from({ length: BARS }, (_, bar) => {
     let sum = 0;
-    for (let index = bar * size; index < (bar + 1) * size && index < samples.length; index += 1) {
+    for (
+      let index = bar * size;
+      index < (bar + 1) * size && index < samples.length;
+      index += 1
+    ) {
       sum += samples[index] * samples[index];
     }
     return Math.sqrt(sum / size);
@@ -39,7 +71,9 @@ export function peaksOf(file) {
 
 /** Writes `entries` into the manifest, keeping the entries of the other generators. */
 export function updateManifest(entries) {
-  const manifest = existsSync(manifestFile) ? JSON.parse(readFileSync(manifestFile, 'utf8')) : {};
+  const manifest = existsSync(manifestFile)
+    ? JSON.parse(readFileSync(manifestFile, 'utf8'))
+    : {};
   Object.assign(manifest, entries);
   writeFileSync(manifestFile, `${JSON.stringify(manifest, null, 2)}\n`);
 }

@@ -39,7 +39,10 @@ const FADE_S = 0.12;
 const PROMPT_VERSION = 3;
 
 const normalise = value =>
-  value.replace(/[«»]/gu, '').toLowerCase().replace(/[^a-zäöüß]/gu, '');
+  value
+    .replace(/[«»]/gu, '')
+    .toLowerCase()
+    .replace(/[^a-zäöüß]/gu, '');
 
 if (!apiKey) {
   console.error('OPENAI_API_KEY is not set');
@@ -57,7 +60,12 @@ const systemPrompt = person =>
 
 async function speak(who, text) {
   const person = cast[who];
-  const hash = createHash('sha256').update(`${MODEL}|${PROMPT_VERSION}|${person.voice}|${person.direction}|${text}`).digest('hex').slice(0, 16);
+  const hash = createHash('sha256')
+    .update(
+      `${MODEL}|${PROMPT_VERSION}|${person.voice}|${person.direction}|${text}`
+    )
+    .digest('hex')
+    .slice(0, 16);
   const file = join(cacheDir, `${hash}.wav`);
   if (existsSync(file)) {
     return file;
@@ -65,14 +73,20 @@ async function speak(who, text) {
   for (let attempt = 1; attempt <= 6; attempt += 1) {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
-      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
       body: JSON.stringify({
         model: MODEL,
         modalities: ['text', 'audio'],
         audio: { voice: person.voice, format: 'wav' },
         messages: [
           { role: 'system', content: systemPrompt(person) },
-          { role: 'user', content: `Lies genau diesen Text vor, sonst nichts:\n«${text}»` }
+          {
+            role: 'user',
+            content: `Lies genau diesen Text vor, sonst nichts:\n«${text}»`
+          }
         ]
       })
     });
@@ -89,7 +103,9 @@ async function speak(who, text) {
       !said.endsWith(meant.slice(-edge)) ||
       Math.abs(said.length - meant.length) > Math.max(4, meant.length * 0.08)
     ) {
-      console.warn(`  ${who}: transcript drifted, retrying: ${audio.transcript}`);
+      console.warn(
+        `  ${who}: transcript drifted, retrying: ${audio.transcript}`
+      );
       continue;
     }
     writeFileSync(file, Buffer.from(audio.data, 'base64'));
@@ -107,12 +123,25 @@ async function timeline(recording) {
     const length = probe(file);
     const side = line.who === recording.left ? 'left' : 'right';
     if (line.over !== undefined && lastMain !== null) {
-      placed.push({ file, side, start: lastMain.start + line.over * lastMain.length, length, cut: false });
+      placed.push({
+        file,
+        side,
+        start: lastMain.start + line.over * lastMain.length,
+        length,
+        cut: false
+      });
       continue;
     }
-    const start = Math.max(0, (lastMain === null ? 0 : lastMain.start + lastMain.length) + (line.gap ?? DEFAULT_GAP_S));
+    const start = Math.max(
+      0,
+      (lastMain === null ? 0 : lastMain.start + lastMain.length) +
+        (line.gap ?? DEFAULT_GAP_S)
+    );
     if (line.cut === true && lastMain !== null) {
-      lastMain.length = Math.min(lastMain.length, start + CUT_TAIL_S - lastMain.start);
+      lastMain.length = Math.min(
+        lastMain.length,
+        start + CUT_TAIL_S - lastMain.start
+      );
       lastMain.cut = true;
     }
     const entry = { file, side, start, length, cut: false };
@@ -123,7 +152,9 @@ async function timeline(recording) {
 }
 
 function segmentFilter(segment, index) {
-  const fade = segment.cut ? `,afade=t=out:st=${(segment.length - FADE_S).toFixed(3)}:d=${FADE_S}` : '';
+  const fade = segment.cut
+    ? `,afade=t=out:st=${(segment.length - FADE_S).toFixed(3)}:d=${FADE_S}`
+    : '';
   return `[${index}:a]aresample=24000,aformat=channel_layouts=mono,atrim=end=${segment.length.toFixed(3)}${fade},adelay=${Math.round(segment.start * 1000)}:all=1[s${index}]`;
 }
 
@@ -137,7 +168,8 @@ async function buildRecording(key, recording) {
   const indexed = placed.map((segment, index) => ({ ...segment, index }));
   const left = indexed.filter(segment => segment.side === 'left');
   const right = indexed.filter(segment => segment.side === 'right');
-  const total = Math.max(...placed.map(segment => segment.start + segment.length)) + 0.4;
+  const total =
+    Math.max(...placed.map(segment => segment.start + segment.length)) + 0.4;
   const graph = [
     ...indexed.map(segmentFilter),
     mixSide(left, 'L'),
@@ -147,10 +179,19 @@ async function buildRecording(key, recording) {
     '[L][R]join=inputs=2:channel_layout=stereo,loudnorm=I=-18:TP=-2[out]'
   ].join(';');
   execFileSync('ffmpeg', [
-    '-y', '-loglevel', 'error',
+    '-y',
+    '-loglevel',
+    'error',
     ...placed.flatMap(segment => ['-i', segment.file]),
-    '-filter_complex', graph,
-    '-map', '[out]', '-ar', '16000', '-b:a', '40k', join(outDir, `${key}.mp3`)
+    '-filter_complex',
+    graph,
+    '-map',
+    '[out]',
+    '-ar',
+    '16000',
+    '-b:a',
+    '40k',
+    join(outDir, `${key}.mp3`)
   ]);
 }
 
@@ -161,12 +202,25 @@ async function buildVoicemail(key, lines) {
   }
   const graph = `${files.map((_, index) => `[${index}:a]aresample=24000,aformat=channel_layouts=mono[v${index}]`).join(';')};${files
     .map((_, index) => `[v${index}]`)
-    .join('')}concat=n=${files.length}:v=0:a=1,highpass=f=300,lowpass=f=3400,loudnorm=I=-18:TP=-2[out]`;
+    .join(
+      ''
+    )}concat=n=${files.length}:v=0:a=1,highpass=f=300,lowpass=f=3400,loudnorm=I=-18:TP=-2[out]`;
   execFileSync('ffmpeg', [
-    '-y', '-loglevel', 'error',
+    '-y',
+    '-loglevel',
+    'error',
     ...files.flatMap(file => ['-i', file]),
-    '-filter_complex', graph,
-    '-map', '[out]', '-ac', '1', '-ar', '16000', '-b:a', '24k', join(outDir, `${key}.mp3`)
+    '-filter_complex',
+    graph,
+    '-map',
+    '[out]',
+    '-ac',
+    '1',
+    '-ar',
+    '16000',
+    '-b:a',
+    '24k',
+    join(outDir, `${key}.mp3`)
   ]);
 }
 
@@ -174,10 +228,20 @@ async function buildVoicemail(key, lines) {
 async function buildPrompt(key, line) {
   const file = await speak(line.who, line.text);
   execFileSync('ffmpeg', [
-    '-y', '-loglevel', 'error',
-    '-i', file,
-    '-af', 'aresample=24000,aformat=channel_layouts=mono,adelay=300:all=1,apad=pad_dur=0.5,highpass=f=70,loudnorm=I=-18:TP=-2',
-    '-ac', '1', '-ar', '24000', '-b:a', '48k', join(outDir, `${key}.mp3`)
+    '-y',
+    '-loglevel',
+    'error',
+    '-i',
+    file,
+    '-af',
+    'aresample=24000,aformat=channel_layouts=mono,adelay=300:all=1,apad=pad_dur=0.5,highpass=f=70,loudnorm=I=-18:TP=-2',
+    '-ac',
+    '1',
+    '-ar',
+    '24000',
+    '-b:a',
+    '48k',
+    join(outDir, `${key}.mp3`)
   ]);
 }
 
@@ -186,18 +250,31 @@ mkdirSync(cacheDir, { recursive: true });
 const manifest = {};
 for (const [key, lines] of Object.entries(voicemails)) {
   await buildVoicemail(key, lines);
-  manifest[key] = { kind: 'voicemail', channels: 1, durationS: Math.round(probe(join(outDir, `${key}.mp3`))) };
+  manifest[key] = {
+    kind: 'voicemail',
+    channels: 1,
+    durationS: Math.round(probe(join(outDir, `${key}.mp3`)))
+  };
   console.log(`${key}: ${manifest[key].durationS}s`);
 }
 for (const [key, recording] of Object.entries(recordings)) {
   await buildRecording(key, recording);
-  manifest[key] = { kind: 'recording', channels: 2, durationS: Math.round(probe(join(outDir, `${key}.mp3`))) };
+  manifest[key] = {
+    kind: 'recording',
+    channels: 2,
+    durationS: Math.round(probe(join(outDir, `${key}.mp3`)))
+  };
   console.log(`${key}: ${manifest[key].durationS}s`);
 }
 for (const [key, line] of Object.entries(library)) {
   await buildPrompt(key, line);
   const file = join(outDir, `${key}.mp3`);
-  manifest[key] = { kind: 'prompt', channels: 1, durationS: Math.round(probe(file)), peaks: peaksOf(file) };
+  manifest[key] = {
+    kind: 'prompt',
+    channels: 1,
+    durationS: Math.round(probe(file)),
+    peaks: peaksOf(file)
+  };
   console.log(`${key}: ${manifest[key].durationS}s`);
 }
 updateManifest(manifest);
