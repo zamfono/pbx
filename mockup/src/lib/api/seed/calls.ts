@@ -388,6 +388,9 @@ function outboundCall(index: number, startedAt: string, userId: string): Draft {
       line(plus(startedAt, ringS), 'answered', { trunkId: TRUNK.nordwind })
     );
     log.push(
+      line(plus(startedAt, ringS), 'codecs', { caller: 'opus', callee: 'g722' })
+    );
+    log.push(
       line(plus(startedAt, ringS + talkS), 'ended', { by: 'caller', cause: 16 })
     );
   } else {
