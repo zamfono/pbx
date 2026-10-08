@@ -1,0 +1,52 @@
+{
+  "vm-support-yilmaz": {
+    "kind": "voicemail",
+    "channels": 1,
+    "durationS": 34
+  },
+  "vm-empfang-huber": {
+    "kind": "voicemail",
+    "channels": 1,
+    "durationS": 20
+  },
+  "vm-felix-schuster": {
+    "kind": "voicemail",
+    "channels": 1,
+    "durationS": 16
+  },
+  "vm-mira-kaya": {
+    "kind": "voicemail",
+    "channels": 1,
+    "durationS": 17
+  },
+  "vm-lea-maier": {
+    "kind": "voicemail",
+    "channels": 1,
+    "durationS": 18
+  },
+  "vm-short-lindner": {
+    "kind": "voicemail",
+    "channels": 1,
+    "durationS": 7
+  },
+  "rec-felix-schuster": {
+    "kind": "recording",
+    "channels": 2,
+    "durationS": 61
+  },
+  "rec-laura-maier": {
+    "kind": "recording",
+    "channels": 2,
+    "durationS": 56
+  },
+  "rec-daniel-bauer": {
+    "kind": "recording",
+    "channels": 2,
+    "durationS": 56
+  },
+  "rec-lea-kaya": {
+    "kind": "recording",
+    "channels": 2,
+    "durationS": 48
+  }
+}

@@ -1,0 +1,222 @@
+/*
+  Design tokens of the "bold & playful" brand. Every colour a component uses is a token here;
+  dark mode redefines the same tokens. The theme follows the system unless the person picks one
+  (`data-theme` on <html>).
+*/
+@import '@fontsource/bricolage-grotesque/latin-600.css';
+@import '@fontsource/bricolage-grotesque/latin-800.css';
+@import '@fontsource/bricolage-grotesque/latin-ext-600.css';
+@import '@fontsource/bricolage-grotesque/latin-ext-800.css';
+@import '@fontsource/dm-sans/latin-400.css';
+@import '@fontsource/dm-sans/latin-500.css';
+@import '@fontsource/dm-sans/latin-700.css';
+@import '@fontsource/dm-sans/latin-ext-400.css';
+@import '@fontsource/dm-sans/latin-ext-500.css';
+@import '@fontsource/dm-sans/latin-ext-700.css';
+@import '@fontsource/ibm-plex-mono/latin-400.css';
+@import '@fontsource/ibm-plex-mono/latin-500.css';
+
+:root {
+  --font-display: 'Bricolage Grotesque', ui-sans-serif, system-ui, sans-serif;
+  --font-body:
+    'DM Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 22px;
+  --radius-pill: 999px;
+
+  --text-xs: 11px;
+  --text-sm: 13px;
+  --text-md: 14px;
+  --text-lg: 16px;
+  --text-xl: 20px;
+  --text-2xl: 26px;
+  --text-3xl: 34px;
+
+  --shadow-sm: 0 1px 2px rgb(23 20 43 / 6%);
+  --shadow-md: 0 6px 20px rgb(23 20 43 / 8%);
+  --shadow-lg: 0 18px 50px rgb(23 20 43 / 16%);
+  --shadow-primary: 0 6px 16px rgb(75 46 232 / 30%);
+
+  --sidebar-width: 236px;
+  --mucki-width: 380px;
+  --topbar-height: 60px;
+  --demobar-height: 36px;
+  --tabbar-height: 64px;
+
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  color-scheme: light;
+
+  /* Surfaces */
+  --bg: #f5f3ff;
+  --surface: #ffffff;
+  --surface-2: #faf9ff;
+  --surface-3: #f0edff;
+  --overlay: rgb(23 20 43 / 45%);
+
+  /* Text */
+  --text: #17142b;
+  --text-muted: #6a6585;
+  --text-faint: #9a95b5;
+
+  /* Lines */
+  --line: #e6e2f7;
+  --line-strong: #d3cdf0;
+  --focus: #4b2ee8;
+
+  /* Brand */
+  --primary: #4b2ee8;
+  --primary-hover: #3f22d6;
+  --primary-soft: #e8e3ff;
+  --on-primary: #ffffff;
+  --lime: #c6f432;
+  --lime-soft: #eafbc4;
+  --on-lime: #17142b;
+
+  /* Mucki */
+  --mucki: #ff5c39;
+  --mucki-hover: #f0461f;
+  --mucki-soft: #fff0ea;
+  --mucki-bg: #fff8f5;
+  --mucki-text: #c2391a;
+  --on-mucki: #ffffff;
+
+  /* Status */
+  --ok: #1f9d55;
+  --ok-soft: #dcf7e6;
+  --warn: #c27c00;
+  --warn-soft: #fff1cc;
+  --danger: #d92d4b;
+  --danger-soft: #ffe1e6;
+  --info: #2f6fe0;
+  --info-soft: #e0ebff;
+
+  /* Presence */
+  --presence-available: #22c55e;
+  --presence-busy: #ff5c39;
+  --presence-dnd: #d92d4b;
+  --presence-offline: #c9c5dc;
+
+  /* Roles */
+  --role-owner: #b0310f;
+  --role-owner-soft: #ffe2d8;
+  --role-admin: #4b2ee8;
+  --role-admin-soft: #e8e3ff;
+  --role-user: #3f6b00;
+  --role-user-soft: #eafbc4;
+
+  /* Demo bar (outside the product) */
+  --demo-bg: #17142b;
+  --demo-text: #e9e6ff;
+  --demo-accent: #c6f432;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --bg: #110e22;
+    --surface: #1a1631;
+    --surface-2: #1f1a3a;
+    --surface-3: #2a2450;
+    --overlay: rgb(0 0 0 / 60%);
+    --text: #f1eeff;
+    --text-muted: #a8a2c9;
+    --text-faint: #6f6993;
+    --line: #2e2853;
+    --line-strong: #3d3670;
+    --focus: #9a87ff;
+    --primary: #7c66ff;
+    --primary-hover: #917fff;
+    --primary-soft: #2c2463;
+    --on-primary: #ffffff;
+    --lime: #c6f432;
+    --lime-soft: #2c3a0d;
+    --on-lime: #17142b;
+    --mucki: #ff7452;
+    --mucki-hover: #ff8a6d;
+    --mucki-soft: #3b1f1a;
+    --mucki-bg: #1c1428;
+    --mucki-text: #ff9a80;
+    --on-mucki: #1b0d08;
+    --ok: #4ade80;
+    --ok-soft: #12351f;
+    --warn: #fbbf24;
+    --warn-soft: #3a2c08;
+    --danger: #ff6b85;
+    --danger-soft: #3d1520;
+    --info: #7aa7ff;
+    --info-soft: #172848;
+    --presence-offline: #4a4470;
+    --role-owner: #ff9a7a;
+    --role-owner-soft: #3d1c12;
+    --role-admin: #a796ff;
+    --role-admin-soft: #2c2463;
+    --role-user: #b8e86a;
+    --role-user-soft: #24320c;
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 30%);
+    --shadow-md: 0 6px 20px rgb(0 0 0 / 35%);
+    --shadow-lg: 0 18px 50px rgb(0 0 0 / 55%);
+    --shadow-primary: 0 6px 16px rgb(124 102 255 / 30%);
+    --demo-bg: #000000;
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #110e22;
+  --surface: #1a1631;
+  --surface-2: #1f1a3a;
+  --surface-3: #2a2450;
+  --overlay: rgb(0 0 0 / 60%);
+  --text: #f1eeff;
+  --text-muted: #a8a2c9;
+  --text-faint: #6f6993;
+  --line: #2e2853;
+  --line-strong: #3d3670;
+  --focus: #9a87ff;
+  --primary: #7c66ff;
+  --primary-hover: #917fff;
+  --primary-soft: #2c2463;
+  --on-primary: #ffffff;
+  --lime: #c6f432;
+  --lime-soft: #2c3a0d;
+  --on-lime: #17142b;
+  --mucki: #ff7452;
+  --mucki-hover: #ff8a6d;
+  --mucki-soft: #3b1f1a;
+  --mucki-bg: #1c1428;
+  --mucki-text: #ff9a80;
+  --on-mucki: #1b0d08;
+  --ok: #4ade80;
+  --ok-soft: #12351f;
+  --warn: #fbbf24;
+  --warn-soft: #3a2c08;
+  --danger: #ff6b85;
+  --danger-soft: #3d1520;
+  --info: #7aa7ff;
+  --info-soft: #172848;
+  --presence-offline: #4a4470;
+  --role-owner: #ff9a7a;
+  --role-owner-soft: #3d1c12;
+  --role-admin: #a796ff;
+  --role-admin-soft: #2c2463;
+  --role-user: #b8e86a;
+  --role-user-soft: #24320c;
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 30%);
+  --shadow-md: 0 6px 20px rgb(0 0 0 / 35%);
+  --shadow-lg: 0 18px 50px rgb(0 0 0 / 55%);
+  --shadow-primary: 0 6px 16px rgb(124 102 255 / 30%);
+  --demo-bg: #000000;
+}

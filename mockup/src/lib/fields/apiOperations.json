@@ -1,0 +1,3427 @@
+{
+  "users.list": {
+    "method": "GET",
+    "path": "/users",
+    "summary": "Lists the tenant's live users, paginated.",
+    "fields": {
+      "limit": {
+        "type": "integer",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "cursor": {
+        "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      }
+    }
+  },
+  "users.create": {
+    "method": "POST",
+    "path": "/users",
+    "summary": "Creates a user, with an e-mail, an extension or both, and returns a setup link for one with an e-mail.",
+    "fields": {
+      "name": {
+        "type": "string",
+        "required": true,
+        "description": null
+      },
+      "email": {
+        "type": "string|null",
+        "required": false,
+        "description": "Where the set-password link and mail go, and the login; null for none: a phone-only user, role user, who cannot log in. A user has an e-mail, an extension or both."
+      },
+      "role": {
+        "type": "string",
+        "enum": ["owner", "admin", "user"],
+        "required": false,
+        "description": "owner and admin, given by an owner only, configure the stack, user only their own self-service fields; 'user' by default. A new owner cannot log in until they set their password through the setup link."
+      },
+      "extension": {
+        "type": "string|null",
+        "required": false,
+        "description": "The internal number colleagues dial, digits of the tenant's fixed extension length; null for none: no devices, no ring groups, not dialable. A user has an e-mail, an extension or both."
+      },
+      "ringTimeoutS": {
+        "type": "integer",
+        "required": false,
+        "description": "Seconds the user's devices ring before the noAnswer rule applies; 25 by default; self-service."
+      },
+      "clir": {
+        "type": "boolean|null",
+        "required": false,
+        "description": "Withholds the number on outbound calls; null inherits from the trunk, then settings.clir; self-service."
+      },
+      "rejectAnonymous": {
+        "type": "boolean|null",
+        "required": false,
+        "description": "Refuses callers who withhold their number; null follows settings.rejectAnonymous; self-service."
+      },
+      "recordCalls": {
+        "type": "boolean",
+        "required": false,
+        "description": "Records this user's calls; admin-set (see zamfono.help recording-consent)."
+      },
+      "notifyMissedCalls": {
+        "type": "boolean",
+        "required": false,
+        "description": "Sends an e-mail per missed inbound call; on by default; self-service."
+      },
+      "mailboxEnabled": {
+        "type": "boolean",
+        "required": false,
+        "description": "Gives the user a voicemail box, where an absent forward rule sends the call; on by default."
+      },
+      "mailboxMaxMessages": {
+        "type": "integer|null",
+        "required": false,
+        "description": "Most messages the mailbox holds; a caller reaching a full mailbox hears that it is full and leaves none; 100 by default; null: no limit."
+      },
+      "findMe": {
+        "type": "array",
+        "required": false,
+        "description": "External numbers rung alongside the user's devices on direct calls, never through a ring group; the answerer presses 1 to accept; self-service."
+      }
+    }
+  },
+  "users.get": {
+    "method": "GET",
+    "path": "/users/{id}",
+    "summary": "Reads one live user by id.",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      }
+    }
+  },
+  "users.update": {
+    "method": "PATCH",
+    "path": "/users/{id}",
+    "summary": "Updates a user's profile; admins write every field, a user only their self-service subset.",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "name": {
+        "type": "string",
+        "required": false,
+        "description": null
+      },
+      "email": {
+        "type": "string|null",
+        "required": false,
+        "description": "Where the set-password link and mail go, and the login; null for none: a phone-only user, role user, who cannot log in. A user has an e-mail, an extension or both."
+      },
+      "role": {
+        "type": "string",
+        "enum": ["owner", "admin", "user"],
+        "required": false,
+        "description": "owner and admin configure the stack (only an owner writes owner-only settings), user only their own self-service fields; the last owner cannot be demoted."
+      },
+      "extension": {
+        "type": "string|null",
+        "required": false,
+        "description": "The internal number colleagues dial, digits of the tenant's fixed extension length; null for none: no devices, no ring groups, not dialable. A user has an e-mail, an extension or both."
+      },
+      "ringTimeoutS": {
+        "type": "integer",
+        "required": false,
+        "description": "Seconds the user's devices ring before the noAnswer rule applies; 25 by default; self-service."
+      },
+      "clir": {
+        "type": "boolean|null",
+        "required": false,
+        "description": "Withholds the number on outbound calls; null inherits from the trunk, then settings.clir; self-service."
+      },
+      "rejectAnonymous": {
+        "type": "boolean|null",
+        "required": false,
+        "description": "Refuses callers who withhold their number; null follows settings.rejectAnonymous; self-service."
+      },
+      "recordCalls": {
+        "type": "boolean",
+        "required": false,
+        "description": "Records this user's calls; admin-set (see zamfono.help recording-consent)."
+      },
+      "notifyMissedCalls": {
+        "type": "boolean",
+        "required": false,
+        "description": "Sends an e-mail per missed inbound call; on by default; self-service."
+      },
+      "mailboxEnabled": {
+        "type": "boolean",
+        "required": false,
+        "description": "Gives the user a voicemail box, where an absent forward rule sends the call; on by default."
+      },
+      "mailboxMaxMessages": {
+        "type": "integer|null",
+        "required": false,
+        "description": "Most messages the mailbox holds; a caller reaching a full mailbox hears that it is full and leaves none; 100 by default; null: no limit."
+      },
+      "mailboxAudioId": {
+        "type": "string|null",
+        "required": false,
+        "description": "The personal voicemail greeting, an audio asset id."
+      },
+      "callerIdDidId": {
+        "type": "string|null",
+        "required": false,
+        "description": "The DID presented on the user's outbound calls; null presents the main number, settings.mainDidId (see zamfono.help numbers)."
+      },
+      "findMe": {
+        "type": "array",
+        "required": false,
+        "description": "External numbers rung alongside the user's devices on direct calls, never through a ring group; the answerer presses 1 to accept; self-service."
+      },
+      "logLevel": {
+        "type": "string|null",
+        "required": false,
+        "description": "Raises this entity's calls to diagnostics level events, qos or sip, above settings.callLogLevel; null: no override (see zamfono.help diagnose-bad-call)."
+      },
+      "logLevelExpiresAt": {
+        "type": "string|null",
+        "required": false,
+        "description": "When the override ends, ISO 8601 with offset; a logLevel set without one ends 7 days later."
+      }
+    }
+  },
+  "users.delete": {
+    "method": "DELETE",
+    "path": "/users/{id}",
+    "summary": "Soft-deletes a user, cascading their devices, extension and sessions.",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "confirm": {
+        "type": "boolean",
+        "required": false,
+        "description": "`true` once a human has answered the confirmation question; without it the operation is refused with 409 and the question (§10.3 \"Confirmation\")."
+      }
+    }
+  },
+  "users.resetPassword": {
+    "method": "POST",
+    "path": "/users/{id}/resetPassword",
+    "summary": "Issues a new one-time link to set a user's password.",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      }
+    }
+  },
+  "users.resetMfa": {
+    "method": "POST",
+    "path": "/users/{id}/resetMfa",
+    "summary": "Removes a user's two-factor methods and recovery codes and signs them out everywhere.",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "confirm": {
+        "type": "boolean",
+        "required": false,
+        "description": "`true` once a human has answered the confirmation question; without it the operation is refused with 409 and the question (§10.3 \"Confirmation\")."
+      }
+    }
+  },
+  "users.erase": {
+    "method": "POST",
+    "path": "/users/{id}/erase",
+    "summary": "Erases a user's personal data from their audit trail (GDPR, irreversible).",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "confirm": {
+        "type": "boolean",
+        "required": false,
+        "description": "`true` once a human has answered the confirmation question; without it the operation is refused with 409 and the question (§10.3 \"Confirmation\")."
+      }
+    }
+  },
+  "users.getForwarding": {
+    "method": "GET",
+    "path": "/users/{id}/forwarding",
+    "summary": "Reads a user's call-forwarding rules in the shape users.setForwarding takes; a user reads their own, an admin anyone's.",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      }
+    }
+  },
+  "users.setForwarding": {
+    "method": "PUT",
+    "path": "/users/{id}/forwarding",
+    "summary": "Replaces a user's call-forwarding rules as a whole; a user sets their own, without new sip or recording targets, an admin anyone's.",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "rules": {
+        "type": "array",
+        "required": true,
+        "description": "The user's rules, one per condition; a condition left out sends the call to the user's mailbox, else rejects it (see zamfono.help routing-order)."
+      }
+    }
+  },
+  "users.setPresence": {
+    "method": "PUT",
+    "path": "/users/{id}/presence",
+    "summary": "Sets a user's do-not-disturb state.",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "dnd": {
+        "type": "boolean",
+        "required": true,
+        "description": "Do not disturb: while on, calls follow the user's dnd forward rule, else their mailbox, else busy."
+      }
+    }
+  },
+  "users.setVoicemailGreeting": {
+    "method": "PUT",
+    "path": "/users/{id}/voicemailGreeting",
+    "summary": "Sets a user's personal voicemail greeting from a WAV or MP3 upload, as recording it on *96 does; over MCP, answers with a link to upload the file to.",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "upload": {
+        "type": "object",
+        "required": true,
+        "description": "The greeting, WAV or MP3, sent as multipart form data; it is transcoded for playback."
+      }
+    }
+  },
+  "users.clearVoicemailGreeting": {
+    "method": "DELETE",
+    "path": "/users/{id}/voicemailGreeting",
+    "summary": "Removes a user's personal voicemail greeting; callers hear the default prompt in the tenant language again.",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "confirm": {
+        "type": "boolean",
+        "required": false,
+        "description": "`true` once a human has answered the confirmation question; without it the operation is refused with 409 and the question (§10.3 \"Confirmation\")."
+      }
+    }
+  },
+  "devices.list": {
+    "method": "GET",
+    "path": "/users/{id}/devices",
+    "summary": "Lists a user's live devices, paginated.",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "limit": {
+        "type": "integer",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "cursor": {
+        "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      }
+    }
+  },
+  "devices.create": {
+    "method": "POST",
+    "path": "/users/{id}/devices",
+    "summary": "Creates a SIP device for a user; a manual device's connection settings are returned once.",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "label": {
+        "type": "string",
+        "required": true,
+        "description": null
+      },
+      "kind": {
+        "type": "string",
+        "enum": ["manual", "ringotel"],
+        "required": true,
+        "description": "manual: a softphone or desk phone set up by hand from the returned connection settings; ringotel: the user's Ringotel app account, at most one per user (see zamfono.help ringotel-setup)."
+      },
+      "transport": {
+        "type": "string",
+        "enum": ["tls", "plain"],
+        "required": false,
+        "description": "tls (the default): SIP over TLS from anywhere; plain: UDP or TCP from allowedIps only, manual devices alone (see zamfono.help remote-workers)."
+      },
+      "allowedIps": {
+        "type": "array",
+        "required": false,
+        "description": "IPs or CIDR ranges, IPv4 or IPv6, the only sources a plain device may register and call from; required for plain, refused for tls."
+      }
+    }
+  },
+  "devices.update": {
+    "method": "PATCH",
+    "path": "/devices/{id}",
+    "summary": "Updates a device's label or, for a plain device, its IP allowlist.",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "label": {
+        "type": "string",
+        "required": false,
+        "description": null
+      },
+      "allowedIps": {
+        "type": "array",
+        "required": false,
+        "description": "IPs or CIDR ranges, IPv4 or IPv6, the only sources a plain device may register and call from; required for plain, refused for tls."
+      }
+    }
+  },
+  "devices.delete": {
+    "method": "DELETE",
+    "path": "/devices/{id}",
+    "summary": "Soft-deletes a device.",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "confirm": {
+        "type": "boolean",
+        "required": false,
+        "description": "`true` once a human has answered the confirmation question; without it the operation is refused with 409 and the question (§10.3 \"Confirmation\")."
+      }
+    }
+  },
+  "devices.revealCredentials": {
+    "method": "GET",
+    "path": "/devices/{id}/credentials",
+    "summary": "Reveals a device's SIP credentials; a manual device's as its full connection settings.",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      }
+    }
+  },
+  "devices.rotate": {
+    "method": "POST",
+    "path": "/devices/{id}/rotate",
+    "summary": "Rotates a device's SIP password.",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "confirm": {
+        "type": "boolean",
+        "required": false,
+        "description": "`true` once a human has answered the confirmation question; without it the operation is refused with 409 and the question (§10.3 \"Confirmation\")."
+      }
+    }
+  },
+  "devices.getBlf": {
+    "method": "GET",
+    "path": "/devices/{id}/blf",
+    "summary": "Reads a ringotel device's BLF panel.",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      }
+    }
+  },
+  "devices.setBlf": {
+    "method": "PUT",
+    "path": "/devices/{id}/blf",
+    "summary": "Replaces a ringotel device's BLF panel as a whole.",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "keys": {
+        "type": "array",
+        "required": true,
+        "description": "Extensions (users, ring groups, parking slots) whose state the panel's lamps show, in panel order; empty: every user and group extension."
+      }
+    }
+  },
+  "personalAccessTokens.list": {
+    "method": "GET",
+    "path": "/users/{id}/personalAccessTokens",
+    "summary": "Lists a user's personal access tokens, revoked and expired ones until the daily purge, paginated.",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "limit": {
+        "type": "integer",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "cursor": {
+        "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      }
+    }
+  },
+  "personalAccessTokens.create": {
+    "method": "POST",
+    "path": "/users/{id}/personalAccessTokens",
+    "summary": "Creates a personal access token, acting as the user, for a server application; its value is returned once.",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "name": {
+        "type": "string",
+        "required": true,
+        "description": "Which application holds the token, unique among the user’s live tokens, e.g. crm-sync."
+      },
+      "expiresAt": {
+        "type": "string|null",
+        "required": false,
+        "description": "When the token stops working, ISO 8601 with an offset, in the future; null or left out: never."
+      }
+    }
+  },
+  "personalAccessTokens.revoke": {
+    "method": "POST",
+    "path": "/personalAccessTokens/{id}/revoke",
+    "summary": "Revokes a personal access token; the application using it loses access at once.",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "confirm": {
+        "type": "boolean",
+        "required": false,
+        "description": "`true` once a human has answered the confirmation question; without it the operation is refused with 409 and the question (§10.3 \"Confirmation\")."
+      }
+    }
+  },
+  "provisioning.ringotelSetup": {
+    "method": "POST",
+    "path": "/provisioning/ringotel/setup",
+    "summary": "Creates the Ringotel organization and connection, and stores their ids; provisioning.ringotelOptions lists the regions and packages it takes.",
+    "fields": {
+      "domain": {
+        "type": "string",
+        "required": true,
+        "description": "The organization's Ringotel domain, as in <domain>.ringotel.co; unique across Ringotel (see zamfono.help ringotel-setup)."
+      },
+      "region": {
+        "type": "string",
+        "required": true,
+        "description": "A region id from provisioning.ringotelOptions, such as 3 for Europe (Frankfurt); fixed once created."
+      },
+      "packageid": {
+        "type": "integer",
+        "required": true,
+        "description": "A package id from provisioning.ringotelOptions."
+      }
+    }
+  },
+  "provisioning.ringotelAdopt": {
+    "method": "POST",
+    "path": "/provisioning/ringotel/adopt",
+    "summary": "Adopts an existing, empty Ringotel organization (by id and domain) and one of its connections, or a new one, instead of creating them.",
+    "fields": {
+      "orgId": {
+        "type": "string",
+        "required": true,
+        "description": "The id of an existing Ringotel organization without users."
+      },
+      "domain": {
+        "type": "string",
+        "required": true,
+        "description": "That organization's domain, which must match its id."
+      },
+      "branchId": {
+        "type": "string",
+        "required": false,
+        "description": "A connection of the organization to reuse; left out, a new one is created."
+      },
+      "confirm": {
+        "type": "boolean",
+        "required": false,
+        "description": "`true` once a human has answered the confirmation question; without it the operation is refused with 409 and the question (§10.3 \"Confirmation\")."
+      }
+    }
+  },
+  "provisioning.ringotelOptions": {
+    "method": "GET",
+    "path": "/provisioning/ringotel/options",
+    "summary": "Lists the Ringotel regions and packages the account offers, the choices provisioning.ringotelSetup takes.",
+    "fields": {}
+  },
+  "trunks.list": {
+    "method": "GET",
+    "path": "/trunks",
+    "summary": "Lists SIP trunks in trunk order, with their live status merged in.",
+    "fields": {
+      "limit": {
+        "type": "integer",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "cursor": {
+        "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      }
+    }
+  },
+  "trunks.create": {
+    "method": "POST",
+    "path": "/trunks",
+    "summary": "Creates a SIP trunk to a PSTN or SIP provider with its ordered host list; the first trunk also gets the catch-all outbound route.",
+    "fields": {
+      "name": {
+        "type": "string",
+        "required": true,
+        "description": null
+      },
+      "emergency": {
+        "type": "boolean",
+        "required": true,
+        "description": "Whether this provider carries emergency calls to the company's registered address; emergency calls try only such trunks (see zamfono.help emergency-calls)."
+      },
+      "authMode": {
+        "type": "string",
+        "enum": ["registration", "ip"],
+        "required": true,
+        "description": "registration: the stack registers with username and password; ip: the provider whitelists the stack's address and nothing registers."
+      },
+      "username": {
+        "type": "string",
+        "required": false,
+        "description": "The provider account name, for registration and digest auth; callerIdHeader pai needs one."
+      },
+      "password": {
+        "type": "string",
+        "required": false,
+        "description": "The provider account password; write-only, read as passwordSet."
+      },
+      "inboundAuth": {
+        "type": "boolean",
+        "required": false,
+        "description": "Challenges the provider's INVITEs and identifies the trunk by its username, so it needs no inbound hosts; with inbound or both hosts, only calls from them are taken. Either auth mode."
+      },
+      "transport": {
+        "type": "string",
+        "enum": ["udp", "tcp", "tls"],
+        "required": false,
+        "description": "SIP signalling transport: udp (default), tcp or tls."
+      },
+      "srtp": {
+        "type": "boolean",
+        "required": false,
+        "description": "Encrypts the media with SDES-SRTP, for a provider that requires it; tls trunks only."
+      },
+      "tlsVerify": {
+        "type": "boolean",
+        "required": false,
+        "description": "On a tls trunk, checks that the provider's certificate chains to a public CA and names the host; default true, false only for a self-signed certificate."
+      },
+      "qualify": {
+        "type": "boolean",
+        "required": false,
+        "description": "Probes an ip trunk's first host with OPTIONS every 60 seconds for its status; default true; false, for an endpoint that answers none, reads unmonitored and is always tried."
+      },
+      "diversion": {
+        "type": "string",
+        "enum": ["off", "last", "all"],
+        "required": false,
+        "description": "What a call forwarded or blind-transferred out over this trunk tells the far end about who forwarded it: off (default) nothing, last the newest forward, all every forward (see zamfono.help caller-id)."
+      },
+      "forwardedCallerId": {
+        "type": "string",
+        "enum": ["own", "original", "originalPreferred"],
+        "required": false,
+        "description": "Whose number a call forwarded or blind-transferred out over this trunk presents: own (default) the company's; original the outside caller's in From with the company's in P-Asserted-Identity, originalPreferred the same with P-Preferred-Identity, for a carrier's booked CLIP no screening; needs callerIdHeader from and diversion last or all (see zamfono.help caller-id)."
+      },
+      "outboundProxy": {
+        "type": "string",
+        "required": false,
+        "description": "The outbound proxy every request goes through: a sip: or sips: URI such as sip:proxy.example.com, written with ;lr where it lacks it."
+      },
+      "registerExpiryS": {
+        "type": "integer",
+        "required": false,
+        "description": "Registration expiry in seconds; registration trunks only."
+      },
+      "registerRetryS": {
+        "type": "integer",
+        "required": false,
+        "description": "Seconds between registration retries after a failure; registration trunks only."
+      },
+      "inboundNumberFormat": {
+        "type": "string",
+        "enum": ["e164", "national"],
+        "required": false,
+        "description": "How the provider sends numbers: e164 (default; + and digits, anything else verbatim) or national (as dialled in settings.country, with its own international and trunk prefixes); see zamfono.help numbers."
+      },
+      "callerIdFormat": {
+        "type": "string",
+        "enum": ["e164", "national"],
+        "required": false,
+        "description": "How the presented caller number is sent: e164 (default) or national."
+      },
+      "callerIdHeader": {
+        "type": "string",
+        "enum": ["from", "pai", "both"],
+        "required": false,
+        "description": "Where the presented number goes: from (default) in From; pai in P-Asserted-Identity with From the account identity (needs username); both in From and P-Asserted-Identity (see zamfono.help caller-id)."
+      },
+      "clir": {
+        "type": "boolean|null",
+        "required": false,
+        "description": "Withholds the caller number on calls over this trunk; null inherits settings.clir; true needs callerIdHeader pai or both."
+      },
+      "codecs": {
+        "type": "array",
+        "required": false,
+        "description": "The trunk's ordered codec offer; left out or null: the tenant's settings.codecs."
+      },
+      "maxChannels": {
+        "type": "integer",
+        "required": false,
+        "description": "Concurrent calls the provider sells on the trunk; an outbound call past it falls through to the next route; left out or null: unlimited."
+      },
+      "hosts": {
+        "type": "array",
+        "required": true,
+        "description": "The ordered host list: where calls and registration go and where the provider sends from, each by its direction."
+      }
+    }
+  },
+  "trunks.get": {
+    "method": "GET",
+    "path": "/trunks/{id}",
+    "summary": "Reads one SIP trunk.",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      }
+    }
+  },
+  "trunks.update": {
+    "method": "PATCH",
+    "path": "/trunks/{id}",
+    "summary": "Updates a SIP trunk; hosts replace the list as a whole, password is write-only.",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "name": {
+        "type": "string",
+        "required": false,
+        "description": null
+      },
+      "emergency": {
+        "type": "boolean",
+        "required": false,
+        "description": "Whether this provider carries emergency calls to the company's registered address; emergency calls try only such trunks (see zamfono.help emergency-calls)."
+      },
+      "authMode": {
+        "type": "string",
+        "enum": ["registration", "ip"],
+        "required": false,
+        "description": "registration: the stack registers with username and password; ip: the provider whitelists the stack's address and nothing registers."
+      },
+      "username": {
+        "type": "string|null",
+        "required": false,
+        "description": "The provider account name, for registration and digest auth; callerIdHeader pai needs one."
+      },
+      "password": {
+        "type": "string|null",
+        "required": false,
+        "description": "The provider account password; write-only, read as passwordSet."
+      },
+      "inboundAuth": {
+        "type": "boolean",
+        "required": false,
+        "description": "Challenges the provider's INVITEs and identifies the trunk by its username, so it needs no inbound hosts; with inbound or both hosts, only calls from them are taken. Either auth mode."
+      },
+      "transport": {
+        "type": "string",
+        "enum": ["udp", "tcp", "tls"],
+        "required": false,
+        "description": "SIP signalling transport: udp (default), tcp or tls."
+      },
+      "srtp": {
+        "type": "boolean",
+        "required": false,
+        "description": "Encrypts the media with SDES-SRTP, for a provider that requires it; tls trunks only."
+      },
+      "tlsVerify": {
+        "type": "boolean",
+        "required": false,
+        "description": "On a tls trunk, checks that the provider's certificate chains to a public CA and names the host; default true, false only for a self-signed certificate."
+      },
+      "qualify": {
+        "type": "boolean",
+        "required": false,
+        "description": "Probes an ip trunk's first host with OPTIONS every 60 seconds for its status; default true; false, for an endpoint that answers none, reads unmonitored and is always tried."
+      },
+      "diversion": {
+        "type": "string",
+        "enum": ["off", "last", "all"],
+        "required": false,
+        "description": "What a call forwarded or blind-transferred out over this trunk tells the far end about who forwarded it: off (default) nothing, last the newest forward, all every forward (see zamfono.help caller-id)."
+      },
+      "forwardedCallerId": {
+        "type": "string",
+        "enum": ["own", "original", "originalPreferred"],
+        "required": false,
+        "description": "Whose number a call forwarded or blind-transferred out over this trunk presents: own (default) the company's; original the outside caller's in From with the company's in P-Asserted-Identity, originalPreferred the same with P-Preferred-Identity, for a carrier's booked CLIP no screening; needs callerIdHeader from and diversion last or all (see zamfono.help caller-id)."
+      },
+      "outboundProxy": {
+        "type": "string|null",
+        "required": false,
+        "description": "The outbound proxy every request goes through: a sip: or sips: URI such as sip:proxy.example.com, written with ;lr where it lacks it."
+      },
+      "registerExpiryS": {
+        "type": "integer|null",
+        "required": false,
+        "description": "Registration expiry in seconds; registration trunks only."
+      },
+      "registerRetryS": {
+        "type": "integer|null",
+        "required": false,
+        "description": "Seconds between registration retries after a failure; registration trunks only."
+      },
+      "inboundNumberFormat": {
+        "type": "string",
+        "enum": ["e164", "national"],
+        "required": false,
+        "description": "How the provider sends numbers: e164 (default; + and digits, anything else verbatim) or national (as dialled in settings.country, with its own international and trunk prefixes); see zamfono.help numbers."
+      },
+      "callerIdFormat": {
+        "type": "string",
+        "enum": ["e164", "national"],
+        "required": false,
+        "description": "How the presented caller number is sent: e164 (default) or national."
+      },
+      "callerIdHeader": {
+        "type": "string",
+        "enum": ["from", "pai", "both"],
+        "required": false,
+        "description": "Where the presented number goes: from (default) in From; pai in P-Asserted-Identity with From the account identity (needs username); both in From and P-Asserted-Identity (see zamfono.help caller-id)."
+      },
+      "clir": {
+        "type": "boolean|null",
+        "required": false,
+        "description": "Withholds the caller number on calls over this trunk; null inherits settings.clir; true needs callerIdHeader pai or both."
+      },
+      "codecs": {
+        "type": "array|null",
+        "required": false,
+        "description": "The trunk's ordered codec offer; left out or null: the tenant's settings.codecs."
+      },
+      "maxChannels": {
+        "type": "integer|null",
+        "required": false,
+        "description": "Concurrent calls the provider sells on the trunk; an outbound call past it falls through to the next route; left out or null: unlimited."
+      },
+      "hosts": {
+        "type": "array",
+        "required": false,
+        "description": "The ordered host list: where calls and registration go and where the provider sends from, each by its direction. Replaces the list as a whole."
+      },
+      "logLevel": {
+        "type": "string|null",
+        "required": false,
+        "description": "Raises this entity's calls to diagnostics level events, qos or sip, above settings.callLogLevel; null: no override (see zamfono.help diagnose-bad-call)."
+      },
+      "logLevelExpiresAt": {
+        "type": "string|null",
+        "required": false,
+        "description": "When the override ends, ISO 8601 with offset; a logLevel set without one ends 7 days later."
+      }
+    }
+  },
+  "trunks.delete": {
+    "method": "DELETE",
+    "path": "/trunks/{id}",
+    "summary": "Soft-deletes a SIP trunk once no outbound route or sip forward target uses it (409 names them).",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "confirm": {
+        "type": "boolean",
+        "required": false,
+        "description": "`true` once a human has answered the confirmation question; without it the operation is refused with 409 and the question (§10.3 \"Confirmation\")."
+      }
+    }
+  },
+  "trunks.setOrder": {
+    "method": "PUT",
+    "path": "/trunks/order",
+    "summary": "Rewrites the tenant trunk order, the order emergency calls try emergency trunks in (§9.4 \"Trunk order\").",
+    "fields": {
+      "trunkIds": {
+        "type": "array",
+        "required": true,
+        "description": "Every live trunk id exactly once, in the new order."
+      }
+    }
+  },
+  "trunks.reregister": {
+    "method": "POST",
+    "path": "/trunks/{id}/reregister",
+    "summary": "Has a registration trunk unregister and register afresh with its provider; trunks.get's status and registeredAt show the outcome. Refused for an ip trunk.",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      }
+    }
+  },
+  "outboundRoutes.list": {
+    "method": "GET",
+    "path": "/outboundRoutes",
+    "summary": "Lists outbound routes in evaluation order, each with its callers and numbers.",
+    "fields": {
+      "limit": {
+        "type": "integer",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "cursor": {
+        "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      }
+    }
+  },
+  "outboundRoutes.replace": {
+    "method": "PUT",
+    "path": "/outboundRoutes",
+    "summary": "Replaces the outbound route list as a whole, in evaluation order: a call takes the first route whose callers and numbers both match, falling through to the next when its trunk fails.",
+    "fields": {
+      "routes": {
+        "type": "array",
+        "required": true,
+        "description": "Every route in evaluation order; a live route left out is deleted. Keep a catch-all (no callers, no numbers) last as the default."
+      }
+    }
+  },
+  "dids.list": {
+    "method": "GET",
+    "path": "/dids",
+    "summary": "Lists the tenant's DIDs",
+    "fields": {
+      "limit": {
+        "type": "integer",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "cursor": {
+        "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      }
+    }
+  },
+  "dids.create": {
+    "method": "POST",
+    "path": "/dids",
+    "summary": "Adds a DID, a phone number the tenant owns, and the forward target its calls go to (zamfono.help numbers)",
+    "fields": {
+      "number": {
+        "type": "string",
+        "required": true,
+        "description": "The called number: E.164 such as +4989123456, or national such as 089123456, normalized with settings.country; anything else, such as a provider's account name, is matched verbatim."
+      },
+      "label": {
+        "type": "string|null",
+        "required": false,
+        "description": null
+      },
+      "target": {
+        "type": "object|object|object|object|object|object|object|object",
+        "required": true,
+        "description": "Where a call to this number goes; a numeric DID for a user with no caller ID of their own becomes it."
+      }
+    }
+  },
+  "dids.update": {
+    "method": "PATCH",
+    "path": "/dids/{id}",
+    "summary": "Changes a DID's forward target; number and label are fixed at creation",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "target": {
+        "type": "object|object|object|object|object|object|object|object",
+        "required": true,
+        "description": "Where a call to this number goes; a numeric DID for a user with no caller ID of their own becomes it."
+      }
+    }
+  },
+  "dids.delete": {
+    "method": "DELETE",
+    "path": "/dids/{id}",
+    "summary": "Soft-deletes a DID unless it is the main number or presented as caller ID",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "confirm": {
+        "type": "boolean",
+        "required": false,
+        "description": "`true` once a human has answered the confirmation question; without it the operation is refused with 409 and the question (§10.3 \"Confirmation\")."
+      }
+    }
+  },
+  "didBlocks.list": {
+    "method": "GET",
+    "path": "/didBlocks",
+    "summary": "Lists the tenant's number blocks with their digit counts and fallback targets",
+    "fields": {
+      "limit": {
+        "type": "integer",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "cursor": {
+        "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      }
+    }
+  },
+  "didBlocks.create": {
+    "method": "POST",
+    "path": "/didBlocks",
+    "summary": "Adds a number block: a base and a fixed digit count, or open-ended; groups DIDs and gives unassigned numbers in it a fallback (zamfono.help numbers)",
+    "fields": {
+      "base": {
+        "type": "string",
+        "required": true,
+        "description": "What every number in the block begins with: E.164 such as +4989123470, or national such as 089123470, normalized with settings.country; immutable."
+      },
+      "label": {
+        "type": "string|null",
+        "required": false,
+        "description": null
+      },
+      "digits": {
+        "type": "integer|null",
+        "required": false,
+        "description": "How many digits follow the base, e.g. 2 for +498912347xx; null or left out: any number of digits, none included (open-ended)."
+      },
+      "fallbackTarget": {
+        "type": "object|object|object|object|object|object|object|object|null",
+        "required": false,
+        "description": "Where a call for a number in the block that no DID holds goes; null: the tenant-wide settings.fallbackTarget, else 404. The digits behind the base are never read as an extension."
+      }
+    }
+  },
+  "didBlocks.update": {
+    "method": "PATCH",
+    "path": "/didBlocks/{id}",
+    "summary": "Changes a number block's label, digit count or fallback target; the base is immutable",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "label": {
+        "type": "string|null",
+        "required": false,
+        "description": null
+      },
+      "digits": {
+        "type": "integer|null",
+        "required": false,
+        "description": "How many digits follow the base, e.g. 2 for +498912347xx; null or left out: any number of digits, none included (open-ended)."
+      },
+      "fallbackTarget": {
+        "type": "object|object|object|object|object|object|object|object|null",
+        "required": false,
+        "description": "Where a call for a number in the block that no DID holds goes; null: the tenant-wide settings.fallbackTarget, else 404. The digits behind the base are never read as an extension."
+      }
+    }
+  },
+  "didBlocks.delete": {
+    "method": "DELETE",
+    "path": "/didBlocks/{id}",
+    "summary": "Soft-deletes a number block once no live DID falls within it",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "confirm": {
+        "type": "boolean",
+        "required": false,
+        "description": "`true` once a human has answered the confirmation question; without it the operation is refused with 409 and the question (§10.3 \"Confirmation\")."
+      }
+    }
+  },
+  "ringGroups.list": {
+    "method": "GET",
+    "path": "/ringGroups",
+    "summary": "Lists the tenant's live ring groups.",
+    "fields": {
+      "limit": {
+        "type": "integer",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "cursor": {
+        "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      }
+    }
+  },
+  "ringGroups.create": {
+    "method": "POST",
+    "path": "/ringGroups",
+    "summary": "Creates a ring group and assigns it a tenant extension.",
+    "fields": {
+      "name": {
+        "type": "string",
+        "required": true,
+        "description": null
+      },
+      "strategy": {
+        "type": "string",
+        "enum": ["simultaneous", "sequential", "random"],
+        "required": true,
+        "description": "simultaneous rings every ringable member at once; sequential one at a time in member order; random one at a time in a shuffled order."
+      },
+      "ringTimeoutS": {
+        "type": "integer",
+        "required": false,
+        "description": "Seconds of ringing before the unanswered rule: in total for simultaneous, per member for sequential and random; 20 by default."
+      },
+      "ringTotalS": {
+        "type": "integer|null",
+        "required": false,
+        "description": "Overall cap in seconds for sequential and random; null: no cap."
+      },
+      "skipBusy": {
+        "type": "boolean",
+        "required": false,
+        "description": "Skips members already in a call (on by default); off, they are rung on their other devices as call waiting."
+      },
+      "allowReject": {
+        "type": "boolean",
+        "required": false,
+        "description": "A member's decline stops ringing all their devices, and the fallback fires early once everyone declined (on by default); off, a decline is ignored."
+      },
+      "greetingAudioId": {
+        "type": "string|null",
+        "required": false,
+        "description": "An audio asset played to the caller before ringing."
+      },
+      "mohAudioId": {
+        "type": "string|null",
+        "required": false,
+        "description": "An audio asset played instead of ringback while ringing."
+      },
+      "recordCalls": {
+        "type": "boolean",
+        "required": false,
+        "description": "Records the group's calls regardless of the answerer's own flag (see zamfono.help recording-consent)."
+      },
+      "mailboxEnabled": {
+        "type": "boolean",
+        "required": false,
+        "description": "Gives the group a voicemail box, where the call goes without an unanswered rule; off by default."
+      },
+      "mailboxAudioId": {
+        "type": "string|null",
+        "required": false,
+        "description": "The group mailbox's greeting, an audio asset id."
+      },
+      "mailboxMaxMessages": {
+        "type": "integer|null",
+        "required": false,
+        "description": "Most messages the mailbox holds; a caller reaching a full mailbox hears that it is full and leaves none; 100 by default; null: no limit."
+      },
+      "members": {
+        "type": "array",
+        "required": false,
+        "description": "Users and user groups (nested ones flattened), in ring order; replaces the list as a whole."
+      }
+    }
+  },
+  "ringGroups.get": {
+    "method": "GET",
+    "path": "/ringGroups/{id}",
+    "summary": "Reads one live ring group by id.",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      }
+    }
+  },
+  "ringGroups.update": {
+    "method": "PATCH",
+    "path": "/ringGroups/{id}",
+    "summary": "Updates a ring group's configuration.",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "name": {
+        "type": "string",
+        "required": false,
+        "description": null
+      },
+      "strategy": {
+        "type": "string",
+        "enum": ["simultaneous", "sequential", "random"],
+        "required": false,
+        "description": "simultaneous rings every ringable member at once; sequential one at a time in member order; random one at a time in a shuffled order."
+      },
+      "ringTimeoutS": {
+        "type": "integer",
+        "required": false,
+        "description": "Seconds of ringing before the unanswered rule: in total for simultaneous, per member for sequential and random; 20 by default."
+      },
+      "ringTotalS": {
+        "type": "integer|null",
+        "required": false,
+        "description": "Overall cap in seconds for sequential and random; null: no cap."
+      },
+      "skipBusy": {
+        "type": "boolean",
+        "required": false,
+        "description": "Skips members already in a call (on by default); off, they are rung on their other devices as call waiting."
+      },
+      "allowReject": {
+        "type": "boolean",
+        "required": false,
+        "description": "A member's decline stops ringing all their devices, and the fallback fires early once everyone declined (on by default); off, a decline is ignored."
+      },
+      "greetingAudioId": {
+        "type": "string|null",
+        "required": false,
+        "description": "An audio asset played to the caller before ringing."
+      },
+      "mohAudioId": {
+        "type": "string|null",
+        "required": false,
+        "description": "An audio asset played instead of ringback while ringing."
+      },
+      "recordCalls": {
+        "type": "boolean",
+        "required": false,
+        "description": "Records the group's calls regardless of the answerer's own flag (see zamfono.help recording-consent)."
+      },
+      "mailboxEnabled": {
+        "type": "boolean",
+        "required": false,
+        "description": "Gives the group a voicemail box, where the call goes without an unanswered rule; off by default."
+      },
+      "mailboxAudioId": {
+        "type": "string|null",
+        "required": false,
+        "description": "The group mailbox's greeting, an audio asset id."
+      },
+      "mailboxMaxMessages": {
+        "type": "integer|null",
+        "required": false,
+        "description": "Most messages the mailbox holds; a caller reaching a full mailbox hears that it is full and leaves none; 100 by default; null: no limit."
+      },
+      "members": {
+        "type": "array",
+        "required": false,
+        "description": "Users and user groups (nested ones flattened), in ring order; replaces the list as a whole."
+      },
+      "logLevel": {
+        "type": "string|null",
+        "required": false,
+        "description": "Raises this entity's calls to diagnostics level events, qos or sip, above settings.callLogLevel; null: no override (see zamfono.help diagnose-bad-call)."
+      },
+      "logLevelExpiresAt": {
+        "type": "string|null",
+        "required": false,
+        "description": "When the override ends, ISO 8601 with offset; a logLevel set without one ends 7 days later."
+      }
+    }
+  },
+  "ringGroups.delete": {
+    "method": "DELETE",
+    "path": "/ringGroups/{id}",
+    "summary": "Soft-deletes a ring group.",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "confirm": {
+        "type": "boolean",
+        "required": false,
+        "description": "`true` once a human has answered the confirmation question; without it the operation is refused with 409 and the question (§10.3 \"Confirmation\")."
+      }
+    }
+  },
+  "ringGroups.getForwarding": {
+    "method": "GET",
+    "path": "/ringGroups/{id}/forwarding",
+    "summary": "Reads a ring group's 'unanswered' and 'unavailable' forwarding rules in the shape ringGroups.setForwarding takes.",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      }
+    }
+  },
+  "ringGroups.setForwarding": {
+    "method": "PUT",
+    "path": "/ringGroups/{id}/forwarding",
+    "summary": "Replaces a ring group's 'unanswered' and 'unavailable' forwarding rules as a whole.",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "rules": {
+        "type": "array",
+        "required": true,
+        "description": "The group's rules, one per condition; without an unanswered rule the call goes to the group's mailbox, else is rejected."
+      }
+    }
+  },
+  "userGroups.list": {
+    "method": "GET",
+    "path": "/userGroups",
+    "summary": "Lists the tenant's live user groups.",
+    "fields": {
+      "limit": {
+        "type": "integer",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "cursor": {
+        "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      }
+    }
+  },
+  "userGroups.create": {
+    "method": "POST",
+    "path": "/userGroups",
+    "summary": "Creates a user group, a nestable set of users for ring-group membership and outbound-route caller lists.",
+    "fields": {
+      "name": {
+        "type": "string",
+        "required": true,
+        "description": null
+      },
+      "members": {
+        "type": "array",
+        "required": false,
+        "description": "Users and nested user groups in the group; replaces the list as a whole."
+      }
+    }
+  },
+  "userGroups.get": {
+    "method": "GET",
+    "path": "/userGroups/{id}",
+    "summary": "Reads one live user group by id.",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      }
+    }
+  },
+  "userGroups.update": {
+    "method": "PATCH",
+    "path": "/userGroups/{id}",
+    "summary": "Updates a user group's name and nested membership.",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "name": {
+        "type": "string",
+        "required": false,
+        "description": null
+      },
+      "members": {
+        "type": "array",
+        "required": false,
+        "description": "Users and nested user groups in the group; replaces the list as a whole."
+      }
+    }
+  },
+  "userGroups.delete": {
+    "method": "DELETE",
+    "path": "/userGroups/{id}",
+    "summary": "Soft-deletes a user group.",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "confirm": {
+        "type": "boolean",
+        "required": false,
+        "description": "`true` once a human has answered the confirmation question; without it the operation is refused with 409 and the question (§10.3 \"Confirmation\")."
+      }
+    }
+  },
+  "audio.list": {
+    "method": "GET",
+    "path": "/audio",
+    "summary": "Lists the tenant's live audio assets.",
+    "fields": {
+      "limit": {
+        "type": "integer",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "cursor": {
+        "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      }
+    }
+  },
+  "audio.create": {
+    "method": "POST",
+    "path": "/audio",
+    "summary": "Uploads and transcodes a new audio asset; over MCP, answers with a link to upload the file to.",
+    "fields": {
+      "kind": {
+        "type": "string",
+        "enum": ["greeting", "moh", "vmGreeting", "announcement"],
+        "required": true,
+        "description": "What the asset is for: a ring group's greeting (greeting), hold or ringing music (moh, see zamfono.help music-licensing), a mailbox greeting (vmGreeting), or a menu's or announcement target's audio (announcement)."
+      },
+      "label": {
+        "type": "string",
+        "required": true,
+        "description": null
+      },
+      "upload": {
+        "type": "object",
+        "required": true,
+        "description": "The file, WAV or MP3, sent as multipart form data; it is transcoded for playback."
+      }
+    }
+  },
+  "audio.update": {
+    "method": "PATCH",
+    "path": "/audio/{id}",
+    "summary": "Updates an audio asset's label.",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "label": {
+        "type": "string",
+        "required": true,
+        "description": null
+      }
+    }
+  },
+  "audio.delete": {
+    "method": "DELETE",
+    "path": "/audio/{id}",
+    "summary": "Soft-deletes an audio asset.",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "confirm": {
+        "type": "boolean",
+        "required": false,
+        "description": "`true` once a human has answered the confirmation question; without it the operation is refused with 409 and the question (§10.3 \"Confirmation\")."
+      }
+    }
+  },
+  "voicemails.list": {
+    "method": "GET",
+    "path": "/voicemails",
+    "summary": "Lists voicemails newest first: a user's own mailbox and their ring groups', every mailbox for an admin.",
+    "fields": {
+      "limit": {
+        "type": "integer",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "cursor": {
+        "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      }
+    }
+  },
+  "voicemails.audio": {
+    "method": "GET",
+    "path": "/voicemails/{id}/audio",
+    "summary": "Returns a voicemail's recorded audio; over MCP, a download link that opens for five minutes.",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "format": {
+        "type": "string",
+        "enum": ["opus", "mp3"],
+        "required": false,
+        "in": "query",
+        "description": null
+      }
+    }
+  },
+  "voicemails.markRead": {
+    "method": "PATCH",
+    "path": "/voicemails/{id}",
+    "summary": "Marks a voicemail read or unread.",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "read": {
+        "type": "boolean",
+        "required": true,
+        "description": "true marks it read, false unread again; the message-waiting light counts the unread ones."
+      }
+    }
+  },
+  "voicemails.delete": {
+    "method": "DELETE",
+    "path": "/voicemails/{id}",
+    "summary": "Permanently deletes a voicemail and its audio file.",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "confirm": {
+        "type": "boolean",
+        "required": false,
+        "description": "`true` once a human has answered the confirmation question; without it the operation is refused with 409 and the question (§10.3 \"Confirmation\")."
+      }
+    }
+  },
+  "recordings.list": {
+    "method": "GET",
+    "path": "/recordings",
+    "summary": "Lists call recordings, newest first: one per recorded user and call (see zamfono.help recording-consent).",
+    "fields": {
+      "limit": {
+        "type": "integer",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "cursor": {
+        "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      }
+    }
+  },
+  "recordings.audio": {
+    "method": "GET",
+    "path": "/recordings/{id}/audio",
+    "summary": "Returns a recording's mixed audio; over MCP, a download link that opens for five minutes.",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "format": {
+        "type": "string",
+        "enum": ["opus", "mp3"],
+        "required": false,
+        "in": "query",
+        "description": null
+      }
+    }
+  },
+  "recordings.delete": {
+    "method": "DELETE",
+    "path": "/recordings/{id}",
+    "summary": "Permanently deletes a call recording and its audio file.",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "confirm": {
+        "type": "boolean",
+        "required": false,
+        "description": "`true` once a human has answered the confirmation question; without it the operation is refused with 409 and the question (§10.3 \"Confirmation\")."
+      }
+    }
+  },
+  "calls.list": {
+    "method": "GET",
+    "path": "/calls",
+    "summary": "Lists call history, or the calls currently in progress.",
+    "fields": {
+      "direction": {
+        "type": "string",
+        "enum": ["inbound", "outbound", "internal"],
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "from": {
+        "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "to": {
+        "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "userId": {
+        "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "ringGroupId": {
+        "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "parentCallId": {
+        "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "answered",
+          "missed",
+          "busy",
+          "failed",
+          "voicemail",
+          "blocked",
+          "interrupted"
+        ],
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "live": {
+        "type": "boolean",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "limit": {
+        "type": "integer",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "cursor": {
+        "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      }
+    }
+  },
+  "calls.originate": {
+    "method": "POST",
+    "path": "/calls",
+    "summary": "Click-to-dial: rings a user's devices, then dials the target on answer, as that phone would; a parking slot as target retrieves the call parked there.",
+    "fields": {
+      "target": {
+        "type": "string",
+        "required": true,
+        "description": "What to dial once a device answers, as that device would: an extension or a number, E.164 or national."
+      },
+      "userId": {
+        "type": "string",
+        "required": false,
+        "description": "The user whose devices ring first; left out, the caller themselves (admins only for another user)."
+      },
+      "clir": {
+        "type": "boolean",
+        "required": false,
+        "description": "This call's own CLIR: true withholds the number, false presents it, as #31# and *31# do, over the user's, trunk's and tenant's default; an emergency call always presents it. Left out, the default applies."
+      }
+    }
+  },
+  "calls.get": {
+    "method": "GET",
+    "path": "/calls/{id}",
+    "summary": "Reads one call of the history with its log, QoS summary (per leg jitter, loss, round trip and the packets received and sent) and the ids of its child calls.",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      }
+    }
+  },
+  "calls.transfer": {
+    "method": "POST",
+    "path": "/calls/{id}/transfer",
+    "summary": "Transfers a live call: blind to an extension or number (target), or with voicemail into an extension's mailbox, where the transferee is routed as a new call; or attended to the consultation calls.consult started (toCallId), where the held party and the consulted party talk on without you. legId names the leg that moves, which an admin not in the call must give.",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "target": {
+        "type": "string",
+        "required": false,
+        "description": "Blind transfer: what to dial, as a phone would: an extension, or an external number E.164 or national; with voicemail, the extension whose mailbox takes the call. Give this or toCallId."
+      },
+      "voicemail": {
+        "type": "boolean",
+        "required": false,
+        "description": "Puts the transferee straight through to the mailbox of the user or ring group owning the target extension, without ringing, as *97<ext> does; 422 noMailbox when nobody owns it."
+      },
+      "toCallId": {
+        "type": "string",
+        "required": false,
+        "description": "Attended transfer: the consultation call's id calls.consult returned; the held party joins whoever answered it, and you leave both calls. Give this or target."
+      },
+      "legId": {
+        "type": "string",
+        "required": false,
+        "description": "The leg that moves to the target, the other side released as you are; with toCallId, the held one, by its id in the call's legs as calls.list with live=true lists them; left out, your own other party. Required when you are not in the call yourself."
+      }
+    }
+  },
+  "calls.pickup": {
+    "method": "POST",
+    "path": "/calls/{id}/pickup",
+    "summary": "Picks up a call ringing for another party, on the picking user's devices.",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      }
+    }
+  },
+  "calls.hangup": {
+    "method": "POST",
+    "path": "/calls/{id}/hangup",
+    "summary": "Hangs up a live call, or with legId one leg of it, as that phone hanging up would.",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "legId": {
+        "type": "string",
+        "required": false,
+        "description": "The one leg to hang up, by its id in the call's legs as calls.list with live=true lists them, as its phone hanging up would; left out, the whole call."
+      }
+    }
+  },
+  "calls.park": {
+    "method": "POST",
+    "path": "/calls/{id}/park",
+    "summary": "Parks the other party of a live call on the lowest free parking slot, as *70 does, and returns the slot; anyone retrieves it by dialling the slot (calls.originate with the slot as target).",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "legId": {
+        "type": "string",
+        "required": false,
+        "description": "The leg that is parked; the other side is the parker, whose user the ring-back rings, by its id in the call's legs as calls.list with live=true lists them; left out, your own other party. Required when you are not in the call yourself."
+      }
+    }
+  },
+  "calls.consult": {
+    "method": "POST",
+    "path": "/calls/{id}/consult",
+    "summary": "Starts an attended transfer: puts the other party of a live call on hold with hold music and dials the target from you, returning the consultation call's id (callId) for calls.transfer with toCallId. The hold happens in the PBX, so the phone does not show it.",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "target": {
+        "type": "string",
+        "required": true,
+        "description": "Whom to consult, dialled from you as your phone would: an extension, or an external number E.164 or national."
+      },
+      "legId": {
+        "type": "string",
+        "required": false,
+        "description": "The leg held, the target dialled from its other side, by its id in the call's legs as calls.list with live=true lists them; left out, your own other party. Required when you are not in the call yourself."
+      }
+    }
+  },
+  "calls.addParty": {
+    "method": "POST",
+    "path": "/calls/{id}/parties",
+    "summary": "Three-way call: dials the target from you and, once answered, adds them to a live call so all three talk; returns the added party's own call id (callId). It only rings the target: no forward or mailbox of theirs applies.",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "target": {
+        "type": "string",
+        "required": true,
+        "description": "Whom to add, dialled from you as your phone would: an extension, or an external number E.164 or national."
+      }
+    }
+  },
+  "calls.hold": {
+    "method": "POST",
+    "path": "/calls/{id}/hold",
+    "summary": "Puts the other party of a live call on hold: they hear the hold music, and you and they no longer hear each other; calls.resume ends it. The hold happens in the PBX, so the phone does not show it. Hangup, transfer and park work as usual while held.",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "legId": {
+        "type": "string",
+        "required": false,
+        "description": "The leg held, the other side holding it, by its id in the call's legs as calls.list with live=true lists them; left out, your own other party. Required when you are not in the call yourself."
+      }
+    }
+  },
+  "calls.resume": {
+    "method": "POST",
+    "path": "/calls/{id}/resume",
+    "summary": "Takes a live call off the hold calls.hold or calls.consult put it on: the held party talks with you again, and during a consultation all three talk. The phone does not show it.",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      }
+    }
+  },
+  "calls.decline": {
+    "method": "POST",
+    "path": "/calls/{id}/decline",
+    "summary": "Declines a call ringing for you, as declining it on your phone would: your phones stop ringing, and the call goes on to your no-answer rule, or a ring group rings its other members.",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      }
+    }
+  },
+  "presenceLog.snapshot": {
+    "method": "GET",
+    "path": "/presence/log",
+    "summary": "Snapshots each user's presence state as of a past timestamp.",
+    "fields": {
+      "at": {
+        "type": "string",
+        "required": true,
+        "in": "query",
+        "description": null
+      },
+      "userId": {
+        "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "limit": {
+        "type": "integer",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "cursor": {
+        "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      }
+    }
+  },
+  "stats.query": {
+    "method": "GET",
+    "path": "/stats",
+    "summary": "Buckets a call metric (answerRate, ringToAnswer, avgCallLength, callVolume) over a time range.",
+    "fields": {
+      "metric": {
+        "type": "string",
+        "enum": ["answerRate", "ringToAnswer", "avgCallLength", "callVolume"],
+        "required": true,
+        "in": "query",
+        "description": null
+      },
+      "from": {
+        "type": "string",
+        "required": true,
+        "in": "query",
+        "description": null
+      },
+      "to": {
+        "type": "string",
+        "required": true,
+        "in": "query",
+        "description": null
+      },
+      "bucket": {
+        "type": "string",
+        "enum": ["minute", "hour", "day", "week"],
+        "required": true,
+        "in": "query",
+        "description": null
+      },
+      "ringGroupId": {
+        "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      }
+    }
+  },
+  "contacts.list": {
+    "method": "GET",
+    "path": "/contacts",
+    "summary": "Lists the tenant's live phone-book contacts.",
+    "fields": {
+      "limit": {
+        "type": "integer",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "cursor": {
+        "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      }
+    }
+  },
+  "contacts.create": {
+    "method": "POST",
+    "path": "/contacts",
+    "summary": "Adds a contact to the tenant-wide phone book; its numbers name inbound callers.",
+    "fields": {
+      "displayName": {
+        "type": "string",
+        "required": true,
+        "description": null
+      },
+      "company": {
+        "type": "string|null",
+        "required": false,
+        "description": null
+      },
+      "email": {
+        "type": "string|null",
+        "required": false,
+        "description": null
+      },
+      "phones": {
+        "type": "array",
+        "required": false,
+        "description": "The contact numbers; on update, the set is replaced as a whole."
+      }
+    }
+  },
+  "contacts.get": {
+    "method": "GET",
+    "path": "/contacts/{id}",
+    "summary": "Reads one live contact by id.",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      }
+    }
+  },
+  "contacts.update": {
+    "method": "PATCH",
+    "path": "/contacts/{id}",
+    "summary": "Updates a contact's details; `phones` replaces the number set as a whole.",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "displayName": {
+        "type": "string",
+        "required": false,
+        "description": null
+      },
+      "company": {
+        "type": "string|null",
+        "required": false,
+        "description": null
+      },
+      "email": {
+        "type": "string|null",
+        "required": false,
+        "description": null
+      },
+      "phones": {
+        "type": "array",
+        "required": false,
+        "description": "The contact numbers; on update, the set is replaced as a whole."
+      }
+    }
+  },
+  "contacts.delete": {
+    "method": "DELETE",
+    "path": "/contacts/{id}",
+    "summary": "Soft-deletes a phone-book contact.",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "confirm": {
+        "type": "boolean",
+        "required": false,
+        "description": "`true` once a human has answered the confirmation question; without it the operation is refused with 409 and the question (§10.3 \"Confirmation\")."
+      }
+    }
+  },
+  "blockedNumbers.list": {
+    "method": "GET",
+    "path": "/blockedNumbers",
+    "summary": "Lists the tenant's inbound blocklist",
+    "fields": {
+      "limit": {
+        "type": "integer",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "cursor": {
+        "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      }
+    }
+  },
+  "blockedNumbers.create": {
+    "method": "POST",
+    "path": "/blockedNumbers",
+    "summary": "Adds a number or number prefix to the tenant blocklist; a matching inbound caller is rejected with 603",
+    "fields": {
+      "number": {
+        "type": "string",
+        "required": true,
+        "description": "The caller number to block, E.164 such as +4930123456."
+      },
+      "isPrefix": {
+        "type": "boolean",
+        "required": false,
+        "description": "Whether every caller whose number begins with `number` is blocked, not only that number; off by default."
+      },
+      "label": {
+        "type": "string|null",
+        "required": false,
+        "description": null
+      }
+    }
+  },
+  "blockedNumbers.delete": {
+    "method": "DELETE",
+    "path": "/blockedNumbers/{id}",
+    "summary": "Removes a number from the tenant blocklist",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "confirm": {
+        "type": "boolean",
+        "required": false,
+        "description": "`true` once a human has answered the confirmation question; without it the operation is refused with 409 and the question (§10.3 \"Confirmation\")."
+      }
+    }
+  },
+  "sipBans.list": {
+    "method": "GET",
+    "path": "/sipBans",
+    "summary": "Lists the bans of sources of failed SIP attempts, the active ones unless state says otherwise",
+    "fields": {
+      "limit": {
+        "type": "integer",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "cursor": {
+        "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "state": {
+        "type": "string",
+        "enum": ["active", "ended", "all"],
+        "required": false,
+        "in": "query",
+        "description": null
+      }
+    }
+  },
+  "sipBans.lift": {
+    "method": "DELETE",
+    "path": "/sipBans/{id}",
+    "summary": "Ends an active SIP ban now, a permanent one included; the ban stays listed as ended",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "confirm": {
+        "type": "boolean",
+        "required": false,
+        "description": "`true` once a human has answered the confirmation question; without it the operation is refused with 409 and the question (§10.3 \"Confirmation\")."
+      }
+    }
+  },
+  "sipAllowlist.list": {
+    "method": "GET",
+    "path": "/sipAllowlist",
+    "summary": "Lists the source addresses and ranges never banned for failed SIP attempts",
+    "fields": {
+      "limit": {
+        "type": "integer",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "cursor": {
+        "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      }
+    }
+  },
+  "sipAllowlist.create": {
+    "method": "POST",
+    "path": "/sipAllowlist",
+    "summary": "Exempts a source address or range from SIP bans, ending every active ban it covers",
+    "fields": {
+      "address": {
+        "type": "string",
+        "required": true,
+        "description": "The source to exempt: an IP address or a CIDR range, IPv4 or IPv6, such as 198.51.100.0/24."
+      },
+      "label": {
+        "type": "string|null",
+        "required": false,
+        "description": null
+      }
+    }
+  },
+  "sipAllowlist.delete": {
+    "method": "DELETE",
+    "path": "/sipAllowlist/{id}",
+    "summary": "Removes a source from the SIP ban allowlist",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "confirm": {
+        "type": "boolean",
+        "required": false,
+        "description": "`true` once a human has answered the confirmation question; without it the operation is refused with 409 and the question (§10.3 \"Confirmation\")."
+      }
+    }
+  },
+  "parking.get": {
+    "method": "GET",
+    "path": "/parking/slots",
+    "summary": "Reads the set of parking-slot extensions",
+    "fields": {}
+  },
+  "parking.set": {
+    "method": "PUT",
+    "path": "/parking/slots",
+    "summary": "Replaces the set of parking-slot extensions as a whole; an extension a user or ring group owns, or an emergency number, is refused",
+    "fields": {
+      "slots": {
+        "type": "array",
+        "required": true,
+        "description": "Every parking-slot extension, of the tenant's extension length; *70 parks a call on the lowest free slot, dialling a slot retrieves it, and settings.parkingTimeoutS rings the parker back."
+      }
+    }
+  },
+  "parking.list": {
+    "method": "GET",
+    "path": "/parking/calls",
+    "summary": "Lists the calls parked right now: slot, call, caller (null when withheld), parked since and by whom.",
+    "fields": {
+      "limit": {
+        "type": "integer",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "cursor": {
+        "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      }
+    }
+  },
+  "menus.list": {
+    "method": "GET",
+    "path": "/menus",
+    "summary": "Lists the tenant's live menus.",
+    "fields": {
+      "limit": {
+        "type": "integer",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "cursor": {
+        "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      }
+    }
+  },
+  "menus.create": {
+    "method": "POST",
+    "path": "/menus",
+    "summary": "Creates an auto-attendant menu: a greeting, a DTMF-to-target map (menus.setTargets) and a fallback.",
+    "fields": {
+      "name": {
+        "type": "string",
+        "required": true,
+        "description": null
+      },
+      "audioId": {
+        "type": "string",
+        "required": true,
+        "description": "The greeting, an audio asset of kind announcement."
+      },
+      "timeoutS": {
+        "type": "integer",
+        "required": false,
+        "description": "Seconds to wait for the first key after the greeting; 5 by default."
+      },
+      "maxAttempts": {
+        "type": "integer",
+        "required": false,
+        "description": "Greeting replays on silence or an unmapped string before fallbackTarget applies; 3 by default."
+      },
+      "allowExtensionDialing": {
+        "type": "boolean",
+        "required": false,
+        "description": "Lets an unmapped string that is a live user or ring-group extension route to it; off by default."
+      },
+      "fallbackTarget": {
+        "type": "object|object|object|object|object|object|object|object",
+        "required": true,
+        "description": "Where the call goes after the last attempt."
+      }
+    }
+  },
+  "menus.get": {
+    "method": "GET",
+    "path": "/menus/{id}",
+    "summary": "Reads one live menu by id.",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      }
+    }
+  },
+  "menus.update": {
+    "method": "PATCH",
+    "path": "/menus/{id}",
+    "summary": "Updates a menu's configuration.",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "name": {
+        "type": "string",
+        "required": false,
+        "description": null
+      },
+      "audioId": {
+        "type": "string",
+        "required": false,
+        "description": "The greeting, an audio asset of kind announcement."
+      },
+      "timeoutS": {
+        "type": "integer",
+        "required": false,
+        "description": "Seconds to wait for the first key after the greeting; 5 by default."
+      },
+      "maxAttempts": {
+        "type": "integer",
+        "required": false,
+        "description": "Greeting replays on silence or an unmapped string before fallbackTarget applies; 3 by default."
+      },
+      "allowExtensionDialing": {
+        "type": "boolean",
+        "required": false,
+        "description": "Lets an unmapped string that is a live user or ring-group extension route to it; off by default."
+      },
+      "fallbackTarget": {
+        "type": "object|object|object|object|object|object|object|object",
+        "required": false,
+        "description": "Where the call goes after the last attempt."
+      }
+    }
+  },
+  "menus.delete": {
+    "method": "DELETE",
+    "path": "/menus/{id}",
+    "summary": "Soft-deletes a menu.",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "confirm": {
+        "type": "boolean",
+        "required": false,
+        "description": "`true` once a human has answered the confirmation question; without it the operation is refused with 409 and the question (§10.3 \"Confirmation\")."
+      }
+    }
+  },
+  "menus.getTargets": {
+    "method": "GET",
+    "path": "/menus/{id}/targets",
+    "summary": "Reads a menu's DTMF-to-target map.",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      }
+    }
+  },
+  "menus.setTargets": {
+    "method": "PUT",
+    "path": "/menus/{id}/targets",
+    "summary": "Replaces a menu's DTMF-to-target map as a whole.",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "targets": {
+        "type": "array",
+        "required": true,
+        "description": "Each key string and the forward target it routes to; a matched target re-enters routing without counting a hop."
+      }
+    }
+  },
+  "ooo.list": {
+    "method": "GET",
+    "path": "/tenant/ooo",
+    "summary": "Lists a scope's out-of-office rules",
+    "fields": {
+      "limit": {
+        "type": "integer",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "cursor": {
+        "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      }
+    }
+  },
+  "ooo.create": {
+    "method": "POST",
+    "path": "/tenant/ooo",
+    "summary": "Adds an out-of-office rule to a scope: while in effect, its calls go to the rule's target, ahead of opening hours",
+    "fields": {
+      "active": {
+        "type": "boolean",
+        "required": false,
+        "description": "Whether the rule applies at all; on by default."
+      },
+      "startsAt": {
+        "type": "string|null",
+        "required": false,
+        "description": "When the rule takes effect, ISO 8601 with an offset; null: immediately."
+      },
+      "expiresAt": {
+        "type": "string|null",
+        "required": false,
+        "description": "When the rule ends, after startsAt; null: until deactivated. Active periods within a scope must not overlap."
+      },
+      "target": {
+        "type": "object|object|object|object|object|object|object|object",
+        "required": true,
+        "description": "Where the scope's calls go while the rule is in effect, ahead of opening hours (see zamfono.help vacation-rule)."
+      }
+    }
+  },
+  "ooo.update": {
+    "method": "PATCH",
+    "path": "/ooo/{id}",
+    "summary": "Changes an out-of-office rule's activity, start, expiry or target",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "active": {
+        "type": "boolean",
+        "required": false,
+        "description": "Whether the rule applies at all; on by default."
+      },
+      "startsAt": {
+        "type": "string|null",
+        "required": false,
+        "description": "When the rule takes effect, ISO 8601 with an offset; null: immediately."
+      },
+      "expiresAt": {
+        "type": "string|null",
+        "required": false,
+        "description": "When the rule ends, after startsAt; null: until deactivated. Active periods within a scope must not overlap."
+      },
+      "target": {
+        "type": "object|object|object|object|object|object|object|object",
+        "required": false,
+        "description": "Where the scope's calls go while the rule is in effect, ahead of opening hours (see zamfono.help vacation-rule)."
+      }
+    }
+  },
+  "ooo.delete": {
+    "method": "DELETE",
+    "path": "/ooo/{id}",
+    "summary": "Removes an out-of-office rule",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "confirm": {
+        "type": "boolean",
+        "required": false,
+        "description": "`true` once a human has answered the confirmation question; without it the operation is refused with 409 and the question (§10.3 \"Confirmation\")."
+      }
+    }
+  },
+  "hours.get": {
+    "method": "GET",
+    "path": "/tenant/hours",
+    "summary": "Reads a scope's opening-hours schedule",
+    "fields": {}
+  },
+  "hours.set": {
+    "method": "PUT",
+    "path": "/tenant/hours",
+    "summary": "Replaces a scope's weekly opening-hours schedule and the target its calls go to while closed",
+    "fields": {
+      "active": {
+        "type": "boolean",
+        "required": false,
+        "description": "Whether the schedule applies (on by default); off, it is kept and the scope follows the tenant's."
+      },
+      "closedTarget": {
+        "type": "object|object|object|object|object|object|object|object",
+        "required": true,
+        "description": "Where inbound and forwarded calls go outside every open interval; internal calls ignore opening hours."
+      },
+      "intervals": {
+        "type": "array",
+        "required": true,
+        "description": "The weekly open intervals; none may cross midnight, so split one that does in two."
+      }
+    }
+  },
+  "hours.delete": {
+    "method": "DELETE",
+    "path": "/tenant/hours",
+    "summary": "Removes a scope's opening-hours schedule",
+    "fields": {
+      "confirm": {
+        "type": "boolean",
+        "required": false,
+        "description": "`true` once a human has answered the confirmation question; without it the operation is refused with 409 and the question (§10.3 \"Confirmation\")."
+      }
+    }
+  },
+  "webhooks.list": {
+    "method": "GET",
+    "path": "/webhooks",
+    "summary": "Lists the tenant's webhooks with their delivery status, ok or failing",
+    "fields": {
+      "limit": {
+        "type": "integer",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "cursor": {
+        "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      }
+    }
+  },
+  "webhooks.create": {
+    "method": "POST",
+    "path": "/webhooks",
+    "summary": "Adds a webhook, an endpoint every event (or the filtered types) is POSTed to; created inactive until switched on with webhooks.update",
+    "fields": {
+      "url": {
+        "type": "string",
+        "required": true,
+        "description": "The http(s) endpoint every event is POSTed to as JSON."
+      },
+      "secret": {
+        "type": "string",
+        "required": true,
+        "description": "Shared secret: each POST carries X-Zamfono-Signature, the HMAC-SHA256 of the body under it; write-only, read as secretSet; required, so null is refused."
+      },
+      "eventTypes": {
+        "type": "array|null",
+        "required": false,
+        "description": "The event types to deliver, such as [\"call.state\", \"voicemail.new\"]; null delivers every event."
+      }
+    }
+  },
+  "webhooks.update": {
+    "method": "PATCH",
+    "path": "/webhooks/{id}",
+    "summary": "Changes a webhook's URL, secret or event-type filter, or switches it on or off",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "url": {
+        "type": "string",
+        "required": false,
+        "description": "The http(s) endpoint every event is POSTed to as JSON."
+      },
+      "secret": {
+        "type": "string",
+        "required": false,
+        "description": "Shared secret: each POST carries X-Zamfono-Signature, the HMAC-SHA256 of the body under it; write-only, read as secretSet; required, so null is refused."
+      },
+      "eventTypes": {
+        "type": "array|null",
+        "required": false,
+        "description": "The event types to deliver, such as [\"call.state\", \"voicemail.new\"]; null delivers every event."
+      },
+      "active": {
+        "type": "boolean",
+        "required": false,
+        "description": "Whether events are delivered; off on creation, switched on once the receiver is ready."
+      }
+    }
+  },
+  "webhooks.delete": {
+    "method": "DELETE",
+    "path": "/webhooks/{id}",
+    "summary": "Soft-deletes a webhook; its events are no longer delivered",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "confirm": {
+        "type": "boolean",
+        "required": false,
+        "description": "`true` once a human has answered the confirmation question; without it the operation is refused with 409 and the question (§10.3 \"Confirmation\")."
+      }
+    }
+  },
+  "mailTemplates.list": {
+    "method": "GET",
+    "path": "/mailTemplates",
+    "summary": "Lists the effective mail templates in the tenant language",
+    "fields": {
+      "limit": {
+        "type": "integer",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "cursor": {
+        "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      }
+    }
+  },
+  "mailTemplates.get": {
+    "method": "GET",
+    "path": "/mailTemplates/{kind}/{language}",
+    "summary": "Reads the effective mail template of a kind and language: the tenant override, else the shipped one",
+    "fields": {
+      "kind": {
+        "type": "string",
+        "enum": [
+          "voicemail",
+          "missedCall",
+          "setup",
+          "reset",
+          "updateFailed",
+          "breakingUpdate",
+          "mfaChanged"
+        ],
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "language": {
+        "type": "string",
+        "enum": ["de", "en", "es", "fr", "it", "ru"],
+        "required": true,
+        "in": "path",
+        "description": null
+      }
+    }
+  },
+  "mailTemplates.put": {
+    "method": "PUT",
+    "path": "/mailTemplates/{kind}/{language}",
+    "summary": "Overrides the shipped mail template of a kind and language, checked against the kind's placeholders",
+    "fields": {
+      "kind": {
+        "type": "string",
+        "enum": [
+          "voicemail",
+          "missedCall",
+          "setup",
+          "reset",
+          "updateFailed",
+          "breakingUpdate",
+          "mfaChanged"
+        ],
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "language": {
+        "type": "string",
+        "enum": ["de", "en", "es", "fr", "it", "ru"],
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "subject": {
+        "type": "string",
+        "required": true,
+        "description": "The subject line, a Handlebars template like the bodies."
+      },
+      "bodyText": {
+        "type": "string",
+        "required": true,
+        "description": "The plain-text body: Handlebars {{placeholder}}, if/unless/each/with and {{date value}}. The placeholders per kind, which the subject and the bodies share, a required one used in at least one of them: voicemail: companyName, recipientName, fqdn, callerNumber, callerName, mailboxName, receivedAt, durationS; missedCall: companyName, recipientName, fqdn, callerNumber, callerName, receivedAt, didLabel; setup: companyName, recipientName, fqdn, link, linkExpiresAt, invitedBy (required: link); reset: companyName, recipientName, fqdn, link, linkExpiresAt (required: link); updateFailed: companyName, recipientName, fqdn, fromVersion, toVersion, reason, failedAt; breakingUpdate: companyName, recipientName, fqdn, currentVersion, version, releaseUrl, publishedAt; mfaChanged: companyName, recipientName, fqdn, added, removed, reset, passkeyName, changedAt."
+      },
+      "bodyHtml": {
+        "type": "string|null",
+        "required": false,
+        "description": "An optional HTML body with the same placeholders, their values HTML-escaped; null sends text only."
+      }
+    }
+  },
+  "mailTemplates.delete": {
+    "method": "DELETE",
+    "path": "/mailTemplates/{kind}/{language}",
+    "summary": "Removes a tenant's mail template override, so the shipped template applies again",
+    "fields": {
+      "kind": {
+        "type": "string",
+        "enum": [
+          "voicemail",
+          "missedCall",
+          "setup",
+          "reset",
+          "updateFailed",
+          "breakingUpdate",
+          "mfaChanged"
+        ],
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "language": {
+        "type": "string",
+        "enum": ["de", "en", "es", "fr", "it", "ru"],
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "confirm": {
+        "type": "boolean",
+        "required": false,
+        "description": "`true` once a human has answered the confirmation question; without it the operation is refused with 409 and the question (§10.3 \"Confirmation\")."
+      }
+    }
+  },
+  "mailTemplates.test": {
+    "method": "POST",
+    "path": "/mailTemplates/{kind}/test",
+    "summary": "Sends a mail template to the caller with sample values",
+    "fields": {
+      "kind": {
+        "type": "string",
+        "enum": [
+          "voicemail",
+          "missedCall",
+          "setup",
+          "reset",
+          "updateFailed",
+          "breakingUpdate",
+          "mfaChanged"
+        ],
+        "required": true,
+        "in": "path",
+        "description": null
+      }
+    }
+  },
+  "backups.targets.list": {
+    "method": "GET",
+    "path": "/backups/targets",
+    "summary": "Lists the tenant's backup targets",
+    "fields": {
+      "limit": {
+        "type": "integer",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "cursor": {
+        "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      }
+    }
+  },
+  "backups.targets.create": {
+    "method": "POST",
+    "path": "/backups/targets",
+    "summary": "Adds a backup target, a restic repository every scheduled run (settings.backupCron) backs up to while enabled",
+    "fields": {
+      "kind": {
+        "type": "string",
+        "enum": ["local", "ftp", "ftps", "sftp", "s3", "webdav"],
+        "required": true,
+        "description": "The restic backend: local (a host path or volume), ftp, ftps, sftp, s3 or webdav."
+      },
+      "params": {
+        "type": "object",
+        "required": true,
+        "description": "The repository location per kind: local { path }, s3 { endpoint, bucket, path? }, sftp { host, path }, ftp and ftps { host, path? }, webdav { url, path? }; optional forget { keepDaily, keepWeekly, keepMonthly }, default 7/4/6."
+      },
+      "secret": {
+        "type": "object",
+        "required": true,
+        "description": "The restic repository password and the kind's backend credentials: { resticPassword } for local, { resticPassword, username, password } for sftp, ftp, ftps and webdav, { resticPassword, accessKeyId, secretAccessKey } for s3; write-only, read as secretSet; required, so null is refused."
+      },
+      "enabled": {
+        "type": "boolean",
+        "required": false,
+        "description": "Whether scheduled runs back up to this target; on for a new one."
+      }
+    }
+  },
+  "backups.targets.update": {
+    "method": "PATCH",
+    "path": "/backups/targets/{id}",
+    "summary": "Changes a backup target's kind, location, secret or enabled flag",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "kind": {
+        "type": "string",
+        "enum": ["local", "ftp", "ftps", "sftp", "s3", "webdav"],
+        "required": false,
+        "description": "The restic backend: local (a host path or volume), ftp, ftps, sftp, s3 or webdav."
+      },
+      "params": {
+        "type": "object",
+        "required": false,
+        "description": "The repository location per kind: local { path }, s3 { endpoint, bucket, path? }, sftp { host, path }, ftp and ftps { host, path? }, webdav { url, path? }; optional forget { keepDaily, keepWeekly, keepMonthly }, default 7/4/6."
+      },
+      "secret": {
+        "type": "object",
+        "required": false,
+        "description": "The restic repository password and the kind's backend credentials: { resticPassword } for local, { resticPassword, username, password } for sftp, ftp, ftps and webdav, { resticPassword, accessKeyId, secretAccessKey } for s3; write-only, read as secretSet; required, so null is refused."
+      },
+      "enabled": {
+        "type": "boolean",
+        "required": false,
+        "description": "Whether scheduled runs back up to this target; on for a new one."
+      }
+    }
+  },
+  "backups.targets.delete": {
+    "method": "DELETE",
+    "path": "/backups/targets/{id}",
+    "summary": "Soft-deletes a backup target; no further run backs up to it",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      },
+      "confirm": {
+        "type": "boolean",
+        "required": false,
+        "description": "`true` once a human has answered the confirmation question; without it the operation is refused with 409 and the question (§10.3 \"Confirmation\")."
+      }
+    }
+  },
+  "backups.runs.list": {
+    "method": "GET",
+    "path": "/backups/runs",
+    "summary": "Lists backup runs, newest first",
+    "fields": {
+      "targetId": {
+        "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "limit": {
+        "type": "integer",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "cursor": {
+        "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      }
+    }
+  },
+  "backups.runs.start": {
+    "method": "POST",
+    "path": "/backups/runs",
+    "summary": "Starts a backup run to one target now, outside the schedule",
+    "fields": {
+      "targetId": {
+        "type": "string",
+        "required": true,
+        "description": "The backup target to run, from backups.targets.list."
+      }
+    }
+  },
+  "backups.runs.get": {
+    "method": "GET",
+    "path": "/backups/runs/{id}",
+    "summary": "Reads one backup run's status, snapshot id and sizes",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      }
+    }
+  },
+  "settings.get": {
+    "method": "GET",
+    "path": "/settings",
+    "summary": "Reads the tenant settings row, each secret only as whether it is set",
+    "fields": {}
+  },
+  "settings.update": {
+    "method": "PATCH",
+    "path": "/settings",
+    "summary": "Updates tenant-wide settings: main number, fallback, country, language, mail relay, feature codes, retention, SSO and more; owner-only fields say so",
+    "fields": {
+      "companyName": {
+        "type": "string",
+        "required": false,
+        "description": null
+      },
+      "mainDidId": {
+        "type": "string",
+        "required": false,
+        "description": "The company main number, a live numeric DID, presented when neither route nor caller sets one; see zamfono.help numbers."
+      },
+      "country": {
+        "type": "string",
+        "required": false,
+        "description": "ISO 3166-1 alpha-2 code, such as DE; its calling code turns a national number into the international form."
+      },
+      "timezone": {
+        "type": "string|null",
+        "required": false,
+        "description": "IANA time zone, such as Europe/Berlin, for every hour-based feature; null: the stack's TZ, else UTC."
+      },
+      "language": {
+        "type": "string",
+        "enum": ["de", "en", "es", "fr", "it", "ru"],
+        "required": false,
+        "description": "The language of the prompts callers hear, the mails and the sign-in pages."
+      },
+      "smtpHost": {
+        "type": "string|null",
+        "required": false,
+        "description": "The mail relay host; null: no mail is sent. Owner-only."
+      },
+      "smtpPort": {
+        "type": "integer",
+        "required": false,
+        "description": "The mail relay port, 465 by default. Owner-only."
+      },
+      "smtpSecurity": {
+        "type": "string",
+        "enum": ["tls", "starttls"],
+        "required": false,
+        "description": "tls (default) for implicit TLS, starttls to upgrade a plain connection. Owner-only."
+      },
+      "smtpUser": {
+        "type": "string|null",
+        "required": false,
+        "description": "The mail relay user. Owner-only."
+      },
+      "smtpPassword": {
+        "type": "string|null",
+        "required": false,
+        "description": "The mail relay password; write-only, read as smtpPasswordSet; null clears it. Owner-only."
+      },
+      "mailFrom": {
+        "type": "string|null",
+        "required": false,
+        "description": "Sender address of every mail; the relay must be allowed to send for its domain; null: no mail. Owner-only."
+      },
+      "smtpCheckIntervalS": {
+        "type": "integer|null",
+        "required": false,
+        "description": "Seconds between background checks of the mail relay, 60 to 86400, 900 by default; null: none besides those at start and after a relay change. Owner-only."
+      },
+      "emergencyNumbers": {
+        "type": "array",
+        "required": false,
+        "description": "Digit strings always dialled out as emergency calls and never valid as extensions (see zamfono.help emergency-calls). Owner-only."
+      },
+      "featureCodes": {
+        "type": "object",
+        "required": false,
+        "description": "Dialled prefixes for the ten keys pickup, dndOn, dndOff, mailbox, ownVoicemail, deposit, addParty, clirOn, clirOff and park, all sent together; each starts with * or # and none is a prefix of another."
+      },
+      "fallbackTarget": {
+        "type": "object|object|object|object|object|object|object|object|null",
+        "required": false,
+        "description": "The tenant-wide fallback for a number in a block that no DID holds and for a number outside every DID and block; null: such calls are released with 404 (see zamfono.help numbers)."
+      },
+      "codecs": {
+        "type": "array",
+        "required": false,
+        "description": "The ordered codec offer to devices and to trunks without their own list."
+      },
+      "clir": {
+        "type": "boolean",
+        "required": false,
+        "description": "Tenant default for withholding the caller number on outbound calls; a trunk, a user and a #31#/*31# prefix override it."
+      },
+      "rejectAnonymous": {
+        "type": "boolean",
+        "required": false,
+        "description": "Tenant default for refusing callers who withhold their number; a user overrides it."
+      },
+      "holdMohAudioId": {
+        "type": "string|null",
+        "required": false,
+        "description": "A moh audio asset played to parties on hold; null: the built-in default music (see zamfono.help music-licensing)."
+      },
+      "voicemailMaxS": {
+        "type": "integer",
+        "required": false,
+        "description": "Maximum length of one voicemail in seconds, 180 by default."
+      },
+      "parkingTimeoutS": {
+        "type": "integer",
+        "required": false,
+        "description": "Seconds a parked call waits before ringing the parker back, 300 by default."
+      },
+      "callLogLevel": {
+        "type": "string",
+        "enum": ["none", "events", "qos", "sip"],
+        "required": false,
+        "description": "Tenant default per-call diagnostics level, each adding to the previous: none, events (routing trace, the default), qos, sip (needs HEP_ENABLED); see zamfono.help diagnose-bad-call."
+      },
+      "recordingRetentionDays": {
+        "type": "integer|null",
+        "required": false,
+        "description": "Days recordings, call logs, QoS, presence log and backup runs are kept, at most 36500, 90 by default; null: forever."
+      },
+      "softDeleteRetentionDays": {
+        "type": "integer|null",
+        "required": false,
+        "description": "Days a soft-deleted row survives before the hard purge, which bounds undoing a deletion; at most 36500, 30 by default; null: forever."
+      },
+      "auditRetentionDays": {
+        "type": "integer|null",
+        "required": false,
+        "description": "Days audit entries are kept, at least 30 and at most 36500; null: forever. Owner-only."
+      },
+      "sipBanFailures": {
+        "type": "integer",
+        "required": false,
+        "description": "Failed SIP attempts from one source address within sipBanWindowS that ban it, 10 by default."
+      },
+      "sipBanWindowS": {
+        "type": "integer",
+        "required": false,
+        "description": "Seconds over which an address's failed SIP attempts are counted, 3600 by default."
+      },
+      "sipBanSuccessExemptS": {
+        "type": "integer",
+        "required": false,
+        "description": "Seconds after a successful SIP authentication during which its address is never banned, 86400 by default; 0: no exemption."
+      },
+      "sipBanLookbackS": {
+        "type": "integer",
+        "required": false,
+        "description": "Seconds after a ban ended within which the address's next ban takes the next step, and after which the ended ban is deleted; 2592000 (30 days) by default."
+      },
+      "sipBanSteps": {
+        "type": "array",
+        "required": false,
+        "description": "Ban lengths in seconds for an address's first, second, … consecutive ban, each 60 to 3153600000 and longer than the one before, null (permanent) only as the last; [] switches banning off; [86400,31536000,null] by default. Applies to new bans only."
+      },
+      "backupCron": {
+        "type": "string",
+        "required": false,
+        "description": "Cron expression of the backup job, 0 3 * * * by default."
+      },
+      "tlsReloadHour": {
+        "type": "integer|null",
+        "required": false,
+        "description": "Hour 0-23 for swapping in a renewed certificate when no opening-hours schedule offers a closed period."
+      },
+      "autoUpdate": {
+        "type": "boolean",
+        "required": false,
+        "description": "Install newer non-breaking releases automatically, after a backup, at a maintenance moment when no call is in progress; off by default. Owner-only."
+      },
+      "mfaRequiredForAll": {
+        "type": "boolean",
+        "required": false,
+        "description": "Every user needs a second factor at password sign-in, not only owners and admins; off by default. Owner-only."
+      },
+      "ssoProvider": {
+        "type": "string|null",
+        "required": false,
+        "description": "Single sign-on provider: microsoft, google or a generic oidc; null: local passwords only. Owner-only."
+      },
+      "ssoLabel": {
+        "type": "string|null",
+        "required": false,
+        "description": "Sign-in button text, required for oidc. Owner-only."
+      },
+      "ssoIssuer": {
+        "type": "string|null",
+        "required": false,
+        "description": "The OIDC issuer URL, required for oidc and preset for microsoft and google. Owner-only."
+      },
+      "ssoClientId": {
+        "type": "string|null",
+        "required": false,
+        "description": "The OIDC client id, required whenever a provider is set. Owner-only."
+      },
+      "ssoTenantId": {
+        "type": "string|null",
+        "required": false,
+        "description": "The customer's Entra tenant id, required for microsoft, so no other tenant's tokens are accepted. Owner-only."
+      },
+      "ssoAllowedDomain": {
+        "type": "string|null",
+        "required": false,
+        "description": "Only accounts of this mail domain may sign in. Owner-only."
+      },
+      "ssoClientSecret": {
+        "type": "string|null",
+        "required": false,
+        "description": "The OIDC client secret; write-only, read as ssoClientSecretSet; null clears it. Owner-only."
+      },
+      "ringotelMaxRegs": {
+        "type": "integer",
+        "required": false,
+        "description": "Registrations per Ringotel user, 3 by default; Ringotel setup sets the package value. Owner-only."
+      },
+      "ringotelApiToken": {
+        "type": "string|null",
+        "required": false,
+        "description": "The Ringotel Admin API bearer token; write-only, read as ringotelApiTokenSet; null clears it. Owner-only."
+      }
+    }
+  },
+  "system.info": {
+    "method": "GET",
+    "path": "/system/info",
+    "summary": "Reads the version, commit and start time of api and core separately, when Asterisk started, the latest release and last update with who asked for it, whether automatic updates are on and why and how often the last one failed, when and why the maintenance gate last gave up, whether a tenant profile or roster change still waits for Ringotel, how the last check or send of the mail relay went, which rows the latest config render left out, and the domain of the stack and the public IPv4 address its SIP and media use.",
+    "fields": {}
+  },
+  "system.checkUpdate": {
+    "method": "POST",
+    "path": "/system/updateCheck",
+    "summary": "Has the updater ask GitHub for the latest release now, at most once a minute (else it answers from its cache), and reads the update block system.info carries; a spent GitHub rate limit answers 503 with retryAfterS.",
+    "fields": {}
+  },
+  "system.update": {
+    "method": "POST",
+    "path": "/system/update",
+    "summary": "Updates the stack to the latest release, or to version, if newer and non-breaking; needs a backup run finished ok within the last hour. system.info reports the progress.",
+    "fields": {
+      "version": {
+        "type": "string",
+        "required": false,
+        "description": "The release to update to, such as 0.2.0; left out, the latest (see zamfono.help update-stack)."
+      },
+      "confirm": {
+        "type": "boolean",
+        "required": false,
+        "description": "`true` once a human has answered the confirmation question; without it the operation is refused with 409 and the question (§10.3 \"Confirmation\")."
+      }
+    }
+  },
+  "search.query": {
+    "method": "GET",
+    "path": "/search",
+    "summary": "The type-ahead behind the search bar: users, ring groups and contacts.",
+    "fields": {
+      "q": {
+        "type": "string",
+        "required": true,
+        "in": "query",
+        "description": null
+      },
+      "limit": {
+        "type": "integer",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "cursor": {
+        "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      }
+    }
+  },
+  "audit.list": {
+    "method": "GET",
+    "path": "/audit",
+    "summary": "Lists audit_log entries, filterable by entity, actor, channel, client, operation, time range and state.",
+    "fields": {
+      "entityKind": {
+        "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "entityId": {
+        "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "actorUserId": {
+        "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "channel": {
+        "type": "string",
+        "enum": ["rest", "mcp", "ui", "undo", "job"],
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "clientId": {
+        "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "operation": {
+        "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "from": {
+        "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "to": {
+        "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "state": {
+        "type": "string",
+        "enum": ["live", "undone", "all"],
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "limit": {
+        "type": "integer",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "cursor": {
+        "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      }
+    }
+  },
+  "audit.undo": {
+    "method": "POST",
+    "path": "/audit/{id}/undo",
+    "summary": "Reverts one audit entry by replaying its recorded 'from' values; refused with 409 while a later live change to the same entity exists (zamfono.help undo).",
+    "fields": {
+      "id": {
+        "type": "string",
+        "required": true,
+        "in": "path",
+        "description": null
+      }
+    }
+  }
+}
