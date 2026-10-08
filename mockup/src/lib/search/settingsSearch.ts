@@ -11,7 +11,7 @@
 import type { Role } from '#lib/api/types.js';
 import { allEntityFields, fieldAccess } from '#lib/fields/registry.js';
 import { has, t } from '#lib/i18n/index.svelte.js';
-import { PAGES, visiblePages, type PageDef } from '#lib/nav.js';
+import { pageAt, PAGES, visiblePages, type PageDef } from '#lib/nav.js';
 import { match } from '#lib/state/router.svelte.js';
 
 import { placeOf, SELF_ENTITIES, type Place } from './places';
@@ -61,12 +61,6 @@ function rank(text: string, needle: string): number | null {
 /** `text` matches `needle` anywhere (a help text, a record kind). */
 const mentions = (text: string, needle: string): boolean =>
   rank(text, needle) !== null;
-
-/** The page whose patterns match `path`. */
-export const pageAt = (path: string): PageDef | undefined =>
-  PAGES.find(candidate =>
-    candidate.patterns.some(pattern => match(pattern, path) !== null)
-  );
 
 /** Pages whose name matches `query`, best first. */
 export function searchPages(

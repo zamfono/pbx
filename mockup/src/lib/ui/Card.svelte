@@ -84,9 +84,14 @@
     color: var(--primary);
     flex: none;
   }
+  /* As tall as the icon at least, so a title alone is centred on it. */
   .titles {
     flex: 1;
     min-width: 0;
+    min-height: 34px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
   }
   .desc {
     color: var(--text-muted);
@@ -98,6 +103,7 @@
     gap: var(--space-2);
     align-items: center;
     flex-wrap: wrap;
+    min-height: 34px;
   }
   .primary {
     background: var(--primary);

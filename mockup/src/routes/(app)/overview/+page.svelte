@@ -250,10 +250,12 @@
       <h2 class="dial-title"><Phone size={18} /> {t('calls.dial.title')}</h2>
       <DialBox id="overview-dial" compact clirOption={false} />
     </div>
-    <svg class="deco" viewBox="0 0 200 200" aria-hidden="true">
-      <circle cx="150" cy="40" r="70" />
-      <circle cx="190" cy="160" r="34" />
-    </svg>
+    <div class="deco-clip" aria-hidden="true">
+      <svg class="deco" viewBox="0 0 200 200">
+        <circle cx="150" cy="40" r="70" />
+        <circle cx="190" cy="160" r="34" />
+      </svg>
+    </div>
   </section>
 
   <div class="tiles">
@@ -555,9 +557,9 @@
   .overview {
     container: overview / inline-size;
   }
+  /* Unclipped, so the dial box's suggestions can reach past it; the decoration clips itself. */
   .hero {
     position: relative;
-    overflow: hidden;
     display: grid;
     grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
     gap: var(--space-5);
@@ -568,6 +570,13 @@
     color: var(--on-primary);
     box-shadow: var(--shadow-primary);
     margin-bottom: var(--space-5);
+  }
+  .deco-clip {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    border-radius: inherit;
+    pointer-events: none;
   }
   .deco {
     position: absolute;

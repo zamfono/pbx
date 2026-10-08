@@ -36,6 +36,7 @@ import Workflow from '@lucide/svelte/icons/workflow';
 import type { Component } from 'svelte';
 
 import type { Role } from '#lib/api/types.js';
+import { match } from '#lib/state/router.svelte.js';
 
 export type NavSection =
   'phone' | 'telephony' | 'organisation' | 'routing' | 'system';
@@ -308,3 +309,9 @@ export function visiblePages(role: Role, expert: boolean): PageDef[] {
       RANK[role] <= RANK[page.minRole] && (expert || page.expertOnly !== true)
   );
 }
+
+/** The page whose patterns match `path`. */
+export const pageAt = (path: string): PageDef | undefined =>
+  PAGES.find(candidate =>
+    candidate.patterns.some(pattern => match(pattern, path) !== null)
+  );

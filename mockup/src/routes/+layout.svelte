@@ -12,9 +12,9 @@
 
   import { PERSONAS } from '#lib/api/seed/ids.js';
   import { t } from '#lib/i18n/index.svelte.js';
-  import { PAGES } from '#lib/nav.js';
+  import { pageAt } from '#lib/nav.js';
   import { startSimulator } from '#lib/sim/simulator.svelte.js';
-  import { match, router } from '#lib/state/router.svelte.js';
+  import { router } from '#lib/state/router.svelte.js';
   import {
     applyTheme,
     session,
@@ -54,9 +54,7 @@
     if (!session.signedIn || path.startsWith('/auth/') || path === '/guide') {
       return;
     }
-    const current = PAGES.find(candidate =>
-      candidate.patterns.some(pattern => match(pattern, path) !== null)
-    );
+    const current = pageAt(path);
     document.title = current ? `${t(current.label)} · Zamfono` : 'Zamfono';
   });
 </script>

@@ -1,7 +1,8 @@
 <!--
   The demo bar's clock: the demo's current date and time, and the moments it can restart at
   (`clock.svelte.ts`). Highlighted while a moment other than now is set, so nobody takes the demo
-  time for the real one.
+  time for the real one. The menu is fixed, as the bar scrolls sideways and would clip it, and
+  opens under the chip, kept inside the window.
 -->
 <script lang="ts">
   import Check from '@lucide/svelte/icons/check';
@@ -21,8 +22,18 @@
   import { go } from '#lib/state/router.svelte.js';
   import { confirmDialog } from '#lib/state/ui.svelte.js';
 
+  const MENU_WIDTH = 400;
+  const EDGE = 12;
+
   let open = $state(false);
   let root = $state<HTMLDivElement>();
+  let menuLeft = $state(EDGE);
+
+  function placeMenu(chip: HTMLElement): void {
+    const width = Math.min(MENU_WIDTH, window.innerWidth - 2 * EDGE);
+    const left = chip.getBoundingClientRect().left;
+    menuLeft = Math.max(EDGE, Math.min(left, window.innerWidth - width - EDGE));
+  }
   let tick = $state(0);
 
   onMount(() => {
@@ -70,6 +81,7 @@
 </script>
 
 <svelte:window
+  onresize={() => (open = false)}
   onclick={event => {
     if (open && root && !root.contains(event.target as Node)) {
       open = false;
@@ -92,6 +104,7 @@
     title={simulated ? t('demo.time.simulatedTitle') : t('demo.time.title')}
     onclick={event => {
       event.stopPropagation();
+      placeMenu(event.currentTarget);
       open = !open;
     }}
   >
@@ -99,7 +112,7 @@
     <span class="nums">{current}</span>
   </button>
   {#if open}
-    <div class="menu" role="menu">
+    <div class="menu" role="menu" style:left="{menuLeft}px">
       <p class="head">{t('demo.time.title')}</p>
       <p class="sub">{t('demo.time.subtitle')}</p>
       {#each MOMENTS as moment (moment)}
@@ -157,7 +170,6 @@
   .menu {
     position: fixed;
     top: calc(var(--demobar-height) + 4px);
-    right: 12px;
     z-index: 120;
     width: min(400px, calc(100vw - 24px));
     padding: 8px;

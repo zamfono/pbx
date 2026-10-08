@@ -9,13 +9,13 @@
 
   import { PERSONAS } from '#lib/api/seed/ids.js';
   import MuckiPanel from '#lib/mucki/MuckiPanel.svelte';
-  import { PAGES, visiblePages } from '#lib/nav.js';
+  import { pageAt, visiblePages } from '#lib/nav.js';
   import DemoBar from '#lib/shell/DemoBar.svelte';
   import MobileTabBar from '#lib/shell/MobileTabBar.svelte';
   import NotFound from '#lib/shell/NotFound.svelte';
   import Sidebar from '#lib/shell/Sidebar.svelte';
   import TopBar from '#lib/shell/TopBar.svelte';
-  import { go, match, router } from '#lib/state/router.svelte.js';
+  import { go, router } from '#lib/state/router.svelte.js';
   import {
     currentActor,
     isExpert,
@@ -26,13 +26,7 @@
   let { children }: { children: Snippet } = $props();
   let sidebarOpen = $state(false);
 
-  const current = $derived(
-    PAGES.find(candidate =>
-      candidate.patterns.some(
-        pattern => match(pattern, router.route.path) !== null
-      )
-    )
-  );
+  const current = $derived(pageAt(router.route.path));
   setExpertPage(() => current?.expertOnly === true);
 
   const allowed = $derived(

@@ -4,9 +4,10 @@ import '#lib/fields/index.js';
 
 import { allEntityFields } from '#lib/fields/registry.js';
 import { has } from '#lib/i18n/index.svelte.js';
+import { pageAt } from '#lib/nav.js';
 
 import { placeOf, SELF_ENTITIES } from './places';
-import { pageAt, placePath, searchFields, searchPages } from './settingsSearch';
+import { placePath, searchFields, searchPages } from './settingsSearch';
 
 const fieldsOf = (hits: { entity: string; key: string }[]): string[] =>
   hits.map(hit => `${hit.entity}.${hit.key}`);

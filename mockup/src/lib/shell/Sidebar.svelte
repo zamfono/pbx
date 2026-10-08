@@ -4,7 +4,7 @@
 <script lang="ts">
   import { store } from '#lib/api/store.svelte.js';
   import { t } from '#lib/i18n/index.svelte.js';
-  import { SECTIONS, visiblePages } from '#lib/nav.js';
+  import { pageAt, SECTIONS, visiblePages } from '#lib/nav.js';
   import { href, router } from '#lib/state/router.svelte.js';
   import { currentActor, isExpert } from '#lib/state/session.svelte.js';
   import ExpertTag from '#lib/ui/ExpertTag.svelte';
@@ -26,13 +26,7 @@
       pages: pages.filter(page => page.section === section.id)
     })).filter(section => section.pages.length > 0)
   );
-  const activeId = $derived(
-    pages.find(page =>
-      page.patterns.some(pattern =>
-        router.route.path.startsWith(pattern.split('/:')[0] ?? '')
-      )
-    )?.id
-  );
+  const activeId = $derived(pageAt(router.route.path)?.id);
 </script>
 
 {#if open}<button
