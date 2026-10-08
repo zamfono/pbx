@@ -536,8 +536,15 @@ export type Call = {
   /** `calls.get` only: the routing trace (JSON lines on the wire, parsed here). */
   log: CallLogLine[];
   /** `calls.get` only: SIP messages of level `sip`. */
-  sipTrace: string[];
+  sipTrace: SipMessage[];
   qos: CallQos[];
+};
+
+/** One SIP message of a call (§7 level `sip`): when HEP captured it, which way it went, as sent. */
+export type SipMessage = {
+  at: string;
+  direction: 'in' | 'out';
+  raw: string;
 };
 
 export type LiveLeg = {

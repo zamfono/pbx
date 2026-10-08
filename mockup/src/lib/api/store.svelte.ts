@@ -7,7 +7,7 @@
 import { seed } from './seed';
 import type { Db } from './types';
 
-const STORAGE_KEY = 'zamfono-mockup:db:v2';
+const STORAGE_KEY = 'zamfono-mockup:db:v4';
 const SAVE_DELAY_MS = 400;
 
 function load(): Db {

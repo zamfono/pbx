@@ -13,6 +13,7 @@ import type {
   LiveCall,
   PresenceLogEntry,
   Recording,
+  SipMessage,
   Voicemail
 } from '../types';
 import { DID, MENU, NUM, RG, TRUNK, U } from './ids';
@@ -415,7 +416,15 @@ function outboundCall(index: number, startedAt: string, userId: string): Draft {
       log,
       qos: userId === U.jonas && answered ? qosFor(id) : [],
       sipTrace:
-        userId === U.jonas && answered ? sipTraceFor(id, callee.number) : []
+        userId === U.jonas && answered
+          ? sipTraceFor(
+              id,
+              callee.number,
+              startedAt,
+              plus(startedAt, ringS),
+              endedAt
+            )
+          : []
     })
   };
   if (answered && RECORDING_USERS.has(userId)) {
@@ -476,9 +485,8 @@ function internalCall(
   };
 }
 
-/** A SIP message: start line, headers, `Content-Length` and the body, if any. */
-function sipMessage(
-  arrow: '→' | '←',
+/** A SIP message's text: start line, headers, `Content-Length` and the body, if any. */
+function sipText(
   startLine: string,
   headers: string[],
   body: string[] = []
@@ -490,11 +498,9 @@ function sipMessage(
     ...(body.length > 0 ? ['Content-Type: application/sdp'] : []),
     `Content-Length: ${length}`
   ];
-  return [
-    `${arrow} ${startLine}`,
-    ...head,
-    ...(body.length > 0 ? ['', ...body] : [])
-  ].join('\n');
+  return [startLine, ...head, ...(body.length > 0 ? ['', ...body] : [])].join(
+    '\n'
+  );
 }
 
 /**
@@ -503,7 +509,25 @@ function sipMessage(
  * credentials; caller-ID in `From` (`callerIdHeader` `from`); the tenant's codecs offered, G.722
  * chosen; the caller hangs up.
  */
-function sipTraceFor(id: string, number: string): string[] {
+function sipTraceFor(
+  id: string,
+  number: string,
+  startedAt: string,
+  answeredAt: string,
+  endedAt: string
+): SipMessage[] {
+  const at = (from: string, ms: number): string =>
+    new Date(new Date(from).getTime() + ms).toISOString();
+  const out = (when: string, text: string): SipMessage => ({
+    at: when,
+    direction: 'out',
+    raw: text
+  });
+  const inn = (when: string, text: string): SipMessage => ({
+    at: when,
+    direction: 'in',
+    raw: text
+  });
   const hex = id.replaceAll('-', '');
   const local = '203.0.113.24';
   const provider = 'sip.nordwind-telecom.example';
@@ -561,8 +585,7 @@ function sipTraceFor(id: string, number: string): string[] {
     `CSeq: ${cseq}`
   ];
   const invite = (cseq: number, branch: string, auth: string[]): string =>
-    sipMessage(
-      '→',
+    sipText(
       `INVITE sip:${number}@${provider} SIP/2.0`,
       [
         via(branch),
@@ -586,63 +609,79 @@ function sipTraceFor(id: string, number: string): string[] {
     extra: string[] = [],
     body: string[] = []
   ): string =>
-    sipMessage(
-      '←',
+    sipText(
       `SIP/2.0 ${status}`,
       [viaBack(branch), ...dialog(cseq, toHeader), ...extra, ...theirs],
       body
     );
   const realm = `realm="${provider}"`;
+  const farContact = `sip:${number}@198.51.100.40:5061;transport=tls`;
   return [
-    invite(1, 'a1', []),
-    reply('100 Trying', 'a1', '1 INVITE', toUri),
-    reply('407 Proxy Authentication Required', 'a1', '1 INVITE', to, [
-      `Proxy-Authenticate: Digest ${realm}, nonce="${nonce}", algorithm=MD5, qop="auth"`
-    ]),
-    sipMessage('→', `ACK sip:${number}@${provider} SIP/2.0`, [
-      via('a1'),
-      'Max-Forwards: 70',
-      ...dialog('1 ACK', to),
-      ...ours
-    ]),
-    invite(2, 'b2', [
-      `Proxy-Authorization: Digest username="${account}", ${realm}, nonce="${nonce}", uri="sip:${number}@${provider}", response="${hex.slice(0, 32)}", algorithm=MD5, cnonce="${hex.slice(20, 28)}", qop=auth, nc=00000001`
-    ]),
-    reply('100 Trying', 'b2', '2 INVITE', toUri),
-    reply('180 Ringing', 'b2', '2 INVITE', to, [
-      `Contact: <sip:${number}@198.51.100.40:5061;transport=tls>`
-    ]),
-    reply(
-      '200 OK',
-      'b2',
-      '2 INVITE',
-      to,
-      [
-        `Contact: <sip:${number}@198.51.100.40:5061;transport=tls>`,
-        allow,
-        'Supported: timer',
-        'Session-Expires: 1800;refresher=uac',
-        'Require: timer'
-      ],
-      answer
+    out(at(startedAt, 14), invite(1, 'a1', [])),
+    inn(at(startedAt, 33), reply('100 Trying', 'a1', '1 INVITE', toUri)),
+    inn(
+      at(startedAt, 41),
+      reply('407 Proxy Authentication Required', 'a1', '1 INVITE', to, [
+        `Proxy-Authenticate: Digest ${realm}, nonce="${nonce}", algorithm=MD5, qop="auth"`
+      ])
     ),
-    sipMessage(
-      '→',
-      `ACK sip:${number}@198.51.100.40:5061;transport=tls SIP/2.0`,
-      [via('c3'), 'Max-Forwards: 70', ...dialog('2 ACK', to), ...ours]
+    out(
+      at(startedAt, 42),
+      sipText(`ACK sip:${number}@${provider} SIP/2.0`, [
+        via('a1'),
+        'Max-Forwards: 70',
+        ...dialog('1 ACK', to),
+        ...ours
+      ])
     ),
-    sipMessage(
-      '→',
-      `BYE sip:${number}@198.51.100.40:5061;transport=tls SIP/2.0`,
-      [
+    out(
+      at(startedAt, 45),
+      invite(2, 'b2', [
+        `Proxy-Authorization: Digest username="${account}", ${realm}, nonce="${nonce}", uri="sip:${number}@${provider}", response="${hex.slice(0, 32)}", algorithm=MD5, cnonce="${hex.slice(20, 28)}", qop=auth, nc=00000001`
+      ])
+    ),
+    inn(at(startedAt, 63), reply('100 Trying', 'b2', '2 INVITE', toUri)),
+    inn(
+      at(startedAt, 1_847),
+      reply('180 Ringing', 'b2', '2 INVITE', to, [`Contact: <${farContact}>`])
+    ),
+    inn(
+      at(answeredAt, 0),
+      reply(
+        '200 OK',
+        'b2',
+        '2 INVITE',
+        to,
+        [
+          `Contact: <${farContact}>`,
+          allow,
+          'Supported: timer',
+          'Session-Expires: 1800;refresher=uac',
+          'Require: timer'
+        ],
+        answer
+      )
+    ),
+    out(
+      at(answeredAt, 2),
+      sipText(`ACK ${farContact} SIP/2.0`, [
+        via('c3'),
+        'Max-Forwards: 70',
+        ...dialog('2 ACK', to),
+        ...ours
+      ])
+    ),
+    out(
+      at(endedAt, 0),
+      sipText(`BYE ${farContact} SIP/2.0`, [
         via('d4'),
         'Max-Forwards: 70',
         ...dialog('3 BYE', to),
         'Reason: Q.850;cause=16;text="Normal Clearing"',
         ...ours
-      ]
+      ])
     ),
-    reply('200 OK', 'd4', '3 BYE', to)
+    inn(at(endedAt, 21), reply('200 OK', 'd4', '3 BYE', to))
   ];
 }
 
