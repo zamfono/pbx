@@ -295,7 +295,11 @@
                 >
                 {#if device.transport === 'plain'}
                   <Badge tone="warn" title={t('people.devices.plainHelp')}
-                    >{t('people.devices.plain')}</Badge
+                    >{t(
+                      isExpert()
+                        ? 'people.devices.plain'
+                        : 'people.devices.unencrypted'
+                    )}</Badge
                   >
                 {/if}
               </div>

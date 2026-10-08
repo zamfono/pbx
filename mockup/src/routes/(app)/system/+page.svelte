@@ -250,22 +250,28 @@
           items={[
             {
               label: t('system.versions.api'),
-              value: info.api.display,
+              value: isExpert() ? info.api.display : info.api.version,
               mono: true
             },
             {
               label: t('system.versions.core'),
-              value: info.core?.display ?? t('system.versions.coreDown'),
+              value:
+                (isExpert() ? info.core?.display : info.core?.version) ??
+                t('system.versions.coreDown'),
               mono: true
             },
-            {
-              label: t('system.versions.apiStarted'),
-              value: formatDateTime(info.api.startedAt)
-            },
-            {
-              label: t('system.versions.asteriskStarted'),
-              value: formatDateTime(info.core?.asteriskStartedAt)
-            },
+            ...(isExpert()
+              ? [
+                  {
+                    label: t('system.versions.apiStarted'),
+                    value: formatDateTime(info.api.startedAt)
+                  },
+                  {
+                    label: t('system.versions.asteriskStarted'),
+                    value: formatDateTime(info.core?.asteriskStartedAt)
+                  }
+                ]
+              : []),
             {
               label: t('system.stack.domain'),
               value: info.stack.domain,

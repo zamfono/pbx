@@ -21,6 +21,7 @@
   import { AUDIT_CHANNELS, type AuditChannel } from '#lib/api/types.js';
   import ForwardTargetLabel from '#lib/components/ForwardTargetLabel.svelte';
   import {
+    changeVisible,
     entityLabel,
     fieldLabel,
     isForwardTarget,
@@ -247,6 +248,9 @@
   <ol class="log">
     {#each entries.slice(0, shown) as entry (entry.id)}
       {@const href = entityHref(entry)}
+      {@const changes = entry.changes.filter(change =>
+        changeVisible(entry.entityKind, change.field, isExpert())
+      )}
       {@const reverted =
         entry.revertsId === null ? undefined : byId.get(entry.revertsId)}
       <li
@@ -319,9 +323,9 @@
               <span class="xs faint">{t('audit.notUndoable')}</span>
             {/if}
           </div>
-          {#if entry.changes.length > 0}
+          {#if changes.length > 0}
             <dl class="diff">
-              {#each entry.changes as change, index (`${change.field}:${index}`)}
+              {#each changes as change, index (`${change.field}:${index}`)}
                 <div class="change">
                   <dt>
                     {fieldLabel(entry.entityKind, change.field)}

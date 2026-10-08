@@ -306,6 +306,8 @@ export type TraceView = {
   target?: ForwardTarget;
   /** Raw technical detail, shown muted in Expert mode. */
   note?: string;
+  /** A technical step (codecs, an event without words) only Expert mode shows. */
+  expert?: boolean;
 };
 
 const str = (value: unknown): string =>
@@ -539,7 +541,8 @@ export function describeLine(line: CallLogLine): TraceView {
         text: t('calls.trace.codecs', {
           caller: str(d.caller),
           callee: str(d.callee)
-        })
+        }),
+        expert: true
       };
     case 'ended': {
       if (d.reason === 'trunkUnreachable') {
@@ -731,7 +734,12 @@ export function describeLine(line: CallLogLine): TraceView {
           : t('calls.trace.addedLeg')
       };
     default:
-      return { icon: CircleDot, tone: 'neutral', text: line.event };
+      return {
+        icon: CircleDot,
+        tone: 'neutral',
+        text: line.event,
+        expert: true
+      };
   }
 }
 

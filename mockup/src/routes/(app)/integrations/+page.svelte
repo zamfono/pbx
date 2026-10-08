@@ -227,9 +227,10 @@
               <Badge tone="info">{t('integrations.webhook.allEvents')}</Badge>
             {:else}
               <span class="events">
-                {#each row.eventTypes as type (type)}<code class="event"
-                    >{type}</code
-                  >{/each}
+                {#each row.eventTypes as type (type)}{#if isExpert()}<code
+                      class="event">{type}</code
+                    >{:else}<Badge>{t(`integrations.event.${type}`)}</Badge
+                    >{/if}{/each}
               </span>
             {/if}
           {:else if key === 'status'}
@@ -454,7 +455,8 @@
                         <span class="strong small"
                           >{t(`integrations.event.${type}`)}</span
                         >
-                        <code class="xs faint">{type}</code>
+                        {#if isExpert()}<code class="xs faint">{type}</code
+                          >{/if}
                       </span>
                     </label>
                   {/each}

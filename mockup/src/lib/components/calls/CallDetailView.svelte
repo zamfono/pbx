@@ -211,7 +211,9 @@
       {#if call.qos.length > 0}
         <Card
           title={t('calls.qos.title')}
-          description={t('calls.qos.help')}
+          description={t(
+            isExpert() ? 'calls.qos.helpExpert' : 'calls.qos.help'
+          )}
           icon={Activity}
         >
           <QosTable qos={call.qos} />

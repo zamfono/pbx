@@ -217,8 +217,8 @@ export default {
     'calls.why.forward': 'Dann griff die Weiterleitung bei „{condition}“:',
     'calls.why.mailbox': 'Der Anruf ging deshalb an die Mailbox.',
 
-    'calls.trace.empty':
-      'Für diesen Anruf wurde kein Verlauf aufgezeichnet (Diagnosestufe „Aus“).',
+    'calls.trace.empty': 'Für diesen Anruf wurde kein Verlauf aufgezeichnet.',
+    'calls.trace.emptyLevel': 'Diagnosestufe: „Aus“.',
     'calls.trace.scope.tenant': 'Unternehmen',
     'calls.trace.trunk': 'Trunk',
     'calls.trace.entry': 'Anruf von {caller} auf {did}',
@@ -290,7 +290,8 @@ export default {
     'calls.trace.addedLeg': 'Hinzugeholt zu einem laufenden Gespräch',
 
     'calls.qos.title': 'Sprachqualität',
-    'calls.qos.help':
+    'calls.qos.help': 'Wie gut die Sprache auf beiden Seiten ankam.',
+    'calls.qos.helpExpert':
       'Je Verbindung: Schwankung, Paketverlust, Laufzeit und Pakete (empfangen / gesendet).',
     'calls.qos.verdict.good': 'Gute Sprachqualität',
     'calls.qos.verdict.fair': 'Spürbare Störungen möglich',
@@ -302,8 +303,8 @@ export default {
     'calls.qos.loss': 'Paketverlust',
     'calls.qos.rtt': 'Laufzeit (RTT)',
     'calls.qos.packets': 'Pakete',
-    'calls.qos.noAudio':
-      'Von dieser Seite kam keine Sprache an – oft eine Firewall oder NAT.',
+    'calls.qos.noAudio': 'Von dieser Seite kam keine Sprache an.',
+    'calls.qos.noAudioCause': 'Oft eine Firewall oder NAT.',
 
     'calls.sip.title': 'SIP-Mitschnitt',
     'calls.sip.help':
@@ -748,8 +749,8 @@ export default {
     'calls.why.forward': 'Then the forward on “{condition}” took over:',
     'calls.why.mailbox': 'So the call went to voicemail.',
 
-    'calls.trace.empty':
-      'No trace was recorded for this call (diagnostics level “Off”).',
+    'calls.trace.empty': 'No trace was recorded for this call.',
+    'calls.trace.emptyLevel': 'Diagnostics level: “Off”.',
     'calls.trace.scope.tenant': 'Company',
     'calls.trace.trunk': 'Trunk',
     'calls.trace.entry': 'Call from {caller} to {did}',
@@ -813,7 +814,8 @@ export default {
     'calls.trace.addedLeg': 'Added to a call in progress',
 
     'calls.qos.title': 'Call quality',
-    'calls.qos.help':
+    'calls.qos.help': 'How well the audio came through on both sides.',
+    'calls.qos.helpExpert':
       'Per connection: jitter, packet loss, round trip and packets (received / sent).',
     'calls.qos.verdict.good': 'Good call quality',
     'calls.qos.verdict.fair': 'Noticeable glitches possible',
@@ -825,8 +827,8 @@ export default {
     'calls.qos.loss': 'Packet loss',
     'calls.qos.rtt': 'Round trip (RTT)',
     'calls.qos.packets': 'Packets',
-    'calls.qos.noAudio':
-      'No audio arrived from this side – often a firewall or NAT.',
+    'calls.qos.noAudio': 'No audio arrived from this side.',
+    'calls.qos.noAudioCause': 'Often a firewall or NAT.',
 
     'calls.sip.title': 'SIP capture',
     'calls.sip.help':

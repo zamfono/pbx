@@ -1,8 +1,8 @@
 <!--
   Picks a forward target (§9.4): one of eight kinds and what it points at. `sip` and the `record`
-  option are admin-only (`forwardTargets.ts`); a `user` keeps a `sip` target they already hold but
-  cannot pick a new one. A `sip` target's header templates use the 13 template variables, at most
-  2048 bytes, with a warning past 150 bytes over a UDP trunk.
+  option are admin-only (`forwardTargets.ts`), and `sip` is edited in Expert mode only; outside it
+  a `sip` target already set stays, shown as a label. A `sip` target's header templates use the 13
+  template variables, at most 2048 bytes, with a warning past 150 bytes over a UDP trunk.
 -->
 <script lang="ts">
   import Plus from '@lucide/svelte/icons/plus';
@@ -24,7 +24,7 @@
     type SipHeader
   } from '#lib/api/types.js';
   import { t } from '#lib/i18n/index.svelte.js';
-  import { currentActor } from '#lib/state/session.svelte.js';
+  import { currentActor, isExpert } from '#lib/state/session.svelte.js';
   import IconButton from '#lib/ui/IconButton.svelte';
   import Select from '#lib/ui/Select.svelte';
   import Switch from '#lib/ui/Switch.svelte';
@@ -55,6 +55,7 @@
   }: Props = $props();
 
   const isAdmin = $derived(currentActor().role !== 'user');
+  const sipEditable = $derived(isAdmin && isExpert());
   const SIP_MAX_BYTES = 2048;
   const UDP_WARN_BYTES = 150;
   const DEFAULT_HEADERS: SipHeader[] = [
@@ -64,7 +65,7 @@
 
   const offered = $derived(
     (kinds ?? FORWARD_TARGET_KINDS).filter(
-      kind => kind !== 'sip' || isAdmin || value?.kind === 'sip'
+      kind => kind !== 'sip' || sipEditable || value?.kind === 'sip'
     )
   );
   const kindOptions = $derived([
@@ -74,7 +75,7 @@
     ...offered.map(kind => ({
       value: kind,
       label: t(`target.kind.${kind}`),
-      disabled: kind === 'sip' && !isAdmin
+      disabled: kind === 'sip' && !sipEditable
     }))
   ]);
 
@@ -127,7 +128,7 @@
   const udpTrunk = $derived(
     value?.kind === 'sip' && trunkById(value.trunkId)?.transport === 'udp'
   );
-  const sipLocked = $derived(value?.kind === 'sip' && !isAdmin);
+  const sipLocked = $derived(value?.kind === 'sip' && !sipEditable);
 
   function patch(next: Partial<ForwardTarget>): void {
     if (value !== null) {

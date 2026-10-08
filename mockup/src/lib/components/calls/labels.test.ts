@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { U } from '#lib/api/seed/ids.js';
 import { resetDb } from '#lib/api/store.svelte.js';
 
-import { liveCounterpart } from './labels';
+import { describeLine, liveCounterpart } from './labels';
 
 describe('liveCounterpart', () => {
   beforeEach(() => {
@@ -41,5 +41,16 @@ describe('liveCounterpart', () => {
         U.lea
       )
     ).toBe('sip:+4981615552@pbx');
+  });
+});
+
+describe('describeLine', () => {
+  it('marks the codec step as Expert-only and leaves routing steps for everyone', () => {
+    const at = '2026-10-06T09:37:20.000Z';
+    expect(
+      describeLine({ at, event: 'codecs', caller: 'g722', callee: 'opus' })
+        .expert
+    ).toBe(true);
+    expect(describeLine({ at, event: 'answered' }).expert).toBeUndefined();
   });
 });

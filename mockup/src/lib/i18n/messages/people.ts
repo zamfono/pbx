@@ -127,6 +127,7 @@ export default {
     'people.devices.kind.ringotel': 'Ringotel-App',
     'people.devices.tls': 'TLS (überall)',
     'people.devices.plain': 'UDP/TCP',
+    'people.devices.unencrypted': 'Unverschlüsselt',
     'people.devices.plainHelp':
       'Unverschlüsselt, nur von den erlaubten IP-Adressen',
     'people.devices.registered': 'angemeldet {when}',
@@ -538,6 +539,7 @@ export default {
     'people.devices.kind.ringotel': 'Ringotel app',
     'people.devices.tls': 'TLS (anywhere)',
     'people.devices.plain': 'UDP/TCP',
+    'people.devices.unencrypted': 'Unencrypted',
     'people.devices.plainHelp':
       'Unencrypted, from the allowed IP addresses only',
     'people.devices.registered': 'signed in {when}',

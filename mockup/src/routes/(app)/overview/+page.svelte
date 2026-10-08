@@ -56,7 +56,7 @@
   } from '#lib/i18n/index.svelte.js';
   import PresenceToggle from '#lib/shell/PresenceToggle.svelte';
   import { go, href } from '#lib/state/router.svelte.js';
-  import { currentActor } from '#lib/state/session.svelte.js';
+  import { currentActor, isExpert } from '#lib/state/session.svelte.js';
   import Badge from '#lib/ui/Badge.svelte';
   import Button from '#lib/ui/Button.svelte';
   import Card from '#lib/ui/Card.svelte';
@@ -475,7 +475,9 @@
           {#if system}
             <li>
               <span>{t('calls.overview.version')}</span>
-              <span class="mono small">{system.api.display}</span>
+              <span class="mono small"
+                >{isExpert() ? system.api.display : system.api.version}</span
+              >
             </li>
             <li>
               <span>{t('calls.overview.updates')}</span>

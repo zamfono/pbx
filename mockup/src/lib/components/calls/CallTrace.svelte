@@ -33,15 +33,17 @@
   });
   const start = $derived(new Date(startedAt).getTime());
   const steps = $derived(
-    log.map((line, index) => ({
-      key: `${index}-${line.event}`,
-      at: line.at,
-      offset: Math.max(
-        0,
-        Math.round((new Date(line.at).getTime() - start) / 1000)
-      ),
-      view: describeLine(line)
-    }))
+    log
+      .map((line, index) => ({
+        key: `${index}-${line.event}`,
+        at: line.at,
+        offset: Math.max(
+          0,
+          Math.round((new Date(line.at).getTime() - start) / 1000)
+        ),
+        view: describeLine(line)
+      }))
+      .filter(step => step.view.expert !== true || isExpert())
   );
   const why = $derived(whyOf(log));
   const explain = $derived(
@@ -133,7 +135,10 @@
       </span>
     </li>
   {:else}
-    <li class="empty muted small">{t('calls.trace.empty')}</li>
+    <li class="empty muted small">
+      {t('calls.trace.empty')}{#if isExpert()}
+        {t('calls.trace.emptyLevel')}{/if}
+    </li>
   {/each}
 </ol>
 

@@ -324,7 +324,7 @@ export default {
       'Die Sicherung ist fehlgeschlagen: {error}. Ohne Sicherung starte ich kein Update.',
     'mucki.update.timeout': 'sie wurde nicht rechtzeitig fertig',
     'mucki.update.backupDone':
-      'Sicherung auf **{target}** ist fertig (Snapshot `{snapshot}`). Jetzt das Update – bitte bestätige es kurz.',
+      'Sicherung auf **{target}** ist fertig. Jetzt das Update – bitte bestätige es kurz.',
     'mucki.update.backupRecent':
       'Es gibt eine frische Sicherung von {time}. Jetzt das Update – bitte bestätige es kurz.',
     'mucki.update.started': 'Update auf {latest} gestartet',
@@ -707,7 +707,7 @@ export default {
       "The backup failed: {error}. I won't start an update without a backup.",
     'mucki.update.timeout': "it didn't finish in time",
     'mucki.update.backupDone':
-      'The backup to **{target}** is done (snapshot `{snapshot}`). Now the update – please confirm.',
+      'The backup to **{target}** is done. Now the update – please confirm.',
     'mucki.update.backupRecent':
       'There is a fresh backup from {time}. Now the update – please confirm.',
     'mucki.update.started': 'Update to {latest} started',

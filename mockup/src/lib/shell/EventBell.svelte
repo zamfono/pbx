@@ -1,5 +1,6 @@
 <!--
-  The event bell: the latest realtime events (§10.6) this person receives, as words.
+  The event bell: the latest realtime events (§10.6) this person receives, as words. SIP bans
+  belong to SIP protection, an Expert-mode page, and show in Expert mode only.
 -->
 <script lang="ts">
   import Bell from '@lucide/svelte/icons/bell';
@@ -19,7 +20,11 @@
   const actor = $derived(currentActor());
   const events = $derived(
     store.db.events
-      .filter(event => visibleTo(store.db, event, actor.role, actor.id))
+      .filter(
+        event =>
+          visibleTo(store.db, event, actor.role, actor.id) &&
+          (event.type !== 'sipBan.added' || isExpert())
+      )
       .slice(0, 30)
   );
   const unseen = $derived(events.filter(event => event.at > seenAt).length);

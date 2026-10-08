@@ -14,6 +14,7 @@ import {
 import type { AuditEntryWire } from '#lib/api/ops/areas/audit.js';
 import { store } from '#lib/api/store.svelte.js';
 import { FORWARD_TARGET_KINDS, type ForwardTarget } from '#lib/api/types.js';
+import { fieldDef } from '#lib/fields/index.js';
 import { formatDateTime, formatPhone, has, t } from '#lib/i18n/index.svelte.js';
 
 const VERBS: Record<string, string> = {
@@ -121,6 +122,15 @@ export function entityLabel(kind: string, id: string | null): string {
 /** The field's label where the registry names one, else its wire name. */
 export function fieldLabel(kind: string, field: string): string {
   return has(`field.${kind}.${field}`) ? t(`field.${kind}.${field}`) : field;
+}
+
+/** Whether a change to `field` shows: an Expert-tier field's change shows in Expert mode only. */
+export function changeVisible(
+  kind: string,
+  field: string,
+  expert: boolean
+): boolean {
+  return expert || fieldDef(kind, field)?.tier !== 'expert';
 }
 
 export function isForwardTarget(value: unknown): value is ForwardTarget {

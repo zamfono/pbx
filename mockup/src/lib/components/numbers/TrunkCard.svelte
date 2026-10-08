@@ -50,7 +50,9 @@
           tone={trunk.transport === 'tls' ? 'ok' : 'neutral'}
           icon={trunk.transport === 'tls' ? Lock : undefined}
         >
-          {trunk.transport.toUpperCase()}{trunk.srtp ? ' · SRTP' : ''}
+          {trunk.transport.toUpperCase()}{trunk.srtp && isExpert()
+            ? ' · SRTP'
+            : ''}
         </Badge>
       </div>
     </div>

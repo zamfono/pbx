@@ -130,16 +130,20 @@
         </div>
         <InfoList
           items={[
-            {
-              label: t('ringotel.status.org'),
-              value: settings.ringotelOrgId ?? '—',
-              mono: true
-            },
-            {
-              label: t('ringotel.status.branch'),
-              value: settings.ringotelBranchId ?? '—',
-              mono: true
-            },
+            ...(isExpert()
+              ? [
+                  {
+                    label: t('ringotel.status.org'),
+                    value: settings.ringotelOrgId ?? '—',
+                    mono: true
+                  },
+                  {
+                    label: t('ringotel.status.branch'),
+                    value: settings.ringotelBranchId ?? '—',
+                    mono: true
+                  }
+                ]
+              : []),
             {
               label: t('field.settings.ringotelMaxRegs'),
               value: String(settings.ringotelMaxRegs)

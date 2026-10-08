@@ -351,10 +351,7 @@ export const update: Scenario = {
         return ctx.stop();
       }
       await ctx.say(
-        t('mucki.update.backupDone', {
-          target: targetName(target),
-          snapshot: finished.snapshotId ?? '—'
-        })
+        t('mucki.update.backupDone', { target: targetName(target) })
       );
     } else {
       await ctx.say(
