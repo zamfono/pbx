@@ -829,6 +829,128 @@ describe('Recorder', () => {
     expect(hungUp(snoopId)).toBe(true);
   });
 
+  /** Lets the snoop pair a held startup (`snoopStasisAfterMs = null`) is waiting on enter
+   * Stasis, one snoop after the other, as Asterisk would. */
+  async function releaseSnoopPair(): Promise<void> {
+    for (const count of [1, 2]) {
+      // eslint-disable-next-line no-await-in-loop -- the right snoop is requested only once the left records
+      await vi.waitFor(() => {
+        expect(snoopIds()).toHaveLength(count);
+      });
+      fakeAri.emit({
+        type: 'StasisStart',
+        timestamp: nowIso(),
+        application: 'zamfono',
+        args: ['snoop', 'leg-channel'],
+        channel: { id: snoopIds()[count - 1] }
+      });
+    }
+  }
+
+  it('finishes a participation whose leg ends while its snoops start, back to none in progress (§6.4)', async () => {
+    const userId = await seedRecordingUser();
+    const recorder = new Recorder({
+      ari,
+      cache,
+      db,
+      mediaDir: MEDIA_DIR,
+      mix: () => Promise.resolve(4),
+      log: fakeLogger(),
+      now: () => NOW
+    });
+    const call = buildCall(null);
+    await cdr.open(call);
+    fakeAri.addChannel({ id: 'leg-channel' });
+    fakeAri.snoopStasisAfterMs = null;
+    const leg = buildLeg({ channelId: 'leg-channel', userId });
+
+    const started = recorder.onLegUp(call, leg);
+    await vi.waitFor(() => {
+      expect(snoopIds()).toHaveLength(1);
+    });
+    const ended = recorder.onLegEnded(call, leg);
+    await releaseSnoopPair();
+    await started;
+    const [leftSnoop = '', rightSnoop = ''] = snoopIds();
+    await vi.waitFor(() => {
+      expect(hungUp(leftSnoop) && hungUp(rightSnoop)).toBe(true);
+    });
+    const [leftName, rightName] = recordCalls().map(body => body.name);
+    emitRecordingFinished(leftName, 4);
+    emitRecordingFinished(rightName, 4);
+    await ended;
+
+    expect(recorder.inProgressCount).toBe(0);
+    const rows = await db
+      .selectFrom('recordings')
+      .select(['callId', 'userId'])
+      .execute();
+    expect(rows).toEqual([{ callId: call.id, userId }]);
+  });
+
+  it('carries a participation still starting over to the call its leg moved to (§10.2 "Call parking")', async () => {
+    const userId = await seedRecordingUser();
+    const recorder = new Recorder({
+      ari,
+      cache,
+      db,
+      mediaDir: MEDIA_DIR,
+      mix: () => Promise.resolve(4),
+      log: fakeLogger(),
+      now: () => NOW
+    });
+    const ringback = buildCall(null);
+    const parked = buildCall(null);
+    await cdr.open(ringback);
+    await cdr.open(parked);
+    fakeAri.addChannel({ id: 'leg-channel' });
+    fakeAri.snoopStasisAfterMs = null;
+    const leg = buildLeg({ channelId: 'leg-channel', userId });
+
+    const started = recorder.onLegUp(ringback, leg);
+    await vi.waitFor(() => {
+      expect(snoopIds()).toHaveLength(1);
+    });
+    recorder.onLegMoved(ringback, parked, leg);
+    await releaseSnoopPair();
+    await started;
+    await recorder.onLegEnded(ringback, leg);
+    expect(recorder.inProgressCount).toBe(1);
+    const [leftName, rightName] = recordCalls().map(body => body.name);
+    const ended = recorder.onLegEnded(parked, leg);
+    emitRecordingFinished(leftName, 4);
+    emitRecordingFinished(rightName, 4);
+    await ended;
+
+    expect(recorder.inProgressCount).toBe(0);
+    const rows = await db
+      .selectFrom('recordings')
+      .select(['callId', 'userId'])
+      .execute();
+    expect(rows).toEqual([{ callId: parked.id, userId }]);
+  });
+
+  it('counts no participation in progress for a leg that records nothing', async () => {
+    const userId = await seedUser(db, { recordCalls: 0 });
+    await seedSettings(db);
+    const recorder = new Recorder({
+      ari,
+      cache,
+      db,
+      mediaDir: MEDIA_DIR,
+      mix: () => Promise.resolve(0),
+      log: fakeLogger(),
+      now: () => NOW
+    });
+
+    await recorder.onLegUp(
+      buildCall(null),
+      buildLeg({ channelId: 'leg-channel', userId })
+    );
+
+    expect(recorder.inProgressCount).toBe(0);
+  });
+
   it('removes the half-recorded raw file of a pair whose second snoop fails (§10.2 "Best effort")', async () => {
     const userId = await seedRecordingUser();
     const mediaDir = await mkdtemp(path.join(tmpdir(), 'zamfono-recording-'));

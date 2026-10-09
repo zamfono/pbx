@@ -46,6 +46,14 @@ type Participation = {
   outPath: string;
 };
 
+/** A participation's snoop pair once it records; the call it names is the `Entry`'s. */
+type Snoops = Omit<Participation, 'callId'>;
+
+/** A participation from the moment its start is asked for, before any await: an end or move
+ * arriving while its flags are read or its snoops start still finds it. `snoops` settles to
+ * `null` when it records nothing; `key` and `callId` follow the leg's moves meanwhile. */
+type Entry = { key: string; callId: string; snoops: Promise<Snoops | null> };
+
 /** A participation is one user's in one call: a transferee's channel records in the call it
  * leaves and, from the transfer on, in the call it carries on (§10.2 "Start and end"). */
 function participationKey(callId: string, channelId: string): string {
@@ -55,10 +63,11 @@ function participationKey(callId: string, channelId: string): string {
 export class Recorder {
   private readonly deps: RecorderDeps;
   private readonly mix: Mixer;
-  private readonly participations = new Map<string, Participation>();
+  private readonly participations = new Map<string, Entry>();
   private mixFailures = 0;
-  // Participations already out of `participations` whose raw files are still being finished or
-  // mixed: a recording in progress all the same, until its row is stored.
+  // Participations already out of `participations` whose snoops are still starting or whose raw
+  // files are still being finished or mixed: a recording in progress all the same, until its row
+  // is stored.
   private finishing = 0;
 
   constructor(deps: RecorderDeps) {
@@ -80,11 +89,11 @@ export class Recorder {
    * never for an unanswered call, a voicemail deposit or a feature-code service call, none of
    * which ever reach `onLegUp`. */
   async onLegUp(call: Call, leg: Leg): Promise<void> {
-    const snapshot = await this.deps.cache.get();
-    if (!legRecords(snapshot, leg)) {
-      return;
-    }
-    await this.start(call.id, legParticipant(leg), leg.channelId);
+    await this.start(call.id, leg.channelId, async () =>
+      legRecords(await this.deps.cache.get(), leg)
+        ? { userId: legParticipant(leg) }
+        : null
+    );
   }
 
   /** Starts recording the calling party's own participation when their `record_calls` flag is
@@ -119,22 +128,48 @@ export class Recorder {
     party: Transferee
   ): Promise<void> {
     const { userId, channelId } = party;
-    const own =
-      userId !== null && userRecords(await this.deps.cache.get(), userId);
-    if (!own && party.targetRecords !== true) {
-      return;
+    await this.start(callId, channelId, async () => {
+      const own =
+        userId !== null && userRecords(await this.deps.cache.get(), userId);
+      return own || party.targetRecords === true
+        ? { userId: own ? userId : null }
+        : null;
+    });
+  }
+
+  /** Registers `channelId`'s participation, then starts it if `recorded` names whose it is. */
+  private async start(
+    callId: string,
+    channelId: string,
+    recorded: () => Promise<{ userId: string | null } | null>
+  ): Promise<void> {
+    const key = participationKey(callId, channelId);
+    const snoops = recorded().then(party =>
+      party === null ? null : this.startSnoops(callId, party.userId, channelId)
+    );
+    const entry: Entry = { key, callId, snoops: snoops.catch(() => null) };
+    this.participations.set(key, entry);
+    try {
+      await snoops;
+    } finally {
+      // Nothing to record: no longer in progress. An entry ended meanwhile is `end`'s already.
+      if (
+        (await entry.snoops) === null &&
+        this.participations.get(entry.key) === entry
+      ) {
+        this.participations.delete(entry.key);
+      }
     }
-    await this.start(callId, own ? userId : null, channelId);
   }
 
   /** Starts `channelId`'s snoop pair. Best effort (§10.2 "A snoop or mixing failure never affects
    * the call"): a pair that cannot start logs an error, leaves no half of itself behind, and the
    * call goes on unrecorded. */
-  private async start(
+  private async startSnoops(
     callId: string,
     userId: string | null,
     channelId: string
-  ): Promise<void> {
+  ): Promise<Snoops | null> {
     const id = newId();
     // §11.6: the raw per-leg pair and the mixed output live in `media/recordings/`. The name given
     // to ARI is relative to Asterisk's recording directory, which the asterisk image resolves to
@@ -160,19 +195,18 @@ export class Recorder {
       return null;
     });
     if (snoops === null) {
-      return;
+      return null;
     }
     const [leftChannelId, rightChannelId] = snoops;
-    this.participations.set(participationKey(callId, channelId), {
+    return {
       id,
-      callId,
       userId,
       leftChannelId,
       rightChannelId,
       leftPath,
       rightPath,
       outPath: path.join(dir, `${id}.wav`)
-    });
+    };
   }
 
   /** Ends `leg`'s recording, mixes its two raw files, and inserts the `recordings` row; a mix
@@ -185,16 +219,16 @@ export class Recorder {
    * here on (a parking ring-back's answer, §10.2 "Call parking"): it goes on recording, and its
    * row names `to`. */
   onLegMoved(from: Call, to: Call, leg: Leg): void {
-    const key = participationKey(from.id, leg.channelId);
-    const participation = this.participations.get(key);
-    if (participation === undefined) {
+    const entry = this.participations.get(
+      participationKey(from.id, leg.channelId)
+    );
+    if (entry === undefined) {
       return;
     }
-    this.participations.delete(key);
-    this.participations.set(participationKey(to.id, leg.channelId), {
-      ...participation,
-      callId: to.id
-    });
+    this.participations.delete(entry.key);
+    entry.key = participationKey(to.id, leg.channelId);
+    entry.callId = to.id;
+    this.participations.set(entry.key, entry);
   }
 
   /** The caller-side counterpart of `onLegEnded`, for a participation started by `onCallerUp`. */
@@ -206,14 +240,18 @@ export class Recorder {
 
   private async end(call: Call, channelId: string): Promise<void> {
     const key = participationKey(call.id, channelId);
-    const participation = this.participations.get(key);
-    if (participation === undefined) {
+    const entry = this.participations.get(key);
+    if (entry === undefined) {
       return;
     }
     this.participations.delete(key);
     this.finishing += 1;
     try {
-      await this.finish(participation);
+      // A participation still starting is finished once its snoops record.
+      const snoops = await entry.snoops;
+      if (snoops !== null) {
+        await this.finish({ ...snoops, callId: entry.callId });
+      }
     } finally {
       this.finishing -= 1;
     }
