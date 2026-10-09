@@ -1,0 +1,4 @@
+# A GitHub-hosted label newer than actionlint's built-in list (ci.yaml's Podman job); drop it once
+# actionlint knows the label.
+self-hosted-runner:
+  labels: [ubuntu-26.04]

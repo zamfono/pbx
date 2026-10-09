@@ -14,6 +14,8 @@ on:
   # Pushes to main run this through main.yaml, which publishes the images the
   # `images` job saved (§6.3 "Images"); a push trigger of its own would run it a second time.
   workflow_call:
+  # A full run of any branch by hand (`gh workflow run ci --ref <branch>`), publishing nothing.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -127,7 +129,10 @@ jobs:
           df -h /
       - name: Save the images for the jobs below
         # Every image scripts/image-env.sh names, sipp by the tag the step above gave it.
-        run: docker save -o /tmp/images.tar $(scripts/image-env.sh | sed 's/^[^=]*=//; s/@.*//')
+        run: |
+          # The image names are one argument each on purpose.
+          # shellcheck disable=SC2046
+          docker save -o /tmp/images.tar $(scripts/image-env.sh | sed 's/^[^=]*=//; s/@.*//')
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: images
@@ -249,6 +254,8 @@ jobs:
         # `env` carries every variable run.sh reads across sudo, the image names as image-env.sh
         # printed them above; the runner's sudo-rs ignores `-E`.
         run: |
+          # The variables are one argument each on purpose.
+          # shellcheck disable=SC2046
           sudo env $(scripts/image-env.sh) \
             COMPOSE="$COMPOSE" DOCKER_HOST="$DOCKER_HOST" DIAG_DIR="$DIAG_DIR" SHARD="$SHARD" \
             bash test/integration/run.sh
