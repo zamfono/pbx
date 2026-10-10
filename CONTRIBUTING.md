@@ -28,6 +28,30 @@ does it, and adds a paragraph at the top of its change log, `docs/spec-changes.m
 - Write commit messages in Conventional Commits format (`type(scope): description`).
 - Keep changes minimal and place explanatory comments at the point of use.
 
+## Dependencies
+
+No dependency moves to a release younger than seven days: a hijacked or broken release is usually
+caught and pulled within days. `.npmrc` (`min-release-age=7`, at the root and in `mockup/`) makes
+npm resolve nothing newer, and Dependabot waits the same seven days (`cooldown`,
+`.github/dependabot.yaml`).
+
+The one exception is a fix for a known vulnerability that this code can actually reach. It goes in
+at once, exempting only that package, at the lowest release that fixes it (its own dependencies
+stay gated):
+
+    npm install --min-release-age-exclude=<package> <package>@<fixed version>
+
+once all of these hold:
+
+- the advisory names that release as the fix;
+- it is published by the package's usual maintainer, with provenance if the package normally
+  ships it, and its tag in the source repository points at the commit npm records;
+- the diff from the previous release is small and matches the advisory, with no new install
+  scripts or dependencies.
+
+The commit message says which advisory the exception is for and why it is reachable. A
+vulnerability the code cannot reach waits out the seven days like any other update.
+
 ## Contributor license agreement
 
 Zamfono is licensed under AGPL-3.0 (`LICENSE`), and 3angular Solutions GmbH, which publishes it,
