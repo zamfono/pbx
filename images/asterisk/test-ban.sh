@@ -42,7 +42,8 @@ LIST
 v4=$(docker exec "$CONTAINER" nft list set inet zamfono sip_ban_v4)
 grep -qE '203\.0\.113\.7 timeout [0-9hms]+ expires' <<< "$v4" \
   || fail "a ban with an expires_at is not a set element with a timeout"
-grep -qE '203\.0\.113\.10 timeout 365[0-9][0-9]d' <<< "$v4" || fail "a century's ban is not in the set"
+# The timeout counts down from 36500d, already below it once the second it was set in has begun.
+grep -qE '203\.0\.113\.10 timeout 36(49|5[0-9])[0-9]d' <<< "$v4" || fail "a century's ban is not in the set"
 grep -qE '203\.0\.113\.8([,[:space:]]|$)' <<< "$v4" || fail "a permanent ban is not a set element"
 grep -q '203\.0\.113\.8 timeout' <<< "$v4" && fail "a permanent ban's set element has a timeout"
 docker exec "$CONTAINER" nft list set inet zamfono sip_ban_v6 | grep '2001:db8:1:2::/64 timeout' > /dev/null \
