@@ -9,7 +9,7 @@
   "dependencies": {
     "@zamfono/shared": "*",
     "kysely": "^0.29.6",
-    "pino": "^10.3.1",
+    "pino": "^10.4.0",
     "ws": "^8.22.0",
     "zod": "^4.6.5"
   },
