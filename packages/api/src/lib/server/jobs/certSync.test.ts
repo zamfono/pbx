@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import {
   mkdir,
   mkdtemp,
@@ -155,8 +156,8 @@ function selfSignedCert(workDir: string): { crt: Buffer; key: Buffer } {
     crtPath
   ]);
   return {
-    crt: execFileSync('cat', [crtPath]),
-    key: execFileSync('cat', [keyPath])
+    crt: readFileSync(crtPath),
+    key: readFileSync(keyPath)
   };
 }
 
@@ -211,8 +212,8 @@ function caIssuedCert(
     leafCrt
   ]);
   return {
-    crt: execFileSync('cat', [leafCrt]),
-    key: execFileSync('cat', [leafKey])
+    crt: readFileSync(leafCrt),
+    key: readFileSync(leafKey)
   };
 }
 
