@@ -57,11 +57,17 @@ jobs:
         # zamfono/<name>:ci is what docker-bake.hcl tags them; the test-devices image in the
         # same archive is a test fixture, and the sipp image there is upstream's, so both stay
         # unpublished. The short sha is the name `promote` looks the build up by when this
-        # commit is released.
+        # commit is released. A push is tried three times: ghcr.io now and then answers one with
+        # "unknown blob", mostly for a layer it mounts from another of the images, and the same
+        # push passes moments later.
         run: |
           for name in $(bash .github/scripts/stack-images.sh); do
             for tag in edge "sha-${GITHUB_SHA::7}"; do
               docker tag "zamfono/$name:ci" "$REGISTRY/$name:$tag"
-              docker push "$REGISTRY/$name:$tag"
+              for attempt in 1 2 3; do
+                docker push "$REGISTRY/$name:$tag" && break
+                [ "$attempt" -lt 3 ] || exit 1
+                sleep 15
+              done
             done
           done
