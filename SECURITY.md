@@ -3,7 +3,8 @@
 ## Scope
 
 This repository builds the Zamfono Compose stack and publishes its images at
-`ghcr.io/zamfono/{asterisk,migrate,core,api}`. Security reports belong here when they concern:
+`ghcr.io/zamfono/{asterisk,migrate,core,api,proxy,updater}`. Security reports belong here when
+they concern:
 
 - the control plane: authentication, sessions, roles and scopes, OAuth and SSO, the REST and MCP
   surfaces, webhook signatures, the handling of stored secrets;
