@@ -17,7 +17,7 @@
     "argon2": "^0.45.1",
     "better-sqlite3": "^13.0.3",
     "cron-parser": "^5.10.1",
-    "handlebars": "^4.7.9",
+    "handlebars": "^4.7.10",
     "jose": "^6.2.12",
     "kysely": "^0.29.6",
     "lean-qr": "^2.7.4",
