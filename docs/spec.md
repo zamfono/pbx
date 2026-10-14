@@ -488,6 +488,8 @@ services:
       - NET_ADMIN                               # the ban helper's nftables table, in this namespace only (§5.6, §9.1)
     healthcheck:                                # the ban helper's heartbeat in sip_ban_helper.status is fresh (§9.1)
       test: ["CMD", "/usr/local/bin/ban-helper-alive"]
+    ulimits:
+      nofile: 65536                             # ~11 per call: the runtime's default 1024 caps a stack at ~90 calls (§6.6)
     volumes:
       - media:/media
       - asterisk-config:/etc/asterisk/gen       # rendered by api: pjsip_users/trunks, hints, MoH, TLS cert
@@ -857,7 +859,7 @@ Litestream is the sole WAL checkpointer: it holds a long-lived read lock, and th
 
 *(informative)* The stack is designed for 5–20 users and is comfortable to roughly **200**, where the first two constraints bind at a similar scale:
 
-1. **RTP range**: 201 ports ≈ 100 RTP sessions (one RTP + one RTCP port per leg; `rtcp_mux` reduces a leg to one port where the peer negotiates it) = 100 legs ≈ **50 concurrent bridged calls** at two legs each. Via Erlang B at 1 % blocking, 50 call slots carry ~38 Erlangs ≈ 220 office users at the traditional planning load of 6 CCS (≈ 0.17 Erlang, 10 busy-hour minutes) per station. Parallel-ringing legs consume ports while ringing, so simultaneous-ring groups eat into this transiently; the range is a `.env` change to raise (in the ports mode the overlay publishes the same variables, §6.3).
+1. **RTP range**: 201 ports ≈ 100 RTP sessions (one RTP + one RTCP port per leg; `rtcp_mux` reduces a leg to one port where the peer negotiates it) = 100 legs ≈ **50 concurrent bridged calls** at two legs each. Via Erlang B at 1 % blocking, 50 call slots carry ~38 Erlangs ≈ 220 office users at the traditional planning load of 6 CCS (≈ 0.17 Erlang, 10 busy-hour minutes) per station. Parallel-ringing legs consume ports while ringing, so simultaneous-ring groups eat into this transiently; the range is a `.env` change to raise (in the ports mode the overlay publishes the same variables, §6.3). Each call also holds about eleven open files in Asterisk (two channels with their RTP and RTCP sockets, timers and alert pipes), which the runtime's default limit of 1024 would cap at about 90 calls; `compose.yaml` raises Asterisk's limit to 65536, far past any range the ports allow.
 2. **Reload-based provisioning** (§9.1): the artifacts that grow with tenant size are `pjsip_users.conf` (one endpoint + auth + aor section per device) and the generated hints file (one line per user/ring-group extension). Every config change re-renders these files, and the global reload re-creates all PJSIP objects and re-parses all hints, so the cost is linear in the total endpoint count, not in the size of the change. The reload is invisible to devices — registrations are state in AstDB and survive it, as do calls and subscriptions; only a TLS-transport reload on certificate change is disruptive (§6.4). Sub-second into the hundreds of endpoints; beyond that the remedy is incremental provisioning (e.g. ARI push configuration), not a faster reload.
 3. **On-demand statistics** (§10.3): fine to ~5–10 M `calls` rows, then rollup tables.
 4. **SQLite writes**: ~10 write transactions per call at ≤ 60 busy-hour calls per extension ≈ 0.17 writes/s per extension, against ≥ 1,000 sustained write tx/s (WAL, `synchronous=NORMAL`, local NVMe) — comfortable into the thousands of extensions, an order of magnitude past every other constraint.

@@ -15,6 +15,8 @@ why the specified behaviour changed; the commit history, how.
 
 - Mode B (several stacks on one host, `compose.macvlan.yaml`): a stack whose directory name sorts before `public`, such as `/srv/acme`, sent its replies to phones, trunks and Let's Encrypt out through the host's address instead of its own, so calls and certificates failed; on Podman every stack did. `public` now always carries the stack's default route.
 
+- A stack could hold at most about 90 concurrent calls: beyond that Asterisk ran out of open files and refused further calls with 503. It may now hold 65536, which no RTP range reaches. Stacks on the default RTP range (about 50 calls) were not affected.
+
 ### Upgrade notes
 
 - Mode B on Docker needs Docker Engine 28 and Compose 2.33 or newer.

@@ -50,6 +50,7 @@ bring_up_stack() {
 step_runtime_asserts() {
   assert_runtime_ordering
   assert_shared_namespace
+  assert_asterisk_open_files
 }
 
 # §9.1: every prompt the core plays ships in the asterisk image; selectable as `prompts`.

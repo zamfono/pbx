@@ -1,4 +1,4 @@
-# Sourced by `run.sh`: the two of §6.3 "Runtimes" four guarded features that are not asserted
+# Sourced by `run.sh`: Asterisk's open-file limit (§6.6) and the two of §6.3 "Runtimes" four guarded features that are not asserted
 # inline there (the namespace share and the migrate exit code are, right where the stack comes
 # up). Reads `run.sh`'s own `COMPOSE`, `compose`, `run_dir`, `RUNTIME`, `here` and `fail`,
 # and runs with `run.sh`'s own working directory, the stack directory, so `compose.yaml` resolves
@@ -35,6 +35,17 @@ assert_shared_namespace() {
   asterisk_ns=$(dc exec -T asterisk readlink /proc/self/ns/net)
   [ -n "$netns_ns" ] && [ "$proxy_ns" = "$netns_ns" ] && [ "$asterisk_ns" = "$netns_ns" ] \
     || fail "asterisk and proxy do not share netns's network namespace (network_mode: service:)"
+}
+
+# §6.6: Asterisk may hold 65536 open files (compose.yaml's `ulimits`), not the runtime's default
+# 1024, which caps a stack at about 90 calls.
+assert_asterisk_open_files() {
+  echo '== §6.6: Asterisk may hold 65536 open files =='
+  local soft
+  soft=$(dc exec -T asterisk sh -c 'cat /proc/$(pidof asterisk | cut -d" " -f1)/limits' \
+    | awk '/^Max open files/ {print $4}')
+  [ "${soft:-0}" -ge 65536 ] \
+    || fail "Asterisk's open-file limit is ${soft:-unknown}, not 65536 (compose.yaml ulimits)"
 }
 
 # §6.3 Runtimes: "the static address on the `public` network". `compose.macvlan.yaml` names an

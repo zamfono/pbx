@@ -44,6 +44,8 @@ services:
       - NET_ADMIN                               # the ban helper's nftables table, in this namespace only (§5.6, §9.1)
     healthcheck:                                # the ban helper's heartbeat in sip_ban_helper.status is fresh (§9.1)
       test: ["CMD", "/usr/local/bin/ban-helper-alive"]
+    ulimits:
+      nofile: 65536                             # ~11 per call: the runtime's default 1024 caps a stack at ~90 calls (§6.6)
     volumes:
       - media:/media
       - asterisk-config:/etc/asterisk/gen       # rendered by api: pjsip_users/trunks, hints, MoH, TLS cert

@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-14 · §6.3 `compose.yaml`, §6.6.** The `asterisk` service gets `ulimits: nofile: 65536`, and §6.6 names the limit next to the RTP range.
+*Why:* the density measurement (TASK-50) found Asterisk refusing calls with 503 at about 90 concurrent calls, `Too many open files`, under the runtime's default limit of 1024 with host CPU at 15 %; each call holds about eleven files, so any tenant that widens the RTP range as §6.6 suggests would hit it (TASK-52).
+
 **2026-10-14 · §6.2.1 step 3, §6.3 `compose.macvlan.yaml`.** `netns` gives `public` `gw_priority: 1`, and step 3 creates `public` on Podman with `-o metric=50`, so a macvlan stack's default route is always `public`'s; the step says why and names Docker Engine ≥ 28 with Compose ≥ 2.33.
 *Why:* the density measurement (TASK-50) found that Docker otherwise takes the default route from the network whose name sorts first, so a stack directory such as `acme` (`acme_internal`) routed its replies through its bridge and the host's address, and that Podman ignores `gw_priority` and installs a route per network at equal metric, picking the bridge for every stack (TASK-51, verified on Docker 29.9 and Podman 5.4).
 
