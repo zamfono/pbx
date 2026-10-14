@@ -17,9 +17,12 @@ why the specified behaviour changed; the commit history, how.
 
 - A stack could hold at most about 90 concurrent calls: beyond that Asterisk ran out of open files and refused further calls with 503. It may now hold 65536, which no RTP range reaches. Stacks on the default RTP range (about 50 calls) were not affected.
 
+- On a host with many stacks (mode B) every stack's SIP ban helper could spin at full speed once the kernel's inotify limit ran out, saturating the host's CPU while it was idle. It now falls back to looking at the ban list every 2 seconds and logs that once.
+
 ### Upgrade notes
 
 - Mode B on Docker needs Docker Engine 28 and Compose 2.33 or newer.
+- Mode B with more than a few stacks: raise the kernel's inotify limit (deploy/README.md step 3).
 - Mode B on Podman: create the `public` network again with `-o metric=50` (deploy/README.md step 3): stop the host's stacks, `podman network rm public`, create it as step 3 now shows, and start them.
 
 ## [0.4.2] - 2026-10-14

@@ -165,6 +165,14 @@ ports it answers on are exactly those of the Mode A table; `SIP_UDP_ENABLED` and
 are how such a stack goes TLS-only. The host cannot reach a stack's address from its parent
 interface (a macvlan property), so check a stack from outside.
 
+Raise the kernel's inotify limit on a host with more than a few stacks. Every stack's processes
+share it as root, and the Debian default of 128 runs out somewhere between 10 and 25 stacks:
+
+```bash
+echo 'fs.inotify.max_user_instances = 8192' > /etc/sysctl.d/90-zamfono.conf
+sysctl --system
+```
+
 ## 4. DNS
 
 Point an **A record** for the stack's name (`FQDN`) at its address — the host's in mode A, the

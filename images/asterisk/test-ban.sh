@@ -85,3 +85,29 @@ docker exec "$CONTAINER" sh -c "echo '2000-01-01T00:00:00Z $applied' > $GEN/sip_
 if docker exec "$CONTAINER" ban-helper-alive; then
   fail "the healthcheck passes on a stale heartbeat"
 fi
+
+# Without inotify (TASK-53: a host whose fs.inotify.max_user_instances many stacks used up), the
+# helper still applies a changed list within its poll interval, logs the outage once and does not
+# spin: the image's own helper, in a throwaway container, with an inotifywait that cannot start and
+# an nft that counts its calls. A busy loop would call nft thousands of times in these 9 seconds.
+fallback=$(docker run --rm --entrypoint bash "$ASTERISK_IMAGE" -c '
+  mkdir -p /tmp/gen /tmp/stub
+  printf "#!/bin/sh\necho \"Couldn'"'"'t initialize inotify: Too many open files\" >&2\nexit 1\n" \
+    > /tmp/stub/inotifywait
+  printf "#!/bin/sh\necho call >> /tmp/nft.calls\n[ \"\$1\" = -f ] && cat > /dev/null\nexit 0\n" \
+    > /tmp/stub/nft
+  chmod +x /tmp/stub/inotifywait /tmp/stub/nft
+  SIP_BAN_GEN_DIR=/tmp/gen PATH=/tmp/stub:$PATH /usr/local/bin/sip-ban-helper 2> /tmp/helper.log &
+  sleep 4
+  echo 203.0.113.7 > /tmp/gen/.l && mv /tmp/gen/.l /tmp/gen/sip_bans.list
+  sleep 5
+  kill $!
+  echo "calls=$(wc -l < /tmp/nft.calls)"
+  echo "logged=$(grep -c "cannot watch" /tmp/helper.log)"
+  [ "$(cut -d" " -f2 /tmp/gen/sip_ban_helper.status)" = "$(sha256sum < /tmp/gen/sip_bans.list | cut -d" " -f1)" ] \
+    && echo applied=yes || echo applied=no
+')
+grep -qx 'applied=yes' <<< "$fallback" || fail "without inotify the helper did not apply a changed list: $fallback"
+grep -qx 'logged=1' <<< "$fallback" || fail "without inotify the helper did not log the outage exactly once: $fallback"
+calls=$(sed -n 's/^calls=//p' <<< "$fallback")
+[ "${calls:-0}" -le 10 ] || fail "without inotify the helper called nft $calls times in 9 s (a busy loop)"

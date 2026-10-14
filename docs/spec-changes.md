@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-14 · §6.2.1 step 3, §9.1 ban list.** While inotify cannot watch, the ban helper logs that once and looks at the list every 2 seconds instead of spinning, and step 3 tells a host with many stacks to raise `fs.inotify.max_user_instances`.
+*Why:* the density measurement (TASK-50) found 25 idle stacks at 98 % host CPU and 50 at a load average of 74 on 8 vCPUs: past the Debian default of 128 inotify instances, which every stack's root processes share, each helper's `inotifywait` failed at once and its loop ran without pause (TASK-53).
+
 **2026-10-14 · §6.3 `compose.yaml`, §6.6.** The `asterisk` service gets `ulimits: nofile: 65536`, and §6.6 names the limit next to the RTP range.
 *Why:* the density measurement (TASK-50) found Asterisk refusing calls with 503 at about 90 concurrent calls, `Too many open files`, under the runtime's default limit of 1024 with host CPU at 15 %; each call holds about eleven files, so any tenant that widens the RTP range as §6.6 suggests would hit it (TASK-52).
 

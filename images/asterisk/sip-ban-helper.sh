@@ -9,10 +9,12 @@
 # refused as a whole and the sets keep what they hold, so the file's text never reaches `nft`.
 set -uo pipefail
 
-GEN_DIR=/etc/asterisk/gen
+GEN_DIR=${SIP_BAN_GEN_DIR:-/etc/asterisk/gen}  # the variable only for test-ban.sh
 LIST=$GEN_DIR/sip_bans.list
 STATUS=$GEN_DIR/sip_ban_helper.status
 HEARTBEAT_S=30
+# How often the list is looked at while inotify is unavailable.
+POLL_S=2
 
 log() { echo "sip-ban-helper: $*" >&2; }
 
@@ -92,11 +94,38 @@ write_status() {
     && mv "$STATUS.tmp" "$STATUS"
 }
 
+# The list's identity, size and time, which a rename, a rewrite or a deletion changes.
+list_stamp() { stat -c '%i %s %Y' "$LIST" 2> /dev/null || echo none; }
+
+# Without inotify (inotifywait exits 1 when it cannot start, e.g. once the host's
+# fs.inotify.max_user_instances is used up by many stacks), until the list's stamp changes or a
+# heartbeat is due: a `stat` every POLL_S, never a busy loop.
+poll_list() {
+  local before waited=0
+  before=$(list_stamp)
+  while [ "$waited" -lt "$HEARTBEAT_S" ]; do
+    sleep "$POLL_S"
+    waited=$((waited + POLL_S))
+    [ "$(list_stamp)" = "$before" ] || return 0
+  done
+}
+
 # A list replaced by a rename is a new file, so the directory is watched, not the file. A wake-up
-# without an event applies nothing new: `apply` compares digests.
+# without an event applies nothing new: `apply` compares digests. inotifywait exits 0 on an event,
+# 2 on its timeout and 1 when it cannot watch, which is logged once per outage.
+inotify=ok
 while :; do
   apply
   write_status
   inotifywait -qq -t "$HEARTBEAT_S" -e close_write,moved_to,delete \
-    --include '(^|/)sip_bans\.list$' "$GEN_DIR" || true
+    --include '(^|/)sip_bans\.list$' "$GEN_DIR"
+  if [ $? -eq 1 ]; then
+    [ "$inotify" = failed ] \
+      || log "inotifywait cannot watch $GEN_DIR; looking at the list every ${POLL_S}s instead"
+    inotify=failed
+    poll_list
+  elif [ "$inotify" = failed ]; then
+    log "inotifywait watches $GEN_DIR again"
+    inotify=ok
+  fi
 done
