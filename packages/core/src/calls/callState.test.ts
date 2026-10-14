@@ -19,6 +19,7 @@ import { endLeg, trackLeg } from './legs.js';
 import type { Pipeline } from './pipeline.js';
 
 type CallStateEvent = Extract<Envelope, { type: 'call.state' }>;
+type CallLegsEvent = Extract<Envelope, { type: 'call.legs' }>;
 
 function leg(userId: string, state: Leg['state']): Leg {
   return {
@@ -48,13 +49,17 @@ describe('a live call’s users (§10.3 "Live calls", §10.6)', () => {
   let deps: CallStateDeps;
   let call: Call;
   let events: CallStateEvent[];
+  let legEvents: CallLegsEvent[];
 
   beforeEach(() => {
     deps = { state: new StateStore(), bus: new EventBus() };
     events = [];
+    legEvents = [];
     onEvents(deps.bus, envelope => {
       if (envelope.type === 'call.state') {
         events.push(envelope);
+      } else if (envelope.type === 'call.legs') {
+        legEvents.push(envelope);
       }
     });
     call = newCall({
@@ -235,5 +240,46 @@ describe('a live call’s users (§10.3 "Live calls", §10.6)', () => {
     call.legs.set('x', leg('member', 'ringing'));
     callPartiesChanged(deps, call);
     expect(events).toEqual([]);
+    expect(legEvents).toEqual([]);
+  });
+
+  it('sends call.legs whenever a leg starts ringing or ends while the state stays (§10.6)', () => {
+    const pipeline = fakePipeline(deps);
+    callRinging(deps, call);
+    const desk = leg('member', 'ringing');
+    trackLeg(pipeline, call, desk);
+    expect(legEvents.at(-1)).toMatchObject({
+      callId: call.id,
+      state: 'ringing',
+      legs: [
+        { role: 'caller', userId: 'caller' },
+        { id: desk.id, state: 'ringing', userId: 'member' }
+      ]
+    });
+
+    // The member's second phone: no user starts or stops seeing the call, its legs still change.
+    const usersOnlyBefore = events.length;
+    const app = leg('member', 'ringing');
+    trackLeg(pipeline, call, app);
+    expect(events).toHaveLength(usersOnlyBefore);
+    expect(legEvents.at(-1)?.legs.map(entry => entry.id)).toEqual([
+      call.callerLegId,
+      desk.id,
+      app.id
+    ]);
+
+    endLeg(pipeline, desk.channelId, desk);
+    expect(legEvents.at(-1)?.legs.map(entry => entry.id)).toEqual([
+      call.callerLegId,
+      app.id
+    ]);
+    expect(legEvents).toHaveLength(3);
+
+    // Nothing changed: no event. The state's own events carry the legs themselves.
+    callPartiesChanged(deps, call);
+    app.state = 'up';
+    callUp(deps, call);
+    callEnded(deps, call);
+    expect(legEvents).toHaveLength(3);
   });
 });

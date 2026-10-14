@@ -235,7 +235,12 @@ describe('startInternalServer', () => {
       ringGroupId: null,
       since: nowIso()
     };
-    state.calls.set(call.id, { call, state: 'ringing', notified: new Set() });
+    state.calls.set(call.id, {
+      call,
+      state: 'ringing',
+      notified: new Set(),
+      legs: '[]'
+    });
     state.trunks.set('mainTrunk', trunk);
     state.presence.set('user1', available);
     state.trunkChannels.set('mainTrunk', 2);

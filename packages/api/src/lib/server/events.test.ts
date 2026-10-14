@@ -159,6 +159,22 @@ describe('visibleTo', () => {
     expect(visibleTo(admin, left)).toBe(false);
   });
 
+  it('shows call.legs to an admin, never to a user, even one with a leg in it (§10.6)', () => {
+    const legs: Envelope = {
+      id: 'e5',
+      at: nowIso(),
+      type: 'call.legs',
+      callId: 'c3',
+      state: 'ringing',
+      peer: '+15550100',
+      ringGroupId: 'group-1',
+      userId: null,
+      legs: [{ id: 'l1', role: 'callee', state: 'ringing', userId: user.id }]
+    };
+    expect(visibleTo(admin, legs)).toBe(true);
+    expect(visibleTo(user, legs)).toBe(false);
+  });
+
   it('shows a user only the tenant-scope ooo and hours events', () => {
     const tenantOoo: Envelope = {
       id: 'e1',

@@ -3,9 +3,10 @@
  * `call.state` events `/events` subscribers and webhooks receive (§10.6). Both track the same
  * three moments, so both are written here and cannot drift apart. Whose call it is changes in
  * between, as legs start and stop ringing: `liveView` reads its users from the `Call` each time
- * it is served, and `callPartiesChanged` tells the users the call starts or stops being theirs.
+ * it is served, and `callPartiesChanged` tells the users the call starts or stops being theirs,
+ * and admins and webhooks its legs (`call.legs`).
  */
-import type { LiveCall } from '@zamfono/shared';
+import type { LiveCall, LiveLeg } from '@zamfono/shared';
 
 import type { EventBus } from '../internal/eventBus.js';
 import type { StateStore } from '../internal/stateStore.js';
@@ -17,13 +18,14 @@ import { liveLegs } from './liveLegs.js';
 /** The two collaborators the live view needs, so `CdrWriter` can publish the end as well. */
 export type CallStateDeps = { state: StateStore; bus: EventBus };
 
-/** A call in the live view (`StateStore.calls`): the call itself, the state it is in, and the
+/** A call in the live view (`StateStore.calls`): the call itself, the state it is in, the
  * users its last `call.state` event reached, so the ones it no longer reaches get their
- * `ended`. */
+ * `ended`, and the legs its last event carried, as JSON, so only a change sends `call.legs`. */
 export type LiveEntry = {
   call: Call;
   state: 'ringing' | 'up';
   notified: ReadonlySet<string>;
+  legs: string;
 };
 
 /** Whether a leg's user sees the call: while it rings or is up, never while it is still being
@@ -128,6 +130,24 @@ function emit(
   });
 }
 
+/** §10.6 `call.legs`: `call`, still in `state`, now has `legs`. */
+function emitLegs(
+  deps: CallStateDeps,
+  call: Call,
+  state: 'ringing' | 'up',
+  legs: LiveLeg[]
+): void {
+  deps.bus.emit({
+    type: 'call.legs',
+    callId: call.id,
+    state,
+    peer: peerOf(call),
+    ringGroupId: call.ringGroupId,
+    userId: call.answeredByUserId ?? call.calleeUserId,
+    legs
+  });
+}
+
 /** The users `entry`'s last event reached that are not among `current`. */
 function leftSince(
   entry: LiveEntry | undefined,
@@ -145,7 +165,12 @@ function publish(
 ): void {
   const current = participants(call);
   const left = leftSince(deps.state.calls.get(call.id), current);
-  deps.state.calls.set(call.id, { call, state, notified: new Set(current) });
+  deps.state.calls.set(call.id, {
+    call,
+    state,
+    notified: new Set(current),
+    legs: JSON.stringify(liveLegs(deps.state, call))
+  });
   if (left.length > 0) {
     emit(deps, call, 'ended', left, true);
   }
@@ -153,9 +178,10 @@ function publish(
 }
 
 /**
- * The call's users changed while its state did not: a leg started or stopped ringing, or left.
+ * The call's legs changed while its state did not: a leg started or stopped ringing, or left.
  * A user it is no longer the call of receives `ended`, one it now is the call of its state, each
- * as a `usersOnly` event; nothing for a call not in the live view.
+ * as a `usersOnly` event, and admins and webhooks receive its legs as `call.legs`; nothing for a
+ * call not in the live view.
  */
 export function callPartiesChanged(deps: CallStateDeps, call: Call): void {
   const entry = deps.state.calls.get(call.id);
@@ -165,12 +191,21 @@ export function callPartiesChanged(deps: CallStateDeps, call: Call): void {
   const current = participants(call);
   const left = leftSince(entry, current);
   const joined = current.filter(id => !entry.notified.has(id));
-  deps.state.calls.set(call.id, { ...entry, notified: new Set(current) });
+  const legs = liveLegs(deps.state, call);
+  const legsJson = JSON.stringify(legs);
+  deps.state.calls.set(call.id, {
+    ...entry,
+    notified: new Set(current),
+    legs: legsJson
+  });
   if (left.length > 0) {
     emit(deps, call, 'ended', left, true);
   }
   if (joined.length > 0) {
     emit(deps, call, entry.state, joined, true);
+  }
+  if (legsJson !== entry.legs) {
+    emitLegs(deps, call, entry.state, legs);
   }
 }
 

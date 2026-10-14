@@ -275,6 +275,33 @@ describe('WebhookDispatcher', () => {
     expect(stub.requests).toHaveLength(0);
   });
 
+  it('posts call.legs to a hook whose filter selects it, and not its call.state (§10.6)', async () => {
+    const db = await migratedTestDb();
+    const kr = testKeyring();
+    await insertWebhook(db, kr, {
+      url: stub.url,
+      eventTypesJson: JSON.stringify(['call.legs'])
+    });
+    const dispatcher = new WebhookDispatcher({ db, kr, delay: noDelay });
+    const legs: Envelope = {
+      id: 'evt-4',
+      at: nowIso(),
+      type: 'call.legs',
+      callId: 'c1',
+      state: 'ringing',
+      peer: '+15550100',
+      ringGroupId: 'group-1',
+      userId: null,
+      legs: [{ id: 'l1', role: 'callee', state: 'ringing', userId: 'u2' }]
+    };
+
+    await dispatcher.enqueue(sampleEvent());
+    await dispatcher.enqueue(legs);
+
+    expect(stub.requests).toHaveLength(1);
+    expect(JSON.parse(stub.requests[0]?.body ?? '')).toEqual(legs);
+  });
+
   it('a hook with an unparsable event-type filter never blocks delivery to the others', async () => {
     const db = await migratedTestDb();
     const kr = testKeyring();

@@ -13,6 +13,7 @@ export type Scope =
 export const EVENT_TYPES = [
   'presence',
   'call.state',
+  'call.legs',
   'voicemail.new',
   'ooo',
   'hours',
@@ -55,6 +56,16 @@ type EventFields = {
      * `userIds`.
      */
     usersOnly?: true;
+  };
+  /** A live call's legs changed while its own state did not (§10.6): a leg started or stopped
+   * ringing, or left. Admins and webhooks only; a `user` has `call.state`'s `usersOnly` events. */
+  'call.legs': {
+    callId: string;
+    state: 'ringing' | 'up';
+    peer: string | null;
+    ringGroupId: string | null;
+    userId: string | null;
+    legs: LiveLeg[];
   };
   'voicemail.new': { voicemailId: string; mailbox: MwiMailbox };
   ooo: {

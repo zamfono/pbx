@@ -84,6 +84,27 @@ function traceEvents(call: Call, name: string): Record<string, unknown>[] {
  * and the race holds it, so an event the test emits for it from here on reaches the race; the
  * fake merely having received the originate is not enough.
  */
+/** What webhooks see of the members (§10.6): per public `call.state` and every `call.legs`, each
+ * member leg's state by name, as `names` maps their user ids. */
+function watchMembers(
+  pipeline: Pipeline,
+  names: Record<string, string>
+): string[] {
+  const seen: string[] = [];
+  onEvents(pipeline.deps.bus, envelope => {
+    if (
+      (envelope.type === 'call.state' && envelope.usersOnly !== true) ||
+      envelope.type === 'call.legs'
+    ) {
+      const legs = envelope.legs
+        .filter(leg => leg.role !== 'caller' && leg.userId !== undefined)
+        .map(leg => `${names[leg.userId ?? ''] ?? '?'}:${leg.state}`);
+      seen.push(`${envelope.type}(${envelope.state}) ${legs.join(' ')}`.trim());
+    }
+  });
+  return seen;
+}
+
 function membersRinging(call: Call, count: number): Promise<void> {
   return eventually(() => {
     expect(traceEvents(call, 'ringGroupMember')).toHaveLength(count);
@@ -261,6 +282,11 @@ describe('ringGroup', () => {
       events
         .filter(event => event.userIds.includes(userId))
         .map(event => `${event.state}${event.usersOnly ? '*' : ''}`);
+    const webhook = watchMembers(pipeline, {
+      [declining]: 'declining',
+      [winning]: 'winning',
+      [losing]: 'losing'
+    });
     const live = (): LiveCall =>
       liveView(
         pipeline.deps.state,
@@ -301,6 +327,15 @@ describe('ringGroup', () => {
     expect(eventsFor(declining)).toEqual(['ringing*', 'ended*']);
     expect(eventsFor(losing)).toEqual(['ringing*', 'up', 'ended*']);
     expect(eventsFor(winning)).toEqual(['ringing*', 'up']);
+    // A webhook follows each member from `call.state` and `call.legs` alone: the declining one's
+    // leg leaving while the others ring on, then the winner's answer and the loser's leg ending.
+    expect(webhook).toEqual([
+      'call.state(ringing)',
+      'call.legs(ringing) declining:ringing winning:ringing losing:ringing',
+      'call.legs(ringing) winning:ringing losing:ringing',
+      'call.state(up) winning:up losing:ringing',
+      'call.legs(up) winning:up'
+    ]);
   });
 
   it("names a phone-book caller on the member legs: the contact's display name is the caller-ID name (§10.2)", async () => {
@@ -603,6 +638,7 @@ describe('ringGroup', () => {
     await registerDevice(fakeAri, pipeline, 'seq-b');
     await seedMember(db, groupId, 0, userA);
     await seedMember(db, groupId, 1, userB);
+    const webhook = watchMembers(pipeline, { [userA]: 'a', [userB]: 'b' });
 
     const finished = ringGroup(pipeline, call, groupId);
     await membersRinging(call, 1);
@@ -614,6 +650,16 @@ describe('ringGroup', () => {
     });
 
     await finished;
+    // A webhook sees each member's ring start and stop as the group steps on (§10.6).
+    expect(webhook).toEqual([
+      'call.state(ringing)',
+      'call.legs(ringing) a:ringing',
+      'call.legs(ringing)',
+      'call.state(ringing)',
+      'call.legs(ringing) b:ringing',
+      'call.legs(ringing)',
+      'call.state(ended)'
+    ]);
     expect(call.status).toBe('missed');
     const released = fakeAri.calls.some(
       entry =>

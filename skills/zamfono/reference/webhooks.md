@@ -27,7 +27,8 @@ or left out delivers every event. On `webhooks.update`, `null` clears the filter
 field out keeps it. A hook receives every event its filter admits, whatever role created it: the
 per-role visibility of `/events` does not apply. There a `user` receives a call's `call.state`
 events while it is theirs to see (`guardrails`), and `ended` once it stops being theirs while it
-goes on for others, as when their phone stops ringing; a hook never receives that `ended`.
+goes on for others, as when their phone stops ringing; a hook never receives that `ended`, and
+receives `call.legs` instead, which a `user` never does.
 
 ## Events and payloads
 
@@ -38,6 +39,7 @@ the fields of its type:
 | ------------------ | ------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
 | `presence`         | `userId`, `status` (`available`, `busy`, `offline`, `dnd`), `peer`, `ringGroupId`     | a user's presence changes; `peer` and group while busy          |
 | `call.state`       | `callId`, `state` (`ringing`, `up`, `ended`), `peer`, `ringGroupId`, `userId`, `legs` | a call starts ringing, is answered, is held or resumed, or ends |
+| `call.legs`        | `callId`, `state` (`ringing`, `up`), `peer`, `ringGroupId`, `userId`, `legs`          | a leg starts ringing, stops ringing or leaves; the state stays  |
 | `voicemail.new`    | `voicemailId`, `mailbox` (`user:<id>` or `ringGroup:<id>`)                            | a message is left (`call-data`)                                 |
 | `ooo`              | `scope`, `active`, `startsAt`, `expiresAt`                                            | an out-of-office rule starts or ends                            |
 | `hours`            | `scope`, `open`                                                                       | an opening-hours interval opens or closes                       |
@@ -52,6 +54,12 @@ A `scope` is `tenant`, `user:<id>`, `ringGroup:<id>` or `menu:<id>`. `peer` is t
 as the routing pipeline sees it: an extension, an international number, a provider's verbatim
 string or `anonymous`. `legs` are the call's parties as `calls.list` with `live: true` lists them
 (`call-control`), empty once it ended. Fields that do not apply are `null`.
+
+`call.state` and `call.legs` together give per-user call state, as a CRM shows it per extension:
+a call starts ringing for a user when a leg with their `userId` appears ringing, is answered by
+them when that leg turns `up`, and stops being theirs when no leg of theirs is left. A sequential
+ring group sends one `call.legs` as a member's leg starts ringing and one as it stops, and a
+user's phones each have a leg, with its `deviceId`.
 
 ```json
 {
