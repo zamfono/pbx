@@ -142,7 +142,16 @@ stack_tok() {
   local made
   made=$(stat -c %Y "$STACK_DIR/.token" 2>/dev/null || echo 0)
   if [ $(($(date +%s) - made)) -ge "$TOKEN_RENEW_AFTER_S" ]; then
-    stack_token
+    # A few tries: with several stacks starting at once, a freshly healthy api has answered the
+    # login with nothing (stage 2), which must not abort a run of many stacks.
+    local try
+    for try in 1 2 3 4 5; do
+      token=$(bash "$repo/test/integration/bootstrap-token.sh" "$api_base" "$OWNER_EMAIL" \
+        "$OWNER_PASSWORD" "https://$FQDN" 2>>"$OUT_DIR/session.log") && [ -n "$token" ] && break
+      log "stack $si: no token on try $try"
+      sleep 5
+    done
+    [ -n "$token" ] || fail "stack $si: could not obtain an access token"
     printf '%s' "$token" > "$STACK_DIR/.token"
   fi
 }
