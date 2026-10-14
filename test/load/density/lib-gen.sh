@@ -7,7 +7,8 @@
 #                            g711   PCMA only, port 5060, RTP 10000-34999 (P1, P2, P3)
 #                            amrwb  AMR-WB octet-aligned only, port 5070, RTP 35000-59999 (P4)
 #   density-gen-<i>-dev    baresip (DEVICES_IMAGE) at <GEN_PREFIX>.3.<i>, every device of the
-#                          stack's users registered, one process per PER_PROC devices of a kind
+#                          stack's users registered, one process per PER_PROC devices of a kind (1: a baresip process
+#                          answering a second call puts its first on hold)
 #                          (gen_baresip.py): alaw / g722 desk phones over UDP, opus Ringotel
 #                          stand-ins over TLS with SDES-SRTP; a user's first device auto-answers,
 #                          the others only ring
@@ -126,10 +127,18 @@ gen_devices_start() {
     done
   done
   gen_push
-  for dir in "$GEN_DIR/s$si"/bs-*; do
-    dir=/load-gen/s$si/${dir##*/}
-    gen docker exec -d "density-gen-$si-dev" sh -c "baresip -f $dir > $dir/baresip.log 2>&1"
-  done
+  gen_devices_launch "$GEN_DIR/s$si"/bs-*
+}
+
+# Stack `si`'s baresip processes for the configuration directories `$@` (paths in GEN_DIR),
+# started by one `docker exec`, however many there are.
+gen_devices_launch() {
+  local dirs=() d
+  for d in "$@"; do dirs+=("/load-gen/s$si/${d##*/}"); done
+  [ ${#dirs[@]} -gt 0 ] || return 0
+  # shellcheck disable=SC2016 # expanded by the container's sh
+  gen docker exec -d "density-gen-$si-dev" sh -c \
+    'for d in "$@"; do baresip -f "$d" >> "$d/baresip.log" 2>&1 & done; wait' sh "${dirs[@]}"
 }
 
 # Stack `si`'s TLS devices (the Ringotel stand-ins) register afresh: what Ringotel does when
@@ -137,29 +146,24 @@ gen_devices_start() {
 # Asterisk needs since it holds no TLS registration of the one before. baresip 1.1 has no
 # command for it, so their processes start anew, registering at once.
 gen_devices_rereg() {
-  local dir
-  gen docker exec "density-gen-$si-dev" pkill -f "baresip -f /load-gen/s$si/bs-opus-"
-  for dir in "$GEN_DIR/s$si"/bs-opus-*; do
-    [ -d "$dir" ] || continue
-    dir=/load-gen/s$si/${dir##*/}
-    gen docker exec -d "density-gen-$si-dev" sh -c "baresip -f $dir >> $dir/baresip.log 2>&1"
-  done
+  gen docker exec "density-gen-$si-dev" pkill -f "^baresip -f /load-gen/s$si/bs-opus-"
+  gen_devices_launch "$GEN_DIR/s$si"/bs-opus-*
 }
 
 # Stack `$1`'s devices all reachable before a step: a baresip process that died (baresip 1.1
 # segfaults now and then, e.g. when Asterisk drops its TLS connections) is started again and its
 # devices awaited, so a step never measures calls to phones that are gone.
 gen_devices_ensure() {
-  local dir total
+  local dir total running dead=()
   stack_use "$1"
   total=$(wc -l < "$STACK_DIR/creds.csv")
   [ "$(devices_available)" -ge "$total" ] && return 0
+  running=$(gen docker exec "density-gen-$si-dev" ps -eo args | sed -n 's#^baresip -f ##p')
   for dir in "$GEN_DIR/s$si"/bs-*; do
-    dir=/load-gen/s$si/${dir##*/}
-    gen docker exec "density-gen-$si-dev" pgrep -f "baresip -f $dir\$" >/dev/null && continue
-    log "stack $si: $dir had died; starting it again"
-    gen docker exec -d "density-gen-$si-dev" sh -c "baresip -f $dir >> $dir/baresip.log 2>&1"
+    grep -qx "/load-gen/s$si/${dir##*/}" <<< "$running" || dead+=("$dir")
   done
+  log "stack $si: ${#dead[@]} baresip process(es) had died; starting them again"
+  gen_devices_launch "${dead[@]}"
   devices_await "$total"
 }
 
