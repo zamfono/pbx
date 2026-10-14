@@ -13,7 +13,9 @@
 #     takes the network whose name sorts first, here `density-<i>_internal`, so replies to a
 #     peer outside the `public` subnet (the remote generator) would leave NATed through the host.
 #     compose.macvlan.yaml sets no priority, so a production stack whose project name sorts
-#     before `public` has the same problem (reported with TASK-50.1)
+#     before `public` has the same problem (TASK-51)
+#   - asterisk may open 65536 files: Docker's default soft limit of 1024 caps a stack at ~90 calls
+#     (TASK-52), a limit calibration steps of 100 calls would measure instead of CPU
 networks:
   internal:
     ipam:
@@ -33,6 +35,10 @@ services:
   asterisk:
     image: ${ASTERISK_IMAGE:?set by density.sh}
     pull_policy: missing
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 524288
 
   migrate:
     image: ${MIGRATE_IMAGE:?set by density.sh}
