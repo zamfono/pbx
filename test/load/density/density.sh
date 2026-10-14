@@ -330,6 +330,7 @@ cmd_step() {
     *) fail "step: EVENT=$EVENT cannot fire during a step (backup, update, tls, docker)" ;;
   esac
   [ -z "$EVENT" ] || name+=".$EVENT.stagger-$STAGGER_S"
+  each gen_devices_ensure
   result_dir "$name"
   local step=${dir##*/}
   log "step $step: P1=$p1 P2=$p2 P3=$p3 P4=$p4 over $N stacks, ${CALL_S}s calls, recorded $REC_SHARE"

@@ -146,6 +146,23 @@ gen_devices_rereg() {
   done
 }
 
+# Stack `$1`'s devices all reachable before a step: a baresip process that died (baresip 1.1
+# segfaults now and then, e.g. when Asterisk drops its TLS connections) is started again and its
+# devices awaited, so a step never measures calls to phones that are gone.
+gen_devices_ensure() {
+  local dir total
+  stack_use "$1"
+  total=$(wc -l < "$STACK_DIR/creds.csv")
+  [ "$(devices_available)" -ge "$total" ] && return 0
+  for dir in "$GEN_DIR/s$si"/bs-*; do
+    dir=/load-gen/s$si/${dir##*/}
+    gen docker exec "density-gen-$si-dev" pgrep -f "baresip -f $dir\$" >/dev/null && continue
+    log "stack $si: $dir had died; starting it again"
+    gen docker exec -d "density-gen-$si-dev" sh -c "baresip -f $dir >> $dir/baresip.log 2>&1"
+  done
+  devices_await "$total"
+}
+
 # Stack `si`'s step `$1` calls on trunk codec `$2` (g711 or amrwb), `$3` of them.
 gen_calls_start() {
   local step=$1 t=$2 k=$3 port=5060 lo=10000 hi=34999
