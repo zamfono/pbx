@@ -1791,7 +1791,7 @@
   "calls.originate": {
     "method": "POST",
     "path": "/calls",
-    "summary": "Click-to-dial: rings a user's devices, then dials the target on answer, as that phone would; a parking slot as target retrieves the call parked there.",
+    "summary": "Click-to-dial: rings a user's devices, or one chosen device, then dials the target on answer, as that phone would; a parking slot as target retrieves the call parked there.",
     "fields": {
       "target": {
         "type": "string",
@@ -1802,6 +1802,11 @@
         "type": "string",
         "required": false,
         "description": "The user whose devices ring first; left out, the caller themselves (admins only for another user)."
+      },
+      "deviceId": {
+        "type": "string",
+        "required": false,
+        "description": "The one device of that user's to ring first, as devices.list lists it; left out, all their registered devices ring."
       },
       "clir": {
         "type": "boolean",

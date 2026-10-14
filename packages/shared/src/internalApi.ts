@@ -105,7 +105,9 @@ export const originateRequestSchema = z.object({
   requestId: z.string(),
   /** This call's own CLIR, as `#31#`/`*31#` give it (§9.4 "Anonymous calls (CLIR)"); absent,
    * the user's, trunk's or tenant's default applies. */
-  clir: z.boolean().optional()
+  clir: z.boolean().optional(),
+  /** The one device of `userId`'s to ring, which `api` checked is theirs; absent, all of them. */
+  deviceId: z.string().optional()
 });
 export type OriginateRequest = z.infer<typeof originateRequestSchema>;
 

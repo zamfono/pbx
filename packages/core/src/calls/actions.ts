@@ -55,17 +55,27 @@ export class CallActions {
   }
 
   /** `POST /internal/calls` (§10.2 "Click-to-dial"): the call's row exists from here on, its trace
-   * naming the actor, whether the user's devices answer, never do, or do not exist. The call has
-   * no caller channel until one of them answers. */
+   * naming the actor, whether the user's devices, or the one `deviceId` names, answer, never do,
+   * or are not registered. The call has no caller channel until one of them answers. */
   async originate(
     req: OriginateRequest
   ): Promise<{ callId: string } | { error: 'noRegisteredDevice' }> {
     const snapshot = await this.pipeline.deps.cache.get();
     const resolved = resolveOriginateTarget(snapshot, req);
-    const devices = registeredDevices(this.pipeline, snapshot, req.userId);
+    const devices = registeredDevices(
+      this.pipeline,
+      snapshot,
+      req.userId
+    ).filter(
+      device => req.deviceId === undefined || device.id === req.deviceId
+    );
     const call = newOriginatedCall(this.pipeline, snapshot, req, resolved);
     if (devices.length === 0) {
-      call.log.event({ event: 'originate', result: 'noRegisteredDevice' });
+      call.log.event({
+        event: 'originate',
+        result: 'noRegisteredDevice',
+        ...(req.deviceId === undefined ? {} : { deviceId: req.deviceId })
+      });
       call.status = 'failed';
       await this.pipeline.finishCall(call);
       return { error: 'noRegisteredDevice' };

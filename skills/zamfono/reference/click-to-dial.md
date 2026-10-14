@@ -16,8 +16,11 @@ history with the actor in its trace (`diagnose-bad-call`).
 
 - `userId` places the call on another user's phones; an admin only. A `user` places calls for
   themselves.
-- A user with no registered phone is refused with 409, `detail` `noRegisteredDevice`, and the
-  attempt is in the history all the same.
+- `deviceId` rings only that phone of the user's, as `devices.list` lists it, so a CRM can let the
+  agent pick their desk phone, softphone or mobile app; the other phones stay quiet. A device that
+  is not the user's, or deleted, is refused with 404.
+- A user with no registered phone, or a `deviceId` that is not registered right now, is refused
+  with 409, `detail` `noRegisteredDevice`, and the attempt is in the history all the same.
 - A phone that does not answer, or declines, ends the call unanswered; nothing is dialled.
 
 ## What the target can be

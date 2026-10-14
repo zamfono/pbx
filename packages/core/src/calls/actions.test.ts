@@ -649,6 +649,46 @@ describe('CallActions', () => {
     expect(result).toEqual({ error: 'noRegisteredDevice' });
   });
 
+  it('rings only the device a click-to-dial names, and answers 409 noRegisteredDevice for one not registered (§10.2)', async () => {
+    await setUp();
+    fakeAri.answerAfterMs = 60_000;
+    const callerId = await seedUser(db, { ext: '101' });
+    await seedRegisteredDevice(rig, callerId, 'e101-a');
+    await seedRegisteredDevice(rig, callerId, 'e101-b');
+    await seedDevice(rig.db, callerId, 'e101-c');
+    await rig.devicesUp();
+    const deviceId = async (sipUsername: string) =>
+      (
+        await db
+          .selectFrom('devices')
+          .select('id')
+          .where('sipUsername', '=', sipUsername)
+          .executeTakeFirstOrThrow()
+      ).id;
+
+    const result = await actions.originate({
+      userId: callerId,
+      target: '102',
+      actorUserId: callerId,
+      requestId: 'req-device',
+      deviceId: await deviceId('e101-b')
+    });
+    expect(result).toHaveProperty('callId');
+    expect(originates().map(entry => entry.endpoint)).toEqual([
+      contactEndpoint('e101-b')
+    ]);
+
+    await expect(
+      actions.originate({
+        userId: callerId,
+        target: '102',
+        actorUserId: callerId,
+        requestId: 'req-unregistered',
+        deviceId: await deviceId('e101-c')
+      })
+    ).resolves.toEqual({ error: 'noRegisteredDevice' });
+  });
+
   it('answers 409 noRegisteredDevice over HTTP for a user without a device and records the attempt', async () => {
     await setUp();
     const userId = await seedUser(db, { ext: '101' });

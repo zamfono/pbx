@@ -23,7 +23,7 @@
 | `calls.hangup` | `POST /api/v1/calls/{id}/hangup` | Hangs up a live call, or with legId one leg of it, as that phone hanging up would. | user | no |
 | `calls.hold` | `POST /api/v1/calls/{id}/hold` | Puts the other party of a live call on hold: they hear the hold music, and you and they no longer hear each other; calls.resume ends it. The hold happens in the PBX, so the phone does not show it. Hangup, transfer and park work as usual while held. | user | no |
 | `calls.list` | `GET /api/v1/calls` | Lists call history, or the calls currently in progress. | user | no |
-| `calls.originate` | `POST /api/v1/calls` | Click-to-dial: rings a user's devices, then dials the target on answer, as that phone would; a parking slot as target retrieves the call parked there. | user | no |
+| `calls.originate` | `POST /api/v1/calls` | Click-to-dial: rings a user's devices, or one chosen device, then dials the target on answer, as that phone would; a parking slot as target retrieves the call parked there. | user | no |
 | `calls.park` | `POST /api/v1/calls/{id}/park` | Parks the other party of a live call on the lowest free parking slot, as *70 does, and returns the slot; anyone retrieves it by dialling the slot (calls.originate with the slot as target). | user | no |
 | `calls.pickup` | `POST /api/v1/calls/{id}/pickup` | Picks up a call ringing for another party, on the picking user's devices. | user | no |
 | `calls.resume` | `POST /api/v1/calls/{id}/resume` | Takes a live call off the hold calls.hold or calls.consult put it on: the held party talks with you again, and during a consultation all three talk. The phone does not show it. | user | no |

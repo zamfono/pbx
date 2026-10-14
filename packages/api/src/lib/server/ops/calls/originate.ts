@@ -1,9 +1,12 @@
 import { z } from 'zod';
 
+import { HTTP_NOT_FOUND } from '@zamfono/shared';
+
 import { getCoreClient } from '#lib/server/coreClient.js';
 
 import { ownActingUser } from '../gates.js';
-import { defineOperation } from '../types.js';
+import { liveRow } from '../rows.js';
+import { defineOperation, OpError } from '../types.js';
 import { CALL_ACTION_PROBLEMS } from './_shared.js';
 
 const inputSchema = z
@@ -20,6 +23,13 @@ const inputSchema = z
       .describe(
         'The user whose devices ring first; left out, the caller themselves (admins only for another user).'
       ),
+    deviceId: z
+      .string()
+      .min(1)
+      .optional()
+      .describe(
+        "The one device of that user's to ring first, as devices.list lists it; left out, all their registered devices ring."
+      ),
     clir: z
       .boolean()
       .optional()
@@ -33,13 +43,14 @@ const inputSchema = z
  * `POST /calls` (§10.2 "Click-to-dial"): rings `userId`'s (or, absent that, the caller's own)
  * devices first, then dials `target` exactly as that device would once one answers, so CLIR,
  * routes, caller-ID and the channel cap all apply, and a parking slot retrieves the call parked
- * there. `clir` is the call's own CLIR, as `#31#`/`*31#` before the target (§9.4). A `user` may
+ * there. `clir` is the call's own CLIR, as `#31#`/`*31#` before the target (§9.4). `deviceId`
+ * rings that one device of the user's alone, 404 for one that is not theirs. A `user` may
  * originate only for themselves, an admin for any user.
  */
 export const originate = defineOperation({
   name: 'calls.originate',
   description:
-    "Click-to-dial: rings a user's devices, then dials the target on answer, as that phone would; a parking slot as target retrieves the call parked there.",
+    "Click-to-dial: rings a user's devices, or one chosen device, then dials the target on answer, as that phone would; a parking slot as target retrieves the call parked there.",
   input: inputSchema,
   output: z.object({
     callId: z
@@ -53,12 +64,20 @@ export const originate = defineOperation({
   writesDatabase: false,
   run: async (ctx, input) => {
     const userId = input.userId ?? ctx.actor.id;
+    if (input.deviceId !== undefined) {
+      const notFound = `device '${input.deviceId}' not found`;
+      const device = await liveRow(ctx.db, 'devices', input.deviceId, notFound);
+      if (device.userId !== userId) {
+        throw new OpError(HTTP_NOT_FOUND, notFound);
+      }
+    }
     return getCoreClient().originate({
       userId,
       target: input.target,
       actorUserId: ctx.actor.id,
       requestId: ctx.requestId,
-      ...(input.clir === undefined ? {} : { clir: input.clir })
+      ...(input.clir === undefined ? {} : { clir: input.clir }),
+      ...(input.deviceId === undefined ? {} : { deviceId: input.deviceId })
     });
   }
 });

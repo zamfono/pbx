@@ -14,6 +14,7 @@ why the specified behaviour changed; the commit history, how.
 ### Added
 
 - `call.legs` event for webhooks and admin `/events` sockets: the call's legs whenever one starts ringing, stops ringing or leaves while the call's state stays, such as a ring-group member's phone. Webhooks with an event-type filter receive it only once `call.legs` is added to the filter.
+- Click-to-dial (`POST /calls`, `calls.originate`) takes an optional `deviceId`: only that phone of the user's rings.
 
 ## [0.4.1] - 2026-10-08
 

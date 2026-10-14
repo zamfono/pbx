@@ -250,6 +250,74 @@ describe('calls', () => {
     ).rejects.toMatchObject({ status: 409, detail: 'noRegisteredDevice' });
   });
 
+  it("calls.originate rings one chosen device of the user's, and 404s one that is not theirs or gone (§10.2)", async () => {
+    const db = await makeTestDb();
+    await seedUser(db, { id: anna.id, ext: '101' });
+    const other = await seedUser(db, { ext: '102' });
+    const device = async (userId: string, deletedAt?: string) => {
+      const id = newId();
+      await db
+        .insertInto('devices')
+        .values({
+          id,
+          userId,
+          label: 'desk',
+          kind: 'manual',
+          transport: 'tls',
+          sipUsername: id,
+          sipPasswordEnc: Buffer.from('x'),
+          createdAt: nowIso(),
+          ...(deletedAt === undefined ? {} : { deletedAt })
+        })
+        .execute();
+      return id;
+    };
+    const own = await device(anna.id);
+    const others = await device(other);
+    const gone = await device(anna.id, nowIso());
+    const originate = vi.fn(() => Promise.resolve({ callId: 'c1' }));
+    vi.mocked(getCoreClient).mockReturnValue(stubCoreClient({ originate }));
+
+    await runOperation(
+      db,
+      'calls.originate',
+      { target: '102', deviceId: own },
+      asRun({ actor: anna })
+    );
+    // An admin names a device of the user they originate for.
+    await runOperation(
+      db,
+      'calls.originate',
+      { target: '102', userId: anna.id, deviceId: own },
+      asRun()
+    );
+    expect(originate.mock.calls).toEqual([
+      [expect.objectContaining({ userId: anna.id, deviceId: own })],
+      [expect.objectContaining({ userId: anna.id, deviceId: own })]
+    ]);
+
+    await Promise.all(
+      (
+        [
+          [others, asRun({ actor: anna })],
+          [gone, asRun({ actor: anna })],
+          ['no-such-device', asRun({ actor: anna })],
+          [others, asRun()]
+        ] as const
+      ).map(([deviceId, run]) =>
+        expect(
+          runOperation(
+            db,
+            'calls.originate',
+            { target: '102', userId: anna.id, deviceId },
+            run
+          )
+        ).rejects.toMatchObject({ status: 404 })
+      )
+    );
+    expect(originate).toHaveBeenCalledTimes(2);
+  });
+
   it('POST /calls answers a missing device as a problem whose detail names the cause (§10.2)', async () => {
     const db = await makeTestDb();
     vi.mocked(getCoreClient).mockReturnValue(
