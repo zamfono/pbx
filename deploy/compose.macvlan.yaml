@@ -9,6 +9,7 @@ services:
     networks:
       public:
         ipv4_address: ${STACK_IPV4:?the macvlan mode needs the stack's own IPv4}
+        gw_priority: 1                          # default route via public, not internal, whatever the project name (Docker; Podman: the network's metric)
 
   asterisk:
     environment:

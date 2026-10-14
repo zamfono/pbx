@@ -403,8 +403,10 @@ One dedicated server hosts up to about thirty stacks, each on its own public add
    docker network create -d macvlan --subnet 203.0.113.32/27 --gateway 203.0.113.33 \
      -o parent=vlan4000 public
    # podman: podman network create -d macvlan --subnet 203.0.113.32/27 --gateway 203.0.113.33 \
-   #   -o parent=vlan4000 --interface-name vlan4000 public
+   #   -o parent=vlan4000 --interface-name vlan4000 -o metric=50 public
    ```
+
+   `netns` sits on two networks, `public` and the stack's `internal` bridge, and its default route must be `public`'s, or replies to phones, trunks and Let's Encrypt leave through the bridge, translated to the host's address. Docker takes the network with the higher `gw_priority`, which `compose.macvlan.yaml` gives `public` (Docker Engine ≥ 28, Compose ≥ 2.33); without it Docker takes the network whose name sorts first, so a stack directory such as `acme` (network `acme_internal`) would lose. Podman ignores `gw_priority` and installs a default route per network, the lower metric winning, hence `metric=50` against the bridge's default 100.
 
 4. **Per stack**: a directory with `compose.yaml`, `compose.macvlan.yaml`, `Caddyfile` and an `.env` holding `STACK_IPV4=203.0.113.34`, the `FQDN` whose A record points at that address, and the rest of §6.3. Then:
 
@@ -623,6 +625,7 @@ services:
     networks:
       public:
         ipv4_address: ${STACK_IPV4:?the macvlan mode needs the stack's own IPv4}
+        gw_priority: 1                          # default route via public, not internal, whatever the project name (Docker; Podman: the network's metric)
 
   asterisk:
     environment:

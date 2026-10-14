@@ -165,6 +165,9 @@ jobs:
           bash images/asterisk/test.sh
           bash images/proxy/test.sh
           bash images/updater/test.sh
+      - name: A macvlan stack's default route is public's, whatever its project name (Docker)
+        # Root: the check makes a dummy interface and the `public` network (§6.2.1 step 3).
+        run: sudo env PROXY_IMAGE="$PROXY_IMAGE" sh deploy/macvlan-route-test.sh
 
   compose-docker:
     name: compose-docker (${{ matrix.shard }})
@@ -250,6 +253,10 @@ jobs:
             exit 1
           fi
       - run: sudo podman load -i /tmp/images.tar
+      - name: A macvlan stack's default route is public's, whatever its project name (Podman)
+        run: |
+          sudo env PROXY_IMAGE="$PROXY_IMAGE" DOCKER_HOST="$DOCKER_HOST" RUNTIME=podman \
+            COMPOSE="podman compose" sh deploy/macvlan-route-test.sh
       - name: Bring the stack up and run the sipp scenarios
         # `env` carries every variable run.sh reads across sudo, the image names as image-env.sh
         # printed them above; the runner's sudo-rs ignores `-E`.

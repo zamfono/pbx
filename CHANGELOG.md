@@ -11,6 +11,15 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+### Fixed
+
+- Mode B (several stacks on one host, `compose.macvlan.yaml`): a stack whose directory name sorts before `public`, such as `/srv/acme`, sent its replies to phones, trunks and Let's Encrypt out through the host's address instead of its own, so calls and certificates failed; on Podman every stack did. `public` now always carries the stack's default route.
+
+### Upgrade notes
+
+- Mode B on Docker needs Docker Engine 28 and Compose 2.33 or newer.
+- Mode B on Podman: create the `public` network again with `-o metric=50` (deploy/README.md step 3): stop the host's stacks, `podman network rm public`, create it as step 3 now shows, and start them.
+
 ## [0.4.2] - 2026-10-14
 
 ### Added

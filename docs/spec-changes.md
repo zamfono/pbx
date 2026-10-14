@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-14 · §6.2.1 step 3, §6.3 `compose.macvlan.yaml`.** `netns` gives `public` `gw_priority: 1`, and step 3 creates `public` on Podman with `-o metric=50`, so a macvlan stack's default route is always `public`'s; the step says why and names Docker Engine ≥ 28 with Compose ≥ 2.33.
+*Why:* the density measurement (TASK-50) found that Docker otherwise takes the default route from the network whose name sorts first, so a stack directory such as `acme` (`acme_internal`) routed its replies through its bridge and the host's address, and that Podman ignores `gw_priority` and installs a route per network at equal metric, picking the bridge for every stack (TASK-51, verified on Docker 29.9 and Podman 5.4).
+
 **2026-10-14 · §10.6.** A new event, `call.legs` (`callId`, `state`, `peer`, `ringGroupId`, `userId`, `legs`), goes to admins and webhooks whenever a leg of a live call starts ringing, stops ringing or leaves while the call's own state is unchanged: a ring-group member's leg, a find-me leg, one of a user's own phones, a parking or attended-transfer hand-over. A `user` does not receive it and keeps the `call.state` events of calls that start or stop being theirs; `call.state` itself is unchanged.
 *Why:* a CRM integration (TASK-48) needs per-user call state, when a call starts ringing for each extension, is answered there and stops being its call, as 3CX reports it, and only polling `GET /calls?live=true` gave it; on carrying it in a new event type rather than a repeated `call.state`: "let's do it with `call.legs`".
 

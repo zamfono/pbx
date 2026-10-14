@@ -150,10 +150,15 @@ dedicated server with a vSwitch; any provider that routes a subnet to you works 
    # Docker
    docker network create -d macvlan --subnet 203.0.113.32/27 --gateway 203.0.113.33 \
      -o parent=vlan4000 public
-   # Podman
+   # Podman: the metric makes this network's default route win over the stack's own bridge
    podman network create -d macvlan --subnet 203.0.113.32/27 --gateway 203.0.113.33 \
-     -o parent=vlan4000 --interface-name vlan4000 public
+     -o parent=vlan4000 --interface-name vlan4000 -o metric=50 public
    ```
+
+   Docker needs Engine 28 and Compose 2.33 or newer here: `compose.macvlan.yaml` gives `public`
+   the default route with `gw_priority`, which older versions ignore, taking whichever network's
+   name sorts first instead, so a stack directory named before `public` (`acme`, `kunde1`) would
+   send its replies out through the host's address.
 
 Each stack's address is public and untranslated, and no host firewall sits in front of it. The
 ports it answers on are exactly those of the Mode A table; `SIP_UDP_ENABLED` and `SIP_TCP_ENABLED`
