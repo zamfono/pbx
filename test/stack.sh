@@ -65,10 +65,23 @@ stack_assert_migrated() {
     || fail "the migrate service exited $migrate_exit; service_completed_successfully did not hold"
 }
 
-# `token`: the bootstrap owner's access token, through the authorization-code flow.
+# `token`: the bootstrap owner's access token, through the authorization-code flow; `token_at`,
+# when, for `stack_token_fresh`.
 stack_token() {
   token=$(bash "$repo/test/integration/bootstrap-token.sh" "$api_base" "$OWNER_EMAIL" \
     "$OWNER_PASSWORD" "https://$FQDN") \
     || fail "could not obtain an access token through the authorization-code flow"
   [ -n "$token" ] || fail "the token endpoint returned nothing"
+  token_at=$SECONDS
+}
+
+# An access token lives 15 min (ACCESS_TOKEN_TTL_S); one this old is renewed before the next piece
+# of work, which must finish within the rest.
+TOKEN_RENEW_AFTER_S=600
+
+# `stack_token` again once `token` is TOKEN_RENEW_AFTER_S old, for a run that outlasts one token.
+# Called from the run's own shell between scenarios and steps: a token renewed in a subshell, such
+# as a `$(api …)`, is lost with it, and a child script is handed the token as it starts.
+stack_token_fresh() {
+  ((SECONDS - token_at < TOKEN_RENEW_AFTER_S)) || stack_token
 }

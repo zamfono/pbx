@@ -196,6 +196,7 @@ for scenario in "$here"/scenarios/*.xml "$here"/scenarios/[!_]*.call.sh; do
   name=${name%.call.sh}
   name_selected "$name" || continue
   echo "-- $name"
+  stack_token_fresh
   load_roles "$name"
   # A scenario that needs tenant state of its own arranges it here and undoes it afterwards, so
   # the scenarios stay independent of the order they run in.

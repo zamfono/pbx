@@ -190,6 +190,10 @@ fi
 # shellcheck source=run-scenarios.sh
 . "$here/run-scenarios.sh"
 
+# The steps below take about 3.5 min together (only.sh), on a token of their own: a full run's
+# scenarios outlast most of the one they started with.
+stack_token
+
 name_selected backups && step_backups
 name_selected updater && step_updater
 
