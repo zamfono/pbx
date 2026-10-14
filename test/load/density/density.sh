@@ -142,14 +142,16 @@ stack_tok() {
   local made
   made=$(stat -c %Y "$STACK_DIR/.token" 2>/dev/null || echo 0)
   if [ $(($(date +%s) - made)) -ge "$TOKEN_RENEW_AFTER_S" ]; then
-    # A few tries: with several stacks starting at once, a freshly healthy api has answered the
-    # login with nothing (stage 2), which must not abort a run of many stacks.
+    # Several tries: a freshly healthy api (stage 2), and one on a host at ~90 % CPU right after a
+    # step (stage 3, 25 and 50 stacks), has answered the login without a code, which must not abort
+    # a run of many stacks; what api and core logged then is kept for the diagnosis.
     local try
-    for try in 1 2 3 4 5; do
+    for try in 1 2 3 4 5 6 7 8 9 10; do
       token=$(bash "$repo/test/integration/bootstrap-token.sh" "$api_base" "$OWNER_EMAIL" \
         "$OWNER_PASSWORD" "https://$FQDN" 2>>"$OUT_DIR/session.log") && [ -n "$token" ] && break
       log "stack $si: no token on try $try"
-      sleep 5
+      [ "$try" -gt 1 ] || dc logs --tail 40 api core >> "$OUT_DIR/token-failure-s$si.log" 2>&1
+      sleep 15
     done
     [ -n "$token" ] || fail "stack $si: could not obtain an access token"
     printf '%s' "$token" > "$STACK_DIR/.token"
