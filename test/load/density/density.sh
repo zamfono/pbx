@@ -365,16 +365,20 @@ cmd_step() {
     phase "$dir" plateau
     step_event
     sleep $((hold_s / 2))
+    # The evidence costs the host a `docker exec` per stack and per leg sampled, so its window is a
+    # phase of its own that neither the verdict nor the plateau averages count.
+    phase "$dir" evidence
     for i in $(stacks); do
       stack_use "$i"
       echo "s$i pjsip_legs=$(pjsip_channels) snoops=$(snoop_channels)"
     done > "$dir/legs-mid-plateau.txt"
-    # Proof of the profiles on stack 1: every leg's formats and transcoding path.
+    # Proof of the profiles on stack 1: formats and transcoding path of its first 16 legs.
     stack_use 1
-    for ch in $(ast 'core show channels concise' | cut -d'!' -f1 | grep '^PJSIP/'); do
+    for ch in $(ast 'core show channels concise' | cut -d'!' -f1 | grep '^PJSIP/' | head -16); do
       echo "$ch $(ast "core show channel $ch" \
         | grep -E 'NativeFormats|ReadTranscode|WriteTranscode' | xargs)"
     done > "$dir/codecs-s1.txt"
+    phase "$dir" plateau
     sleep $((hold_s - hold_s / 2))
     phase "$dir" drain
     poll $((CALL_S + 300)) 1 reads "$k" gen_calls_ended "$step" \
