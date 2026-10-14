@@ -30,9 +30,11 @@ stack_port_free() {
 }
 
 # The .env setup.sh writes in stack directory `$1` from the answers an operator gives it, for
-# company `$2` at public address `$3`, its output kept in `$1/setup.log`.
+# company `$2` at public address `$3` in mode `$4` (ports, the default, or macvlan, where `$3` is
+# the stack's own STACK_IPV4), its output kept in `$1/setup.log`.
 stack_write_env() {
-  ZAMFONO_MODE=ports ZAMFONO_RUNTIME=$RUNTIME ZAMFONO_API_IMAGE=$API_IMAGE EXTERNAL_IPV4=$3 \
+  ZAMFONO_MODE=${4:-ports} ZAMFONO_RUNTIME=$RUNTIME ZAMFONO_API_IMAGE=$API_IMAGE EXTERNAL_IPV4=$3 \
+    STACK_IPV4=$3 \
     FQDN=$FQDN COMPANY_NAME=$2 MAIN_DID=$MAIN_DID COUNTRY=DE EXT_LENGTH=3 TZ=UTC \
     BOOTSTRAP_OWNER_NAME="$2 Owner" BOOTSTRAP_OWNER_EMAIL=$OWNER_EMAIL \
     OWNER_PASSWORD=$OWNER_PASSWORD SETUP_NONINTERACTIVE=1 bash "$1/setup.sh" >"$1/setup.log" 2>&1 \

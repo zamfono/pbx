@@ -31,6 +31,9 @@
 CERT_SYNC_WAIT_ATTEMPTS=60
 # Where Asterisk reads its TLS pair (images/asterisk/entrypoint.sh, certSyncFiles.ts).
 CERT_SYNC_TLS_DIR=/etc/asterisk/gen/tls
+# Where the TLS transport listens: loopback in the ports mode; the macvlan mode binds STACK_IPV4
+# (§9.1 "Binding"), which test/load/density sets here.
+CERT_SYNC_TLS_ADDR=${CERT_SYNC_TLS_ADDR:-127.0.0.1}
 
 # The certificate Asterisk actually presents on 5061, fetched with `openssl s_client` from the
 # `asterisk` container itself — on the test network, and already carrying `openssl`
@@ -41,7 +44,7 @@ cert_sync_presented() {
   # pipefail Podman's compose provider reports the unread rest's SIGPIPE as a failure.
   local handshake
   handshake=$(dc exec -T asterisk sh -c \
-    "echo | openssl s_client -connect 127.0.0.1:5061 -servername $FQDN 2>/dev/null" || true)
+    "echo | openssl s_client -connect $CERT_SYNC_TLS_ADDR:5061 -servername $FQDN 2>/dev/null" || true)
   printf '%s\n' "$handshake" | openssl x509 "$@" 2>/dev/null
 }
 

@@ -1,0 +1,59 @@
+# test/load/density: layered over the shipped compose.yaml + compose.macvlan.yaml (the
+# compose.override.yaml link setup.sh makes in the macvlan mode), so every stack is the one an
+# operator runs in §6.2.1, plus what the harness needs of it:
+#   - images are the *_IMAGE set density.sh exports (scripts/image-env.sh), never pulled, so
+#     update.sh's `pull` finds a relabelled update image present (as compose.test.yaml)
+#   - api's port on the host's loopback, one per stack (API_PORT), for the REST calls
+#   - Caddy issues the FQDN's certificate from its own local CA (Caddyfile.density-ca), so
+#     Asterisk's TLS transport presents a CA-issued certificate (§6.4)
+#   - `internal` gets a /24 of its own per stack (INTERNAL_SUBNET): Docker's default address
+#     pools hold about 30 bridge networks, fewer than the stacks a host carries
+#   - netns answers to its FQDN on `public`, for whatever on that network resolves it there
+#   - netns's default route is `public`'s gateway (gw_priority): with equal priorities Docker
+#     takes the network whose name sorts first, here `density-<i>_internal`, so replies to a
+#     peer outside the `public` subnet (the remote generator) would leave NATed through the host.
+#     compose.macvlan.yaml sets no priority, so a production stack whose project name sorts
+#     before `public` has the same problem (reported with TASK-50.1)
+networks:
+  internal:
+    ipam:
+      config:
+        - subnet: ${INTERNAL_SUBNET:?set by density.sh}
+
+services:
+  netns:
+    image: ${PROXY_IMAGE:?set by density.sh}
+    pull_policy: missing
+    networks:
+      public:
+        gw_priority: 1
+        aliases:
+          - ${FQDN:?set by density.sh}
+
+  asterisk:
+    image: ${ASTERISK_IMAGE:?set by density.sh}
+    pull_policy: missing
+
+  migrate:
+    image: ${MIGRATE_IMAGE:?set by density.sh}
+    pull_policy: missing
+
+  core:
+    image: ${CORE_IMAGE:?set by density.sh}
+    pull_policy: missing
+
+  api:
+    image: ${API_IMAGE:?set by density.sh}
+    pull_policy: missing
+    ports:
+      - '127.0.0.1:${API_PORT:?set by density.sh}:3000'
+
+  proxy:
+    image: ${PROXY_IMAGE:?set by density.sh}
+    pull_policy: missing
+    volumes:
+      - ${CERT_SYNC_CADDYFILE:?set by density.sh}:/etc/caddy/global.d/local-certs.caddy:ro
+
+  updater:
+    image: ${UPDATER_IMAGE:?set by density.sh}
+    pull_policy: missing

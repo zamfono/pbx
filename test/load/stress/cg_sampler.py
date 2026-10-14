@@ -16,10 +16,14 @@ must be the full one (`compose ps -q` prints it on both runtimes).
 Runs until <stop_file> exists. The phase label of each row is the current content of
 <phase_file> (the step driver writes ramp / plateau / drain / tail into it).
 
+CG_SAMPLER_NET=0 skips the veth lookup (and its `docker exec` per container), for a sampler over
+hundreds of containers (test/load/density); rx/tx then read 0.
+
 Usage: cg_sampler.py <out.csv> <phase_file> <stop_file> <interval_s> <container_id=label> ...
 Rows: ts,phase,name,cpu_usec,mem_bytes,rx_bytes,tx_bytes
 """
 import csv
+import os
 import sys
 import time
 from pathlib import Path
@@ -66,7 +70,7 @@ def main() -> None:
     targets = []
     for spec in sys.argv[5:]:
         cid, label = spec.split('=', 1)
-        iflink = container_eth0_iflink(cid)
+        iflink = container_eth0_iflink(cid) if os.environ.get('CG_SAMPLER_NET') != '0' else None
         veth = host_veth_for_iflink(iflink) if iflink is not None else None
         targets.append((label, container_cgroup(cid), veth))
     new = not Path(out_csv).exists()

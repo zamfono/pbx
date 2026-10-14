@@ -3,7 +3,7 @@
 # Sourced, not run. test/stack.sh's bring-up, on a stack directory of the session's own.
 #
 # The caller sets, before sourcing: repo, OUT_DIR, COMPOSE, compose_args (array, relative to the
-# stack directory), api_base, FQDN, MAIN_DID, API_IMAGE; optionally METRICS_TOKEN (default empty =
+# stack directory; not read when the caller sets STACK_DIR itself, below), api_base, FQDN, MAIN_DID, API_IMAGE; optionally METRICS_TOKEN (default empty =
 # /metrics off). Sourcing makes the stack directory, STACK_DIR, and changes into it, and sets
 # compose; it provides: log, fail, test/api.sh's and test/stack.sh's helpers, and stack_up, which
 # sets STACK_UP=true once `compose up` ran (the caller's teardown trap keys
@@ -27,11 +27,15 @@ HEP_ENABLED=false
 METRICS_TOKEN=${METRICS_TOKEN:-}
 export HEP_ENABLED METRICS_TOKEN
 
-STACK_DIR=$(mktemp -d "${TMPDIR:-/tmp}/zamfono-load.XXXXXX")
-stack_dir_files "$STACK_DIR"
-compose_args=(-p "$(stack_project "$STACK_DIR")" "${compose_args[@]}")
-compose="$COMPOSE ${compose_args[*]}"
-cd "$STACK_DIR" || exit 1
+# A caller that sets STACK_DIR (even empty) makes and enters its stack directories itself
+# (density/, one per stack).
+if [ -z "${STACK_DIR+set}" ]; then
+  STACK_DIR=$(mktemp -d "${TMPDIR:-/tmp}/zamfono-load.XXXXXX")
+  stack_dir_files "$STACK_DIR"
+  compose_args=(-p "$(stack_project "$STACK_DIR")" "${compose_args[@]}")
+  compose="$COMPOSE ${compose_args[*]}"
+  cd "$STACK_DIR" || exit 1
+fi
 
 log() { echo "== $* ==" | tee -a "$OUT_DIR/session.log" >&2; }
 

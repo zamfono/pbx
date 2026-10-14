@@ -152,3 +152,26 @@ share, the retention period (§11.6) and the per-minute figure above.
 - Stress profile: build the images with `TAG=stress docker buildx bake --load`, then `OUT_DIR=… flock <lock> bash test/load/stress/session.sh` (knobs in its header: `STEPS`
   with `in:`/`out:`/`mix:` tokens, `HANGUP_SIDE`, `CALL_S`, `RUNTIME=podman`, image variables).
   Long sessions should run in the background; each session tears its stack down itself.
+- Multi-stack density (TASK-50): `test/load/density/density.sh` (every knob in its header). It
+  brings up `N` stacks in the macvlan mode on a `public` macvlan network over a `dummy0` parent
+  (10.99.0.0/16; stack i at 10.99.1.i, FQDN `pbx-<i>.density.test`, TLS from Caddy's local CA),
+  each with `USERS` users and `DEVICES` devices per user, and drives them with sipp (trunk) and
+  baresip (devices) per profile P1–P4. Build the images with `TAG=density docker buildx bake
+  --load`. Commands: `up`, `step P1=n P2=n P3=n P4=n` (plus `REC_SHARE`, `CALL_S`, and `EVENT`
+  to fire a maintenance event at the plateau), `maint backup|update|tls|cold|docker` (with
+  `STAGGER_S`), `down`, or `run` with `STEPS` and `MAINT` for a whole session that tears itself
+  down. Each step writes host CPU/RAM/swap, cgroup figures per container, sipp counts and
+  call_qos per leg, and a PASS/FAIL verdict against TASK-50's criteria (`verdicts.txt`).
+  - Local mode (development; generators on the same host and network):
+    `N=2 USERS=4 DEVICES=2 REC_SHARE=0.67 STEPS='idle;P1=2 P2=2 P3=2 P4=2' MAINT='backup tls update cold'
+    flock /root/pbx-harness.lock bash test/load/density/density.sh run`
+  - Remote mode (target and generator, e.g. CCX33 + CCX43 on one Cloud Network whose routes send
+    10.99.0.0/16 to the target and 10.98.0.0/16 to the generator): run on the target with
+    `GEN_SSH=root@<generator's private IP>` (the target's root key authorised on the generator).
+    The target needs Docker, python3, rsync, jq and ffmpeg, the stack images (`TAG=density
+    docker buildx bake --load` in a checkout there) and the sipp image; the generator needs
+    Docker, python3 and rsync, and gets the devices image (and sipp, unless already pulled) over
+    ssh.
+  - Stage 1 (calibration), as run for TASK-50: one stack, `N=1 USERS=400 DEVICES=1
+    MIX=alaw:1,g722:1,opus:2 RTP_PORT_END=11199 CALL_S=150`, `STEPS` P1-P4 each at 10, 25, 50 and
+    100 calls, once with `REC_SHARE=0` and once with `0.67`.

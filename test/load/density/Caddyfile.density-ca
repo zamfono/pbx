@@ -1,0 +1,10 @@
+# test/load/density: the global option compose.density.yaml mounts into the proxy's
+# /etc/caddy/global.d/ in place of test/integration/Caddyfile.local-ca's `local_certs`: the same
+# internal CA, but leaf certificates that live 5 days instead of 12 hours. §6.4's safety valve
+# applies a new certificate at once when the current one expires before the maintenance gate is
+# next worth asking, which a 12-hour certificate always does; with 5 days a new certificate waits
+# for the gate, as a Let's Encrypt one does, so the TLS reload wave (lib-maint.sh) decides when it
+# is applied. (Caddy's internal intermediate lives 7 days, the ceiling for a leaf.)
+cert_issuer internal {
+	lifetime 120h
+}
