@@ -11,6 +11,8 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-10-14
+
 ### Added
 
 - `call.legs` event for webhooks and admin `/events` sockets: the call's legs whenever one starts ringing, stops ringing or leaves while the call's state stays, such as a ring-group member's phone. Webhooks with an event-type filter receive it only once `call.legs` is added to the filter.
@@ -645,7 +647,8 @@ The first 0.2 release; its `v0.2.0` tag was never published.
 
 The first tagged version, before any deployment.
 
-[Unreleased]: https://github.com/zamfono/pbx/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/zamfono/pbx/compare/v0.4.2...HEAD
+[0.4.2]: https://github.com/zamfono/pbx/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/zamfono/pbx/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/zamfono/pbx/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/zamfono/pbx/compare/v0.3.1...v0.3.2
