@@ -197,7 +197,16 @@ stack_create() {
     || fail "stack $si: no local CA root"
   gen_containers
   gen_devices_start
-  devices_await "$(wc -l < "$STACK_DIR/creds.csv")"
+  # Stage 4 (32 stacks) once had a stack none of whose devices registered, with nothing logged;
+  # what the generator then runs is logged, and dead baresip processes are started again.
+  local total users n=0
+  total=$(wc -l < "$STACK_DIR/creds.csv")
+  users=$(cut -d, -f1 "$STACK_DIR/creds.csv" | tr '\n' ' ')
+  if ! poll 90 3 devices_reachable "$total"; then
+    log "stack $si: $n of $total devices reachable after 90 s; baresip processes there: $(gen docker \
+      exec "density-gen-$si-dev" sh -c 'ps -e | grep -c baresip' 2>&1)"
+    gen_devices_ensure "$si"
+  fi
   touch "$STACK_DIR/.ready"
 }
 
