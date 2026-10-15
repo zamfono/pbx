@@ -13,6 +13,8 @@ shares) and is given per direction.
 
 ## Recommended sizing
 
+### One tenant per host
+
 | Profile                                                   | Concurrent calls | vCPU        | RAM            | Network (symmetric) | Disk                        |
 | --------------------------------------------------------- | ---------------- | ----------- | -------------- | ------------------- | --------------------------- |
 | G.711 end to end, no recording                            | ≤ 10 / ~25 / 50  | 1 / 1–2 / 2 | 1 / 2 / 2–4 GB | 2 / 5 / 10 Mbit/s   | 10–40 GB + media            |
@@ -23,7 +25,52 @@ burst when recordings are mixed, and transcoding; measured need is below them (s
 The first limit a growing tenant hits is the RTP port range, not the hardware: raise
 `RTP_PORT_START`/`RTP_PORT_END` in `.env` (§6.6).
 
-## Test bed
+### Many tenants per host (macvlan mode)
+
+A Hetzner CCX33 (8 dedicated vCPU, 32 GB RAM) carries, at busy hour (see "Users and concurrent
+calls" below):
+
+| Codec mix                                                                 | Users per host | Concurrent calls |
+| ------------------------------------------------------------------------- | -------------- | ---------------- |
+| Every call transcoded AMR-WB ⇄ Opus, ⅔ recorded                           | about 400      | about 100        |
+| Realistic: half AMR-WB ⇄ Opus, the rest Opus or G.722 ⇄ G.711, ⅓ recorded | about 500      | about 120        |
+
+The limit is CPU; RAM (about 1 GB plus 0.31 GB per stack) would allow about 80 stacks. Very small
+tenants fit somewhat fewer users, since every stack costs CPU even when idle. Such a host needs
+`fs.inotify.max_user_instances` raised (`deploy/README.md` step 3). Details in section 3.
+
+## Users and concurrent calls
+
+The hardware is sized by concurrent calls; tenants are counted in users. The bridge between the
+two is traffic in **Erlang**: one Erlang is one call held all the time, so a user's traffic in
+Erlang is the share of the busiest hour they spend on the phone. This file assumes **0.17 Erlang
+per user**, about 10 minutes of calls in the busy hour, the traditional planning load for office
+phones (6 CCS) that §6.6 of the specification uses too.
+
+The traffic of many users adds up (100 users × 0.17 = 17 Erlang), but calls arrive at random, so
+the concurrent calls needed are more than that average. The **Erlang B** formula gives how many
+call slots carry a traffic with a chosen overflow probability; this file uses **0.01 %**, since an
+overloaded host degrades every call on it rather than refusing one. Because random peaks even out
+over many users, the calls of all users on one host are pooled:
+
+| Users on the host | Traffic (Erlang) | Concurrent calls at 0.01 % overflow |
+| ----------------- | ---------------- | ----------------------------------- |
+| 10                | 1.7              | 9                                   |
+| 20                | 3.4              | 13                                  |
+| 50                | 8.5              | 22                                  |
+| 100               | 17               | 34                                  |
+| 200               | 34               | 57                                  |
+| 400               | 68               | 99                                  |
+| 500               | 85               | 119                                 |
+| 600               | 102              | 139                                 |
+| 800               | 136              | 178                                 |
+| 1000              | 170              | 216                                 |
+
+A host's 400 users need about 99 concurrent calls, while 40 tenants of 10 users sized one by one
+would need 40 × 9 = 360. A tenant whose people phone much more (a sales team, a call centre)
+needs its own, higher traffic per user.
+
+## Test bed (sections 1 and 2)
 
 - Host: 4 vCPU AMD EPYC-Genoa, 7.7 GB RAM, no swap, Debian 13 (kernel 6.12).
 - Runtimes: Docker 29.8.1 with Compose v5.5.1; rootful Podman 5.4.2 (docker-compose provider over
@@ -134,21 +181,22 @@ the peaks do not stack.
   once, every call inbound and held for 150 s. Harness: `test/load/density/`.
 - **Profiles:** P1 G.711 ⇄ G.711; P2 G.722 desk phone ⇄ G.711 trunk; P3 Opus app over TLS/SRTP ⇄
   G.711 trunk; P4 Opus app over TLS/SRTP ⇄ AMR-WB trunk.
-- **Busy hour:** 0.17 Erlang per user; the concurrent calls of all users on the host from
-  Erlang B at 0.01 % overflow, spread evenly over the stacks.
+- **Busy hour:** the concurrent calls of all users on the host as in "Users and concurrent calls"
+  (0.17 Erlang per user, Erlang B at 0.01 % overflow), spread evenly over the stacks.
 - **Pass criteria for every step:** host CPU p95 ≤ 70 %, RAM ≤ 80 %, no swapping, packet loss
   p95 < 0.5 %, jitter p95 < 20 ms (per leg, from `call_qos`), no failed call.
 
 ### Result: users per CCX33 at busy hour
 
-The largest number of stacks that passed every criterion:
+The largest number of stacks that passed every criterion, with the users they held and the
+concurrent calls those users make at busy hour:
 
-| Tenant size | Worst mix (100 % P4, ⅔ recorded)                | Realistic mix (50 % P4, 30 % P3, 20 % P2, ⅓ recorded) |
-| ----------- | ----------------------------------------------- | ----------------------------------------------------- |
-| 10 users    | ≥ 27 stacks / ≥ 270 users (CPU 49 %)            | 47 stacks / **470 users** (54 failed: CPU 73 %)       |
-| 20 users    | 21 stacks / **420 users** (24 failed: CPU 79 %) | ≥ 28 stacks / **560 users** (CPU 67 %)                |
-| 50 users    | 8 stacks / **400 users** (9 failed: CPU 70.1 %) | ≥ 13 stacks / **650 users** (CPU 69 %)                |
-| 200 users   | 2 stacks / **400 users** (3 failed: CPU 75 %)   | 4 stacks / **800 users** (5 failed: CPU 89 %)         |
+| Tenant size | Worst mix (100 % P4, ⅔ recorded)                            | Realistic mix (50 % P4, 30 % P3, 20 % P2, ⅓ recorded)       |
+| ----------- | ----------------------------------------------------------- | ----------------------------------------------------------- |
+| 10 users    | ≥ 27 stacks / ≥ 270 users / 72 calls (CPU 49 %)             | 47 stacks / **470 users** / 113 calls (54 failed: CPU 73 %) |
+| 20 users    | 21 stacks / **420 users** / 103 calls (24 failed: CPU 79 %) | ≥ 28 stacks / **560 users** / 131 calls (CPU 67 %)          |
+| 50 users    | 8 stacks / **400 users** / 99 calls (9 failed: CPU 70.1 %)  | ≥ 13 stacks / **650 users** / 149 calls (CPU 69 %)          |
+| 200 users   | 2 stacks / **400 users** / 99 calls (3 failed: CPU 75 %)    | 4 stacks / **800 users** / 178 calls (5 failed: CPU 89 %)   |
 
 "≥" marks a size whose next step up was not measured. Every step that failed did so on CPU
 alone: no call failed, loss stayed 0 % and jitter p95 ≤ 16 ms.
