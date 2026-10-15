@@ -93,7 +93,14 @@ maint_stack() {
   fi
   # A new Asterisk (cold start, update, Docker restart): the TLS devices register again on
   # Ringotel's behalf; regs_s then includes that, not Ringotel's own delay.
-  case $ev in cold | update | docker) gen_devices_rereg >&2 ;; esac
+  # Not before Asterisk has loaded the endpoints: a REGISTER before is refused, and baresip
+  # then backs off for minutes (stage 5's Docker restart: 10 of 14 stacks stayed unregistered).
+  case $ev in
+    cold | update | docker)
+      poll 180 2 endpoints_loaded "$(wc -l < "$STACK_DIR/creds.csv")"
+      gen_devices_rereg >&2
+      ;;
+  esac
   users=$(cut -d, -f1 "$STACK_DIR/creds.csv" | tr '\n' ' ')
   poll $((REG_TIMEOUT_S / 5)) 5 devices_reachable "$(wc -l < "$STACK_DIR/creds.csv")" \
     && regs_s=$(since "$t0")
