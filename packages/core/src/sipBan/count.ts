@@ -58,8 +58,20 @@ export class SipBanCount {
    * Counts `event`; the report for its address when this failure reached `sipBanFailures` and the
    * address authenticated successfully within none of the last `sipBanSuccessExemptS`, else
    * `null`. A crossing clears the address's count, so it reports once per crossing.
+   * `ownEndpoints` names the endpoints the stack renders: an `InvalidAccountID` for one of them is
+   * a device or trunk that registered before Asterisk had loaded its endpoint, and never counts.
    */
-  record(event: AmiEvent, thresholds: SipBanThresholds): SipBanReport | null {
+  record(
+    event: AmiEvent,
+    thresholds: SipBanThresholds,
+    ownEndpoints: ReadonlySet<string> = new Set()
+  ): SipBanReport | null {
+    if (
+      event.Event === 'InvalidAccountID' &&
+      ownEndpoints.has(event.AccountID ?? '')
+    ) {
+      return null;
+    }
     const isFailure = COUNTED_EVENTS.has(event.Event ?? '');
     if (!isFailure && event.Event !== SUCCESS_EVENT) {
       return null;

@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-15 · §5.6 Counting.** An `InvalidAccountID` for one of the stack's own endpoint names, a live device's SIP username or a live `inbound_auth` trunk's username, no longer counts as a failed attempt.
+*Why:* the density measurement (TASK-50) saw a stack's 20 newly provisioned phones register before their endpoints were loaded under load: each REGISTER raised `InvalidAccountID`, and the tenth banned the phones' address for a day; an office behind one NAT address adding its phones at once would ban itself the same way (TASK-54). The names carry a random slug no scanner guesses, and a wrong password on a loaded endpoint still counts as `ChallengeResponseFailed`.
+
 **2026-10-14 · §6.2.1 step 3, §9.1 ban list.** While inotify cannot watch, the ban helper logs that once and looks at the list every 2 seconds instead of spinning, and step 3 tells a host with many stacks to raise `fs.inotify.max_user_instances`.
 *Why:* the density measurement (TASK-50) found 25 idle stacks at 98 % host CPU and 50 at a load average of 74 on 8 vCPUs: past the Debian default of 128 inotify instances, which every stack's root processes share, each helper's `inotifywait` failed at once and its loop ran without pause (TASK-53).
 

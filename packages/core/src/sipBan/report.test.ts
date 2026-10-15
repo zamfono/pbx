@@ -9,7 +9,11 @@ import {
 } from 'vitest';
 
 import { newId, nowIso, type Db, type SipBanReport } from '@zamfono/shared';
-import { migratedTestDb, seedSettings } from '@zamfono/shared/testDb.js';
+import {
+  migratedTestDb,
+  seedSettings,
+  seedUser
+} from '@zamfono/shared/testDb.js';
 
 import { AmiClient } from '../ami/client.js';
 import type { Logger } from '../ari/types.js';
@@ -17,6 +21,7 @@ import { ConfigCache } from '../internal/snapshot.js';
 import { FakeAmi } from '../testing/ami/fake.js';
 import { eventually } from '../testing/eventually.js';
 import { noopLogger } from '../testing/pipelineDeps.js';
+import { seedDevice } from '../testing/seedRows.js';
 import { startSipBanCount } from './report.js';
 
 function failure(address: string): Record<string, string> {
@@ -116,6 +121,25 @@ describe('startSipBanCount', () => {
     expect(log.warn).toHaveBeenCalledTimes(1);
     expect(log.warn.mock.calls[0]?.[0]).toMatchObject({
       address: '172.18.0.1'
+    });
+  });
+
+  it('never counts a device of the stack registering before Asterisk has its endpoint', async () => {
+    // TASK-54: phones provisioned together behind one office address register while the reload
+    // that loads their endpoints is still under way.
+    const userId = await seedUser(db, { ext: '200' });
+    await seedDevice(db, userId, 'e200-dk3x7');
+    cache.invalidate();
+    for (let round = 0; round < 4; round += 1) {
+      fakeAmi.emit({
+        ...failure('203.0.113.7'),
+        AccountID: 'e200-dk3x7'
+      });
+    }
+    fakeAmi.emit(failure('198.51.100.1'));
+    fakeAmi.emit(failure('198.51.100.1'));
+    await eventually(() => {
+      expect(reports).toEqual([{ address: '198.51.100.1', failures: 2 }]);
     });
   });
 

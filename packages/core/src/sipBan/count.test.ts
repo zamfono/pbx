@@ -172,3 +172,44 @@ describe('SipBanCount', () => {
     expect(count.size).toBe(0);
   });
 });
+
+describe('SipBanCount and the own endpoints of the stack', () => {
+  const own = new Set(['e200-dk3x7']);
+
+  it('does not count an InvalidAccountID for an endpoint the stack renders', () => {
+    // A device that registers before Asterisk has loaded its endpoint (TASK-54): ten of them
+    // behind one office address must not ban it.
+    const { count } = rig();
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      expect(
+        count.record(
+          { ...security('InvalidAccountID'), AccountID: 'e200-dk3x7' },
+          THRESHOLDS,
+          own
+        )
+      ).toBeNull();
+    }
+    expect(count.size).toBe(0);
+  });
+
+  it('still counts an unknown account name, and a wrong password for an own endpoint', () => {
+    const { count } = rig();
+    count.record(
+      { ...security('InvalidAccountID'), AccountID: '100' },
+      THRESHOLDS,
+      own
+    );
+    count.record(
+      { ...security('ChallengeResponseFailed'), AccountID: 'e200-dk3x7' },
+      THRESHOLDS,
+      own
+    );
+    expect(
+      count.record(
+        { ...security('InvalidAccountID'), AccountID: 'admin' },
+        THRESHOLDS,
+        own
+      )
+    ).toEqual({ address: '203.0.113.7', failures: 3 });
+  });
+});

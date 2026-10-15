@@ -18,6 +18,31 @@ import { exemption, type OwnAddresses } from './exempt.js';
 // How often the addresses past their window are dropped (`SipBanCount.sweep`).
 const SWEEP_INTERVAL_MS = 60_000;
 
+// The endpoint names of each snapshot, built once per snapshot.
+const endpointNames = new WeakMap<Snapshot, ReadonlySet<string>>();
+
+/**
+ * The endpoints the stack renders (§9.1, §9.4): every live device's, named by its SIP username,
+ * and every live `inbound_auth` trunk's, named by its username. A configuration propagation
+ * refreshes the cache before it reloads PJSIP (§3.1), so a new device is named here before its
+ * endpoint exists in Asterisk.
+ */
+export function ownEndpoints(snapshot: Snapshot): ReadonlySet<string> {
+  let names = endpointNames.get(snapshot);
+  if (names === undefined) {
+    names = new Set([
+      ...snapshot.devices.map(device => device.sipUsername),
+      ...snapshot.trunks.flatMap(trunk =>
+        trunk.inboundAuth === 1 && trunk.username !== null
+          ? [trunk.username]
+          : []
+      )
+    ]);
+    endpointNames.set(snapshot, names);
+  }
+  return names;
+}
+
 export function startSipBanCount(deps: {
   ami: AmiClient;
   cache: ConfigCache;
@@ -54,7 +79,11 @@ export function startSipBanCount(deps: {
     cache
       .get()
       .then(snapshot => {
-        const report = count.record(event, snapshot.settings);
+        const report = count.record(
+          event,
+          snapshot.settings,
+          ownEndpoints(snapshot)
+        );
         return report === null ? undefined : crossed(report, snapshot);
       })
       .catch(logFailure(log, 'SIP ban count'));
