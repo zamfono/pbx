@@ -119,6 +119,88 @@ the peaks do not stack.
 - Load generators at 50 calls: baresip devices ~55–61 % CPU and ~750 MiB, trunk sipp ~7 %,
   provider UAS ~4–5 %.
 
+## 3. Multi-stack density (TASK-50): how many tenants fit on one host
+
+Measured 2026-10-14/15 on a **Hetzner CCX33** (8 dedicated vCPU AMD EPYC-Milan, 32 GB RAM, no swap,
+Debian 13, Docker 29.9) carrying stacks in the macvlan mode (`compose.macvlan.yaml`, simulated with
+a `dummy0` parent), loaded from a separate **CCX43** over a Hetzner Cloud Network, with the
+harness `test/load/density/`. Pass criteria per step: host CPU p95 ≤ 70 %, RAM ≤ 80 %, no swap,
+packet loss p95 < 0.5 %, jitter p95 < 20 ms, no failed call. Profiles: P1 G.711 ⇄ G.711, P2 G.722
+desk phone ⇄ G.711 trunk, P3 Opus/TLS/SRTP ⇄ G.711, P4 AMR-WB trunk ⇄ Opus/TLS/SRTP. Busy-hour
+load: 0.17 Erlang per user, concurrent calls from Erlang B at 0.01 % overflow over all users of the
+host. The test stacks carried the fixes of TASK-51, TASK-52 and TASK-53 (as harness workarounds:
+`gw_priority`, Asterisk `nofile` 65536, host `fs.inotify.max_user_instances` 8192).
+
+### Result: users per CCX33 at busy hour
+
+Two phones per user ringing at once; the largest number of stacks that passed every criterion.
+
+| Tenant size | Worst mix (100 % P4, ⅔ recorded)                          | Realistic mix (50 % P4, 30 % P3, 20 % P2, ⅓ recorded)      |
+| ----------- | --------------------------------------------------------- | ---------------------------------------------------------- |
+| 10 users    | ≥ 27 stacks / 270 users (higher N not settled, see below) | 47 stacks / **470 users** (54 failed: CPU 73 %)            |
+| 20 users    | 21 stacks / **420 users** (24 failed: CPU 79 %)           | ≥ 28 stacks / **560 users** (CPU 67 %; no failure reached) |
+| 50 users    | 8 stacks / **400 users** (9 failed: CPU 70.1 %)           | ≥ 13 stacks / **650 users** (CPU 69 %)                     |
+| 200 users   | 2 stacks / **400 users** (3 failed: CPU 75 %)             | 4 stacks / **800 users** (5 failed: CPU 89 %)              |
+
+Every failure above was CPU alone: no call failed, loss stayed 0 % and jitter p95 ≤ 16 ms in all
+of them. **Rule of thumb for a CCX33: about 400 users with every call transcoded AMR-WB ⇄ Opus,
+about 500 with a realistic mix**, fewer the smaller the tenants (each idle stack costs CPU too).
+RAM is never the limit under busy-hour load.
+
+### Building blocks
+
+- **Per call** (host CPU p95, % of the 8-vCPU host, one stack): P1 ≈ 0.15, P2 ≈ 0.2, P3 ≈ 0.28-0.35,
+  P4 ≈ 0.47-0.52. One stack scales to the host's limit (P3 200 calls: 56 %; P4 150 calls: 70 %,
+  200 calls: 96 % with every call still fine); a single Asterisk is not a bottleneck of its own.
+- **Recording** costs Asterisk next to nothing; the stereo mix runs in `core` after the call,
+  ~0.4 CPU-s per recorded 150 s call.
+- **Idle stacks** (stage 2): host RAM ≈ 1.0 GB + **0.31 GB per stack** (containers ≈ 0.25 GB; 200
+  users instead of 20 add ≈ 15 MB). Host CPU p95 idle: 10 stacks 13 %, 25: 25 %, 50: 29 %, 75: 34 %
+  (half of it Docker's own overhead, e.g. healthchecks). RAM alone caps a CCX33 at ≈ 80 stacks.
+- **Spreading** the same calls over more stacks adds the stacks' idle cost and some jitter: 120 P4
+  calls took 58-63 % CPU on 1 stack, 68-75 % on 10, 86 % on 25, 97-98 % on 50; 400 P1 calls 48-50 %
+  on 10 stacks, 77 % on 50. Jitter p95 rose from ~1 ms (1 stack) to 6-20 ms (10-50 stacks), within
+  the limit; loss stayed ≤ 0.17 %.
+
+### Maintenance events (stage 5)
+
+14 stacks of 20 users (70 % of the worst-mix limit), 74 P4 calls running, each event on all
+stacks at once and 30 s apart.
+
+| Event                                   | At once                                                                                 | 30 s apart                                                                                                        | Calls                                                           |
+| --------------------------------------- | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| Backup (local restic)                   | CPU p95 42 → 52 %, each 4-8 s                                                           | 52 %                                                                                                              | unaffected                                                      |
+| TLS certificate reload                  | 54 %                                                                                    | 52 %                                                                                                              | unaffected                                                      |
+| Automatic update (backup + `update.sh`) | CPU 89-94 %; healthy after ~90 s, phones back after ~107 s                              | 57-67 %; each ~76 s, phones back after 84-147 s (13 of 14 stacks; one stack's phones did not return, unexplained) | the updated stacks' calls drop (74/74 at once, 44/74 staggered) |
+| Docker daemon restart                   | Docker back in ~21 s, stacks healthy ~1 s later, phones back after 2-61 s (mostly ~8 s) | n/a                                                                                                               | all calls drop                                                  |
+| Cold start of all stacks                | —                                                                                       | healthy after ~63 s, phones back ~70 s (13 of 14; one test-phone process crashed)                                 | —                                                               |
+
+The product's maintenance gate runs updates and certificate swaps only when a stack is idle;
+here they fired under load on purpose. Updating many stacks at once peaks the host near 90 %
+CPU for about a minute, so staggering them (the gate's moments differ per tenant anyway) is
+advisable on a full host.
+
+### Found on the way (filed)
+
+- TASK-51 — macvlan stacks whose directory name sorts before `public` (and every stack on Podman)
+  routed their replies through the host's address. Fixed on main.
+- TASK-52 — Asterisk's default 1024 open files capped a stack at ~90 calls. Fixed on main.
+- TASK-53 — the SIP ban helper busy-looped once the host's inotify instances (128) were used up
+  by 10-25 stacks: 98 % CPU with 25 idle stacks. Fixed on main; a many-stack host also raises
+  `fs.inotify.max_user_instances`.
+- TASK-54 — devices that REGISTER before their endpoints are loaded count as failed SIP attempts
+  and can ban their own address; the same race after a restart can delay Ringotel's re-register.
+
+### Caveats
+
+- One host type, one run per cell (the steps of stage 3 twice); differences under ~10 % are noise.
+- The worst mix at 10 users was not settled: two bring-ups aborted on a harness race (devices
+  registered before their endpoints existed, TASK-54) before it was fixed; 27 stacks passed at 49 %
+  CPU, so the real limit is well above.
+- No WAN (loss, latency, jitter) between the two hosts; baresip stands in for Ringotel and desk
+  phones, sipp for the trunk; baresip 1.1 crashed now and then (the harness restarts it).
+- Calls are inbound only; transfers, ring groups and voicemail were not part of the load.
+
 ## Disk footprint
 
 | Item                                                                 | Size                                                                |
@@ -157,21 +239,21 @@ share, the retention period (§11.6) and the per-minute figure above.
   (10.99.0.0/16; stack i at 10.99.1.i, FQDN `pbx-<i>.density.test`, TLS from Caddy's local CA),
   each with `USERS` users and `DEVICES` devices per user, and drives them with sipp (trunk) and
   baresip (devices) per profile P1–P4. Build the images with `TAG=density docker buildx bake
-  --load`. Commands: `up`, `step P1=n P2=n P3=n P4=n` (plus `REC_SHARE`, `CALL_S`, and `EVENT`
+--load`. Commands: `up`, `step P1=n P2=n P3=n P4=n` (plus `REC_SHARE`, `CALL_S`, and `EVENT`
   to fire a maintenance event at the plateau), `maint backup|update|tls|cold|docker` (with
   `STAGGER_S`), `down`, or `run` with `STEPS` and `MAINT` for a whole session that tears itself
   down. Each step writes host CPU/RAM/swap, cgroup figures per container, sipp counts and
   call_qos per leg, and a PASS/FAIL verdict against TASK-50's criteria (`verdicts.txt`).
   - Local mode (development; generators on the same host and network):
     `N=2 USERS=4 DEVICES=2 REC_SHARE=0.67 STEPS='idle;P1=2 P2=2 P3=2 P4=2' MAINT='backup tls update cold'
-    flock /root/pbx-harness.lock bash test/load/density/density.sh run`
+flock /root/pbx-harness.lock bash test/load/density/density.sh run`
   - Remote mode (target and generator, e.g. CCX33 + CCX43 on one Cloud Network whose routes send
     10.99.0.0/16 to the target and 10.98.0.0/16 to the generator): run on the target with
     `GEN_SSH=root@<generator's private IP>` (the target's root key authorised on the generator).
     The target needs Docker, python3, rsync, jq and ffmpeg, the stack images (`TAG=density
-    docker buildx bake --load` in a checkout there) and the sipp image; the generator needs
+docker buildx bake --load` in a checkout there) and the sipp image; the generator needs
     Docker, python3 and rsync, and gets the devices image (and sipp, unless already pulled) over
     ssh.
   - Stage 1 (calibration), as run for TASK-50: one stack, `N=1 USERS=400 DEVICES=1
-    MIX=alaw:1,g722:1,opus:2 RTP_PORT_END=11199 CALL_S=150`, `STEPS` P1-P4 each at 10, 25, 50 and
+MIX=alaw:1,g722:1,opus:2 RTP_PORT_END=11199 CALL_S=150`, `STEPS` P1-P4 each at 10, 25, 50 and
     100 calls, once with `REC_SHARE=0` and once with `0.67`.
