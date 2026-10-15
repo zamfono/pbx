@@ -36,7 +36,7 @@ calls" below):
 | Realistic: half AMR-WB ⇄ Opus, the rest Opus or G.722 ⇄ G.711, ⅓ recorded | about 500      | about 120        |
 
 The limit is CPU; RAM (about 1 GB plus 0.31 GB per stack) would allow about 80 stacks. Very small
-tenants fit somewhat fewer users, since every stack costs CPU even when idle. Such a host needs
+tenants fit fewer users, since every stack costs CPU even when idle. Such a host needs
 `fs.inotify.max_user_instances` raised (`deploy/README.md` step 3). Details in section 3.
 
 ## Users and concurrent calls
@@ -193,7 +193,7 @@ concurrent calls those users make at busy hour:
 
 | Tenant size | Worst mix (100 % P4, ⅔ recorded)                            | Realistic mix (50 % P4, 30 % P3, 20 % P2, ⅓ recorded)       |
 | ----------- | ----------------------------------------------------------- | ----------------------------------------------------------- |
-| 10 users    | ≥ 27 stacks / ≥ 270 users / 72 calls (CPU 49 %)             | 47 stacks / **470 users** / 113 calls (54 failed: CPU 73 %) |
+| 10 users    | 32 stacks / **320 users** / 83 calls (37 failed: CPU 72 %)  | 47 stacks / **470 users** / 113 calls (54 failed: CPU 73 %) |
 | 20 users    | 21 stacks / **420 users** / 103 calls (24 failed: CPU 79 %) | ≥ 28 stacks / **560 users** / 131 calls (CPU 67 %)          |
 | 50 users    | 8 stacks / **400 users** / 99 calls (9 failed: CPU 70.1 %)  | ≥ 13 stacks / **650 users** / 149 calls (CPU 69 %)          |
 | 200 users   | 2 stacks / **400 users** / 99 calls (3 failed: CPU 75 %)    | 4 stacks / **800 users** / 178 calls (5 failed: CPU 89 %)   |
@@ -227,13 +227,13 @@ CPU as well. RAM is not the limit under busy-hour load.
 14 stacks of 20 users (70 % of the worst-mix limit) with 74 P4 calls running; each event on all
 stacks at once, then 30 s apart.
 
-| Event                                   | At once                                                                                    | 30 s apart                                                                      | Calls                          |
-| --------------------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------- | ------------------------------ |
-| Backup (local restic target)            | CPU p95 42 → 52 %, 4–8 s per stack                                                         | CPU p95 52 %                                                                    | unaffected                     |
-| TLS certificate reload                  | CPU p95 54 %                                                                               | CPU p95 52 %                                                                    | unaffected                     |
-| Automatic update (backup + `update.sh`) | CPU p95 89–94 %; stacks healthy after ~90 s, phones back after ~107 s                      | CPU p95 57–67 %; ~76 s per stack, phones back after 84–147 s on 13 of 14 stacks | the updated stacks' calls drop |
-| Docker daemon restart                   | Docker back after ~21 s, stacks healthy ~1 s later, phones back after 2–61 s (mostly ~8 s) | —                                                                               | all calls drop                 |
-| Cold start of every stack               | —                                                                                          | healthy after ~63 s, phones back after ~70 s                                    | —                              |
+| Event                                   | At once                                                                                    | 30 s apart                                                   | Calls                          |
+| --------------------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------ |
+| Backup (local restic target)            | CPU p95 42 → 52 %, 4–8 s per stack                                                         | CPU p95 52 %                                                 | unaffected                     |
+| TLS certificate reload                  | CPU p95 54 %                                                                               | CPU p95 52 %                                                 | unaffected                     |
+| Automatic update (backup + `update.sh`) | CPU p95 89–94 %; stacks healthy after ~90 s, phones back after ~107 s                      | CPU p95 56–67 %; ~76–79 s per stack, phones back after ~97 s | the updated stacks' calls drop |
+| Docker daemon restart                   | Docker back after ~21 s, stacks healthy ~1 s later, phones back after 2–61 s (mostly ~8 s) | —                                                            | all calls drop                 |
+| Cold start of every stack               | —                                                                                          | healthy after ~63 s, phones back after ~70 s                 | —                              |
 
 The maintenance gate (§6.4) runs updates and certificate swaps only while a stack is idle; here
 they fired under load on purpose. Updating many stacks at the same moment holds the host near
@@ -247,8 +247,6 @@ they fired under load on purpose. Updating many stacks at the same moment holds 
   real phones and trunks.
 - Calls were inbound only; transfers, ring groups, voicemail and outbound calls were not part of
   the load.
-- After the staggered update, one stack's phones had not re-registered within 5 minutes; the
-  cause was not found.
 
 ## Disk footprint
 
