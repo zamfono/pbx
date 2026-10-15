@@ -9,13 +9,6 @@
 #   - `internal` gets a /24 of its own per stack (INTERNAL_SUBNET): Docker's default address
 #     pools hold about 30 bridge networks, fewer than the stacks a host carries
 #   - netns answers to its FQDN on `public`, for whatever on that network resolves it there
-#   - netns's default route is `public`'s gateway (gw_priority): with equal priorities Docker
-#     takes the network whose name sorts first, here `density-<i>_internal`, so replies to a
-#     peer outside the `public` subnet (the remote generator) would leave NATed through the host.
-#     compose.macvlan.yaml sets no priority, so a production stack whose project name sorts
-#     before `public` has the same problem (TASK-51)
-#   - asterisk may open 65536 files: Docker's default soft limit of 1024 caps a stack at ~90 calls
-#     (TASK-52), a limit calibration steps of 100 calls would measure instead of CPU
 networks:
   internal:
     ipam:
@@ -28,17 +21,12 @@ services:
     pull_policy: missing
     networks:
       public:
-        gw_priority: 1
         aliases:
           - ${FQDN:?set by density.sh}
 
   asterisk:
     image: ${ASTERISK_IMAGE:?set by density.sh}
     pull_policy: missing
-    ulimits:
-      nofile:
-        soft: 65536
-        hard: 524288
 
   migrate:
     image: ${MIGRATE_IMAGE:?set by density.sh}

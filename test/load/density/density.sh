@@ -56,7 +56,8 @@
 # zamfono/*:$TAG, `TAG=$TAG docker buildx bake --load`; default density), *_IMAGE, STATE_DIR
 # (/var/tmp/zamfono-density), OUT_DIR, SUBNET_PREFIX (10.99), GEN_SSH, GEN_PREFIX,
 # INTERNAL_PREFIX (10.250: stack i's internal network is .<i>.0/24), API_PORT_BASE (8300), MTU
-# (1450), RTP_PORT_START / RTP_PORT_END (each stack's RTP range; unset = the stack's default,
+# (1450), ENDPOINT_WAIT (1: devices start once Asterisk has loaded their endpoints; 0: at once),
+# RTP_PORT_START / RTP_PORT_END (each stack's RTP range; unset = the stack's default,
 # 10000-10200, about 50 calls), CPU_P95_MAX / RAM_MAX / LOSS_MAX / JITTER_MAX (density.py judge).
 set -uo pipefail
 
@@ -203,7 +204,9 @@ stack_create() {
   # The devices start once Asterisk has loaded every endpoint: a REGISTER to one not loaded yet
   # is a failed SIP attempt, and ten of them ban the devices' address for a day (§5.6), which
   # happened under load in stage 4 (InvalidAccountID, then sip-ban).
-  poll 180 2 endpoints_loaded "$(wc -l < "$STACK_DIR/creds.csv")" \
+  # ENDPOINT_WAIT=0 leaves the wait out, as a real office's phones would: early REGISTERs then
+  # meet the product's own handling of them (TASK-54).
+  [ "${ENDPOINT_WAIT:-1}" = 0 ] || poll 180 2 endpoints_loaded "$(wc -l < "$STACK_DIR/creds.csv")" \
     || fail "stack $si: Asterisk did not load the devices' endpoints"
   gen_containers
   gen_devices_start
