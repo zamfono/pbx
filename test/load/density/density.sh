@@ -195,6 +195,16 @@ stack_create() {
     "$DEVICES" "$MIX" "$STACK_DIR" || fail "stack $si: tenant configuration failed"
   dc exec -T proxy cat /data/caddy/pki/authorities/local/root.crt > "$GEN_DIR/s$si/ca.pem" \
     || fail "stack $si: no local CA root"
+  # The devices start once Asterisk has loaded every endpoint: a REGISTER to one not loaded yet
+  # is a failed SIP attempt, and ten of them ban the devices' address for a day (§5.6), which
+  # happened under load in stage 4 (InvalidAccountID, then sip-ban).
+  local endpoints
+  endpoints=$(wc -l < "$STACK_DIR/creds.csv")
+  # shellcheck disable=SC2317 # called through poll
+  endpoints_loaded() {
+    [ "$(ast 'pjsip show endpoints' | grep -cE '^ +Endpoint: +e[0-9]+-d')" -ge "$endpoints" ]
+  }
+  poll 180 2 endpoints_loaded || fail "stack $si: Asterisk did not load the $endpoints endpoints"
   gen_containers
   gen_devices_start
   # Stage 4 (32 stacks) once had a stack none of whose devices registered, with nothing logged;
