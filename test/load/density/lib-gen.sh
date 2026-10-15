@@ -1,12 +1,13 @@
 # shellcheck shell=bash
 # test/load/density: the generator side (sourced by density.sh). Every stack gets two generator
-# containers on the generator host's `public` macvlan network:
-#   density-gen-<i>-trunk  sipp (SIPP_IMAGE) at <GEN_PREFIX>.2.<i>, the stack's trunk host: one
+# containers on the generator host's macvlan network (GEN_NET; GEN_NAME names it, the containers
+# and GEN_DIR):
+#   GEN_NAME-<i>-trunk     sipp (SIPP_IMAGE) at <GEN_PREFIX>.2.<i>, the stack's trunk host: one
 #                          UAC per step and trunk codec, each call to one user's DID, holding the
 #                          call CALL_S and hanging up itself (stress-caller-bye.xml):
 #                            g711   PCMA only, port 5060, RTP 10000-34999 (P1, P2, P3)
 #                            amrwb  AMR-WB octet-aligned only, port 5070, RTP 35000-59999 (P4)
-#   density-gen-<i>-dev    baresip (DEVICES_IMAGE) at <GEN_PREFIX>.3.<i>, every device of the
+#   GEN_NAME-<i>-dev       baresip (DEVICES_IMAGE) at <GEN_PREFIX>.3.<i>, every device of the
 #                          stack's users registered, one process per PER_PROC devices of a kind (1: a baresip process
 #                          answering a second call puts its first on hold)
 #                          (gen_baresip.py): alaw / g722 desk phones over UDP, opus Ringotel
@@ -17,7 +18,7 @@
 # command runs through `gen`, i.e. over ssh: the only difference between the two modes.
 # Expects density.sh's globals and stack_use.
 
-GEN_LABEL=zamfono.density=gen
+GEN_LABEL=zamfono.density=$GEN_NAME
 
 # `gen <cmd…>` runs one command on the generator host.
 gen() {
@@ -38,11 +39,13 @@ gen_pull() {
   [ -z "$GEN_SSH" ] || rsync -a "$GEN_SSH:$GEN_DIR/" "$GEN_DIR/"
 }
 
-# The generator host's own `public` network (net.sh); in the local mode it is the target's.
+# The generator host's own network GEN_NET (net.sh) on its own dummy parent and shim; in the local
+# mode it is the target's `public`.
 gen_net() {
   [ -n "$GEN_SSH" ] || return 0
   # shellcheck disable=SC2029
-  ssh -o BatchMode=yes "$GEN_SSH" "MTU=$MTU bash -s -- $1 $GEN_PREFIX.0.0/16 $GEN_PREFIX.0.1" \
+  ssh -o BatchMode=yes "$GEN_SSH" "MTU=$MTU NET_NAME=$GEN_NET PARENT=dummy-${GEN_NAME#density-} SHIM=$GEN_NAME \
+    bash -s -- $1 $GEN_PREFIX.0.0/16 $GEN_PREFIX.0.1" \
     < "$here/net.sh"
 }
 
@@ -90,19 +93,19 @@ gen_media() {
 
 # Stack `si`'s two generator containers (stack_use first).
 gen_containers() {
-  gen docker rm -f "density-gen-$si-trunk" "density-gen-$si-dev" >/dev/null 2>&1
-  gen docker run -d --name "density-gen-$si-trunk" --label "$GEN_LABEL" --restart unless-stopped \
-    --network "$NET_NAME" --ip "$TRUNK_IP" --cap-add NET_RAW --init -v "$GEN_DIR:/load-gen" \
+  gen docker rm -f "$GEN_NAME-$si-trunk" "$GEN_NAME-$si-dev" >/dev/null 2>&1
+  gen docker run -d --name "$GEN_NAME-$si-trunk" --label "$GEN_LABEL" --restart unless-stopped \
+    --network "$GEN_NET" --ip "$TRUNK_IP" --cap-add NET_RAW --init -v "$GEN_DIR:/load-gen" \
     --entrypoint sleep "$SIPP_IMAGE" infinity >/dev/null || fail "could not start the trunk generator"
-  gen docker run -d --name "density-gen-$si-dev" --label "$GEN_LABEL" --restart unless-stopped \
-    --network "$NET_NAME" --ip "$DEVICES_IP" --init -v "$GEN_DIR:/load-gen" \
+  gen docker run -d --name "$GEN_NAME-$si-dev" --label "$GEN_LABEL" --restart unless-stopped \
+    --network "$GEN_NET" --ip "$DEVICES_IP" --init -v "$GEN_DIR:/load-gen" \
     --entrypoint sleep "$DEVICES_IMAGE" infinity >/dev/null || fail "could not start the device generator"
 }
 
 # Stack `si`'s devices: baresip configurations written here, pushed, then one process each.
 gen_devices_start() {
   local kind creds n c p=0 dir registrar extra
-  gen docker exec "density-gen-$si-dev" pkill baresip >/dev/null 2>&1
+  gen docker exec "$GEN_NAME-$si-dev" pkill baresip >/dev/null 2>&1
   rm -rf "$GEN_DIR/s$si"/bs-*
   for creds in "$STACK_DIR"/creds-*.csv; do
     [ -f "$creds" ] || continue
@@ -137,7 +140,7 @@ gen_devices_launch() {
   for d in "$@"; do dirs+=("/load-gen/s$si/${d##*/}"); done
   [ ${#dirs[@]} -gt 0 ] || return 0
   # shellcheck disable=SC2016 # expanded by the container's sh
-  gen docker exec -d "density-gen-$si-dev" sh -c \
+  gen docker exec -d "$GEN_NAME-$si-dev" sh -c \
     'for d in "$@"; do baresip -f "$d" >> "$d/baresip.log" 2>&1 & done; wait' sh "${dirs[@]}"
 }
 
@@ -149,7 +152,7 @@ gen_devices_rereg() {
   # The old processes first have to be gone: with a call up, one takes a while to hang up, and a
   # new one started before then finds its SIP port taken and exits.
   # shellcheck disable=SC2016 # expanded by the container's sh
-  gen docker exec "density-gen-$si-dev" sh -c '
+  gen docker exec "$GEN_NAME-$si-dev" sh -c '
     p="^baresip -f /load-gen/s$1/bs-opus-"
     pkill -f "$p"
     for _ in $(seq 1 20); do pgrep -f "$p" > /dev/null || exit 0; sleep 0.5; done
@@ -165,7 +168,7 @@ gen_devices_ensure() {
   stack_use "$1"
   total=$(wc -l < "$STACK_DIR/creds.csv")
   [ "$(devices_available)" -ge "$total" ] && return 0
-  running=$(gen docker exec "density-gen-$si-dev" ps -eo args | sed -n 's#^baresip -f ##p')
+  running=$(gen docker exec "$GEN_NAME-$si-dev" ps -eo args | sed -n 's#^baresip -f ##p')
   for dir in "$GEN_DIR/s$si"/bs-*; do
     grep -qx "/load-gen/s$si/${dir##*/}" <<< "$running" || dead+=("$dir")
   done
@@ -178,7 +181,7 @@ gen_devices_ensure() {
 gen_calls_start() {
   local step=$1 t=$2 k=$3 port=5060 lo=10000 hi=34999
   [ "$t" = amrwb ] && port=5070 lo=35000 hi=59999
-  gen docker exec -d "density-gen-$si-trunk" sh -c "cd /load-gen/s$si/$step && \
+  gen docker exec -d "$GEN_NAME-$si-trunk" sh -c "cd /load-gen/s$si/$step && \
     sipp -sf /load-gen/caller-$t.xml -inf dids-$t.csv -l $k -m $k -r $RATE -rp 1s \
       -d $((CALL_S * 1000)) -p $port -min_rtp_port $lo -max_rtp_port $hi \
       -timeout $((CALL_S + 300))s -trace_stat -stf sipp-$t.csv -fd 5 \

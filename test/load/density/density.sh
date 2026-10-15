@@ -9,9 +9,11 @@
 # (SUBNET_PREFIX.0.0/16) on it and a host-side shim holding its gateway (.0.1), with IP
 # forwarding: stack i owns SUBNET_PREFIX.1.<i> (STACK_IPV4) and the FQDN pbx-<i>.density.test,
 # TLS from Caddy's local CA. The generators are two containers per stack (lib-gen.sh) on the
-# generator host's own `public` network, GEN_PREFIX.0.0/16:
+# generator host's own network, GEN_PREFIX.0.0/16:
 #   local mode   GEN_SSH unset: generator = target, GEN_PREFIX = SUBNET_PREFIX, one network
-#   remote mode  GEN_SSH=root@<generator>: GEN_PREFIX 10.98, net.sh run there too, every
+#   remote mode  GEN_SSH=root@<generator>: GEN_PREFIX 10.98, net.sh run there too (network,
+#                parent, shim, containers and GEN_DIR named density-g<GEN_PREFIX's 2nd octet>, so
+#                targets with distinct GEN_PREFIXes share a generator host), every
 #                generator command over ssh and GEN_DIR synced with rsync; the Cloud Network
 #                routes SUBNET_PREFIX.0.0/16 to the target and GEN_PREFIX.0.0/16 to the generator
 #                (or net.sh's PEER_SUBNET/PEER_GW add the routes on the hosts)
@@ -67,7 +69,6 @@ load=$(CDPATH= cd -- "$here/.." && pwd)
 repo=$(CDPATH= cd -- "$load/../.." && pwd)
 COMPOSE=${COMPOSE:-docker compose}
 STATE_DIR=${STATE_DIR:-/var/tmp/zamfono-density}
-GEN_DIR=$STATE_DIR/gen
 N=${N:-$(cat "$STATE_DIR/n" 2>/dev/null || echo 2)}
 USERS=${USERS:-10}
 DEVICES=${DEVICES:-1}
@@ -85,6 +86,11 @@ MEDIA_S=${MEDIA_S:-660}
 SUBNET_PREFIX=${SUBNET_PREFIX:-10.99}
 GEN_SSH=${GEN_SSH:-}
 if [ -n "$GEN_SSH" ]; then GEN_PREFIX=${GEN_PREFIX:-10.98}; else GEN_PREFIX=$SUBNET_PREFIX; fi
+# Generator containers, network and files are named after GEN_PREFIX on a remote generator, so
+# runs from several targets share one generator host (each with its own GEN_PREFIX).
+if [ -n "$GEN_SSH" ]; then GEN_NAME=density-g${GEN_PREFIX#*.}; GEN_NET=$GEN_NAME
+else GEN_NAME=density-gen; GEN_NET=public; fi
+GEN_DIR=$STATE_DIR/${GEN_NAME#density-}
 INTERNAL_PREFIX=${INTERNAL_PREFIX:-10.250}
 API_PORT_BASE=${API_PORT_BASE:-8300}
 NET_NAME=public
@@ -217,7 +223,7 @@ stack_create() {
   users=$(cut -d, -f1 "$STACK_DIR/creds.csv" | tr '\n' ' ')
   if ! poll 90 3 devices_reachable "$total"; then
     log "stack $si: $n of $total devices reachable after 90 s; baresip processes there: $(gen docker \
-      exec "density-gen-$si-dev" sh -c 'ps -e | grep -c baresip' 2>&1)"
+      exec "$GEN_NAME-$si-dev" sh -c 'ps -e | grep -c baresip' 2>&1)"
     gen_devices_ensure "$si"
   fi
   touch "$STACK_DIR/.ready"

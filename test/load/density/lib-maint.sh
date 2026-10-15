@@ -89,7 +89,7 @@ maint_stack() {
   done_s=$(since "$t0")
   poll "$REG_TIMEOUT_S" 1 healthz_200 && healthy_s=$(since "$t0")
   if [ "$ev" = docker ] && [ -z "$GEN_SSH" ]; then
-    poll 60 1 gen docker exec "density-gen-$si-dev" true && gen_devices_start
+    poll 60 1 gen docker exec "$GEN_NAME-$si-dev" true && gen_devices_start
   fi
   # A new Asterisk (cold start, update, Docker restart): the TLS devices register again on
   # Ringotel's behalf; regs_s then includes that, not Ringotel's own delay.

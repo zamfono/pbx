@@ -129,6 +129,7 @@ def judge_main(step_dir, expected) -> None:
         'samples': len(window),
         'cpu_p95': p95([float(r['cpu_pct']) for r in window]),
         'cpu_max': max((float(r['cpu_pct']) for r in window), default=None),
+        'steal_p95': p95([float(r.get('steal_pct') or 0) for r in window]),
         'ram_max_pct': max((float(r['mem_pct']) for r in host), default=None),
         'ram_max_mib': max((int(r['mem_used_mib']) for r in host), default=None),
         'swap_used_mib': max((int(r['swap_used_mib']) for r in host), default=None),
@@ -183,7 +184,8 @@ def judge_main(step_dir, expected) -> None:
     v['verdict'] = 'PASS' if all(checks.values()) else 'FAIL'
     (d / 'verdict.json').write_text(json.dumps(v, indent=1))
     fmt = lambda x: '-' if x is None else x  # noqa: E731
-    print(f"{v['verdict']} {d.name}: cpu_p95={fmt(v['cpu_p95'])}% ram_max={fmt(v['ram_max_pct'])}% "
+    print(f"{v['verdict']} {d.name}: cpu_p95={fmt(v['cpu_p95'])}% steal_p95={fmt(v['steal_p95'])}% "
+          f"ram_max={fmt(v['ram_max_pct'])}% "
           f"swapped_out={v['swapped_out_pages']} loss_p95={fmt(v['loss_p95'])}% "
           f"jitter_p95={fmt(v['jitter_p95'])}ms failed={v['calls_failed']}/{expected} "
           f"legs={len(legs)} gen_cpu_p95={fmt(v['gen_cpu_p95'])}% "
