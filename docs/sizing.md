@@ -39,6 +39,19 @@ The limit is CPU; RAM (about 1 GB plus 0.31 GB per stack) would allow about 80 s
 tenants fit fewer users, since every stack costs CPU even when idle. Such a host needs
 `fs.inotify.max_user_instances` raised (`deploy/README.md` step 3). Details in section 3.
 
+Hetzner's shared-vCPU servers (CPX) carry more per euro but lose about 10 % of their capacity in
+the evening, when their neighbours are busy; sized for the evening:
+
+| Host                                    | Every call AMR-WB ⇄ Opus, ⅔ recorded | Realistic mix               |
+| --------------------------------------- | ------------------------------------ | --------------------------- |
+| CPX62 (16 shared vCPU, 32 GB)           | about 750 users / 170 calls          | about 950 users / 200 calls |
+| CPX32 (4 shared vCPU, 8 GB)             | about 180 users / 53 calls           | about 230 users / 62 calls  |
+| CPX12 (1 shared vCPU, 2 GB), one tenant | about 25 users / 14 calls            | about 45 users / 20 calls   |
+
+With tenants of 10 users or fewer, a CPX32 is limited by RAM to about 16 stacks. A CPX12 runs one
+stack; its single vCPU has no reserve when a neighbour takes CPU away (section 3, "Shared
+vCPUs").
+
 ## Users and concurrent calls
 
 The hardware is sized by concurrent calls; tenants are counted in users. The bridge between the
@@ -239,10 +252,66 @@ The maintenance gate (§6.4) runs updates and certificate swaps only while a sta
 they fired under load on purpose. Updating many stacks at the same moment holds the host near
 90 % CPU for about a minute, so on a full host updates are best spread over time.
 
+### Shared vCPUs: Hetzner CPX62, CPX32, CPX12
+
+The same method on three shared-vCPU hosts (AMD EPYC-Genoa, Debian 13, Docker 29), measured in
+parallel against one generator on 2026-10-15; each limit is the largest number of stacks (or, for
+one tenant, of users) that passed. The searches ran in the morning and early afternoon (UTC):
+
+| Tenant size | CPX62 (16 vCPU, 31 GB), worst | CPX62, realistic      | CPX32 (4 vCPU, 7.6 GB), worst | CPX32, realistic      |
+| ----------- | ----------------------------- | --------------------- | ----------------------------- | --------------------- |
+| 10 users    | 73 stacks / 730 users         | 76 / 760 (RAM 80 %)   | 16 / 160 (RAM 79 %)           | 16 / 160 (RAM 78 %)   |
+| 20 users    | 43 / 860 / 189 calls          | 53 / 1060 / 227 calls | 10 / 200 / 57 calls           | 13 / 260 / 70 calls   |
+| 50 users    | 21 / 1050 / 225 calls         | 27 / 1350 / 282 calls | 4 / 200 / 57 calls            | 5 / 250 / 68 calls    |
+| 200 users   | 4 / 800 / 178 calls           | 7 / 1400 / 291 calls  | —                             | —                     |
+| One tenant  | —                             | —                     | 292 users / 77 calls          | 428 users / 105 calls |
+
+The CPX12 (1 vCPU, 1.9 GB) runs one stack: 32 users / 17 calls in the worst mix, 57 users / 24
+calls in the realistic one. Every failing step failed on CPU, except where RAM is noted; the
+next step up from each limit failed. Per vCPU the shared Genoa cores carried about as much as the
+CCX33's dedicated Milan cores, the CPX62 about twice a CCX33.
+
+**Time of day.** Each host's 20-user worst-mix limit (the CPX12's one tenant) was run again every
+hour until 22:00 UTC. Steal time stayed 0.0 % in every run, yet the same load cost more CPU in the
+evening:
+
+| Host  | Limit     | Morning to afternoon    | From about 18:30 UTC    | Passed every time   |
+| ----- | --------- | ----------------------- | ----------------------- | ------------------- |
+| CPX62 | 43 stacks | passed (CPU p95 68 %)   | failed 4 of 4 (74–78 %) | 38 stacks (55–70 %) |
+| CPX32 | 10 stacks | passed 3 of 3 (64–69 %) | failed 4 of 4 (71–73 %) | 9 stacks (61–67 %)  |
+| CPX12 | 32 users  | passed 6 of 7 (64–75 %) | passed 2 of 4 (66–71 %) | 28 users (56–63 %)  |
+
+A neighbour's load shows up here as slower vCPUs, not as steal, so steal monitoring alone does not
+reveal it. Sizing for the evening means about 10–12 % below the daytime limits above; the
+recommendation at the top does so.
+
+**CPU taken away.** With each host at its daytime limit, a process capped by a systemd CPU quota
+took 0–50 % of the host's CPU, as a busy neighbour would; only call quality was judged, since the
+host CPU includes that process by design:
+
+| Taken | CPX62, 43 stacks / 189 calls | CPX32, 10 stacks / 57 calls  | CPX12, 32 users / 17 calls             |
+| ----- | ---------------------------- | ---------------------------- | -------------------------------------- |
+| 0 %   | jitter p95 1.0 ms, loss 0 %  | 1.9 ms, 0 %                  | 4.4 ms, 0 %                            |
+| 10 %  | 1.3 ms, 0 %                  | 2.8 ms, 0.11 %               | **27 ms** (fails the 20 ms limit), 0 % |
+| 20 %  | 1.6 ms, 0.01 %               | 3.2 ms, 0 %                  | —                                      |
+| 50 %  | 1.7 ms, 0 % (host CPU 100 %) | 2.9 ms, 0 % (host CPU 100 %) | —                                      |
+
+With 4 or more vCPUs, call quality held even with the host at 100 % CPU: Asterisk's media threads
+still found a free core, and only work that can wait (recording mixes after the call) waited. The
+70 % CPU criterion is therefore conservative there. With one vCPU, every packet waits whenever
+another task holds the core, and 10 % taken away already broke the jitter limit; a CPX12 needs a
+larger margin than its CPU figure suggests.
+
+Maintenance under load (70 % of the 20-user worst-mix limit) matched the CCX33: a backup ran in
+2–6 s per stack with every call unaffected (CPX62, 30 stacks; CPX32, 7 stacks; CPX12, one tenant
+of 22 users), and on the CPX62 and CPX32 an update 30 s apart took each stack about 76 s to healthy and its phones about
+94 s to register again, dropping the calls of the stacks being updated.
+
 ### Caveats
 
-- One host type; most cells ran once (the spreading steps twice). Treat differences below ~10 %
-  as noise.
+- One dedicated host type (CCX33); most of its cells ran once (the spreading steps twice). Treat
+  differences below ~10 % as noise. The shared hosts were measured on one day, so their evening
+  figures are a single day's evening.
 - No WAN between the hosts (no loss, latency or jitter of its own); baresip and sipp stand in for
   real phones and trunks.
 - Calls were inbound only; transfers, ring groups, voicemail and outbound calls were not part of
@@ -300,7 +369,10 @@ flock /root/pbx-harness.lock bash test/load/density/density.sh run`
     The target needs Docker, python3, rsync, jq and ffmpeg, the stack images (`TAG=density
 docker buildx bake --load` in a checkout there) and the sipp image; the generator needs
     Docker, python3 and rsync, and gets the devices image (and sipp, unless already pulled) over
-    ssh.
+    ssh. Several targets share one generator when each has its own `SUBNET_PREFIX` and
+    `GEN_PREFIX` (the shared-vCPU runs used 10.101/10.98, 10.102/10.97 and 10.103/10.96, each pair
+    routed by the Cloud Network); the stock images then come from `ghcr.io/zamfono/*:<version>`,
+    retagged as `zamfono/*:density`.
   - The per-call figures of section 3: one stack, `N=1 USERS=400 DEVICES=1
 MIX=alaw:1,g722:1,opus:2 RTP_PORT_END=11199 CALL_S=150`, `STEPS` P1-P4 each at 10, 25, 50 and
     100 calls, once with `REC_SHARE=0` and once with `0.67`.
