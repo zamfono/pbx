@@ -23,7 +23,7 @@ why the specified behaviour changed; the commit history, how.
 ### Upgrade notes
 
 - Mode B on Docker needs Docker Engine 28 and Compose 2.33 or newer: `compose.macvlan.yaml` now sets `gw_priority`, which older versions do not accept.
-- Mode B on Podman: create the `public` network again with `-o metric=50` (deploy/README.md step 3): stop the host's stacks, `podman network rm public`, create it as step 3 now shows, and start them.
+- Mode B on Podman: replace Debian's `docker-compose` (2.26, which does not accept the file) with `docker-compose-plugin` from Docker's repository: `apt-get remove docker-compose`, then install the plugin as deploy/README.md step 2 shows; then create the `public` network again with `-o metric=50` (step 3): stop the host's stacks, `podman network rm public`, create it as step 3 now shows, and start them.
 - Mode B with more than a few stacks: raise the kernel's inotify limit (deploy/README.md step 3).
 
 ## [0.4.2] - 2026-10-14

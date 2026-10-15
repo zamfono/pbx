@@ -68,15 +68,21 @@ Run everything as root. Rootless Podman can bind neither ports below 1024 nor a 
 Podman needs a systemd host, since it runs healthchecks and restart policies through systemd.
 
 ```bash
-apt-get update
-apt-get install -y --no-install-recommends podman aardvark-dns docker-compose
+apt-get update && apt-get install -y --no-install-recommends podman aardvark-dns ca-certificates curl
+install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] \
+  https://download.docker.com/linux/debian $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
+  > /etc/apt/sources.list.d/docker.list
+apt-get update && apt-get install -y docker-compose-plugin
 systemctl enable --now podman.socket
 ```
 
 `aardvark-dns` is what lets the services find each other by name. Without it `core` fails to
-reach `asterisk`. `docker-compose` is the Compose provider `podman compose` hands the files to,
-the same one CI uses; it talks to the root socket enabled above and needs no Docker daemon.
-It is the recommended provider. `podman-compose` also works: it has no `up --wait`, so
+reach `asterisk`. `docker-compose-plugin` is the Compose provider `podman compose` hands the
+files to, the same one CI uses; it talks to the root socket enabled above and needs no Docker
+daemon. It comes from Docker's repository because mode B needs Compose 2.33 or newer, and
+Debian's own `docker-compose` package is older. It is the recommended provider. `podman-compose` also works: it has no `up --wait`, so
 `update.sh` checks the services' health itself instead, and no `rm`, so without the boot unit of
 step 7 `update.sh` takes the stack `down` before `up -d`, as it does on Podman anyway.
 
