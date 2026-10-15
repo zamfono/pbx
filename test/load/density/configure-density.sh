@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# test/load/density: builds one stack's tenant for the density matrix (TASK-50), close kin of
+# test/load/density: builds one stack's tenant for the density measurement (docs/sizing.md section 3), close kin of
 # stress/configure-stress.sh:
 #   - settings.callLogLevel `qos`, so every leg leaves its call_qos row (§7), which the step
 #     verdict reads; the tenant's codecs stay the default (opus, g722, alaw)

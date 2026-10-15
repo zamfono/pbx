@@ -1,6 +1,6 @@
 # shellcheck shell=bash
-# test/load/density: maintenance events across every stack (sourced by density.sh), TASK-50's
-# stage 5. `maint_prep` readies an event on every stack, outside the measured window;
+# test/load/density: maintenance events across every stack (sourced by density.sh), the
+# maintenance part of docs/sizing.md section 3. `maint_prep` readies an event on every stack, outside the measured window;
 # `maint_run` then fires it on stack i at (i-1) * STAGGER_S seconds into the wave and measures,
 # per stack, how long the event itself took, until /healthz answers 200 again and until every
 # device of the stack is reachable again (Asterisk's contacts, re-qualified every 5 s, as
@@ -94,7 +94,7 @@ maint_stack() {
   # A new Asterisk (cold start, update, Docker restart): the TLS devices register again on
   # Ringotel's behalf; regs_s then includes that, not Ringotel's own delay.
   # Not before Asterisk has loaded the endpoints: a REGISTER before is refused, and baresip
-  # then backs off for minutes (stage 5's Docker restart: 10 of 14 stacks stayed unregistered).
+  # then backs off for minutes.
   case $ev in
     cold | update | docker)
       poll 180 2 endpoints_loaded "$(wc -l < "$STACK_DIR/creds.csv")"

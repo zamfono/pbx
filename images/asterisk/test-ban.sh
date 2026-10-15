@@ -86,7 +86,7 @@ if docker exec "$CONTAINER" ban-helper-alive; then
   fail "the healthcheck passes on a stale heartbeat"
 fi
 
-# Without inotify (TASK-53: a host whose fs.inotify.max_user_instances many stacks used up), the
+# Without inotify (a host whose fs.inotify.max_user_instances many stacks used up), the
 # helper still applies a changed list within its poll interval, logs the outage once and does not
 # spin: the image's own helper, in a throwaway container, with an inotifywait that cannot start and
 # an nft that counts its calls. A busy loop would call nft thousands of times in these 9 seconds.

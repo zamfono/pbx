@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """test/load/density: the host-wide sampler next to stress/cg_sampler.py's per-container one, for
-TASK-50's host criteria (CPU p95, RAM, no swap). Every <interval_s>: CPU busy % of the whole host
+the host criteria of docs/sizing.md section 3 (CPU p95, RAM, no swap). Every <interval_s>: CPU busy % of the whole host
 (all cores = 100 %, from /proc/stat), RAM in use ((MemTotal - MemAvailable), % and MiB), swap in
 use (MiB) and the kernel's cumulative swap-out page count (pswpout, /proc/vmstat), whose growth
 within a step is what "no swap" rules out (a host may hold old pages in swap from before).

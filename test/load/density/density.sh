@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# test/load/density: the multi-stack density harness (TASK-50): N single-tenant stacks in the
-# macvlan mode (docs/spec.md §6.2.1, compose.macvlan.yaml) on one target host, loaded by sipp
-# (trunk side) and baresip (devices) from a generator host, each step judged against TASK-50's
-# pass criteria; plus maintenance events across all stacks at once or staggered.
+# test/load/density: the multi-stack density harness (docs/sizing.md section 3): N single-tenant
+# stacks in the macvlan mode (docs/spec.md §6.2.1, compose.macvlan.yaml) on one target host,
+# loaded by sipp (trunk side) and baresip (devices) from a generator host, each step judged
+# against that section's pass criteria; plus maintenance events across all stacks at once or
+# staggered.
 #
 # Topology. On the target, net.sh makes a `dummy0` parent, the `public` macvlan network
 # (SUBNET_PREFIX.0.0/16) on it and a host-side shim holding its gateway (.0.1), with IP
@@ -17,7 +18,7 @@
 # Each stack's tenant (configure-density.sh): USERS users with a DID each and DEVICES devices
 # each (DEVICES=2: both ring, the first answers), device kinds shared by MIX; one trunk.
 #
-# Profiles (per call; TASK-50): P1 G.711 A-law trunk <-> A-law UDP device; P2 G.711 <-> G.722
+# Profiles (per call): P1 G.711 A-law trunk <-> A-law UDP device; P2 G.711 <-> G.722
 # UDP device; P3 G.711 <-> Opus TLS/SRTP device; P4 AMR-WB trunk <-> Opus TLS/SRTP device. All
 # calls inbound, held CALL_S, hung up by the trunk side; REC_SHARE of each profile's calls on a
 # stack go to users with recordCalls on.
@@ -147,7 +148,7 @@ stack_tok() {
     # every stack's owner has the same e-mail, and one file for all made each enrolment overwrite
     # the last stack's secret, so a renewal sent another stack's code, a failed login. Four tries
     # at most, under the five failures that lock the account (§5.5); a freshly healthy api has
-    # answered a login without a code (stage 2), and what api and core logged is kept.
+    # answered a login without a code, and what api and core logged is kept.
     local try
     for try in 1 2 3 4; do
       token=$(STATE_DIR=$STACK_DIR bash "$repo/test/integration/bootstrap-token.sh" "$api_base" \
@@ -201,11 +202,10 @@ stack_create() {
     "$DEVICES" "$MIX" "$STACK_DIR" || fail "stack $si: tenant configuration failed"
   dc exec -T proxy cat /data/caddy/pki/authorities/local/root.crt > "$GEN_DIR/s$si/ca.pem" \
     || fail "stack $si: no local CA root"
-  # The devices start once Asterisk has loaded every endpoint: a REGISTER to one not loaded yet
-  # is a failed SIP attempt, and ten of them ban the devices' address for a day (§5.6), which
-  # happened under load in stage 4 (InvalidAccountID, then sip-ban).
-  # ENDPOINT_WAIT=0 leaves the wait out, as a real office's phones would: early REGISTERs then
-  # meet the product's own handling of them (TASK-54).
+  # By default the devices start once Asterisk has loaded every endpoint, so they register at
+  # once. ENDPOINT_WAIT=0 starts them right away, as an office's new phones would: a REGISTER that
+  # arrives before its endpoint is loaded is refused and retried, and is no failed attempt for the
+  # SIP ban (§5.6).
   [ "${ENDPOINT_WAIT:-1}" = 0 ] || poll 180 2 endpoints_loaded "$(wc -l < "$STACK_DIR/creds.csv")" \
     || fail "stack $si: Asterisk did not load the devices' endpoints"
   gen_containers

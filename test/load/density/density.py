@@ -2,14 +2,14 @@
 """test/load/density: the two pieces of density.sh that are easier in Python.
 
 plan   shares one step's calls out over the stacks: <p1..p4> concurrent calls of profiles P1-P4
-       (TASK-50), each profile round-robin over the stacks, each call to a user of its own (one
+       (docs/sizing.md section 3), each profile round-robin over the stacks, each call to a user of its own (one
        call per user) of the profile's device kind; writes per stack, into
        <gen_dir>/s<i>/<step>/: dids-g711.csv and dids-amrwb.csv (sipp -inf files for the
        trunk-side sipp, one DID per call), rec-on.txt and rec-off.txt (the user ids whose
        recordCalls the step turns on or off, so <share> of each stack's calls of each profile are
        recorded), and prints the plan as JSON. Exits 1 when the stacks hold too few users.
 judge  reads one step's (or maintenance event's) samples and results and writes verdict.json,
-       printing the verdict: TASK-50's pass criteria, thresholds from the environment
+       printing the verdict: the pass criteria of docs/sizing.md section 3, thresholds from the environment
        (CPU_P95_MAX 70, RAM_MAX 80, LOSS_MAX 0.5, JITTER_MAX 20):
          host CPU p95 over the plateau (or the event) <= CPU_P95_MAX %, host RAM <= RAM_MAX %,
          no page swapped out during the step, per-leg loss p95 < LOSS_MAX % and jitter p95 <

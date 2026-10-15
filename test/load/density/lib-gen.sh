@@ -147,7 +147,7 @@ gen_devices_launch() {
 # command for it, so their processes start anew, registering at once.
 gen_devices_rereg() {
   # The old processes first have to be gone: with a call up, one takes a while to hang up, and a
-  # new one started before then finds its SIP port taken and exits (stage 5's update wave).
+  # new one started before then finds its SIP port taken and exits.
   # shellcheck disable=SC2016 # expanded by the container's sh
   gen docker exec "density-gen-$si-dev" sh -c '
     p="^baresip -f /load-gen/s$1/bs-opus-"
