@@ -17,6 +17,7 @@
 #
 # Usage: configure-density.sh <api_base> <token> <trunk_ip> <devices_ip> <users> <devices> <mix>
 #          <out_dir>
+# With TOKEN_FILE set, the token is read from that file before each user (a renewed one).
 set -euo pipefail
 
 api_base=$1
@@ -57,6 +58,7 @@ rm -f "$out_dir"/creds-*.csv
 i=0
 for kind in $kinds; do
   i=$((i + 1))
+  [ -z "${TOKEN_FILE:-}" ] || token=$(cat "$TOKEN_FILE")
   ext=$((199 + i))  # 2xx: 110/112 are emergency numbers (COUNTRY=DE), refused as extensions
   did=$(printf '+15552%03d' "$i")
   user_id=$(api POST /users \

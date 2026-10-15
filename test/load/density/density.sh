@@ -165,7 +165,7 @@ stack_tok() {
       sleep 15
     done
     [ -n "$token" ] || fail "stack $si: could not obtain an access token"
-    printf '%s' "$token" > "$STACK_DIR/.token"
+    printf '%s' "$token" > "$STACK_DIR/.token.new" && mv "$STACK_DIR/.token.new" "$STACK_DIR/.token"
   fi
 }
 
@@ -204,8 +204,14 @@ stack_create() {
   stack_assert_migrated
   stack_tok
   await_certificate_synced
-  bash "$here/configure-density.sh" "$api_base" "$token" "$TRUNK_IP" "$DEVICES_IP" "$USERS" \
-    "$DEVICES" "$MIX" "$STACK_DIR" || fail "stack $si: tenant configuration failed"
+  # A large tenant on a small host takes longer to configure than an access token lives (15 min):
+  # a renewer keeps .token fresh meanwhile, and configure-density.sh reads it before each user.
+  ( while sleep 60; do stack_tok; done ) &
+  local renewer=$! ok=0
+  TOKEN_FILE=$STACK_DIR/.token bash "$here/configure-density.sh" "$api_base" "$token" "$TRUNK_IP" \
+    "$DEVICES_IP" "$USERS" "$DEVICES" "$MIX" "$STACK_DIR" && ok=1
+  kill "$renewer" 2>/dev/null
+  [ "$ok" = 1 ] || fail "stack $si: tenant configuration failed"
   dc exec -T proxy cat /data/caddy/pki/authorities/local/root.crt > "$GEN_DIR/s$si/ca.pem" \
     || fail "stack $si: no local CA root"
   # By default the devices start once Asterisk has loaded every endpoint, so they register at
