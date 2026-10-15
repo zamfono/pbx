@@ -146,7 +146,14 @@ gen_devices_launch() {
 # Asterisk needs since it holds no TLS registration of the one before. baresip 1.1 has no
 # command for it, so their processes start anew, registering at once.
 gen_devices_rereg() {
-  gen docker exec "density-gen-$si-dev" pkill -f "^baresip -f /load-gen/s$si/bs-opus-"
+  # The old processes first have to be gone: with a call up, one takes a while to hang up, and a
+  # new one started before then finds its SIP port taken and exits (stage 5's update wave).
+  # shellcheck disable=SC2016 # expanded by the container's sh
+  gen docker exec "density-gen-$si-dev" sh -c '
+    p="^baresip -f /load-gen/s$1/bs-opus-"
+    pkill -f "$p"
+    for _ in $(seq 1 20); do pgrep -f "$p" > /dev/null || exit 0; sleep 0.5; done
+    pkill -9 -f "$p"; sleep 1' sh "$si"
   gen_devices_launch "$GEN_DIR/s$si"/bs-opus-*
 }
 
