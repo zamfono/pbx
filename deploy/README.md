@@ -429,6 +429,48 @@ the boot unit of step 7 run Compose on `compose.yaml`, `compose.override.yaml` a
 ./setup/compose.sh up -d
 ```
 
+A starting point, with every `<…>` yours to fill in. The service must be called `litestream`,
+since `litestream.caddy` routes `/metrics/litestream` to `litestream:9090`:
+
+```yaml
+# compose.dr.yaml
+services:
+  litestream:
+    image: litestream/litestream:<version> # an exact release, e.g. 0.5.17; a new 0.x minor is a migration
+    command: replicate
+    user: '1000:1000' # like every container writing the db volume
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - internal
+    environment:
+      LITESTREAM_ACCESS_KEY_ID: <access key id>
+      LITESTREAM_SECRET_ACCESS_KEY: <secret access key>
+    volumes:
+      - db:/data
+      - ./litestream.yml:/etc/litestream.yml:ro
+    restart: unless-stopped
+
+  proxy:
+    volumes:
+      - ./litestream.caddy:/etc/caddy/conf.d/litestream.caddy:ro
+```
+
+```yaml
+# litestream.yml
+addr: ':9090' # metrics, published as /metrics/litestream
+dbs:
+  - path: /data/zamfono.sqlite3
+    replica:
+      url: s3://<bucket>/<path>
+      region: <region>
+      endpoint: <https://s3.example.com> # leave out for AWS
+```
+
+The bucket needs server-side encryption: the stream is not encrypted on the client, unlike the
+restic repository. Keep a copy of both files with `.env`, since a restore needs them.
+
 ## Logs
 
 `compose logs <service>` reads the running container's own log, and an upgrade recreates every

@@ -80,16 +80,15 @@ unit of step 7, `systemctl stop zamfono.service`.
    `-o "sftp.command=sshpass -e ssh -o StrictHostKeyChecking=accept-new -l <username> <host> -s sftp"`.
 
 5. With continuous replication, replace the database with Litestream's newer copy, through the
-   sidecar of `compose.dr.yaml`, which mounts the `db` volume at `/data`, as uid 1000 like every
-   container writing that volume. The restic step above still brings the media. Litestream
-   refuses to restore over an existing database, so the restic copy and its `-wal` and `-shm`
-   files go first:
+   `litestream` sidecar of `compose.dr.yaml` and its `litestream.yml` (`deploy/README.md`,
+   "Continuous replication"), which name the bucket and its credentials. The restic step above
+   still brings the media. Litestream refuses to restore over an existing database, so the
+   restic copy and its `-wal` and `-shm` files go first:
 
    ```bash
    ./setup/compose.sh run --rm --no-deps --entrypoint rm api \
      -f /data/zamfono.sqlite3 /data/zamfono.sqlite3-wal /data/zamfono.sqlite3-shm
-   ./setup/compose.sh run --rm --no-deps --user 1000:1000 --entrypoint litestream <sidecar> \
-     restore -o /data/zamfono.sqlite3 '<replica URL>'
+   ./setup/compose.sh run --rm --no-deps litestream restore /data/zamfono.sqlite3
    ```
 
 6. Start the stack: `docker compose up -d`, or `./setup/compose.sh up -d` with `compose.dr.yaml`;

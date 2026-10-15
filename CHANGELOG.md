@@ -11,6 +11,12 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+### Added
+
+- `deploy/README.md` gives a starting `compose.dr.yaml` and `litestream.yml` for continuous
+  replication ("Continuous replication"); the restore guide's Litestream step reads the bucket from
+  that `litestream.yml`.
+
 ## [0.5.0] - 2026-10-15
 
 ### Fixed
