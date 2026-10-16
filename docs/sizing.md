@@ -273,14 +273,21 @@ CCX33's dedicated Milan cores, the CPX62 about twice a CCX33.
 
 **Time of day.** Each host's 20-user worst-mix limit (the CPX12's one tenant) was run again every
 hour until 22:00 UTC and once more at 02:00, 05:00 and 08:00 UTC. Steal time stayed 0.0 % in
-every run, yet the same load cost more CPU in the evening, and the limits passed again overnight,
-so the slowdown follows the time of day rather than building up over the run:
+every run, yet the same load cost more CPU in the evening; overnight the limits stayed within
+budget again, so the slowdown follows the time of day rather than building up over the run.
 
-| Host  | Limit     | Morning to afternoon    | From about 18:30 UTC    | 02:00–08:00 UTC         | Passed every time   |
-| ----- | --------- | ----------------------- | ----------------------- | ----------------------- | ------------------- |
-| CPX62 | 43 stacks | passed (CPU p95 68 %)   | failed 4 of 4 (74–78 %) | passed 3 of 3 (64–65 %) | 38 stacks (55–70 %) |
-| CPX32 | 10 stacks | passed 3 of 3 (64–69 %) | failed 4 of 4 (71–73 %) | passed 3 of 3 (69–70 %) | 9 stacks (61–67 %)  |
-| CPX12 | 32 users  | passed 6 of 7 (64–75 %) | passed 2 of 4 (66–71 %) | passed 3 of 3 (59–62 %) | 28 users (56–63 %)  |
+Each cell counts the repeats that stayed within the 70 % CPU budget, with the range of CPU p95
+across all of them:
+
+| Host  | Limit     | Morning to afternoon | From about 18:30 UTC | 02:00–08:00 UTC  | Within budget every time |
+| ----- | --------- | -------------------- | -------------------- | ---------------- | ------------------------ |
+| CPX62 | 43 stacks | 1 of 1 (68 %)        | 0 of 4 (74–78 %)     | 3 of 3 (64–65 %) | 38 stacks (55–70 %)      |
+| CPX32 | 10 stacks | 3 of 3 (64–69 %)     | 0 of 4 (71–73 %)     | 3 of 3 (69–70 %) | 9 stacks (61–67 %)       |
+| CPX12 | 32 users  | 6 of 7 (64–75 %)     | 2 of 4 (66–71 %)     | 3 of 3 (59–62 %) | 28 users (56–63 %)       |
+
+The runs over budget went over on CPU alone; call quality held in every one of them, with no
+failed call, loss at most 0.01 % and jitter p95 at most 16 ms. Over budget means less reserve
+than planned for peaks, re-registration storms and maintenance, not degraded calls.
 
 A neighbour's load shows up here as slower vCPUs, not as steal, so steal monitoring alone does not
 reveal it. Sizing for the evening means about 10–12 % below the daytime limits above; the
