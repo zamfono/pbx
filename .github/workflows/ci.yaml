@@ -59,10 +59,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      # The images' names as docker-bake.hcl tags them (zamfono/<name>:ci), plus SIPP_IMAGE, the
-      # upstream sipp compose.test.yaml pins: `images` pulls it into the archive, so no later job
-      # pulls from Docker Hub and both runtimes bring up the same bytes. main.yaml pushes only the
-      # six zamfono/ images, so it and test-devices stay unpublished.
+      # The images' names as docker-bake.hcl tags them (zamfono/<name>:ci). main.yaml pushes only
+      # the six stack images, so test-devices, the harness's sipp and baresip, stays unpublished.
       - name: The image names, from docker-bake.hcl
         run: scripts/image-env.sh >>"$GITHUB_ENV"
       # `use: false` leaves the runner's own builder the default, so the plain `docker build` of
@@ -74,7 +72,7 @@ jobs:
           use: false
           # The step before the save removes this builder itself, to free its disk.
           cleanup: false
-      - name: Build the six images, plus the TLS/SRTP scenario's baresip device
+      - name: Build the six images, plus the harness's sipp and baresip
         # docker-bake.hcl names the six targets with their Dockerfiles, contexts and tags; bake
         # builds them in parallel, and
         # `load` puts them in the local daemon. `source: .` builds this checkout, not a fetch of
@@ -114,12 +112,6 @@ jobs:
           echo "asterisk $version"
           echo "FROM $ASTERISK_IMAGE" \
             | docker build --label "org.zamfono.asterisk.version=$version" -t "$ASTERISK_IMAGE" -
-      - name: Pull the upstream image the harness runs
-        # Tagged, since an archive keeps an image's tag but not the digest it was pulled by, and
-        # Podman finds the digest only on a named image.
-        run: |
-          docker pull "$SIPP_IMAGE"
-          docker tag "$SIPP_IMAGE" "${SIPP_IMAGE%@*}"
       - name: Remove the bake builder
         # Its layer store holds a second copy of every image and their build stages, and the
         # runner's disk cannot fit that, the loaded images and the archive below at once. Bake has
@@ -128,11 +120,11 @@ jobs:
           docker buildx rm "${{ steps.buildx.outputs.name }}"
           df -h /
       - name: Save the images for the jobs below
-        # Every image scripts/image-env.sh names, sipp by the tag the step above gave it.
+        # Every image scripts/image-env.sh names.
         run: |
           # The image names are one argument each on purpose.
           # shellcheck disable=SC2046
-          docker save -o /tmp/images.tar $(scripts/image-env.sh | sed 's/^[^=]*=//; s/@.*//')
+          docker save -o /tmp/images.tar $(scripts/image-env.sh | sed 's/^[^=]*=//')
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: images

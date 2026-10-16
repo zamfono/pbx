@@ -3,11 +3,10 @@
 # registers and answers it. Layered over compose.yaml and compose.override.yaml, the link to
 # compose.ports.yaml setup.sh makes, so what CI exercises is the files an operator runs, not a copy.
 #
-# The harness's sipp: SIPp 3.5.1, the build `ctaloi/sipp` has published since 2017, pinned by
-# digest, since the harness depends on what that release does (no TLS Asterisk's transports
-# accept, `-aa` probes counted against `-m`, `play_pcap_audio` played asynchronously).
-# The one pin of it: scripts/image-env.sh reads it from here for CI and test/load.
-x-sipp-image: &sipp-image ctaloi/sipp:latest@sha256:c459f2340443ddcc159227efc798217dbdaad0dbe88b76b78b1a876aa271986a
+# The harness's sipp: Debian's sip-tester, in the test-devices image docker-bake.hcl builds
+# beside the stack's (test/load/stress/devices/Dockerfile), so it is built for whichever
+# architecture the stack is.
+x-sipp-image: &sipp-image ${DEVICES_IMAGE:?set by run.sh}
 
 # `internal` has a fixed subnet and `netns`, Asterisk's namespace, a fixed address on it, which
 # `.env` names as `EXTERNAL_IPV4` (steps.sh): the ports mode writes that address into SIP and SDP
@@ -151,9 +150,8 @@ services:
         condition: service_healthy
 
   # `inbound-forward-sip`'s trunk host (§9.4 "SIP targets"): a TLS front, a few lines of Node the
-  # scenario's setup runs, relaying to the `sipp` container over TCP, since the harness's sipp
-  # (3.5.1) offers no TLS version Asterisk's transports accept. The scenario's setup copies its self-signed certificate
-  # in and starts it; idle otherwise, like the sipp containers. It runs from the api image under
+  # scenario's setup runs, relaying to the `sipp` container over TCP, so the scenario's sipp plays
+  # plain TCP. The scenario's setup copies its self-signed certificate in and starts it; idle otherwise, like the sipp containers. It runs from the api image under
   # test, which has the Node it needs, so the harness pulls nothing from Docker Hub for it.
   sip-tls:
     image: ${API_IMAGE:?set by run.sh}

@@ -5,8 +5,9 @@
   ring group answers immediately to play hold music while the sole member's unconditional
   forward is dialled back out over the trunk to sipp-provider (load-provider.xml /
   load-provider-ulaw.xml). Unlike the single-call CI scenario, this leg plays real RTP audio
-  (sipp's own /sipp/g711a.pcap, replayed 6 times, ~42s) for the plateau hold instead of a
-  bare pause, so Asterisk actually relays media both ways for the duration docker stats samples.
+  (sipp's own /usr/share/sip-tester/g711a.pcap, replayed 6 times, ~42s) for the plateau hold
+  instead of a bare pause, so Asterisk actually relays media both ways for the duration docker
+  stats samples.
 -->
 <scenario name="load caller">
   <send retrans="500">
@@ -66,7 +67,7 @@
   <label id="play"/>
   <nop>
     <action>
-      <exec play_pcap_audio="/sipp/g711a.pcap"/>
+      <exec play_pcap_audio="/usr/share/sip-tester/g711a.pcap"/>
       <add assign_to="plays" value="1"/>
       <test assign_to="more" variable="plays" compare="less_than" value="6"/>
     </action>

@@ -50,7 +50,7 @@
   <!-- sipp's own A-law voice sample (about 6.5 s), the caller's audio the bot receives. -->
   <nop>
     <action>
-      <exec play_pcap_audio="/sipp/g711a.pcap" />
+      <exec play_pcap_audio="/usr/share/sip-tester/g711a.pcap" />
     </action>
   </nop>
 

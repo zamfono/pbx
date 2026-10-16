@@ -2,7 +2,7 @@
 # test/load/density: the generator side (sourced by density.sh). Every stack gets two generator
 # containers on the generator host's macvlan network (GEN_NET; GEN_NAME names it, the containers
 # and GEN_DIR):
-#   GEN_NAME-<i>-trunk     sipp (SIPP_IMAGE) at <GEN_PREFIX>.2.<i>, the stack's trunk host: one
+#   GEN_NAME-<i>-trunk     sipp (DEVICES_IMAGE) at <GEN_PREFIX>.2.<i>, the stack's trunk host: one
 #                          UAC per step and trunk codec, each call to one user's DID, holding the
 #                          call CALL_S and hanging up itself (stress-caller-bye.xml):
 #                            g711   PCMA only, port 5060, RTP 10000-34999 (P1, P2, P3)
@@ -49,16 +49,14 @@ gen_net() {
     < "$here/net.sh"
 }
 
-# The two generator images on the generator host, copied from here where it lacks them.
+# The generator image (sipp and baresip both) on the generator host, copied from here where it
+# lacks it.
 gen_images() {
   [ -n "$GEN_SSH" ] || return 0
-  local img
-  for img in "$SIPP_IMAGE" "$DEVICES_IMAGE"; do
-    gen docker image inspect "$img" >/dev/null 2>&1 && continue
-    log "copying $img to the generator host"
-    "$RUNTIME" save "$img" | ssh -o BatchMode=yes "$GEN_SSH" docker load >/dev/null \
-      || fail "could not copy $img to $GEN_SSH"
-  done
+  gen docker image inspect "$DEVICES_IMAGE" >/dev/null 2>&1 && return 0
+  log "copying $DEVICES_IMAGE to the generator host"
+  "$RUNTIME" save "$DEVICES_IMAGE" | ssh -o BatchMode=yes "$GEN_SSH" docker load >/dev/null \
+    || fail "could not copy $DEVICES_IMAGE to $GEN_SSH"
 }
 
 # The media every generator plays, built once into GEN_DIR: speech per device kind's rate,
@@ -96,7 +94,7 @@ gen_containers() {
   gen docker rm -f "$GEN_NAME-$si-trunk" "$GEN_NAME-$si-dev" >/dev/null 2>&1
   gen docker run -d --name "$GEN_NAME-$si-trunk" --label "$GEN_LABEL" --restart unless-stopped \
     --network "$GEN_NET" --ip "$TRUNK_IP" --cap-add NET_RAW --init -v "$GEN_DIR:/load-gen" \
-    --entrypoint sleep "$SIPP_IMAGE" infinity >/dev/null || fail "could not start the trunk generator"
+    --entrypoint sleep "$DEVICES_IMAGE" infinity >/dev/null || fail "could not start the trunk generator"
   gen docker run -d --name "$GEN_NAME-$si-dev" --label "$GEN_LABEL" --restart unless-stopped \
     --network "$GEN_NET" --ip "$DEVICES_IP" --init -v "$GEN_DIR:/load-gen" \
     --entrypoint sleep "$DEVICES_IMAGE" infinity >/dev/null || fail "could not start the device generator"

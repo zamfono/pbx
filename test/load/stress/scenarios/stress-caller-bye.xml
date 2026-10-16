@@ -4,7 +4,7 @@
   line of the -inf DID file (field0), each to a different user's DID, so every concurrent call
   lands on a different device. Offers AMR-WB only (the trunk's codecs = ["amrwb"]) in the
   payload format make_amrwb_pcap.py packs (octet-align=1 here; the pcap must match), then
-  replays the ~90 s AMR-WB pcap once. play_pcap_audio is asynchronous in sipp 3.5.1, so the
+  replays the ~90 s AMR-WB pcap once. play_pcap_audio is asynchronous in sipp, so the
   <pause/> (length from sipp's -d, the pcap's duration) is what holds the call for real time;
   then this side sends the BYE (HANGUP_SIDE=trunk; stress-caller.xml lets the device hang up).
 -->
