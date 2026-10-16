@@ -1,12 +1,13 @@
 # §8 "Testing Strategy". Five jobs: the unit suites; the image builds (the six the stack ships
-# plus the TLS/SRTP scenario's baresip device), saved together with the upstream image the harness
-# runs into one archive; each image's own checks; and the stack brought up on each runtime. The
-# last three start from that archive and run side by side. The two runtime jobs exist
-# because §6.3 "Runtimes" names four features of the compose file that behave differently under
-# Docker and Podman, and nothing but running it both ways tells us they still do.
+# plus the harness's sipp and baresip), saved into one archive per platform; each image's own
+# checks; and the stack brought up on each runtime. The last three start from that archive and run
+# side by side, once per platform (§6.3 "Images": linux/amd64 and linux/arm64), each on a runner
+# of that architecture, so nothing is emulated. The two runtime jobs exist because §6.3 "Runtimes"
+# names four features of the compose file that behave differently under Docker and Podman, and
+# nothing but running it both ways tells us they still do.
 #
 # On a pull request the token is read-only, whoever opened it. Publishing a pull request's images
-# for review is pr-images.yaml's job; it takes the archive this run uploads, and nothing else.
+# for review is pr-images.yaml's job; it takes the archives this run uploads, and nothing else.
 name: ci
 
 on:
@@ -56,7 +57,15 @@ jobs:
       - run: npm run format:check
 
   images:
-    runs-on: ubuntu-latest
+    name: images (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-26.04-arm
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # The images' names as docker-bake.hcl tags them (zamfono/<name>:ci). main.yaml pushes only
@@ -101,6 +110,7 @@ jobs:
             FRESH=${{ github.event_name != 'pull_request' }}
             CACHE_FROM=${{ github.event_name == 'pull_request' && 'gha' || '' }}
             CACHE_TO=gha
+            ARCH=${{ matrix.arch }}
             REVISION=${{ github.event.pull_request.head.sha || github.sha }}
       - name: Label the asterisk image with the Asterisk version it installed
         # A Dockerfile LABEL cannot read what a RUN installed, so the version is read from the built
@@ -127,18 +137,27 @@ jobs:
           docker save -o /tmp/images.tar $(scripts/image-env.sh | sed 's/^[^=]*=//')
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: images
+          name: images-${{ matrix.arch }}
           path: /tmp/images.tar
           retention-days: 1
 
   image-tests:
+    name: image-tests (${{ matrix.arch }})
     needs: images
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-26.04-arm
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: images
+          name: images-${{ matrix.arch }}
           path: /tmp
       - run: docker load -i /tmp/images.tar
       - name: The image names, from docker-bake.hcl
@@ -162,20 +181,27 @@ jobs:
         run: sudo env PROXY_IMAGE="$PROXY_IMAGE" sh deploy/macvlan-route-test.sh
 
   compose-docker:
-    name: compose-docker (${{ matrix.shard }})
+    name: compose-docker (${{ matrix.arch }}, ${{ matrix.shard }})
     needs: images
-    runs-on: ubuntu-latest
-    # Two fresh installs, the path a new operator takes, in parallel, sharing the sipp scenarios
-    # (run.sh's SHARD); the last one also runs the named steps and plays fewer scenarios for them.
+    runs-on: ${{ matrix.runner }}
+    # Two fresh installs per platform, the path a new operator takes, in parallel, sharing the sipp
+    # scenarios (run.sh's SHARD); the last one also runs the named steps and plays fewer scenarios
+    # for them.
     strategy:
       fail-fast: false
       matrix:
+        arch: [amd64, arm64]
         shard: [1/2, 2/2]
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-26.04-arm
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: images
+          name: images-${{ matrix.arch }}
           path: /tmp
       - run: docker load -i /tmp/images.tar
       - name: Bring the stack up and run the sipp scenarios
@@ -194,18 +220,24 @@ jobs:
           if-no-files-found: ignore
 
   compose-podman:
-    name: compose-podman (${{ matrix.shard }})
+    name: compose-podman (${{ matrix.arch }}, ${{ matrix.shard }})
     needs: images
     # Podman runs healthchecks and restart policies through systemd (§6.3 "Runtimes"), so the
     # runner has to be a systemd host rather than a container. §4 asks for Podman ≥ 5: Ubuntu
-    # 24.04, which `ubuntu-latest` still names, ships 4.9, while the 26.04 image carries 5.7 from
-    # its own archive. The label is pinned so the move of `ubuntu-latest` cannot change it.
-    runs-on: ubuntu-26.04
-    # The same two runs as compose-docker's.
+    # 24.04, which `ubuntu-latest` still names, ships 4.9, while the 26.04 images carry 5.7 from
+    # their own archive. The labels are pinned so the move of `ubuntu-latest` cannot change them.
+    runs-on: ${{ matrix.runner }}
+    # The same four runs as compose-docker's.
     strategy:
       fail-fast: false
       matrix:
+        arch: [amd64, arm64]
         shard: [1/2, 2/2]
+        include:
+          - arch: amd64
+            runner: ubuntu-26.04
+          - arch: arm64
+            runner: ubuntu-26.04-arm
     env:
       # §6.3 documents Podman rootful, so everything below runs as root. `podman compose` hands the
       # file to the docker-compose plugin and points it at `$DOCKER_HOST`; naming the rootful
@@ -215,7 +247,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: images
+          name: images-${{ matrix.arch }}
           path: /tmp
       # Read while Docker still runs; with every one set, run.sh's own image-env.sh asks no bake.
       - name: The image names, from docker-bake.hcl

@@ -6,10 +6,18 @@
 # Environment: REPOSITORY (e.g. ghcr.io/zamfono), IMAGES (the image names, space-separated),
 # WAIT_TIMEOUT and WAIT_INTERVAL in seconds.
 #
-# Waits until every image carries <source tag>, then adds each new tag to exactly that manifest,
-# and checks that every new tag resolves to its digest. `crane tag` puts the manifest's own bytes
-# under the new tag, so the release stays byte-identical to the build it came from.
+# Waits until every image's <source tag> names main's finished build, the index of its linux/amd64
+# and linux/arm64 images (push-platforms.sh, which pushes each platform's image under that tag
+# first), then adds each new tag to exactly that index, and checks that every new tag resolves to
+# its digest. `crane tag` puts the index's own bytes under the new tag, so the release stays
+# byte-identical to the build it came from.
 set -euo pipefail
+
+# Whether <ref> names an index of both platforms.
+published() {
+  crane manifest "$1" 2>/dev/null | jq -e '[.manifests[]?.platform | "\(.os)/\(.architecture)"]
+    | contains(["linux/amd64", "linux/arm64"])' >/dev/null
+}
 
 source_tag=$1
 shift
@@ -20,11 +28,11 @@ deadline=$((SECONDS + WAIT_TIMEOUT))
 while :; do
   missing=()
   for image in "${names[@]}"; do
-    crane digest "$REPOSITORY/$image:$source_tag" >/dev/null 2>&1 || missing+=("$image")
+    published "$REPOSITORY/$image:$source_tag" || missing+=("$image")
   done
   [ ${#missing[@]} -eq 0 ] && break
   if [ $SECONDS -ge $deadline ]; then
-    echo "::error::no :$source_tag yet for ${missing[*]} after ${WAIT_TIMEOUT}s. The release" \
+    echo "::error::no :$source_tag of both platforms yet for ${missing[*]} after ${WAIT_TIMEOUT}s. The release" \
       "workflow's run on main for this commit must finish green first; then re-run this job." >&2
     exit 1
   fi

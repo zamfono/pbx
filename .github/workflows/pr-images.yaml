@@ -6,17 +6,17 @@
 #
 # How it stays safe with a fork's code:
 #   - ci.yaml runs the pull request itself, on `pull_request`, with a read-only token, and uploads
-#     the `images` archive; it has nothing to publish with.
+#     the `images-amd64` and `images-arm64` archives; it has nothing to publish with.
 #   - This workflow holds `packages: write`. It runs from the default branch (that is what
 #     `workflow_run` and `pull_request_target` do) and never checks out or runs the pull request:
 #     where it checks out at all, it checks out the default branch, explicitly, for its scripts.
-#   - The archive is the one input the pull request controls. It is only loaded, the six
-#     zamfono/<name>:ci images are taken from it, and they are re-labelled by a bare `FROM` build
+#   - The archives are the one input the pull request controls. They are only loaded, the six
+#     zamfono/<name>:ci images are taken from each, and they are re-labelled by a bare `FROM` build
 #     (pr-images-tag.sh), which runs nothing from them.
 #   - A maintainer approves by adding the `publish-image` label after reading the diff, and a new
 #     push takes it off again (`unlabel`), so the label always stands for the head that was read.
 #     Pull request, head commit and ci run come from the event and the API, checked against each
-#     other when this runs (pr-images-resolve.sh), never from the archive.
+#     other when this runs (pr-images-resolve.sh), never from the archives.
 #
 # Triggers: a ci run of a pull request finishing green (`workflow_run`), the label being added
 # after that (`labeled`, which finds the head's latest green ci run), a push (`synchronize`, which
@@ -108,29 +108,36 @@ jobs:
           persist-credentials: false
       - name: The stack's images, from docker-bake.hcl
         run: echo "IMAGES=$(bash .github/scripts/stack-images.sh)" >>"$GITHUB_ENV"
+      # Each platform's archive, as images-amd64/images.tar and images-arm64/images.tar; anything
+      # else the run uploaded is never read.
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: images
+          pattern: images-*
           path: ${{ runner.temp }}/pr-images
           run-id: ${{ needs.resolve.outputs.run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
-      - run: docker load -i "$RUNNER_TEMP/pr-images/images.tar"
-      - name: Re-label the six images for the pull request
+      - name: Re-label the six images of each platform for the pull request
+        # Both archives tag their images zamfono/<name>:ci, so each platform's are re-labelled to
+        # zamfono/<name>:pr-<arch> before the next archive takes those names.
         env:
           SOURCE: ${{ needs.resolve.outputs.source }}
-        run: bash .github/scripts/pr-images-tag.sh "$PR" "$SHA" "$SOURCE"
-      # Only now, with nothing from the archive left to handle, does the daemon get a credential.
+        run: |
+          for arch in amd64 arm64; do
+            docker load -i "$RUNNER_TEMP/pr-images/images-$arch/images.tar"
+            bash .github/scripts/pr-images-tag.sh "$PR" "$SHA" "$SOURCE" "$arch"
+          done
+      # Only now, with nothing from the archives left to handle, does the daemon get a credential.
       - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Push them as <N> and <N>-<short sha>
+        # One multi-platform image per name and tag (push-platforms.sh).
         run: |
           for name in $IMAGES; do
-            for tag in "$PR" "$PR-${SHA::7}"; do
-              docker push "$REGISTRY/$name-pr:$tag"
-            done
+            bash .github/scripts/push-platforms.sh "zamfono/$name:pr" "$REGISTRY/$name-pr" \
+              "$PR-${SHA::7}" "$PR"
           done
           {
             echo "Images of #$PR at \`${SHA::7}\`; review them with deploy/compose.pr.yaml:"
