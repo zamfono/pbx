@@ -47,10 +47,12 @@ the evening, when their neighbours are busy; sized for the evening:
 | CPX62 (16 shared vCPU, 32 GB)           | about 750 users / 170 calls          | about 950 users / 200 calls |
 | CPX32 (4 shared vCPU, 8 GB)             | about 180 users / 53 calls           | about 230 users / 62 calls  |
 | CPX12 (1 shared vCPU, 2 GB), one tenant | about 25 users / 14 calls            | about 45 users / 20 calls   |
+| CPX02 (1 shared vCPU, 1 GB), one tenant | about 16 users / 11 calls            | about 24 users / 14 calls   |
 
 With tenants of 10 users or fewer, a CPX32 is limited by RAM to about 16 stacks. A CPX12 runs one
 stack; its single vCPU has no reserve when a neighbour takes CPU away (section 3, "Shared
-vCPUs").
+vCPUs"). A CPX02 runs one stack too, with a slower and less steady vCPU than the CPX12's and about
+200 MB of RAM to spare.
 
 ## Users and concurrent calls
 
@@ -252,7 +254,7 @@ The maintenance gate (§6.4) runs updates and certificate swaps only while a sta
 they fired under load on purpose. Updating many stacks at the same moment holds the host near
 90 % CPU for about a minute, so on a full host updates are best spread over time.
 
-### Shared vCPUs: Hetzner CPX62, CPX32, CPX12
+### Shared vCPUs: Hetzner CPX62, CPX32, CPX12, CPX02
 
 The same method on three shared-vCPU hosts (AMD EPYC-Genoa, Debian 13, Docker 29), measured in
 parallel against one generator on 2026-10-15; each limit is the largest number of stacks (or, for
@@ -312,14 +314,39 @@ larger margin than its CPU figure suggests.
 
 Maintenance under load (70 % of the 20-user worst-mix limit) matched the CCX33: a backup ran in
 2–6 s per stack with every call unaffected (CPX62, 30 stacks; CPX32, 7 stacks; CPX12, one tenant
-of 22 users), and on the CPX62 and CPX32 an update 30 s apart took each stack about 76 s to healthy and its phones about
-94 s to register again, dropping the calls of the stacks being updated.
+of 22 users), and on the CPX62 and CPX32 an update 30 s apart took each stack about 76 s to
+healthy and its phones about 94 s to register again, dropping the calls of the stacks being
+updated.
+
+**CPX02 (1 vCPU, 938 MB).** One stack, in a short set of daytime runs on 2026-10-16, each at the
+same time as the same run on a CPX12 against the same generator:
+
+| Run                            | CPX02                                          | CPX12, same time       |
+| ------------------------------ | ---------------------------------------------- | ---------------------- |
+| Worst, 32 users / 17 calls     | CPU 78 %, jitter 19 ms                         | CPU 61 %, jitter 10 ms |
+| Worst, 12 calls (18 users)     | CPU 62 %, jitter 6 ms: **within limits**       | —                      |
+| Realistic, 57 users / 24 calls | CPU 85 %, **jitter 23 ms**                     | CPU 65 %, jitter 11 ms |
+| Realistic, 38 users / 18 calls | CPU 61 %, **jitter 23 ms**; again: 79 %, 18 ms | CPU 45 %, jitter 1 ms  |
+| Realistic, 28 users / 15 calls | CPU 59 %, jitter 7 ms: **within limits**       | CPU 59 %, jitter 2 ms  |
+| Backup, 22 users / 14 calls    | 4.6 s, calls unaffected (CPU 73 %)             | 4.4 s (CPU 66 %)       |
+| Update, 22 users / 14 calls    | 86 s to healthy, phones back after 161 s       | 81 s, 159 s            |
+
+No call failed and loss stayed at most 0.09 %. Both hosts report AMD EPYC-Genoa and steal 0.0 %,
+yet the CPX02 needed 25–75 % more CPU than the CPX12 for the same calls (Asterisk alone about
+15 % more), and the same run varied by up to 30 % between repeats: its vCPU gets less done and
+less steadily. Jitter, not the CPU budget, set the realistic limit: between 15 and 18 calls it
+went over 20 ms at only 61 % CPU. RAM peaked at 72–77 % with no swap, the restart in the update
+included. A 1 GB swap file added nothing: with the RAM not short, the kernel swapped 65–120 MB of
+idle pages out and CPU p95 rose rather than fell (worst mix 92 % against 78 %); it only guards
+against the out-of-memory killer. The recommendation at the top keeps about 10 % below these
+daytime limits for the evening.
 
 ### Caveats
 
 - One dedicated host type (CCX33); most of its cells ran once (the spreading steps twice). Treat
   differences below ~10 % as noise. The shared hosts were measured over one day and night, so their
-  evening figures are a single evening.
+  evening figures are a single evening. The CPX02 ran only the handful of daytime runs above, so
+  its figures are an estimate against the CPX12 rather than a full search.
 - No WAN between the hosts (no loss, latency or jitter of its own); baresip and sipp stand in for
   real phones and trunks.
 - Calls were inbound only; transfers, ring groups, voicemail and outbound calls were not part of
