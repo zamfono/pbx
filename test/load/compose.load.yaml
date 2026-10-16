@@ -30,8 +30,8 @@
 # Asterisk's actual local RTP port range still comes from RTP_PORT_START/END in .env regardless of
 # this address -- unrelated to which address gets advertised in SDP.
 
-# The same pinned sipp as compose.test.yaml's `x-sipp-image`, which session.sh reads.
-x-sipp-image: &sipp-image ${SIPP_IMAGE:?set by session.sh}
+# The same sipp as compose.test.yaml's `x-sipp-image`: the test-devices image.
+x-sipp-image: &sipp-image ${DEVICES_IMAGE:?set by session.sh}
 
 networks:
   internal:

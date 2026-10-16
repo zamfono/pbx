@@ -55,8 +55,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Push the six images as edge and sha-<short sha>
         # zamfono/<name>:ci is what docker-bake.hcl tags them; the test-devices image in the
-        # same archive is a test fixture, and the sipp image there is upstream's, so both stay
-        # unpublished. The short sha is the name `promote` looks the build up by when this
+        # same archive is a test fixture, so it stays unpublished. The short sha is the name `promote` looks the build up by when this
         # commit is released. A push is tried three times: ghcr.io now and then answers one with
         # "unknown blob", mostly for a layer it mounts from another of the images, and the same
         # push passes moments later.

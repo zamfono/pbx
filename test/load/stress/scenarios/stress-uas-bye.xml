@@ -7,7 +7,7 @@
   unable to decode what this side sends, so the device hears nothing), and replays the ~CALL_S
   AMR-WB pcap make_amrwb_pcap.py packs in exactly that format (amrwb-be98.pcap) once
   (asynchronously).
-  play_pcap_audio is asynchronous in sipp 3.5.1, so the <pause/> (length from sipp's -d) holds
+  play_pcap_audio is asynchronous in sipp, so the <pause/> (length from sipp's -d) holds
   the call for real time; then this side (the called party, external) sends the BYE.
 -->
 <scenario name="stress uas">

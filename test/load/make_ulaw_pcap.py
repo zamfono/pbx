@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """test/load: builds the ulaw pcap the transcoding load step needs.
 
-sipp ships /sipp/g711a.pcap (alaw, RTP payload type 8) in its own image; there is no ulaw
-counterpart. For the transcoding-cost step (docs/spec.md §6.6 "Sizing envelope") the provider leg
+sipp (Debian's sip-tester) ships /usr/share/sip-tester/g711a.pcap (alaw, RTP payload type 8);
+there is no ulaw counterpart. For the transcoding-cost step (docs/spec.md §6.6 "Sizing envelope") the provider leg
 needs to actually negotiate and send ulaw, not just relabel alaw bytes under payload type 0, or
 Asterisk's transcoding CPU cost would go unmeasured. This pulls the shipped pcap out of the sipp
 image, transcodes its audio samples with ffmpeg (alaw -> raw PCM -> ulaw), and rewrites each
@@ -32,7 +32,7 @@ def extract_source_pcap(sipp_image: str, dest: Path) -> None:
     )
     try:
         subprocess.run(
-            ['docker', 'cp', f'{name}:/sipp/g711a.pcap', str(dest)],
+            ['docker', 'cp', f'{name}:/usr/share/sip-tester/g711a.pcap', str(dest)],
             check=True
         )
     finally:

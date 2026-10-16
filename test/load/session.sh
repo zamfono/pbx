@@ -108,7 +108,7 @@ containers=(
 {
   echo '-- image sizes (docker images) --'
   docker images --format '{{.Repository}}:{{.Tag}}\t{{.Size}}' \
-    | grep -E "zamfono/(asterisk|core|api|migrate):load|caddy:2|ctaloi/sipp"
+    | grep -E "zamfono/(asterisk|core|api|migrate):load|caddy:2|test-devices"
   echo
   echo '-- volume sizes (the stack Compose project) --'
   stack_volume_sizes

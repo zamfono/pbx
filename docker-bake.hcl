@@ -1,6 +1,6 @@
 # The images CI builds (§6.3 "Images", §8): the six the stack ships, which the `stack` group below
-# is the one list of, plus the TLS/SRTP scenario's baresip device, built in parallel by `docker
-# buildx bake` from ci.yaml's `images` job. The workflows that publish, promote or prune the
+# is the one list of, plus the harness's SIP tools (sipp and baresip, test-devices), built in
+# parallel by `docker buildx bake` from ci.yaml's `images` job. The workflows that publish, promote or prune the
 # stack's images read the names from that group (.github/scripts/stack-images.sh). Each target's
 # tag is the *_IMAGE variable of the same name; scripts/image-env.sh prints them for ci.yaml and
 # the harnesses, so the names and tags below are the only place either is written.

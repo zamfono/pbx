@@ -54,13 +54,13 @@
        it. -->
   <nop>
     <action>
-      <exec play_pcap_audio="/sipp/g711a.pcap" />
+      <exec play_pcap_audio="/usr/share/sip-tester/g711a.pcap" />
     </action>
   </nop>
   <pause milliseconds="6500" />
   <nop>
     <action>
-      <exec play_pcap_audio="/sipp/g711a.pcap" />
+      <exec play_pcap_audio="/usr/share/sip-tester/g711a.pcap" />
     </action>
   </nop>
   <pause milliseconds="6500" />
