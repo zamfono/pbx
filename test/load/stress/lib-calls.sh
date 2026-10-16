@@ -11,7 +11,9 @@
 #             sipp's -d, then BYE) -- for inbound that is the caller hanging up first, for
 #             outbound the called party
 # Every device has its own baresip process (PROCS = DEVICES), so device i's ctrl_tcp port is
-# 4000 + i - 1. Expects: CALL_S, RATE, STEP_DIR, LOAD_GEN_DIR.
+# 4000 + i - 1: baresip's `dial` can name an account of a process by its index, but its `hangup`
+# ends the process's current call or one named by its Call-ID, which nothing here tracks.
+# Expects: CALL_S, RATE, STEP_DIR, LOAD_GEN_DIR.
 # shellcheck shell=bash
 
 OUT_NUMBER_PREFIX=+1555800   # outbound call i dials +1555800<iii>

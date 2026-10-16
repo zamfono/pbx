@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Removes what `inbound-forward-sip.setup.sh` created: 178's forward first, since a trunk a live
 # `sip` target dials over cannot be deleted (§5.9), then both users, with them 177's
-# out-of-office rule, the DID and the trunk; and the TLS front with its certificate.
+# out-of-office rule, the DID and the trunk; and the TLS target with its certificate.
 set -euo pipefail
 
 api_base=$1
@@ -20,7 +20,5 @@ api_delete "/users/$forwarder"
 api_delete "/users/$agent"
 api_delete "/dids/$did_id"
 api_delete "/trunks/$trunk_id"
-dc exec -T sip-tls sh -c 'kill "$(cat /tmp/sip-target-tls/front.pid)"; rm -rf /tmp/sip-target-tls'
-# shellcheck disable=SC2086
-dc exec -T sipp rm -f /tmp/sip-target-messages.log
+dc exec -T devices sh -c 'pkill baresip; rm -rf /tmp/sip-target'
 rm -f "$state"

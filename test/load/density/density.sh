@@ -55,7 +55,7 @@
 # Knobs (environment): N (2), USERS (10), DEVICES (1), MIX (alaw:1,g722:1,opus:2), PARALLEL
 # (stacks brought up at once, 4), CALL_S (90), RATE (calls/s per stack and trunk codec, 2),
 # IDLE_S (60), REC_SHARE (0; 0.67 = two thirds), EVENT, STAGGER_S (0), REG_TIMEOUT_S (300),
-# PER_PROC (devices per baresip process, 1: baresip holds a call when it answers another), MEDIA_S (longest call + margin, 660), TAG (images:
+# PER_PROC (devices per baresip process, 1), MEDIA_S (longest call + margin, 660), TAG (images:
 # zamfono/*:$TAG, `TAG=$TAG docker buildx bake --load`; default density), *_IMAGE, STATE_DIR
 # (/var/tmp/zamfono-density), OUT_DIR, SUBNET_PREFIX (10.99), GEN_SSH, GEN_PREFIX,
 # INTERNAL_PREFIX (10.250: stack i's internal network is .<i>.0/24), API_PORT_BASE (8300), MTU

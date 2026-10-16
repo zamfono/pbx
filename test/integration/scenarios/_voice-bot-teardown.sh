@@ -11,6 +11,6 @@ compose=$3
 
 state=$(state_file inbound-forward-web-socket)
 api_delete "/dids/$(cat "$state")"
-dc exec -T sip-tls sh -c \
+dc exec -T voice-bot sh -c \
   'kill "$(cat /tmp/voice-bot.pid)"; rm -rf /tmp/voice-bot /tmp/voice-bot.log /tmp/voice-bot.pid'
 rm -f "$state" "$(state_file recording-before)"

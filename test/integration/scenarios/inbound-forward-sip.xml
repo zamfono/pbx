@@ -3,7 +3,7 @@
   §9.4 "SIP targets", "Forwarded calls": an inbound call to +15551077 reaches user 177, whose
   out-of-office rule forwards to user 178, who forwards unconditionally to a `sip` target, so the
   stack dials `proj_ci123` over the TLS trunk (`inbound-forward-sip.setup.sh`) and bridges the two
-  legs. This side places the call; `uas/answer-sip-target.xml` answers the leg the stack dials.
+  legs. This side places the call; a baresip the setup starts answers the leg the stack dials.
 -->
 <scenario name="inbound forward sip">
   <send retrans="500">

@@ -8,9 +8,13 @@ process's ctrl_tcp listens on 127.0.0.1:<first_port + index> (one account per pr
           as bunched as the ramp was)
   dial    places one outbound call per process to <number_prefix><index:03d>@<domain> (the
           stack routes it out through the trunk, where the provider-side sipp UAS answers it)
+  rereg   has the <count> accounts of the one process on <first_port> register anew, at once,
+          with gen_baresip.py's interval (`uareg <regint> <index>`): what a Ringotel app does on
+          `api`'s `rereg` push (docs/spec.md §10.4 "After a restart")
 
 Usage: devices_ctrl.py hangup <first_port> <count> <interval_s>
        devices_ctrl.py dial <first_port> <count> <interval_s> <number_prefix> <domain>
+       devices_ctrl.py rereg <first_port> <count> <interval_s>
 """
 import json
 import socket
@@ -38,11 +42,13 @@ def main() -> None:
     interval = float(sys.argv[4])
     start = time.time()
     for i in range(count):
-        params = ''
+        port, name, params = first + i, action, ''
         if action == 'dial':
             params = f'sip:{sys.argv[5]}{i:03d}@{sys.argv[6]}'
-        reply = command(first + i, action, params)
-        print(f'{time.time() - start:6.2f}s port {first + i} {action} {params}: {reply}',
+        elif action == 'rereg':
+            port, name, params = first, 'uareg', f'600 {i}'
+        reply = command(port, name, params)
+        print(f'{time.time() - start:6.2f}s port {port} {name} {params}: {reply}',
               flush=True)
         time.sleep(max(0.0, start + (i + 1) * interval - time.time()))
 

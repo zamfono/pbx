@@ -21,12 +21,12 @@ here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 # shellcheck source=_lib.sh
 . "$here/_lib.sh"
 
-poll 30 1 dc exec -T sip-tls test -e /tmp/voice-bot/result.json \
+poll 30 1 dc exec -T voice-bot test -e /tmp/voice-bot/result.json \
   || { echo "the voice bot's socket never closed" >&2; exit 1; }
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
-dc exec -T sip-tls cat /tmp/voice-bot/result.json >"$work/result.json"
-dc exec -T sip-tls cat /tmp/voice-bot/caller.raw >"$work/caller.raw"
+dc exec -T voice-bot cat /tmp/voice-bot/result.json >"$work/result.json"
+dc exec -T voice-bot cat /tmp/voice-bot/caller.raw >"$work/caller.raw"
 
 call_id=$(await_new_call "$(cat "$(state_file recording-before)")" 15)
 api GET "/calls/$call_id" >"$work/call.json"

@@ -11,8 +11,9 @@ rendered endpoint of a `tls` device demands (packages/api/src/lib/server/pjsip/r
 `media_encryption = sdes`). Audio comes from a WAV file (aufile), so each answered call encodes
 real speech into Opus (complexity 0: the generator shares the host with the stack, so its own
 encoder is kept cheap; Asterisk's Opus encoder settings are untouched); what the device receives
-is decoded and discarded. ctrl_tcp (port
-sip_port - 1080) is how devices_ctrl.py ends the calls from the device side.
+is decoded and discarded. Answering one account's call holds none of the process's others
+(`call_hold_other_calls no`). ctrl_tcp (port sip_port - 1080) is how devices_ctrl.py ends the
+calls from the device side and has the accounts register anew (`regint=600` below).
 
 Usage: gen_baresip.py <creds.csv> <out_dir> <first_index> <count> <sip_port> <wav_path>
          [<kind> [<registrar> [<cafile> [<account_extra>]]]]
@@ -39,6 +40,7 @@ rtp_ports		20000-60000
 sip_cafile		{cafile}
 call_local_timeout	120
 call_max_calls		{max_calls}
+call_hold_other_calls	no
 audio_player		aufile,/dev/null
 audio_source		aufile,{wav}
 audio_alert		aufile,/dev/null

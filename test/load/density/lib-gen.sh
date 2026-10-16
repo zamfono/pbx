@@ -8,8 +8,7 @@
 #                            g711   PCMA only, port 5060, RTP 10000-34999 (P1, P2, P3)
 #                            amrwb  AMR-WB octet-aligned only, port 5070, RTP 35000-59999 (P4)
 #   GEN_NAME-<i>-dev       baresip (DEVICES_IMAGE) at <GEN_PREFIX>.3.<i>, every device of the
-#                          stack's users registered, one process per PER_PROC devices of a kind (1: a baresip process
-#                          answering a second call puts its first on hold)
+#                          stack's users registered, one process per PER_PROC devices of a kind
 #                          (gen_baresip.py): alaw / g722 desk phones over UDP, opus Ringotel
 #                          stand-ins over TLS with SDES-SRTP; a user's first device auto-answers,
 #                          the others only ring
@@ -63,7 +62,7 @@ gen_images() {
 # looped to MEDIA_S (baresip's aufile stops at its end), and the trunk side's two pcaps.
 gen_media() {
   mkdir -p "$GEN_DIR"
-  cp "$here/host_sampler.py" "$GEN_DIR/"
+  cp "$here/host_sampler.py" "$load/stress/devices_ctrl.py" "$GEN_DIR/"
   [ -f "$GEN_DIR/amrwb.pcap" ] && return 0
   log "building the speech sources and the G.711 / AMR-WB pcaps ($MEDIA_S s)"
   mkdir -p "$GEN_DIR"
@@ -144,23 +143,21 @@ gen_devices_launch() {
 
 # Stack `si`'s TLS devices (the Ringotel stand-ins) register afresh: what Ringotel does when
 # `api` sends `rereg` for a new Asterisk start (spec §10.4 "After a restart"), which a new
-# Asterisk needs since it holds no TLS registration of the one before. baresip 1.1 has no
-# command for it, so their processes start anew, registering at once.
+# Asterisk needs since it holds no TLS registration of the one before. Each process is told over
+# its ctrl_tcp to register every account of its own now (devices_ctrl.py rereg).
 gen_devices_rereg() {
-  # The old processes first have to be gone: with a call up, one takes a while to hang up, and a
-  # new one started before then finds its SIP port taken and exits.
   # shellcheck disable=SC2016 # expanded by the container's sh
   gen docker exec "$GEN_NAME-$si-dev" sh -c '
-    p="^baresip -f /load-gen/s$1/bs-opus-"
-    pkill -f "$p"
-    for _ in $(seq 1 20); do pgrep -f "$p" > /dev/null || exit 0; sleep 0.5; done
-    pkill -9 -f "$p"; sleep 1' sh "$si"
-  gen_devices_launch "$GEN_DIR/s$si"/bs-opus-*
+    for d in /load-gen/s$1/bs-opus-*; do
+      port=$(sed -n "s/^ctrl_tcp_listen.*://p" "$d/config")
+      python3 /load-gen/devices_ctrl.py rereg "$port" "$(grep -c . "$d/accounts")" 0
+    done' sh "$si"
 }
 
-# Stack `$1`'s devices all reachable before a step: a baresip process that died (baresip 1.1
-# segfaults now and then, e.g. when Asterisk drops its TLS connections) is started again and its
-# devices awaited, so a step never measures calls to phones that are gone.
+# Stack `$1`'s devices all reachable before a step: a baresip process that died is started again
+# and its devices awaited, so a step never measures calls to phones that are gone. baresip 1.1
+# segfaulted now and then, e.g. when Asterisk dropped its TLS connections; the guard stays for
+# whatever a later release does there.
 gen_devices_ensure() {
   local dir total running dead=()
   stack_use "$1"

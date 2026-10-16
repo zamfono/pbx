@@ -14,8 +14,8 @@
 # Must run under the shared harness lock, teardown included:
 #   flock /root/pbx-harness.lock bash test/load/stress/session.sh
 # Knobs (environment): OUT_DIR (required), STEPS ("0 10 25 50"), DEVICES (the most users a step
-# needs), PROCS (one baresip process per device; device-side hangups and outbound dials need
-# that), CALL_S (90), RATE (5 calls/s per direction), TAIL_S (90), IDLE_S (60), *_IMAGE,
+# needs), PROCS (one baresip process per device; device-side hangups need that, lib-calls.sh),
+# CALL_S (90), RATE (5 calls/s per direction), TAIL_S (90), IDLE_S (60), *_IMAGE,
 # HANGUP_SIDE (for bare <n> tokens: device or trunk, lib-calls.sh), COMPOSE ("docker compose" or
 # "podman compose"; RUNTIME, the plain CLI, follows it).
 # Images are neither built nor removed here (build them once: `TAG=stress docker buildx bake --load`).

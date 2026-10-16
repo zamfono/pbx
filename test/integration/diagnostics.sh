@@ -43,7 +43,7 @@ dump_diagnostics() {
   fi
   diag_compose ps -a > "$dir/ps.txt" 2>&1
   local service
-  for service in migrate core asterisk api proxy sipp sipp-phone sipp-provider sipp-outside sip-tls \
+  for service in migrate core asterisk api proxy sipp sipp-phone sipp-provider sipp-outside voice-bot \
     devices; do
     diag_compose logs --no-color --timestamps "$service" > "$dir/$service.log" 2>&1
   done

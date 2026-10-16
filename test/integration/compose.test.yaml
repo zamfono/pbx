@@ -149,14 +149,10 @@ services:
       api:
         condition: service_healthy
 
-  # `inbound-forward-sip`'s trunk host (§9.4 "SIP targets"): a TLS front, a few lines of Node the
-  # scenario's setup runs, relaying to the `sipp` container over TCP: Debian's sipp, built with
-  # wolfSSL, takes Asterisk's TLS connection and its INVITE but fails to send the answer back
-  # (`SSL_accept failed … WANT_READ`, then `Unable to send TLS message`). It also hosts the
-  # `inbound-forward-web-socket*` scenarios' voice bot. Each scenario's setup starts what it needs;
+  # The `inbound-forward-web-socket*` scenarios' voice bot, which each scenario's setup starts;
   # idle otherwise, like the sipp containers. It runs from the api image under test, which has the
-  # Node it needs, so the harness pulls nothing from Docker Hub for it.
-  sip-tls:
+  # Node and `ws` the bot needs, so the harness pulls nothing from Docker Hub for it.
+  voice-bot:
     image: ${API_IMAGE:?set by run.sh}
     pull_policy: missing
     networks:
@@ -169,12 +165,14 @@ services:
       api:
         condition: service_healthy
 
-  # `device-tls-srtp`'s device side: baresip, the same image test/load/stress runs its Ringotel
-  # stand-ins from (test/load/stress/devices/Dockerfile), registering over TLS with SDES-SRTP,
-  # Opus (§3, §9.1 transport-tls, §9.3/§10.4). Idle like the sipp containers; the scenario's own
-  # setup writes its config and starts it (`compose exec -d`), the way `phone.sh` drives
-  # `sipp-phone`. No `NET_RAW`: unlike the sipp containers it plays no pcap. docker-bake.hcl's
-  # `test-devices` target builds it.
+  # The real devices: baresip, the same image test/load/stress runs its Ringotel stand-ins from
+  # (test/load/stress/devices/Dockerfile), registering over TLS with SDES-SRTP, Opus (§3, §9.1
+  # transport-tls, §9.3/§10.4); and `inbound-forward-sip`'s TLS trunk host (§9.4 "SIP targets"),
+  # a baresip listening for TLS itself, which Debian's sipp, built with wolfSSL, cannot answer as
+  # (`SSL_accept failed … WANT_READ`, then `Unable to send TLS message`). Idle like the sipp
+  # containers; the scenario's own setup writes its config and starts it (`compose exec -d`), the
+  # way `phone.sh` drives `sipp-phone`. No `NET_RAW`: unlike the sipp containers it plays no pcap.
+  # docker-bake.hcl's `test-devices` target builds it.
   devices:
     image: ${DEVICES_IMAGE:?set by run.sh}
     pull_policy: missing

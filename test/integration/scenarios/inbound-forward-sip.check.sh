@@ -22,8 +22,10 @@ here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 
 read -r _ _ agent _ < "$(state_file inbound-forward-sip)"
 # shellcheck disable=SC2016 # the `${EXTEN}` is the literal text under test
-sipp_trace sipp /tmp/sip-target-messages.log \
-  | python3 "$here/_forward-context-check.py" 'sip:proj_ci123@sip-tls:5061' \
+# The target's own SIP trace, in which what it received is what came to its own TLS address.
+dc exec -T devices cat /tmp/sip-target/baresip.log \
+  | SIP_TRACE_LOCAL="$(container_ip devices):5061" \
+    python3 "$here/_forward-context-check.py" 'sip:proj_ci123@devices:5061' \
     '^"CI Agent" <sip:\+15551000@[^>]+>;reason=unconditional, "CI Away" <sip:\+15551077@[^>]+>;reason=away$' \
     'X-Zamfono-Caller=+15559999' 'X-Zamfono-Did=+15551077' 'X-Called=177' \
     'X-Forward=unconditional ${EXTEN}'

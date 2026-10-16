@@ -1,10 +1,10 @@
 """The trunk side's view of a forwarded leg (§9.4 "SIP targets", "Forwarded calls", "Header
-templates"): the one INVITE sipp traced as received, its size, request URI, To, custom headers and
+templates"): the one INVITE the trunk side traced as received, its size, request URI, To, custom headers and
 Diversion, each printed verbatim and checked against what the scenario's forwarding chain should
 give.
 
 Usage: python3 _forward-context-check.py <request-uri> <diversion-regex> [<name>=<value> ...]
-                                         < <sipp message trace>
+                                         < <sipp message trace or baresip log>
 
 Each <name>=<value> is a custom `X-` header the INVITE must carry exactly once with that value, and
 it must carry no other `X-` header: none at all for an `external` forward. The Diversion must be
