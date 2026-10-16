@@ -31,7 +31,7 @@ describe('Playout', () => {
     vi.useRealTimers();
   });
 
-  it('sends one whole frame per 20 ms, padding the last with zeros', () => {
+  it('sends one whole frame per 20 ms, padding the last with zeros, and silence with nothing queued', () => {
     const { queue, frames } = playout();
     queue.push(Buffer.from([1, 2, 3, 4, 5, 6]));
     queue.start();
@@ -44,9 +44,12 @@ describe('Playout', () => {
       Buffer.from([1, 2, 3, 4]),
       Buffer.from([5, 6, 0, 0])
     ]);
-    // Nothing queued: nothing sent.
-    vi.advanceTimersByTime(FRAME_MS * 3);
-    expect(frames).toHaveLength(2);
+    vi.advanceTimersByTime(FRAME_MS);
+    expect(frames).toEqual([
+      Buffer.from([1, 2, 3, 4]),
+      Buffer.from([5, 6, 0, 0]),
+      Buffer.alloc(FRAME_BYTES)
+    ]);
     queue.stop();
   });
 
@@ -78,7 +81,9 @@ describe('Playout', () => {
     vi.advanceTimersByTime(0);
     expect(queue.clear()).toEqual(['a', 'b']);
     vi.advanceTimersByTime(FRAME_MS * 5);
-    expect(frames).toHaveLength(1);
+    expect(frames.slice(1)).toEqual(
+      Array.from({ length: 5 }, () => Buffer.alloc(FRAME_BYTES))
+    );
     expect(marks).toEqual([]);
     queue.stop();
   });

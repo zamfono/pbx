@@ -89,6 +89,13 @@ describe('webSocket targets (§9.4 "WebSocket targets")', () => {
   // What `core` sent Asterisk over the media channel's AudioSocket.
   const fromCore: AudioSocketMessage[] = [];
 
+  /** What `core` sent Asterisk but silence, which it sends while the bot is quiet. */
+  function sounds(): Buffer[] {
+    return fromCore
+      .map(message => message.payload)
+      .filter(payload => payload.some(byte => byte !== 0));
+  }
+
   /** Asterisk's end of the media channel's AudioSocket, read into `fromCore`. */
   async function asterisk(): Promise<{ write: (data: Buffer) => void }> {
     const socket = await eventually(() => {
@@ -211,8 +218,9 @@ describe('webSocket targets (§9.4 "WebSocket targets")', () => {
       }
     });
 
-    // The bot's mu-law reaches Asterisk as two frames of linear, then its mark is echoed.
-    const spoken = Buffer.alloc(FRAME_BYTES, 0xff);
+    // The bot's mu-law reaches Asterisk as a frame of linear, then its mark is echoed: mu-law
+    // 0x00 is -32124, little-endian 0x84 0x82.
+    const spoken = Buffer.alloc(FRAME_BYTES / 2, 0x00);
     bot.socket?.send(
       JSON.stringify({
         event: 'media',
@@ -233,11 +241,11 @@ describe('webSocket targets (§9.4 "WebSocket targets")', () => {
       ]);
     });
     await eventually(() => {
-      expect(fromCore).toEqual([
-        { kind: SLIN_KIND, payload: Buffer.alloc(FRAME_BYTES) },
-        { kind: SLIN_KIND, payload: Buffer.alloc(FRAME_BYTES) }
+      expect(sounds()).toEqual([
+        Buffer.alloc(FRAME_BYTES, Buffer.from([0x84, 0x82]))
       ]);
     });
+    expect(fromCore.every(message => message.kind === SLIN_KIND)).toBe(true);
   });
 
   it('hands the caller’s DTMF to the bot and its session token resolves while the stream lasts', async () => {
@@ -348,9 +356,11 @@ describe('webSocket targets (§9.4 "WebSocket targets")', () => {
       ]);
     });
     // One 20 ms frame at 16 kHz, the bot's sample first, as it came, then silence.
-    expect(fromCore.at(0)).toEqual({
-      kind: SLIN16_KIND,
-      payload: Buffer.concat([Buffer.from([0x78, 0x56]), Buffer.alloc(638)])
+    await eventually(() => {
+      expect(sounds()).toEqual([
+        Buffer.concat([Buffer.from([0x78, 0x56]), Buffer.alloc(638)])
+      ]);
     });
+    expect(fromCore.every(message => message.kind === SLIN16_KIND)).toBe(true);
   });
 });
