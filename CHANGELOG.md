@@ -11,6 +11,8 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-16
+
 ### Added
 
 - The images are published for ARM (`linux/arm64`) as well as `linux/amd64`, so a stack runs on
@@ -20,7 +22,6 @@ why the specified behaviour changed; the commit history, how.
   16 or 24 kHz), wherever a target goes. The bot gets the caller, the number dialled and a session
   token with which it hangs up, transfers, holds or parks its own call through the API while it
   is connected. Admin-only, like a `sip` target. See the `forward-to-voice-bot` recipe.
-
 - `deploy/README.md` gives a starting `compose.dr.yaml` and `litestream.yml` for continuous
   replication ("Continuous replication"); the restore guide's Litestream step reads the bucket from
   that `litestream.yml`.
@@ -689,7 +690,8 @@ The first 0.2 release; its `v0.2.0` tag was never published.
 
 The first tagged version, before any deployment.
 
-[Unreleased]: https://github.com/zamfono/pbx/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/zamfono/pbx/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/zamfono/pbx/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/zamfono/pbx/compare/v0.4.2...v0.5.0
 [0.4.2]: https://github.com/zamfono/pbx/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/zamfono/pbx/compare/v0.4.0...v0.4.1
