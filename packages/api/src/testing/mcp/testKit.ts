@@ -11,16 +11,14 @@ import { defineOperation } from '#lib/server/ops/types.js';
 import { makeTestDb, seedSession } from '../testDb.js';
 
 // Fixtures the MCP endpoint's tests share (`../mcp.test.ts` and the focused `*.test.ts` beside
-// it): the test operations, a seeded database, and requests shaped as each protocol era sends
-// them — https://modelcontextprotocol.io/specification/2026-07-28 for a stateless request,
-// https://modelcontextprotocol.io/specification/2025-11-25 for a session opened with
-// `initialize`. Importing it registers the operations, once per test file.
+// it): the test operations, a seeded database, and requests shaped as a 2026-07-28 client sends
+// them (https://modelcontextprotocol.io/specification/2026-07-28). Importing it registers the
+// operations, once per test file.
 export const ORIGIN = 'https://pbx.example';
 export const JWT_SECRET = 'test-secret';
 export const CLIENT_ID = 'client-1';
 const CLIENT_NAME = 'Ops Console';
 export const CURRENT = '2026-07-28';
-export const LEGACY = '2025-11-25';
 
 register(
   defineOperation<{ value: string }, { id: string; value: string }>({
@@ -89,6 +87,8 @@ export function mcpRequest(
     method: 'POST',
     headers: {
       authorization: `Bearer ${token}`,
+      // Streamable HTTP: every POST accepts both a JSON body and an SSE stream.
+      accept: 'application/json, text/event-stream',
       'content-type': 'application/json',
       ...headers
     },
@@ -193,3 +193,17 @@ export const confirmationProblem = (
   confirmationRequired: true,
   question
 });
+
+/** A tool as `tools/list` publishes it. */
+export type PublishedTool = {
+  name: string;
+  inputSchema: Record<string, unknown>;
+  outputSchema?: Record<string, unknown>;
+  annotations?: { readOnlyHint?: boolean; destructiveHint?: boolean };
+};
+
+/** Every tool as `tools/list` publishes it, its schemas as the SDK exports them. */
+export async function publishedTools(): Promise<PublishedTool[]> {
+  const body = await rpc(await seededDeps(), currentRequest(1, 'tools/list'));
+  return body.result?.tools as PublishedTool[];
+}

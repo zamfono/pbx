@@ -30,10 +30,10 @@ undoable and never block an undo. See the `undo` recipe for the full walk-throug
 for undo until `settings.softDeleteRetentionDays` passes. Every `DELETE`, plus `users.erase`
 and `devices.rotate`, additionally requires an explicit confirmation: the first call without
 `confirm: true` answers 409 with the question to ask a human ("Delete Anna Huber (extension
-101)? …"); the retry with `confirm: true` performs it. Over MCP, a capable client (Claude Code,
-Cursor, VS Code) asks this through elicitation instead of a second tool call; a client that lacks
-it, or declines, falls back to the same two-call REST contract, at which point the client's own
-permission prompt for a destructive tool is the human gate.
+101)? …"); the retry with `confirm: true` performs it. Over MCP, a capable client (Claude Code)
+asks this through elicitation instead of a second tool call; a client that lacks it, or declines,
+falls back to the same two-call REST contract, at which point the client's own permission prompt
+for a destructive tool is the human gate.
 
 A soft delete is itself refused, listing the blocking references, while another live row still
 points at it — a DID targeting the user, another group's fallback, the tenant main number. Retarget

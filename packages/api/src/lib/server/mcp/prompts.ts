@@ -1,11 +1,11 @@
-import { isRecord } from '@zamfono/shared';
+import { z } from 'zod';
 
 import { bundledEntries, type BundledEntry } from './guide.js';
 
 // §10.5 "Prompts": every `docs/guide/recipes/*.md` file is published as an MCP prompt, its
 // parameters from the recipe's front matter, listed by `prompts/list` and fetched, filled in with
-// the client's arguments, by `prompts/get`. The shapes are the MCP schema's `Prompt` and
-// `GetPromptResult`, the same in 2025-11-25 and 2026-07-28
+// the client's arguments, by `prompts/get`, both answered by `McpServer` from what is registered
+// here. The shapes are the MCP schema's `Prompt` and `GetPromptResult`
 // (https://modelcontextprotocol.io/specification/2026-07-28/server/prompts).
 const FRONT_MATTER_DELIM = '---';
 type RecipeArgument = { name: string; description: string; required: boolean };
@@ -15,23 +15,11 @@ export type Prompt = {
   description: string;
   arguments: RecipeArgument[];
 };
-/** A `GetPromptResult`'s own fields; the era's result shape wraps them (`./results.js`). */
+/** A `GetPromptResult`'s own fields; the SDK adds the rest. */
 export type PromptContent = {
   description: string;
   messages: { role: 'user'; content: { type: 'text'; text: string } }[];
 };
-
-/**
- * A `prompts/get` the server cannot answer: an unknown prompt, a required argument missing, or
- * arguments that are not the schema's string map. Both revisions' "Error Handling" name `-32602`
- * (Invalid params) for these, a protocol error rather than a result.
- */
-export class PromptRequestError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'PromptRequestError';
-  }
-}
 
 /** The index of the front matter's closing delimiter, or -1 when the file has none. */
 function frontMatterEnd(lines: string[]): number {
@@ -113,57 +101,33 @@ export function listPrompts(): Prompt[] {
   return recipes().map(promptFrom);
 }
 
-/** `prompts/get`'s `arguments`, the schema's `{ [key: string]: string }`; `null` when malformed. */
-function promptArguments(value: unknown): Record<string, string> | null {
-  if (value === undefined) {
-    return {};
-  }
-  if (!isRecord(value)) {
-    return null;
-  }
-  const entries = Object.entries(value);
-  const strings = entries.filter(
-    (entry): entry is [string, string] => typeof entry[1] === 'string'
-  );
-  return strings.length === entries.length ? Object.fromEntries(strings) : null;
+/**
+ * The arguments `prompt` takes, as `McpServer` validates them before `renderPrompt` runs: strings,
+ * none it does not declare, every required one non-blank, since a client's form sends an empty
+ * string for a field left blank.
+ */
+export function promptArgsSchema(prompt: Prompt): z.ZodObject {
+  const fields = prompt.arguments.map(arg => {
+    const value = z.string().describe(arg.description);
+    return [arg.name, arg.required ? value.min(1) : value.optional()] as const;
+  });
+  return z.object(Object.fromEntries(fields)).strict();
 }
 
 /**
  * `prompts/get`: the named recipe as one user message, followed by the arguments the client
- * filled in. An empty string counts as not given, since a client's form sends one for an optional
- * field left blank. Each value is quoted as a JSON string, so a newline in one cannot forge
- * another parameter line of the message.
+ * filled in, a blank optional one left out. Each value is quoted as a JSON string, so a newline in
+ * one cannot forge another parameter line of the message.
  */
-export function getPrompt(params: Record<string, unknown>): PromptContent {
-  const name = params.name;
-  if (typeof name !== 'string') {
-    throw new PromptRequestError('prompts/get needs a prompt name');
-  }
-  const recipe = recipes().find(entry => entry.name === name);
-  if (!recipe) {
-    throw new PromptRequestError(`Unknown prompt: ${name}`);
-  }
-  const args = promptArguments(params.arguments);
-  if (!args) {
-    throw new PromptRequestError('prompt arguments must be strings');
-  }
-  const prompt = promptFrom(recipe);
-  const declared = new Set(prompt.arguments.map(arg => arg.name));
-  const unknown = Object.keys(args).filter(key => !declared.has(key));
-  if (unknown.length > 0) {
-    throw new PromptRequestError(`Unknown argument: ${unknown.join(', ')}`);
-  }
-  const missing = prompt.arguments.filter(
-    arg => arg.required && !args[arg.name]
-  );
-  if (missing.length > 0) {
-    const names = missing.map(arg => arg.name).join(', ');
-    throw new PromptRequestError(`Missing required argument: ${names}`);
-  }
+export function renderPrompt(
+  prompt: Prompt,
+  args: Record<string, unknown>
+): PromptContent {
+  const recipe = recipes().find(entry => entry.name === prompt.name);
   const given = prompt.arguments
-    .filter(arg => args[arg.name])
+    .filter(arg => typeof args[arg.name] === 'string' && args[arg.name] !== '')
     .map(arg => `- ${arg.name}: ${JSON.stringify(args[arg.name])}`);
-  const body = recipeBody(recipe.content);
+  const body = recipeBody(recipe?.content ?? '');
   const text =
     given.length > 0 ? `${body}\n\nParameters:\n${given.join('\n')}` : body;
   return {

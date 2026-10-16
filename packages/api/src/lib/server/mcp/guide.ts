@@ -1,8 +1,10 @@
 import path from 'node:path';
+import { z } from 'zod';
 
 import { HTTP_NOT_FOUND } from '@zamfono/shared';
 
 import { OpError } from '../ops/types.js';
+import type { ToolDefinition } from './tools.js';
 
 // The guide ships as `docs/guide/{*.md,recipes/*.md}` (§10.5). `import.meta.glob` bundles the
 // text into the server chunk at build time, so it ships inside the deployed tree regardless of
@@ -18,34 +20,29 @@ const RECIPES_SEGMENT = '/recipes/';
 const INDEX_ALIAS = 'index';
 const MD_EXT = '.md';
 export const HELP_TOOL_NAME = 'zamfono.help';
-export const HELP_TOOL = {
+export const HELP_TOOL: ToolDefinition = {
   name: HELP_TOOL_NAME,
   description:
     'Reads a section of the admin guide by topic name; without a topic, lists every topic.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      topic: {
-        type: 'string',
-        description:
-          'A topic name, such as mental-model, routing-order, numbers or a recipe; left out, the list of every topic.'
-      }
-    }
-  },
+  inputSchema: z.object({
+    topic: z
+      .string()
+      .optional()
+      .describe(
+        'A topic name, such as mental-model, routing-order, numbers or a recipe; left out, the list of every topic.'
+      )
+  }),
   // Either answer is this one object: the topic list alone, or the topic with its text.
-  outputSchema: {
-    type: 'object',
-    properties: {
-      topics: {
-        type: 'array',
-        items: { type: 'string' },
-        description: 'Every topic name, when no topic was asked for.'
-      },
-      topic: { type: 'string', description: 'The topic asked for.' },
-      content: { type: 'string', description: "The topic's text, in Markdown." }
-    },
-    additionalProperties: false
-  },
+  outputSchema: z
+    .object({
+      topics: z
+        .array(z.string())
+        .optional()
+        .describe('Every topic name, when no topic was asked for.'),
+      topic: z.string().optional().describe('The topic asked for.'),
+      content: z.string().optional().describe("The topic's text, in Markdown.")
+    })
+    .strict(),
   annotations: { readOnlyHint: true, destructiveHint: false }
 };
 type HelpOutput = { topics: string[] } | { topic: string; content: string };
@@ -78,8 +75,8 @@ function helpFiles(): Map<string, string> {
 /** `zamfono.help`'s output: the topic list with no `topic` (or `index`), else that topic's text;
  * an unknown topic throws, naming every topic, which the tool call reports as a tool execution
  * error. */
-export function callHelp(args: Record<string, unknown>): HelpOutput {
-  const topic = typeof args.topic === 'string' ? args.topic : null;
+export function callHelp(args: { topic?: string }): HelpOutput {
+  const topic = args.topic ?? null;
   const files = helpFiles();
   const topics = [...files.keys()].sort();
   if (topic === null || (topic === INDEX_ALIAS && !files.has(topic))) {

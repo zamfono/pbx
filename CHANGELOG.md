@@ -25,6 +25,19 @@ why the specified behaviour changed; the commit history, how.
   replication ("Continuous replication"); the restore guide's Litestream step reads the bucket from
   that `litestream.yml`.
 
+### Changed
+
+- The MCP server speaks MCP protocol revision 2026-07-28 only and now runs on the official MCP
+  TypeScript SDK (`@modelcontextprotocol/server`). A client that opens with the older
+  2025-11-25 handshake is refused; Claude Code connects from v2.1.274, Cursor not until it
+  supports 2026-07-28. A tool call with invalid arguments is now refused in the SDK's words
+  rather than as the REST API's 422 problem.
+
+### Upgrade notes
+
+- Update Claude Code to v2.1.274 or later before connecting it to the upgraded stack's MCP
+  server.
+
 ## [0.5.0] - 2026-10-15
 
 ### Fixed

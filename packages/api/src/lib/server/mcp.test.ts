@@ -1,8 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { isHttpError } from '@sveltejs/kit';
 import { describe, expect, it } from 'vitest';
-
-import { epochSeconds, nowIso } from '@zamfono/shared';
 
 import {
   CLIENT_ID,
@@ -10,8 +7,6 @@ import {
   CURRENT,
   currentRequest,
   currentToolResult,
-  JWT_SECRET,
-  LEGACY,
   mcpRequest,
   ORIGIN,
   rpc,
@@ -19,22 +14,14 @@ import {
   SERVER_INFO_META,
   type RpcBody
 } from '#testing/mcp/testKit.js';
-import {
-  legacyRequest,
-  legacySession,
-  readSseEvents
-} from '#testing/mcp/testKitLegacy.js';
-import { seedSession } from '#testing/testDb.js';
 
-import { signAccessToken } from './auth/jwt.js';
 import { handleMcpRequest } from './mcp.js';
 import { protectedResourceMetadata } from './mcp/auth.js';
 import { callHelp } from './mcp/guide.js';
 
-// The result shapes below are asserted field by field against the MCP schema of the era the
-// request speaks: https://modelcontextprotocol.io/specification/2026-07-28/schema for a
-// stateless request, https://modelcontextprotocol.io/specification/2025-11-25/schema for a
-// session opened with `initialize`. The fixtures, test operations included, are `./mcp/testKit.js`.
+// The result shapes below are asserted field by field against the MCP schema,
+// https://modelcontextprotocol.io/specification/2026-07-28/schema. The fixtures, test operations
+// included, are `./mcp/testKit.js`.
 const MAX_INSTRUCTIONS_LENGTH = 512;
 
 describe('handleMcpRequest, 2026-07-28', () => {
@@ -45,8 +32,11 @@ describe('handleMcpRequest, 2026-07-28', () => {
     );
     expect(body.result).toEqual({
       resultType: 'complete',
-      supportedVersions: [CURRENT, LEGACY],
-      capabilities: { tools: {}, prompts: {} },
+      supportedVersions: [CURRENT],
+      capabilities: {
+        tools: { listChanged: false },
+        prompts: { listChanged: false }
+      },
       instructions: expect.any(String) as string,
       ttlMs: expect.any(Number) as number,
       cacheScope: 'private',
@@ -135,16 +125,16 @@ describe('handleMcpRequest, 2026-07-28', () => {
       })
     );
     expect(body.error).toBeUndefined();
+    // Refused by the SDK against the tool's input schema, the operation's own, in its words.
     expect(body.result).toMatchObject({
       resultType: 'complete',
       isError: true,
       content: [
         {
           type: 'text',
-          text: expect.stringContaining('validation failed') as string
+          text: expect.stringContaining('Input validation error') as string
         }
-      ],
-      structuredContent: { status: 422, title: 'validation failed' }
+      ]
     });
   });
 
@@ -177,7 +167,7 @@ describe('handleMcpRequest, 2026-07-28', () => {
     expect(unknown.result).toBeUndefined();
     expect(unknown.error).toEqual({
       code: -32602,
-      message: 'Unknown tool: no.such'
+      message: 'Tool no.such not found'
     });
     const nameless = await rpc(deps, currentRequest(5, 'tools/call', {}));
     expect(nameless.error?.code).toBe(-32602);
@@ -190,19 +180,19 @@ describe('handleMcpRequest, 2026-07-28', () => {
         name: 'contacts.create',
         arguments: { displayName: 'x'.repeat(524_288) }
       })
-    ).then(
-      () => null,
-      (error: unknown) => error
     );
-    expect(isHttpError(refused, 413)).toBe(true);
+    expect(refused.status).toBe(413);
   });
 
-  it('answers an unexpected failure with JSON-RPC -32603, leaking nothing', async () => {
+  it('answers an unexpected failure as a tool execution error, leaking nothing', async () => {
     const body = await rpc(
       await seededDeps(),
       currentRequest(6, 'tools/call', { name: 'test.crash', arguments: {} })
     );
-    expect(body.error).toEqual({ code: -32603, message: 'internal error' });
+    expect(body.result).toMatchObject({
+      isError: true,
+      content: [{ type: 'text', text: 'internal error' }]
+    });
   });
 
   it('mirrors the REST confirmation contract when the client lacks elicitation', async () => {
@@ -276,7 +266,7 @@ describe('handleMcpRequest, 2026-07-28', () => {
     }
   });
 
-  it('accepts the boolean and form forms of the elicitation capability, not URL mode alone', async () => {
+  it('accepts the bare and form forms of the elicitation capability, not URL mode alone', async () => {
     const deps = await seededDeps();
     const resultTypeFor = async (elicitation: unknown) => {
       const body = await rpc(
@@ -290,7 +280,7 @@ describe('handleMcpRequest, 2026-07-28', () => {
       );
       return [body.result?.resultType, body.result?.isError];
     };
-    expect(await resultTypeFor(true)).toEqual(['input_required', undefined]);
+    expect(await resultTypeFor({})).toEqual(['input_required', undefined]);
     expect(await resultTypeFor({ form: {} })).toEqual([
       'input_required',
       undefined
@@ -299,232 +289,27 @@ describe('handleMcpRequest, 2026-07-28', () => {
   });
 });
 
-describe('handleMcpRequest, legacy 2025-11-25', () => {
-  it('answers initialize with an InitializeResult and a session id', async () => {
+describe('handleMcpRequest, 2025-era clients', () => {
+  it('refuses initialize as an unsupported revision, opening no session', async () => {
     const response = await handleMcpRequest(
       await seededDeps(),
       mcpRequest({
         jsonrpc: '2.0',
         id: 'init',
         method: 'initialize',
-        params: { protocolVersion: LEGACY, capabilities: {} }
-      })
-    );
-    expect(response.headers.get('mcp-session-id')).toBeTruthy();
-    const body = (await response.json()) as RpcBody;
-    expect(body.result).toEqual({
-      protocolVersion: LEGACY,
-      capabilities: { tools: {}, prompts: {} },
-      serverInfo: SERVER_INFO_META['io.modelcontextprotocol/serverInfo'],
-      instructions: expect.any(String) as string
-    });
-  });
-
-  it('lists tools and prompts in the 2025-11-25 shape, without 2026-07-28 fields', async () => {
-    const deps = await seededDeps();
-    const headers = await legacySession(deps);
-    const tools = await rpc(deps, legacyRequest(headers, 1, 'tools/list'));
-    expect(tools.result).toEqual({ tools: expect.any(Array) as unknown[] });
-    const listed = tools.result?.tools as Record<string, unknown>[];
-    expect(listed.find(tool => tool.name === 'test.write')).toEqual({
-      name: 'test.write',
-      description: 'writes a thing',
-      inputSchema: expect.objectContaining({ type: 'object' }) as object,
-      outputSchema: expect.objectContaining({ type: 'object' }) as object,
-      annotations: { readOnlyHint: false, destructiveHint: false }
-    });
-    const prompts = await rpc(deps, legacyRequest(headers, 2, 'prompts/list'));
-    expect(prompts.result).toEqual({ prompts: expect.any(Array) as unknown[] });
-  });
-
-  it('returns a tool call as a 2025-11-25 CallToolResult', async () => {
-    const deps = await seededDeps();
-    const headers = await legacySession(deps);
-    const body = await rpc(
-      deps,
-      legacyRequest(headers, 3, 'tools/call', {
-        name: 'test.write',
-        arguments: { value: 'y' }
-      })
-    );
-    expect(body.result).toEqual({
-      content: [{ type: 'text', text: '{"id":"w1","value":"y"}' }],
-      structuredContent: { id: 'w1', value: 'y' },
-      isError: false
-    });
-  });
-
-  it('carries a non-object output as text only, since structuredContent must be an object', async () => {
-    const deps = await seededDeps();
-    const headers = await legacySession(deps);
-    const body = await rpc(
-      deps,
-      legacyRequest(headers, 3, 'tools/call', {
-        name: 'test.names',
-        arguments: {}
-      })
-    );
-    expect(body.result).toEqual({
-      content: [{ type: 'text', text: '["a","b"]' }],
-      isError: false
-    });
-  });
-
-  it('reports a tool execution error with isError and the confirmation contract as REST does', async () => {
-    const deps = await seededDeps();
-    const headers = await legacySession(deps);
-    const invalid = await rpc(
-      deps,
-      legacyRequest(headers, 4, 'tools/call', {
-        name: 'test.write',
-        arguments: {}
-      })
-    );
-    expect(invalid.result).toMatchObject({
-      isError: true,
-      structuredContent: { status: 422 }
-    });
-    const unconfirmed = await rpc(
-      deps,
-      legacyRequest(headers, 5, 'tools/call', {
-        name: 'test.delete',
-        arguments: { id: 't6' }
-      })
-    );
-    expect(unconfirmed.result).toEqual({
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(confirmationProblem('Delete t6?'))
+        params: {
+          protocolVersion: '2025-11-25',
+          capabilities: {},
+          clientInfo: { name: 'test', version: '1' }
         }
-      ],
-      structuredContent: confirmationProblem('Delete t6?'),
-      isError: true
-    });
-  });
-
-  it('asks an elicitation-capable client with a server-initiated elicitation/create', async () => {
-    const deps = await seededDeps();
-    const headers = await legacySession(deps, { elicitation: {} });
-    const response = await handleMcpRequest(
-      deps,
-      legacyRequest(headers, 5, 'tools/call', {
-        name: 'test.delete',
-        arguments: { id: 't3' }
       })
     );
-    expect(response.headers.get('content-type')).toBe('text/event-stream');
-    const events = readSseEvents(response);
-    const elicit = (await events.next()).value as {
-      id: string;
-      method: string;
-      params: Record<string, unknown>;
-    };
-    expect(elicit.method).toBe('elicitation/create');
-    expect(elicit.params).toEqual({
-      mode: 'form',
-      message: 'Delete t3?',
-      requestedSchema: {
-        type: 'object',
-        properties: { confirm: { type: 'boolean' } },
-        required: ['confirm']
-      }
-    });
-
-    const answered = await handleMcpRequest(
-      deps,
-      mcpRequest({
-        jsonrpc: '2.0',
-        id: elicit.id,
-        result: { action: 'accept', content: { confirm: true } }
-      })
-    );
-    expect(answered.status).toBe(202);
-
-    const settled = (await events.next()).value as RpcBody;
-    expect(settled.id).toBe(5);
-    expect(settled.result).toEqual({
-      content: [{ type: 'text', text: '{"deleted":"t3"}' }],
-      structuredContent: { deleted: 't3' },
-      isError: false
-    });
-  });
-
-  it('mirrors the REST confirmation contract when the legacy client declines', async () => {
-    const deps = await seededDeps();
-    const headers = await legacySession(deps, { elicitation: {} });
-    const response = await handleMcpRequest(
-      deps,
-      legacyRequest(headers, 8, 'tools/call', {
-        name: 'test.delete',
-        arguments: { id: 't7' }
-      })
-    );
-    const events = readSseEvents(response);
-    const elicit = (await events.next()).value as { id: string };
-    await handleMcpRequest(
-      deps,
-      mcpRequest({
-        jsonrpc: '2.0',
-        id: elicit.id,
-        result: { action: 'decline' }
-      })
-    );
-    const settled = (await events.next()).value as RpcBody;
-    expect(settled.result).toMatchObject({
-      isError: true,
-      structuredContent: confirmationProblem('Delete t7?')
-    });
-  });
-
-  it('leaves an elicitation pending when a different actor answers it', async () => {
-    const deps = await seededDeps();
-    const headers = await legacySession(deps, { elicitation: true });
-    const response = await handleMcpRequest(
-      deps,
-      legacyRequest(headers, 7, 'tools/call', {
-        name: 'test.delete',
-        arguments: { id: 't5' }
-      })
-    );
-    const events = readSseEvents(response);
-    const elicit = (await events.next()).value as { id: string };
-
-    const otherActorToken = await signAccessToken(
-      JWT_SECRET,
-      { sub: 'someone-else', role: 'owner', cid: CLIENT_ID, sid: 'session-2' },
-      epochSeconds(Date.now()),
-      ORIGIN
-    );
-    await deps.db
-      .insertInto('users')
-      .values({
-        id: 'someone-else',
-        name: 'Someone Else',
-        email: 'someone-else@x',
-        role: 'owner',
-        passwordHash: 'x',
-        createdAt: nowIso()
-      })
-      .execute();
-    await seedSession(deps.db, 'someone-else', CLIENT_ID, 'session-2');
-    const wrongActorAnswer = await handleMcpRequest(
-      deps,
-      mcpRequest(
-        {
-          jsonrpc: '2.0',
-          id: elicit.id,
-          result: { action: 'accept', content: { confirm: true } }
-        },
-        {},
-        otherActorToken
-      )
-    );
-    expect(wrongActorAnswer.status).toBe(200);
-    const wrongActorBody = (await wrongActorAnswer.json()) as RpcBody;
-    expect(wrongActorBody.error).toEqual({
-      code: -32600,
-      message: 'invalid JSON-RPC request'
+    expect(response.status).toBe(400);
+    expect(response.headers.get('mcp-session-id')).toBeNull();
+    const body = (await response.json()) as RpcBody;
+    expect(body.error).toMatchObject({
+      code: -32022,
+      data: { supported: [CURRENT] }
     });
   });
 });
