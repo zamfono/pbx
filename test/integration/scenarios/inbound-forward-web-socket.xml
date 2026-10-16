@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="ISO-8859-1"?>
 <!--
   §9.4 "WebSocket targets": an inbound call to +15551090, whose DID hands the call to a recording
-  `webSocket` target (the setup), a Vonage-protocol bot at 16 kHz (`_voice-bot.cjs`). This side
-  speaks; the bot plays a tone back, then hangs the call up through the API with its session
-  token, so this side answers the stack's BYE.
+  `webSocket` target (the setup), a Vonage-protocol bot at its default 16 kHz (`_voice-bot.cjs`).
+  This side speaks; the bot plays a tone back, then hangs the call up through the API with its
+  session token, so this side answers the stack's BYE.
 -->
 <scenario name="inbound forward web socket">
   <send retrans="500">

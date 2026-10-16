@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# §9.4 "WebSocket targets", a Vonage bot at 24 kHz (`_voice-bot-teardown.sh`).
+set -euo pipefail
+
+bash "$(dirname "$0")/_voice-bot-teardown.sh" "$1" "$2" "$3"
