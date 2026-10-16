@@ -1,6 +1,6 @@
 #!/bin/bash
 # Decides whether pr-images.yaml publishes a pull request's images, and which ones: the pull
-# request, the head commit, and the ci run whose `images` archive holds them. Run by its
+# request, the head commit, and the ci run whose `images-<arch>` archives hold them. Run by its
 # `resolve` job, from the default branch, never from the pull request's code.
 #
 # Usage: pr-images-resolve.sh workflow_run <ci run id> <head sha> <head repo>
@@ -11,7 +11,7 @@
 # and source (the head repository's URL).
 #
 # Everything is looked up through the API when this runs and matched against the event: nothing
-# comes from the archive, which the pull request's own ci run produced. Publishing needs the pull
+# comes from the archives, which the pull request's own ci run produced. Publishing needs the pull
 # request open, carrying LABEL, with the head that ci run built still its head, and the run a
 # successful pull_request run of .github/workflows/ci.yaml from that head repository.
 set -euo pipefail
@@ -73,10 +73,12 @@ jq -e --arg sha "$sha" '.path == ".github/workflows/ci.yaml" and .event == "pull
     and .conclusion == "success" and .head_sha == $sha' <<<"$run" >/dev/null \
   || fail "run $run_id is not a successful pull_request run of ci.yaml at $sha"
 run_repo=$(jq -r '.head_repository.full_name' <<<"$run")
-# ci.yaml keeps the archive for a day; a label added later needs a fresh run of ci first.
-gh api "/repos/$REPO/actions/runs/$run_id/artifacts?name=images" \
-  --jq '.artifacts | any(.expired == false)' | grep -qx true \
-  || skip "run $run_id has no unexpired images archive; re-run its ci, which then publishes"
+# ci.yaml keeps the archives for a day; a label added later needs a fresh run of ci first.
+for arch in amd64 arm64; do
+  gh api "/repos/$REPO/actions/runs/$run_id/artifacts?name=images-$arch" \
+    --jq '.artifacts | any(.expired == false)' | grep -qx true \
+    || skip "run $run_id has no unexpired images-$arch archive; re-run its ci, which then publishes"
+done
 
 pull=$(gh api "/repos/$REPO/pulls/$pr")
 state=$(jq -r .state <<<"$pull")

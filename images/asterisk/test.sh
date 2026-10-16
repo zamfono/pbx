@@ -15,9 +15,7 @@ STARTUP_TIMEOUT_S=30
 # CI adds after its own build. Standalone, bake builds it fresh under :test.
 if [ -z "${ASTERISK_IMAGE:-}" ]; then
   export ASTERISK_IMAGE=zamfono/asterisk:test
-  # The Zamfono APT repository publishes amd64 only (spec §4); pin the platform so the image
-  # builds the same way on an arm64 development machine as it does on an amd64 CI runner.
-  (cd "$repo_root" && docker buildx bake --load --set asterisk.platform=linux/amd64 asterisk)
+  (cd "$repo_root" && docker buildx bake --load asterisk)
 fi
 
 # The second run, with HEP on and the astdb on a volume, that the first one's HEP_ENABLED=false
@@ -31,10 +29,9 @@ cleanup() {
 }
 trap cleanup EXIT
 
-docker run -d --name "$NETNS_CONTAINER" --platform linux/amd64 --entrypoint sleep \
-  "$ASTERISK_IMAGE" infinity > /dev/null
+docker run -d --name "$NETNS_CONTAINER" --entrypoint sleep "$ASTERISK_IMAGE" infinity > /dev/null
 # EXTERNAL_IPV4 as in the ports mode (§6.1), for the TLS transports' Contact and Via below.
-docker run -d --name "$CONTAINER" --platform linux/amd64 --cap-add NET_ADMIN \
+docker run -d --name "$CONTAINER" --cap-add NET_ADMIN \
   --network "container:$NETNS_CONTAINER" \
   -e HEP_ENABLED=false \
   -e SIP_UDP_ENABLED=false \

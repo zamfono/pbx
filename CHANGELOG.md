@@ -13,6 +13,8 @@ why the specified behaviour changed; the commit history, how.
 
 ### Added
 
+- The images are published for ARM (`linux/arm64`) as well as `linux/amd64`, so a stack runs on
+  an ARM host; each tag names both, and the runtime pulls the host's own. CI tests both.
 - Calls can be handed to a voice bot over a WebSocket: a new forward target, `webSocket`, speaks
   Twilio Media Streams (base64 μ-law at 8 kHz) or the Vonage Voice API WebSocket (16-bit PCM at 8,
   16 or 24 kHz), wherever a target goes. The bot gets the caller, the number dialled and a session

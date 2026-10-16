@@ -6,6 +6,9 @@
 # Prints one line per tagged version of package `$1`: its id, then its tags. A package that does
 # not exist yet, because nothing was ever published to it, prints nothing. Untagged versions are
 # left out; neither prune judges them.
+# ponytail: a tagged version is a two-platform index (push-platforms.sh), and deleting it leaves
+# its two untagged platform images behind; delete those by the index's manifest digests if the
+# untagged versions ever get in the way.
 tagged_versions() {
   local err status=0
   err=$(mktemp)

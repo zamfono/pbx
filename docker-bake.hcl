@@ -21,10 +21,12 @@ variable "UPDATER_IMAGE" { default = "zamfono/updater:${TAG}" }
 variable "DEVICES_IMAGE" { default = "zamfono/test-devices:${TAG}" }
 
 # `gha` reads (CACHE_FROM) or writes (CACHE_TO) the GitHub Actions layer cache, one scope per
-# target; empty, the default, means no cache at all, which is what a local run gets. ci.yaml
-# decides which of the two a run uses and says why.
+# target and platform; empty, the default, means no cache at all, which is what a local run gets.
+# ci.yaml decides which of the two a run uses and says why, and names the platform in ARCH, the
+# runner's own (amd64 or arm64), which is what bake builds for.
 variable "CACHE_FROM" { default = "" }
 variable "CACHE_TO" { default = "" }
+variable "ARCH" { default = "" }
 
 # FRESH builds every layer anew, reading no cache: ci.yaml sets it on a push to main, whose images
 # `publish` pushes, so each carries the current Debian and Node layers and the packages resolved
@@ -41,20 +43,20 @@ variable "REVISION" { default = "" }
 
 function "cache_from" {
   params = [scope]
-  result = CACHE_FROM == "gha" ? ["type=gha,scope=${scope}"] : []
+  result = CACHE_FROM == "gha" ? ["type=gha,scope=${scope}-${ARCH}"] : []
 }
 
 # The cache proxy's pinned build stage reads in CI whether or not the run is FRESH.
 function "pinned_cache_from" {
   params = [scope]
-  result = CACHE_TO == "gha" ? ["type=gha,scope=${scope}"] : []
+  result = CACHE_TO == "gha" ? ["type=gha,scope=${scope}-${ARCH}"] : []
 }
 
 # mode=max keeps the build stages' layers too, not only the final image's: the node images do
 # their `npm ci` and compile in a `build` stage that a min-mode cache would drop.
 function "cache_to" {
   params = [scope]
-  result = CACHE_TO == "gha" ? ["type=gha,scope=${scope},mode=max"] : []
+  result = CACHE_TO == "gha" ? ["type=gha,scope=${scope}-${ARCH},mode=max"] : []
 }
 
 group "stack" {

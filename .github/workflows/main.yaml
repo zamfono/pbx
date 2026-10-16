@@ -1,7 +1,7 @@
 # §6.3 "Images", a push to main: ci.yaml runs inside this workflow, and `publish` pushes the images
 # its `images` job built and saved as edge and sha-<short sha>, so what reaches the registry is the
-# build the compose jobs brought up on both runtimes. A release tag later adds its own tags to the
-# very same images (release.yaml); it never builds one.
+# build the compose jobs brought up on both runtimes and platforms. A release tag later adds its
+# own tags to the very same images (release.yaml); it never builds one.
 #
 # A release never moves `edge`, so `latest` only ever names a release and `edge` only ever main.
 name: main
@@ -43,30 +43,44 @@ jobs:
           sparse-checkout: |
             docker-bake.hcl
             .github/scripts
+      # Each platform's archive, as images-amd64/images.tar and images-arm64/images.tar.
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: images
-          path: /tmp
-      - run: docker load -i /tmp/images.tar
+          pattern: images-*
+          path: /tmp/images
+      - name: Load both platforms' images
+        # Both archives tag their images zamfono/<name>:ci, so each platform's are renamed
+        # :ci-<arch> before the next archive takes those names. The test-devices image in them is
+        # a test fixture and stays unpublished.
+        run: |
+          for arch in amd64 arm64; do
+            docker load -i "/tmp/images/images-$arch/images.tar"
+            for name in $(bash .github/scripts/stack-images.sh); do
+              docker tag "zamfono/$name:ci" "zamfono/$name:ci-$arch"
+            done
+          done
+      - name: Both platforms installed the same Asterisk
+        # The Zamfono APT repository may publish one architecture's build before the other's; one
+        # tag must not name two Asterisk versions.
+        run: |
+          label='{{index .Config.Labels "org.zamfono.asterisk.version"}}'
+          amd64=$(docker image inspect --format "$label" zamfono/asterisk:ci-amd64)
+          arm64=$(docker image inspect --format "$label" zamfono/asterisk:ci-arm64)
+          echo "asterisk: amd64 $amd64, arm64 $arm64"
+          if [ -z "$amd64" ] || [ "$amd64" != "$arm64" ]; then
+            echo "::error::amd64 installed Asterisk '$amd64', arm64 '$arm64'" >&2
+            exit 1
+          fi
       - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Push the six images as edge and sha-<short sha>
-        # zamfono/<name>:ci is what docker-bake.hcl tags them; the test-devices image in the
-        # same archive is a test fixture, so it stays unpublished. The short sha is the name `promote` looks the build up by when this
-        # commit is released. A push is tried three times: ghcr.io now and then answers one with
-        # "unknown blob", mostly for a layer it mounts from another of the images, and the same
-        # push passes moments later.
+        # One multi-platform image per name and tag (push-platforms.sh). The short sha is the name
+        # `promote` looks the build up by when this commit is released.
         run: |
           for name in $(bash .github/scripts/stack-images.sh); do
-            for tag in edge "sha-${GITHUB_SHA::7}"; do
-              docker tag "zamfono/$name:ci" "$REGISTRY/$name:$tag"
-              for attempt in 1 2 3; do
-                docker push "$REGISTRY/$name:$tag" && break
-                [ "$attempt" -lt 3 ] || exit 1
-                sleep 15
-              done
-            done
+            bash .github/scripts/push-platforms.sh "zamfono/$name:ci" "$REGISTRY/$name" \
+              "sha-${GITHUB_SHA::7}" edge
           done
