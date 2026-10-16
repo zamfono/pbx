@@ -272,14 +272,15 @@ next step up from each limit failed. Per vCPU the shared Genoa cores carried abo
 CCX33's dedicated Milan cores, the CPX62 about twice a CCX33.
 
 **Time of day.** Each host's 20-user worst-mix limit (the CPX12's one tenant) was run again every
-hour until 22:00 UTC. Steal time stayed 0.0 % in every run, yet the same load cost more CPU in the
-evening:
+hour until 22:00 UTC and once more at 02:00, 05:00 and 08:00 UTC. Steal time stayed 0.0 % in
+every run, yet the same load cost more CPU in the evening, and the limits passed again overnight,
+so the slowdown follows the time of day rather than building up over the run:
 
-| Host  | Limit     | Morning to afternoon    | From about 18:30 UTC    | Passed every time   |
-| ----- | --------- | ----------------------- | ----------------------- | ------------------- |
-| CPX62 | 43 stacks | passed (CPU p95 68 %)   | failed 4 of 4 (74–78 %) | 38 stacks (55–70 %) |
-| CPX32 | 10 stacks | passed 3 of 3 (64–69 %) | failed 4 of 4 (71–73 %) | 9 stacks (61–67 %)  |
-| CPX12 | 32 users  | passed 6 of 7 (64–75 %) | passed 2 of 4 (66–71 %) | 28 users (56–63 %)  |
+| Host  | Limit     | Morning to afternoon    | From about 18:30 UTC    | 02:00–08:00 UTC         | Passed every time   |
+| ----- | --------- | ----------------------- | ----------------------- | ----------------------- | ------------------- |
+| CPX62 | 43 stacks | passed (CPU p95 68 %)   | failed 4 of 4 (74–78 %) | passed 3 of 3 (64–65 %) | 38 stacks (55–70 %) |
+| CPX32 | 10 stacks | passed 3 of 3 (64–69 %) | failed 4 of 4 (71–73 %) | passed 3 of 3 (69–70 %) | 9 stacks (61–67 %)  |
+| CPX12 | 32 users  | passed 6 of 7 (64–75 %) | passed 2 of 4 (66–71 %) | passed 3 of 3 (59–62 %) | 28 users (56–63 %)  |
 
 A neighbour's load shows up here as slower vCPUs, not as steal, so steal monitoring alone does not
 reveal it. Sizing for the evening means about 10–12 % below the daytime limits above; the
@@ -310,8 +311,8 @@ of 22 users), and on the CPX62 and CPX32 an update 30 s apart took each stack ab
 ### Caveats
 
 - One dedicated host type (CCX33); most of its cells ran once (the spreading steps twice). Treat
-  differences below ~10 % as noise. The shared hosts were measured on one day, so their evening
-  figures are a single day's evening.
+  differences below ~10 % as noise. The shared hosts were measured over one day and night, so their
+  evening figures are a single evening.
 - No WAN between the hosts (no loss, latency or jitter of its own); baresip and sipp stand in for
   real phones and trunks.
 - Calls were inbound only; transfers, ring groups, voicemail and outbound calls were not part of
