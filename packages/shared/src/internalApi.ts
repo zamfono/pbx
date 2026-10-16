@@ -136,6 +136,10 @@ const legRequestSchema = actorRequestSchema.extend({
 export const pickupRequestSchema = actorRequestSchema;
 export type PickupRequest = z.infer<typeof pickupRequestSchema>;
 
+/** The prefix of a voice bot's session token (§5.2 "Session tokens"), which `core` mints and
+ * `GET /internal/callSessions/{sha256}` resolves to `{ callId, legId }`. */
+export const SESSION_TOKEN_PREFIX = 'zcs_';
+
 /** `POST /internal/calls/{id}/hangup` → 204: the whole call, or with `legId` that leg alone. */
 export const hangupRequestSchema = legRequestSchema;
 export type HangupRequest = z.infer<typeof hangupRequestSchema>;

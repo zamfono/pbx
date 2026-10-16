@@ -13,6 +13,12 @@ why the specified behaviour changed; the commit history, how.
 
 ### Added
 
+- Calls can be handed to a voice bot over a WebSocket: a new forward target, `webSocket`, speaks
+  Twilio Media Streams (base64 μ-law at 8 kHz) or the Vonage Voice API WebSocket (16-bit PCM at 8,
+  16 or 24 kHz), wherever a target goes. The bot gets the caller, the number dialled and a session
+  token with which it hangs up, transfers, holds or parks its own call through the API while it
+  is connected. Admin-only, like a `sip` target. See the `forward-to-voice-bot` recipe.
+
 - `deploy/README.md` gives a starting `compose.dr.yaml` and `litestream.yml` for continuous
   replication ("Continuous replication"); the restore guide's Litestream step reads the bucket from
   that `litestream.yml`.

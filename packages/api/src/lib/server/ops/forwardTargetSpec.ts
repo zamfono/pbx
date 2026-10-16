@@ -1,14 +1,22 @@
-import { newId, sipHeadersColumn, type Db } from '@zamfono/shared';
+import {
+  isWebSocketSampleRate,
+  newId,
+  sipHeadersColumn,
+  type Db,
+  type WebSocketProtocol,
+  type WebSocketSampleRate
+} from '@zamfono/shared';
 
 import { noteWarning } from './afterCommit.js';
 import { assertAudioOfKind } from './audio/_shared.js';
-import type { TargetSpec } from './forwardTargetSchema.js';
+import { webSocketSampleRate, type TargetSpec } from './forwardTargetSchema.js';
 import { liveRow } from './rows.js';
 import { udpHeadersWarning } from './sipHeaders.js';
 import { type Context } from './types.js';
 
-/** The one column `spec` sets on its `forward_targets` row, with an `external` or `sip` target's
- * `record_calls`; every other column stays `null`. */
+/** The one column `spec` sets on its `forward_targets` row, `sip`'s and `webSocket`'s column sets
+ * among them, with an `external`, `sip` or `webSocket` target's `record_calls`; every other column
+ * stays `null`. */
 function forwardTargetColumns(
   spec: TargetSpec
 ): Record<string, string | number> {
@@ -26,6 +34,14 @@ function forwardTargetColumns(
       sipTrunkId: spec.trunkId,
       sipUser: spec.user,
       sipHeadersJson: JSON.stringify(spec.headers),
+      recordCalls: spec.record ? 1 : 0
+    };
+  }
+  if (spec.kind === 'webSocket') {
+    return {
+      webSocketProtocol: spec.protocol,
+      webSocketUrl: spec.url,
+      webSocketSampleRate: webSocketSampleRate(spec),
       recordCalls: spec.record ? 1 : 0
     };
   }
@@ -48,12 +64,23 @@ type ForwardTargetColumns = {
   sipTrunkId: string | null;
   sipUser: string | null;
   sipHeadersJson: string | null;
+  webSocketProtocol: WebSocketProtocol | null;
+  webSocketUrl: string | null;
+  webSocketSampleRate: number | null;
   mailboxUserId: string | null;
   mailboxRingGroupId: string | null;
   announcementAudioId: string | null;
   menuId: string | null;
   recordCalls: number;
 };
+
+/** A `webSocket` target's stored sample rate, one of those the table's CHECK allows. */
+function storedSampleRate(rate: number | null): WebSocketSampleRate {
+  if (isWebSocketSampleRate(rate)) {
+    return rate;
+  }
+  throw new Error(`forwardTargets: web socket sample rate ${String(rate)}`);
+}
 
 /** The inverse of `forwardTargetColumns`: the wire target a `forward_targets` row represents. */
 export function rowToTarget(row: ForwardTargetColumns): TargetSpec {
@@ -81,6 +108,16 @@ export function rowToTarget(row: ForwardTargetColumns): TargetSpec {
       trunkId: row.sipTrunkId,
       user: row.sipUser,
       headers: sipHeadersColumn.decode(row.sipHeadersJson),
+      record: row.recordCalls === 1
+    };
+  }
+  // The table's CHECKs set the three `web_socket_*` columns together, 8000 for `twilio`.
+  if (row.webSocketUrl !== null && row.webSocketProtocol !== null) {
+    return {
+      kind: 'webSocket',
+      protocol: row.webSocketProtocol,
+      url: row.webSocketUrl,
+      sampleRate: storedSampleRate(row.webSocketSampleRate),
       record: row.recordCalls === 1
     };
   }
@@ -194,6 +231,9 @@ export async function insertForwardTarget(
       sipTrunkId: null,
       sipUser: null,
       sipHeadersJson: null,
+      webSocketProtocol: null,
+      webSocketUrl: null,
+      webSocketSampleRate: null,
       mailboxUserId: null,
       mailboxRingGroupId: null,
       announcementAudioId: null,

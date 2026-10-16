@@ -24,12 +24,15 @@ import type { Pipeline } from './pipeline.js';
 import { recordAnsweredParticipation } from './recordParticipation.js';
 
 /** What the `answered` line says of the leg that answered: its channel and kind, and whose it is —
- * the trunk a `trunk` leg went out over, else the user and, for a phone, the device. */
+ * the trunk a `trunk` leg went out over, nobody's for a voice bot's `webSocket` leg, else the user
+ * and, for a phone, the device. */
 function answeredLeg(leg: Leg): Record<string, unknown> {
-  const owner =
-    leg.kind === 'trunk'
-      ? { trunkId: leg.trunkId ?? null }
-      : { userId: leg.userId };
+  let owner: Record<string, unknown> = { userId: leg.userId };
+  if (leg.kind === 'trunk') {
+    owner = { trunkId: leg.trunkId ?? null };
+  } else if (leg.kind === 'webSocket') {
+    owner = {};
+  }
   return {
     channelId: leg.channelId,
     leg: leg.kind,

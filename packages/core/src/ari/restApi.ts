@@ -58,6 +58,8 @@ function buildChannelsApi(rest: AriRequests): ChannelsApi {
       rest.json('POST', `channels/${id}/play`, { media, playbackId }),
     record: (id, params) => rest.void('POST', `channels/${id}/record`, params),
     snoop: (id, params) => rest.json('POST', `channels/${id}/snoop`, params),
+    externalMedia: params =>
+      rest.json('POST', 'channels/externalMedia', params),
     setVar: (id, name, value) =>
       rest.void('POST', `channels/${id}/variable`, {
         variable: name,

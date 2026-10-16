@@ -1,7 +1,14 @@
 // In-process fake ARI server: HTTP + WebSocket, an in-memory channel/bridge model, for tests only.
+import net from 'node:net';
+
 import { HTTP_CONFLICT, HTTP_NOT_FOUND, HTTP_OK } from '@zamfono/shared';
 
 import type { Channel } from '#src/ari/types.js';
+import {
+  audioSocketMessage,
+  UUID_KIND,
+  uuidBytes
+} from '#src/calls/botAudioSocket.js';
 import type { RtpQos } from '#src/qosFigures.js';
 import { AST_CAUSE_NORMAL_CLEARING } from '#src/sipCodes.js';
 
@@ -103,6 +110,8 @@ export class FakeAri {
   holdRequest: ((request: FakeRequest) => RequestHold) | null = null;
   /** How long a snoop channel takes to enter Stasis after its creation, `null` for never. */
   snoopStasisAfterMs: number | null = DEFAULT_SNOOP_STASIS_AFTER_MS;
+  /** Asterisk's end of each `externalMedia` channel's AudioSocket connection, in order. */
+  readonly externalMediaSockets: net.Socket[] = [];
   /** What `GET /ari/asterisk/info` reports as Asterisk's `startup_time`. */
   private startupTime = FAKE_ASTERISK_STARTUP_TIME;
   private readonly snoopsOutsideStasis = new Set<string>();
@@ -123,6 +132,9 @@ export class FakeAri {
 
   close(): Promise<void> {
     this.playbacks.clear();
+    for (const socket of this.externalMediaSockets) {
+      socket.destroy();
+    }
     return this.transport.close();
   }
 
@@ -217,6 +229,49 @@ export class FakeAri {
     return { status: HTTP_OK, body: snoopChannel };
   }
 
+  /**
+   * `POST /channels/externalMedia`: an `AudioSocket` channel under the requested `channelId`, up
+   * at once, connected to `external_host` and named there by the UUID `data`, as
+   * `chan_audiosocket` does. Like a snoop channel, it enters Stasis just after Asterisk answers
+   * the request, `data` its app argument.
+   */
+  private externalMedia(body: unknown): RouteResult {
+    const params = body as {
+      channelId?: string;
+      external_host?: string;
+      data?: string;
+    };
+    const host = params.external_host ?? '';
+    const channel = defaultChannel({
+      id: params.channelId,
+      name: `AudioSocket/${host}-${params.data ?? ''}`,
+      state: 'Up'
+    });
+    this.channels.set(channel.id, channel);
+    const separator = host.lastIndexOf(':');
+    const socket = net.connect(
+      Number(host.slice(separator + 1)),
+      host.slice(0, separator),
+      () => {
+        socket.write(
+          audioSocketMessage(UUID_KIND, uuidBytes(params.data ?? ''))
+        );
+      }
+    );
+    socket.on('error', () => undefined);
+    this.externalMediaSockets.push(socket);
+    setTimeout(() => {
+      this.emit({
+        type: 'StasisStart',
+        timestamp: new Date().toISOString(),
+        application: 'zamfono',
+        args: [params.data ?? ''],
+        channel
+      });
+    }, DEFAULT_SNOOP_STASIS_AFTER_MS);
+    return { status: HTTP_OK, body: channel };
+  }
+
   private route(
     method: string,
     path: string,
@@ -225,6 +280,9 @@ export class FakeAri {
   ): RouteResult {
     if (path === 'channels/create' && method === 'POST') {
       return fakeCreate(this, this.channels, body);
+    }
+    if (path === 'channels/externalMedia' && method === 'POST') {
+      return this.externalMedia(body);
     }
     if (path === 'channels' && method === 'GET') {
       return { status: HTTP_OK, body: [...this.channels.values()] };

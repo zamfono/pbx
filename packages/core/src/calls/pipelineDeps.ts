@@ -9,6 +9,7 @@ import type { EventBus } from '../internal/eventBus.js';
 import type { ConfigCache } from '../internal/snapshot.js';
 import type { StateStore } from '../internal/stateStore.js';
 import type { Presence } from '../presence.js';
+import type { BotSessions } from './botSessions.js';
 import type { Call } from './call.js';
 import type { ParticipationRecorder } from './recordParticipation.js';
 import type { TrunkChannels } from './trunkChannels.js';
@@ -65,4 +66,6 @@ export type PipelineDeps = {
   // `presence.setCallState` (§10.2 "Presence and BLF", "Three-way calls").
   trunkChannels: TrunkChannels;
   presence: Presence;
+  /** The voice bots' streams in progress (§9.4 "WebSocket targets"). */
+  bots: BotSessions;
 };

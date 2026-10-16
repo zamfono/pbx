@@ -9,14 +9,15 @@ import type { Call } from './calls/call.js';
 export type QosTarget = { channelId: string; role: QosRole };
 
 // The caller's own channel, plus every leg bridged in (`up`) right now; a leg still ringing, or one
-// that ended unanswered, never carried the call's own media.
+// that ended unanswered, never carried the call's own media, and a voice bot's (§9.4 "WebSocket
+// targets") carries it only to `core` over the internal network.
 export function qosTargets(call: Call): QosTarget[] {
   const targets: QosTarget[] =
     call.callerChannelId === null
       ? []
       : [{ channelId: call.callerChannelId, role: 'caller' }];
   for (const leg of call.legs.values()) {
-    if (leg.state === 'up') {
+    if (leg.state === 'up' && leg.kind !== 'webSocket') {
       targets.push({ channelId: leg.channelId, role: 'callee' });
     }
   }

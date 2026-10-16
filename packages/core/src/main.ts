@@ -206,7 +206,8 @@ export async function main(): Promise<{ close: () => Promise<void> }> {
         presence,
         recorder,
         trunks: trunkState,
-        version: env.version
+        version: env.version,
+        sessions: pipeline.deps.bots
       },
       CORE_INTERNAL_PORT
     );

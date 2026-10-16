@@ -10,7 +10,8 @@ import type { GroupLeg } from './groupLegs.js';
 
 export type CallsRow = Selectable<DB['calls']>;
 
-/** One channel dialed for a call: a device, a find-me leg, a trunk leg or a group member. `endCause`
+/** One channel dialed for a call: a device, a find-me leg, a trunk leg, a group member or a voice
+ * bot's media stream (§9.4 "WebSocket targets"). `endCause`
  * is the Q.850 hangup cause `ringOutcome()` reads, set from `ChannelDestroyed` while ringing.
  * `placing` from before its channel is created until it is dialled (`legOriginate.ts`): such a leg
  * is its placement's to settle, never shown, counted as ringing or hung up by anything else. */
@@ -18,7 +19,7 @@ export type Leg = {
   /** The leg's own id in the live calls (§10.3 "Live calls"), never Asterisk's. */
   id: string;
   channelId: string;
-  kind: 'device' | 'findMe' | 'trunk' | 'member';
+  kind: 'device' | 'findMe' | 'trunk' | 'member' | 'webSocket';
   userId: string | null;
   state: 'placing' | 'ringing' | 'up' | 'ended';
   endCause: number | null;

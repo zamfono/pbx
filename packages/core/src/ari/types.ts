@@ -64,6 +64,19 @@ type SnoopParams = {
   snoopId: string;
 };
 
+/** `POST /channels/externalMedia`'s parameters (§9.4 "WebSocket targets"): an AudioSocket
+ * stream of `format` between the channel and the TCP server at `external_host` (`host:port`),
+ * which the connection names by the UUID `data`. */
+export type ExternalMediaParams = {
+  app: 'zamfono';
+  channelId: string;
+  external_host: string;
+  format: 'slin' | 'slin16' | 'slin24';
+  encapsulation: 'audiosocket';
+  transport: 'tcp';
+  data: string;
+};
+
 export type DeviceState =
   'NOT_INUSE' | 'INUSE' | 'BUSY' | 'UNAVAILABLE' | 'RINGING';
 export type AsteriskModule =
@@ -98,6 +111,8 @@ export type ChannelsApi = {
   ) => Promise<{ id: string }>;
   record: (id: string, params: RecordParams) => Promise<void>;
   snoop: (id: string, params: SnoopParams) => Promise<Channel>;
+  /** `POST /channels/externalMedia`: an `AudioSocket` channel streaming to and from a TCP server. */
+  externalMedia: (params: ExternalMediaParams) => Promise<Channel>;
   setVar: (id: string, name: string, value: string) => Promise<void>;
   /** `GET /channels/{id}/variable`, `null` when the channel or the variable is absent. Reading
    * `CHANNEL(pjsip,call-id)` is how a call is matched to its HEP stream (§7 level `sip`). */

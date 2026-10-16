@@ -186,6 +186,23 @@ describe('resyncOnBoot', () => {
     }
   );
 
+  // §9.4 "WebSocket targets": the bot's stream died with the process, so the caller is let go.
+  it("tears down a bridge holding a voice bot's media stream at once", async () => {
+    const caller = fakeAri.addChannel({ name: 'PJSIP/trunk-1-00000002' });
+    const media = fakeAri.addChannel({
+      name: 'AudioSocket/10.0.0.3:40000-0199a1b2-0000-7000-8000-000000000001'
+    });
+    const bridge = await ari.bridges.create({ type: 'mixing' });
+    await ari.bridges.addChannel(bridge.id, caller.id);
+    await ari.bridges.addChannel(bridge.id, media.id);
+
+    await resyncOnBoot(deps());
+
+    expect(hungUp(caller.id)).toBe(true);
+    expect(hungUp(media.id)).toBe(true);
+    expect(bridgeDestroyed(bridge.id)).toBe(true);
+  });
+
   it('keeps the one who held the other party, alone in the conversation bridge, until they leave', async () => {
     const holder = fakeAri.addChannel({ name: 'PJSIP/e101-a-00000001' });
     const bridge = await ari.bridges.create({ type: 'mixing' });

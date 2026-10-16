@@ -12,6 +12,7 @@ import { AmiClient } from '../ami/client.js';
 import type { AriClient } from '../ari/client.js';
 import type { Logger } from '../ari/types.js';
 import { CallActions } from '../calls/actions.js';
+import { BotSessions } from '../calls/botSessions.js';
 import { STASIS_WAIT_MS } from '../calls/legOriginate.js';
 import { Pipeline } from '../calls/pipeline.js';
 import type { PipelineDeps } from '../calls/pipelineDeps.js';
@@ -128,6 +129,7 @@ export function testPipelineDeps(
     apiClient: { mail: () => Promise.resolve() },
     logger: noopLogger,
     trunkChannels: overrides.trunkChannels ?? new TrunkChannels({ ari, state }),
+    bots: overrides.bots ?? new BotSessions(ari, '127.0.0.1'),
     presence:
       overrides.presence ??
       new Presence({

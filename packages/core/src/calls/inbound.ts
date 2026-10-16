@@ -29,6 +29,7 @@ import { endTargetOwner, release } from './release.js';
 import { ringGroup } from './ringGroup.js';
 import { runUserStep } from './userStep.js';
 import { deposit } from './voicemail.js';
+import { dialWebSocketTarget } from './webSocketTarget.js';
 
 /** Step 1 "Entry" for an already-resolved target (§10.1): reject-anonymous, OOO/hours, then the
  * target's own step. Exported for outbound dialling of an internal extension or own DID, which
@@ -61,6 +62,10 @@ export async function enterTarget(
   }
   if (target.kind === 'external' || target.kind === 'sip') {
     await dialForwardTarget(pipeline, call, target, forwarder);
+    return;
+  }
+  if (target.kind === 'webSocket') {
+    await dialWebSocketTarget(pipeline, call, target, forwarder);
     return;
   }
 
@@ -109,8 +114,8 @@ export async function enterTarget(
     await playMenu(pipeline, call, target.menuId);
     return;
   }
-  // The last of `ForwardTarget`'s kinds: the two mailboxes, the announcement, the user and the
-  // menu each returned above.
+  // The last of `ForwardTarget`'s kinds: the two mailboxes, the announcement, the outward targets,
+  // the user and the menu each returned above.
   await ringGroup(pipeline, call, target.ringGroupId);
 }
 

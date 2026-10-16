@@ -10,8 +10,14 @@ import {
 
 import type { Effects } from './effects.js';
 
-/** The authenticated caller of an operation. */
-export type Actor = { id: string; name: string; role: UserRole };
+/** The authenticated caller of an operation: a user, or a voice bot holding a session token for
+ * one call, whose id is its leg's (§5.2 "Session tokens"). */
+export type Actor = {
+  id: string;
+  name: string;
+  role: UserRole;
+  callSession?: { callId: string };
+};
 
 /** Built by the runner for every call; `run` holds only what differs between operations (§10.3). */
 export type Context = {

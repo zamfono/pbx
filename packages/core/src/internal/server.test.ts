@@ -115,7 +115,8 @@ describe('startInternalServer', () => {
               : Promise.resolve();
           }
         },
-        version: VERSION
+        version: VERSION,
+        sessions: { resolve: () => null }
       },
       ANY_FREE_PORT
     );
@@ -405,7 +406,8 @@ describe('startInternalServer', () => {
         presence: idlePresence(),
         recorder: idleRecorder,
         trunks: idleTrunks,
-        version: VERSION
+        version: VERSION,
+        sessions: { resolve: () => null }
       },
       ANY_FREE_PORT
     );
@@ -454,7 +456,8 @@ describe('startInternalServer', () => {
         presence: idlePresence(),
         recorder: idleRecorder,
         trunks: idleTrunks,
-        version: VERSION
+        version: VERSION,
+        sessions: { resolve: () => null }
       },
       ANY_FREE_PORT
     );
@@ -494,7 +497,8 @@ describe('startInternalServer', () => {
         presence: idlePresence(),
         recorder: idleRecorder,
         trunks: idleTrunks,
-        version: VERSION
+        version: VERSION,
+        sessions: { resolve: () => null }
       },
       ANY_FREE_PORT
     );
@@ -543,7 +547,8 @@ describe('startInternalServer', () => {
         presence: idlePresence(),
         recorder: idleRecorder,
         trunks: idleTrunks,
-        version: VERSION
+        version: VERSION,
+        sessions: { resolve: () => null }
       },
       ANY_FREE_PORT
     );

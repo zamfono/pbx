@@ -1,13 +1,12 @@
 ; Autoload brings up the installed module set (spec §4, §9.1); the channel, CDR and CEL
-; drivers the stack does not use (chan_pjsip and the core's own call log are the only ones,
-; per spec §9.3/§9.4) are noloaded so they cannot start. HEP_NOLOAD_LINES additionally keeps
+; drivers the stack does not use (chan_pjsip, chan_audiosocket for a voice bot's media and the
+; core's own call log are the only ones, per spec §9.3/§9.4) are noloaded so they cannot start. HEP_NOLOAD_LINES additionally keeps
 ; the HEP modules out of the running process when HEP_ENABLED=false (spec §9.1).
 [modules]
 autoload = yes
 noload => chan_iax2.so
 noload => chan_unistim.so
 noload => chan_websocket.so
-noload => chan_audiosocket.so
 noload => chan_console.so
 noload => cdr_csv.so
 noload => cdr_custom.so

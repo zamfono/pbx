@@ -26,8 +26,9 @@ the outbound route nor the caller sets one. See `numbers`.
 block's `fallbackTarget`, else the tenant-wide `settings.fallbackTarget`, else a 404 release. See
 `numbers`.
 
-**Forward target** — the eight-kind vocabulary (`user`, `ringGroup`, `external`, `sip`,
-`mailboxUser`, `mailboxRingGroup`, `announcement`, `menu`) every routing rule points at. See
+**Forward target** — the nine-kind vocabulary (`user`, `ringGroup`, `external`, `sip`,
+`webSocket`, `mailboxUser`, `mailboxRingGroup`, `announcement`, `menu`) every routing rule points
+at. See
 `mental-model`.
 
 **Hop** — one re-entry of the routing pipeline through a `user` or `ringGroup` forward target. A

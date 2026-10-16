@@ -170,14 +170,19 @@ export function noteDiversion(call: Call, diversion: Diversion | null): void {
 }
 
 /** Records the hop tenant `number` makes to its own `target` when that is an `external` or `sip`
- * target, which a trunk leg dials: the number forwards unconditionally (§9.4 "Forwarded calls"). */
+ * target, which a trunk leg dials, or a `webSocket` one, whose bot is told the hop: the number
+ * forwards unconditionally (§9.4 "Forwarded calls", "WebSocket targets"). */
 export function noteNumberForward(
   snapshot: Snapshot,
   call: Call,
   number: TenantNumber,
   target: ForwardTarget
 ): void {
-  if (target.kind === 'external' || target.kind === 'sip') {
+  if (
+    target.kind === 'external' ||
+    target.kind === 'sip' ||
+    target.kind === 'webSocket'
+  ) {
     noteDiversion(call, diversionFor(snapshot, call, number, 'cfu'));
   }
 }

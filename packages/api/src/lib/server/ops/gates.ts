@@ -2,6 +2,7 @@ import {
   HTTP_FORBIDDEN,
   HTTP_NOT_FOUND,
   HTTP_UNPROCESSABLE_CONTENT,
+  isRecord,
   type UserRole
 } from '@zamfono/shared';
 
@@ -36,7 +37,23 @@ export function parseInput(op: ErasedOperation, input: unknown): unknown {
   return parsed.data;
 }
 
+/** What a session token may run (§5.2 "Session tokens"): the actions on its own live call. */
+const CALL_SESSION_OPERATIONS: ReadonlySet<string> = new Set([
+  'calls.hangup',
+  'calls.transfer',
+  'calls.hold',
+  'calls.resume',
+  'calls.park'
+]);
+
+/** Throws 403 for an operation above `actor`'s role, and for any a session token may not run. */
 export function checkRole(op: ErasedOperation, actor: Actor): void {
+  if (
+    actor.callSession !== undefined &&
+    !CALL_SESSION_OPERATIONS.has(op.name)
+  ) {
+    throw new OpError(HTTP_FORBIDDEN, 'forbidden');
+  }
   if (ROLE_RANK[actor.role] > ROLE_RANK[op.minRole]) {
     throw new OpError(HTTP_FORBIDDEN, 'forbidden');
   }
@@ -44,12 +61,21 @@ export function checkRole(op: ErasedOperation, actor: Actor): void {
 
 /** Throws 403 unless what the input names is a `user` caller's own (`Operation.scope`, §5.3), and
  *  when a caller below owner makes a call only an owner makes (`Operation.ownerOnly`, §10.3); an
- *  `admin` acts on anything else, an `owner` on anything. */
+ *  `admin` acts on anything else, an `owner` on anything. A session token's call is its own and
+ *  nothing else is (§5.2 "Session tokens"). */
 export async function checkScope(
   op: ErasedOperation,
   ctx: Context,
   input: unknown
 ): Promise<void> {
+  // A session token acts on its own call alone, whoever's that is (§5.2 "Session tokens").
+  const session = ctx.actor.callSession;
+  if (session !== undefined) {
+    if (!isRecord(input) || input.id !== session.callId) {
+      throw new OpError(HTTP_FORBIDDEN, `${op.name}: not your own`);
+    }
+    return;
+  }
   if (
     ctx.actor.role === 'user' &&
     op.minRole === 'user' &&

@@ -119,7 +119,8 @@ export async function startRig(
           presence,
           recorder: idleRecorder,
           trunks: trunkStateFor(ari, db, { cache, state, bus }),
-          version: resolveVersion({})
+          version: resolveVersion({}),
+          sessions: pipeline.deps.bots
         },
         ANY_FREE_PORT
       );

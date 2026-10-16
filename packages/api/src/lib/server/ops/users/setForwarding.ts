@@ -54,7 +54,7 @@ function keptAdminTargets(
 export const setForwarding = defineOperation({
   name: 'users.setForwarding',
   description:
-    "Replaces a user's call-forwarding rules as a whole; a user sets their own, without new sip or recording targets, an admin anyone's.",
+    "Replaces a user's call-forwarding rules as a whole; a user sets their own, without new sip, webSocket or recording targets, an admin anyone's.",
   input: forwardingSchema,
   output: forwardingSchema,
   problems: [HTTP_NOT_FOUND],
