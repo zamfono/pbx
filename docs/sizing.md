@@ -324,7 +324,7 @@ same time as the same run on a CPX12 against the same generator:
 | Run                            | CPX02                                          | CPX12, same time       |
 | ------------------------------ | ---------------------------------------------- | ---------------------- |
 | Worst, 32 users / 17 calls     | CPU 78 %, jitter 19 ms                         | CPU 61 %, jitter 10 ms |
-| Worst, 12 calls (18 users)     | CPU 62 %, jitter 6 ms: **within limits**       | —                      |
+| Worst, 18 users / 12 calls     | CPU 62 %, jitter 6 ms: **within limits**       | —                      |
 | Realistic, 57 users / 24 calls | CPU 85 %, **jitter 23 ms**                     | CPU 65 %, jitter 11 ms |
 | Realistic, 38 users / 18 calls | CPU 61 %, **jitter 23 ms**; again: 79 %, 18 ms | CPU 45 %, jitter 1 ms  |
 | Realistic, 28 users / 15 calls | CPU 59 %, jitter 7 ms: **within limits**       | CPU 59 %, jitter 2 ms  |
