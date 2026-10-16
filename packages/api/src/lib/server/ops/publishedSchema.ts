@@ -11,10 +11,11 @@ import type { ErasedOperation } from './registry.js';
 
 export type JsonSchema = Record<string, unknown>;
 
+export const CONFIRM_DESCRIPTION =
+  '`true` once a human has answered the confirmation question; without it the operation is refused with 409 and the question (§10.3 "Confirmation").';
 const CONFIRM_SCHEMA: JsonSchema = {
   type: 'boolean',
-  description:
-    '`true` once a human has answered the confirmation question; without it the operation is refused with 409 and the question (§10.3 "Confirmation").'
+  description: CONFIRM_DESCRIPTION
 };
 
 /** `schema` with `exclude`d property names dropped from `properties` and `required`. */

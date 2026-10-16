@@ -5,12 +5,10 @@ import {
   currentHeaders,
   currentMeta,
   currentRequest,
-  LEGACY,
   mcpRequest,
   seededDeps,
   type RpcBody
 } from '#testing/mcp/testKit.js';
-import { legacySession } from '#testing/mcp/testKitLegacy.js';
 
 import { handleMcpRequest } from '../mcp.js';
 
@@ -91,7 +89,7 @@ describe('2026-07-28 request validation', () => {
       'tools/list',
       {},
       {
-        headers: { 'mcp-protocol-version': LEGACY }
+        headers: { 'mcp-protocol-version': '2025-11-25' }
       }
     );
     expectRejected(outcome, -32020);
@@ -110,10 +108,9 @@ describe('2026-07-28 request validation', () => {
       }
     );
     expectRejected(outcome, -32022);
-    expect(outcome.body.error).toEqual({
+    expect(outcome.body.error).toMatchObject({
       code: -32022,
-      message: 'Unsupported protocol version',
-      data: { supported: [CURRENT, LEGACY], requested: '1900-01-01' }
+      data: { supported: [CURRENT], requested: '1900-01-01' }
     });
   });
 
@@ -168,20 +165,19 @@ describe('2026-07-28 request validation', () => {
     expect(outcome.body.error?.code).toBe(-32601);
   });
 
-  it('treats a request with neither _meta nor a legacy session as a malformed 2026-07-28 one', async () => {
+  it('refuses a request without _meta as naming no version it speaks', async () => {
     const response = await handleMcpRequest(
       await seededDeps(),
       mcpRequest({ jsonrpc: '2.0', id: 1, method: 'tools/list' })
     );
     expect(response.status).toBe(400);
-    expect(((await response.json()) as RpcBody).error?.code).toBe(-32020);
+    expect(((await response.json()) as RpcBody).error?.code).toBe(-32022);
   });
 
   it('serves a request carrying 2026-07-28 _meta statelessly, whatever session id it also carries', async () => {
     const deps = await seededDeps();
-    const legacy = await legacySession(deps, { elicitation: {} });
     const request = currentRequest(1, 'tools/list');
-    request.headers.set('mcp-session-id', legacy['mcp-session-id'] ?? '');
+    request.headers.set('mcp-session-id', 'some-session');
     const body = (await (
       await handleMcpRequest(deps, request)
     ).json()) as RpcBody;

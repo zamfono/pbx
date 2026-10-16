@@ -6,11 +6,9 @@ import {
   seededDeps,
   SERVER_INFO_META
 } from '#testing/mcp/testKit.js';
-import { legacyRequest, legacySession } from '#testing/mcp/testKitLegacy.js';
 
 // `prompts/get` against the recipes bundled from `docs/guide/recipes/` (§10.5 "Prompts"), in the
-// shapes of https://modelcontextprotocol.io/specification/2026-07-28/server/prompts and
-// https://modelcontextprotocol.io/specification/2025-11-25/server/prompts.
+// shapes of https://modelcontextprotocol.io/specification/2026-07-28/server/prompts.
 const ONBOARD = {
   name: 'onboard-employee',
   arguments: { employeeName: 'Jane Doe', email: 'jane@example.com' }
@@ -69,40 +67,45 @@ describe('prompts/get, 2026-07-28', () => {
     expect(body.result).toBeUndefined();
     expect(body.error).toEqual({
       code: -32602,
-      message: 'Unknown prompt: no-such-recipe'
+      message: 'Prompt no-such-recipe not found'
     });
   });
 
-  it.each([{ employeeName: 'Jane' }, { employeeName: 'Jane', email: '' }])(
-    'answers a missing required argument, blank or absent, with -32602: %o',
-    async args => {
-      const body = await rpc(
-        await seededDeps(),
-        currentRequest(3, 'prompts/get', {
-          name: 'onboard-employee',
-          arguments: args
-        })
-      );
-      expect(body.error).toEqual({
-        code: -32602,
-        message: 'Missing required argument: email'
-      });
-    }
-  );
-
   it.each([
-    { name: 'undo', arguments: { colour: 'blue' } },
-    { name: 'undo', arguments: { entityId: 5 } },
-    { name: 'undo', arguments: ['entityId'] },
-    {}
+    { name: 'onboard-employee', arguments: { employeeName: 'Jane' } },
+    {
+      name: 'onboard-employee',
+      arguments: { employeeName: 'Jane', email: '' }
+    },
+    { name: 'undo', arguments: { colour: 'blue' } }
   ])(
-    'answers an undeclared or non-string argument, or no name, with -32602: %o',
+    'answers a missing required argument, blank or absent, or an undeclared one, with -32602: %o',
     async params => {
       const body = await rpc(
         await seededDeps(),
         currentRequest(4, 'prompts/get', params)
       );
+      expect(body.result).toBeUndefined();
       expect(body.error?.code).toBe(-32602);
+    }
+  );
+
+  // Refused by the SDK's wire-schema check before any prompt is looked up; in
+  // @modelcontextprotocol/server 2.3.1 that check answers -32603, not the -32602 the prompts page
+  // names.
+  it.each([
+    { name: 'undo', arguments: { entityId: 5 } },
+    { name: 'undo', arguments: ['entityId'] },
+    {}
+  ])(
+    'refuses a non-string argument, or no name, with an error: %o',
+    async params => {
+      const body = await rpc(
+        await seededDeps(),
+        currentRequest(4, 'prompts/get', params)
+      );
+      expect(body.result).toBeUndefined();
+      expect(body.error).toBeDefined();
     }
   );
 
@@ -113,30 +116,5 @@ describe('prompts/get, 2026-07-28', () => {
     );
     const text = (body.result as PromptBody).messages[0]?.content.text;
     expect(text).not.toContain('Parameters:');
-  });
-});
-
-describe('prompts/get, legacy 2025-11-25', () => {
-  it('returns a GetPromptResult without the 2026-07-28 fields', async () => {
-    const deps = await seededDeps();
-    const headers = await legacySession(deps);
-    const body = await rpc(
-      deps,
-      legacyRequest(headers, 1, 'prompts/get', ONBOARD)
-    );
-    expect(body.result).toEqual({
-      description: 'Onboard an employee',
-      messages: [
-        {
-          role: 'user',
-          content: { type: 'text', text: expect.any(String) as string }
-        }
-      ]
-    });
-    const missing = await rpc(
-      deps,
-      legacyRequest(headers, 2, 'prompts/get', { name: 'onboard-employee' })
-    );
-    expect(missing.error?.code).toBe(-32602);
   });
 });

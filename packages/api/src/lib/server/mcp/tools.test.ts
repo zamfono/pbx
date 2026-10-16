@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
-import { listTools } from './tools.js';
+import { publishedTools } from '#testing/mcp/testKit.js';
 
-describe('listTools', () => {
-  it("lets a destructive tool's input carry `confirm: true`, the fallback's second call (§10.5)", () => {
-    const remove = listTools().find(tool => tool.name === 'users.delete');
-    expect(remove?.annotations.destructiveHint).toBe(true);
+describe('tools/list', () => {
+  it("lets a destructive tool's input carry `confirm: true`, the fallback's second call (§10.5)", async () => {
+    const remove = (await publishedTools()).find(
+      tool => tool.name === 'users.delete'
+    );
+    expect(remove?.annotations?.destructiveHint).toBe(true);
     const validator = z.fromJSONSchema(
       remove?.inputSchema as Parameters<typeof z.fromJSONSchema>[0]
     );
@@ -18,8 +20,8 @@ describe('listTools', () => {
 
   // A multipart upload's bytes have no JSON Schema of their own, so the tool schema falls back to
   // an unconstrained value.
-  it('publishes an upload operation without its file, which its upload link takes (§10.5)', () => {
-    const tools = listTools();
+  it('publishes an upload operation without its file, which its upload link takes (§10.5)', async () => {
+    const tools = await publishedTools();
     const upload = tools.find(tool => tool.name === 'audio.create');
     expect(upload?.inputSchema).toMatchObject({
       type: 'object',
@@ -28,8 +30,8 @@ describe('listTools', () => {
     expect(upload?.inputSchema).not.toHaveProperty('properties.upload');
   });
 
-  it('publishes the object a tool answers with as its output schema (§10.5)', () => {
-    const tools = listTools();
+  it('publishes the object a tool answers with as its output schema (§10.5)', async () => {
+    const tools = await publishedTools();
     const get = tools.find(tool => tool.name === 'users.get');
     expect(get?.outputSchema).toMatchObject({
       type: 'object',
@@ -47,8 +49,10 @@ describe('listTools', () => {
     }
   });
 
-  it("publishes the help tool's two answers, the topic list and one topic, as one output schema", () => {
-    const help = listTools().find(tool => tool.name === 'zamfono.help');
+  it("publishes the help tool's two answers, the topic list and one topic, as one output schema", async () => {
+    const help = (await publishedTools()).find(
+      tool => tool.name === 'zamfono.help'
+    );
     expect(help?.outputSchema).toMatchObject({
       type: 'object',
       properties: {
@@ -61,8 +65,8 @@ describe('listTools', () => {
     expect(help?.outputSchema).not.toHaveProperty('required');
   });
 
-  it('sorts tools by code point and always offers the help tool', () => {
-    const names = listTools().map(tool => tool.name);
+  it('sorts tools by code point and always offers the help tool', async () => {
+    const names = (await publishedTools()).map(tool => tool.name);
     expect(names).toContain('zamfono.help');
     expect([...names].sort()).toEqual(names);
   });

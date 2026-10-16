@@ -2,6 +2,12 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-16 · §10.5 Tools.** A tool call's arguments are validated by the MCP SDK (`McpServer`) against the operation's own input schema before the operation runs, and an invalid one is refused as a tool execution error in the SDK's words, no longer as REST's 422 problem; RBAC and auditing are unchanged.
+*Why:* the MCP server moves to `@modelcontextprotocol/server` (TASK-61), whose low-level `Server` is marked deprecated in favour of `McpServer`, and `McpServer.registerTool` validates before the tool runs. The product owner, offered keeping the low-level `Server`, `McpServer` with the tools handled per method, or `McpServer` for everything: "Do "option 2"".
+
+**2026-10-16 · §4 Technology Choices, §10.5 Protocol revision, Context budget, Confirmation over MCP.** The MCP server speaks protocol revision 2026-07-28 alone: the legacy 2025-11-25 sessions (`initialize`, `Mcp-Session-Id`, at most 10 per user, a confirmation asked as a server-initiated `elicitation/create`) are gone, and a client opening with `initialize` is refused as speaking an unsupported revision. Clients must speak 2026-07-28, as Claude Code does from v2.1.274; Cursor, which spoke 2025-11-25 and earlier as of 2026-09-25, cannot connect until it does.
+*Why:* the MCP server moves to `@modelcontextprotocol/server` (TASK-61), whose own legacy serving is stateless only, so keeping the sessions meant keeping a hand-written session store beside it. The product owner: "do we really need to keep the legacy mode?", and "zamfono is still in development, so we are allowed to require newer / the newest releases of claude / codex etc."
+
 **2026-10-16 · §6.3 Images, §8 Integration.** Every image tag is one image for `linux/amd64` and `linux/arm64`, each built and tested in CI on a runner of its own architecture, with the integration suite run on both runtimes on both platforms; `main` publishes only when both platforms' `asterisk` installed the same Asterisk version.
 *Why:* the Zamfono APT repository now publishes Asterisk for arm64 too (TASK-60). The product owner: "`packages.zamfono.com` finally also publishes Asterisk for ARM. what is needed for Zamfono to run on ARM as well?", then "extend the CI/CD to ARM first".
 
