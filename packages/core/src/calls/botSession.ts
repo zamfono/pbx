@@ -85,9 +85,12 @@ export class BotSession {
         params.log.warn({ ...fields, bytes }, 'voice bot audio dropped');
       }
     });
+    // Silence from the moment Asterisk connects, which its channel needs (`botPlayout.ts`).
+    this.playout.start();
   }
 
-  /** Starts the stream: the protocol's opening frames, then audio both ways. */
+  /** Starts the stream: the protocol's opening frames, then audio both ways; until now Asterisk
+   * got silence. */
   start(): void {
     const { params } = this;
     this.startedAtMs = Date.now();
@@ -127,7 +130,6 @@ export class BotSession {
         'voice bot socket failed'
       );
     });
-    this.playout.start();
   }
 
   /** A DTMF digit the caller pressed. */

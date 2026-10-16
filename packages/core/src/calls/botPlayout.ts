@@ -1,7 +1,9 @@
 /**
  * The audio a voice bot sends, played into the call at its own pace (§9.4 "WebSocket targets"):
  * a bot sends faster than real time, so its audio is queued and sent one 20 ms frame per tick,
- * as Asterisk expects it. A marker the bot sets (Twilio's `mark`, Vonage's `notify`) waits
+ * as Asterisk expects it, and silence on a tick with nothing queued: Asterisk 22's AudioSocket
+ * channel waits for the next message with the channel locked, so a stream that goes quiet would
+ * hold it, and every bridge and ARI request touching it, until the bot spoke again. A marker the bot sets (Twilio's `mark`, Vonage's `notify`) waits
  * in the queue behind the audio sent before it and is echoed once that has been sent; one set
  * with nothing queued is echoed at once. `clear` drops the queued audio and hands back the
  * markers dropped with it.
@@ -100,16 +102,13 @@ export class Playout {
       return;
     }
     this.due += FRAME_MS;
-    const frame = this.takeFrame();
-    if (frame !== null) {
-      this.deps.send(frame);
-    }
+    this.deps.send(this.takeFrame());
     this.echoMarkers();
     this.schedule();
   }
 
   /** The next frame: the queued audio up to the next marker, padded to a whole frame. */
-  private takeFrame(): Buffer | null {
+  private takeFrame(): Buffer {
     const frame = Buffer.alloc(this.deps.frameBytes);
     let filled = 0;
     while (filled < frame.length) {
@@ -126,7 +125,7 @@ export class Playout {
         head.audio = head.audio.subarray(taken);
       }
     }
-    return filled === 0 ? null : frame;
+    return frame;
   }
 
   /** Echoes the markers at the head of the queue, whose audio has all been sent. */

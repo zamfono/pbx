@@ -215,7 +215,11 @@ export async function dialWebSocketTarget(
   forwarder: Forwarder | null
 ): Promise<void> {
   const encoding = mediaEncoding(target.sampleRate);
-  const socket = await connect(target.url);
+  // Ready before the media connects, so its session starts sending at once (`botPlayout.ts`).
+  const [socket, parameters] = await Promise.all([
+    connect(target.url),
+    metadata(pipeline, call)
+  ]);
   const media =
     socket === null || call.callerEnded === true
       ? null
@@ -256,7 +260,7 @@ export async function dialWebSocketTarget(
       callId: call.id,
       accountId: pipeline.deps.stackFqdn,
       sampleRate: target.sampleRate,
-      parameters: await metadata(pipeline, call)
+      parameters
     },
     ari,
     log: logger
