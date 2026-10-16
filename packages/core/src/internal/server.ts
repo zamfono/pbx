@@ -26,9 +26,11 @@ import type { AriClient } from '../ari/client.js';
 import { logFailure } from '../ari/failures.js';
 import type { Logger } from '../ari/types.js';
 import type { CallActions } from '../calls/actions.js';
+import type { BotSessions } from '../calls/botSessions.js';
 import type { Recorder } from '../calls/recording.js';
 import type { Presence } from '../presence.js';
 import { handleActionRoute, handleParkingRead } from './actionRoutes.js';
+import { handleCallSessionRoute } from './callSessionRoute.js';
 import {
   handleConfigChanged,
   type PresenceRefresh,
@@ -64,6 +66,8 @@ type InternalDeps = {
   trunks: TrunkMonitoringRefresh & TrunkReregister;
   /** The version `/internal/version` reports (§7 "Version"), `CoreEnv.version`. */
   version: ZamfonoVersion;
+  /** The voice bots' session tokens (§5.2 "Session tokens"). */
+  sessions: Pick<BotSessions, 'resolve'>;
 };
 
 /** `core:database` and `core:ari`, each `fail` while down (§6.3 "Health"). */
@@ -179,7 +183,8 @@ const ROUTES: Partial<Record<string, Route[]>> = {
     at('/readyz', handleReadyz),
     at('/internal/state', handleState),
     at('/internal/version', handleVersion),
-    at('/internal/parking', handleParkingRead)
+    at('/internal/parking', handleParkingRead),
+    handleCallSessionRoute
   ],
   POST: [
     at('/internal/configChanged', handleConfigChanged),

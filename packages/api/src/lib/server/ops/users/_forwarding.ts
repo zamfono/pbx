@@ -8,7 +8,11 @@ import {
 } from '@zamfono/shared';
 
 import { isAdminTarget } from '../forwardTargets.js';
-import { targetSpecSchema, type TargetSpec } from '../forwardTargetSchema.js';
+import {
+  targetSpecSchema,
+  webSocketSampleRate,
+  type TargetSpec
+} from '../forwardTargetSchema.js';
 import { rowToTarget } from '../forwardTargetSpec.js';
 
 /** A user's forwarding rules (§10.3 "Users"), as `users.setForwarding` takes them and both
@@ -78,9 +82,9 @@ function headerPairs(headers: SipHeaderTemplate[]): string {
 
 /**
  * §10.3 "Forward targets": whether `input` is the very admin target (`isAdminTarget`) `stored`
- * holds, with the same `record`: the same number, or the same trunk, user part and headers, in
- * order, name for name and value for value. `stored` comes through `rowToTarget`, so its headers
- * are the parsed JSON the wire returns.
+ * holds, with the same `record`: the same number; the same trunk, user part and headers, in
+ * order, name for name and value for value; or the same protocol, URL and sample rate. `stored`
+ * comes through `rowToTarget`, so its headers are the parsed JSON the wire returns.
  */
 export function isSameAdminTarget(
   stored: TargetSpec,
@@ -91,6 +95,14 @@ export function isSameAdminTarget(
   }
   if (stored.kind === 'external' && input.kind === 'external') {
     return stored.external === input.external && stored.record === input.record;
+  }
+  if (stored.kind === 'webSocket' && input.kind === 'webSocket') {
+    return (
+      stored.protocol === input.protocol &&
+      stored.url === input.url &&
+      webSocketSampleRate(stored) === webSocketSampleRate(input) &&
+      stored.record === input.record
+    );
   }
   if (stored.kind !== 'sip' || input.kind !== 'sip') {
     return false;

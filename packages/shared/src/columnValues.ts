@@ -129,6 +129,36 @@ export type TokenKind = 'refresh' | 'reset';
 export const WEBHOOK_STATUSES = ['ok', 'failing'] as const;
 export type WebhookStatus = (typeof WEBHOOK_STATUSES)[number];
 
+/** `forward_targets.web_socket_protocol` (§9.4 "WebSocket targets"): the wire protocol a voice
+ * bot speaks. */
+export const WEB_SOCKET_PROTOCOLS = ['twilio', 'vonage'] as const;
+export type WebSocketProtocol = (typeof WEB_SOCKET_PROTOCOLS)[number];
+
+/** The PCM rates a voice bot's audio runs at, in Hz: narrowband, wideband, super-wideband. */
+export const NARROWBAND_SAMPLE_RATE = 8000;
+export const WIDEBAND_SAMPLE_RATE = 16000;
+export const SUPER_WIDEBAND_SAMPLE_RATE = 24000;
+
+/** `forward_targets.web_socket_sample_rate`: `twilio` always narrowband, `vonage` the rate
+ * chosen, wideband unless given. */
+export const WEB_SOCKET_SAMPLE_RATES = [
+  NARROWBAND_SAMPLE_RATE,
+  WIDEBAND_SAMPLE_RATE,
+  SUPER_WIDEBAND_SAMPLE_RATE
+] as const;
+export type WebSocketSampleRate = (typeof WEB_SOCKET_SAMPLE_RATES)[number];
+export const TWILIO_SAMPLE_RATE = NARROWBAND_SAMPLE_RATE;
+export const DEFAULT_VONAGE_SAMPLE_RATE = WIDEBAND_SAMPLE_RATE;
+/** The longest `forward_targets.web_socket_url`. */
+export const WEB_SOCKET_URL_MAX_LENGTH = 2048;
+
+/** Whether `rate` is one of `WEB_SOCKET_SAMPLE_RATES`. */
+export function isWebSocketSampleRate(
+  rate: number | null
+): rate is WebSocketSampleRate {
+  return WEB_SOCKET_SAMPLE_RATES.some(candidate => candidate === rate);
+}
+
 /** `backup_targets.kind` (§6.5 "Backups"): the restic backends. */
 export const BACKUP_TARGET_KINDS = [
   'local',

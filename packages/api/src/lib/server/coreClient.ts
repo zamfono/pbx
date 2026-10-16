@@ -9,6 +9,7 @@ import * as env from '$app/env/private';
 
 import {
   healthDocumentSchema,
+  HTTP_NOT_FOUND,
   type AddPartyRequest,
   type AttendedTransferRequest,
   type ConsultRequest,
@@ -58,7 +59,29 @@ export type CoreClient = {
   decline(callId: string, req: DeclineRequest): Promise<void>;
   /** Has Asterisk register the `registration` trunk afresh (§9.4 "Provisioning and status"). */
   reregisterTrunk(trunkId: string): Promise<void>;
+  /** The call and bot leg the session token hashed to `hash` acts for (§5.2 "Session tokens"),
+   * `null` once its stream has ended or for no such token. */
+  callSession(hash: string): Promise<{ callId: string; legId: string } | null>;
 };
+
+/** `GET /internal/callSessions/{hash}` (§5.2 "Session tokens"): the call and bot leg, `null` for
+ * a 404. */
+async function fetchCallSession(
+  fetchFn: typeof fetch,
+  baseUrl: string,
+  hash: string
+): Promise<{ callId: string; legId: string } | null> {
+  const response = await fetchFn(`${baseUrl}/internal/callSessions/${hash}`, {
+    signal: AbortSignal.timeout(CORE_READ_TIMEOUT_MS)
+  });
+  if (response.status === HTTP_NOT_FOUND) {
+    return null;
+  }
+  if (!response.ok) {
+    throw new Error(`core call session lookup failed: ${response.status}`);
+  }
+  return (await response.json()) as { callId: string; legId: string };
+}
 
 /** `core`'s internal API at `baseUrl` (default `CORE_URL`). */
 export function createCoreClient(
@@ -131,7 +154,8 @@ export function createCoreClient(
         fetchFn,
         `${baseUrl}/internal/trunks/${encodeURIComponent(trunkId)}/reregister`,
         undefined
-      )
+      ),
+    callSession: async hash => fetchCallSession(fetchFn, baseUrl, hash)
   };
 }
 

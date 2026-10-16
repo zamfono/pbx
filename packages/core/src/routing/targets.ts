@@ -2,7 +2,13 @@
  * The shared forward-target vocabulary (spec §11.2 `forward_targets`), its lookups in the config
  * snapshot, and hop counting for routing pipeline step 7, "Forward targets" (§10.1).
  */
-import type { SipHeaderTemplate, UserForwardCondition } from '@zamfono/shared';
+import {
+  isWebSocketSampleRate,
+  type SipHeaderTemplate,
+  type UserForwardCondition,
+  type WebSocketProtocol,
+  type WebSocketSampleRate
+} from '@zamfono/shared';
 
 import type { Snapshot } from '../internal/snapshot.js';
 
@@ -17,13 +23,21 @@ export type ForwardTarget =
       headers: SipHeaderTemplate[];
       record?: true;
     }
+  | {
+      kind: 'webSocket';
+      protocol: WebSocketProtocol;
+      url: string;
+      sampleRate: WebSocketSampleRate;
+      record?: true;
+    }
   | { kind: 'mailboxUser'; userId: string }
   | { kind: 'mailboxRingGroup'; ringGroupId: string }
   | { kind: 'announcement'; audioId: string }
   | { kind: 'menu'; menuId: string };
 
-/** A `forward_targets` row: exactly one target is set, `sip`'s being its column pair, enforced by
- * the table's CHECK, which also allows `record_calls` on an `external` or `sip` target alone. */
+/** A `forward_targets` row: exactly one target is set, `sip`'s and `webSocket`'s being their
+ * column sets, enforced by the table's CHECK, which also allows `record_calls` on an `external`,
+ * `sip` or `webSocket` target alone. */
 type ForwardTargetsRow = {
   id: string;
   userId: string | null;
@@ -33,6 +47,9 @@ type ForwardTargetsRow = {
   sipUser: string | null;
   /** `sip_headers_json` as the config snapshot parses it (§9.4 "Header templates"). */
   sipHeaders: SipHeaderTemplate[] | null;
+  webSocketProtocol: WebSocketProtocol | null;
+  webSocketUrl: string | null;
+  webSocketSampleRate: number | null;
   mailboxUserId: string | null;
   mailboxRingGroupId: string | null;
   announcementAudioId: string | null;
@@ -40,9 +57,21 @@ type ForwardTargetsRow = {
   recordCalls: number;
 };
 
-/** An `external` or `sip` target's `record` (§10.2 "Recording semantics"): set only when it records. */
+/** An `external`, `sip` or `webSocket` target's `record` (§10.2 "Recording semantics"): set only
+ * when it records. */
 function recordOf(row: ForwardTargetsRow): { record?: true } {
   return row.recordCalls === 1 ? { record: true } : {};
+}
+
+/** A `webSocket` target's sample rate, one of those the table's CHECK allows. */
+function sampleRateOf(row: ForwardTargetsRow): WebSocketSampleRate {
+  const rate = row.webSocketSampleRate;
+  if (isWebSocketSampleRate(rate)) {
+    return rate;
+  }
+  throw new Error(
+    `forwardTargets: row ${row.id} has sample rate ${String(rate)}`
+  );
 }
 
 /** Reads the one set column of `row` into the `ForwardTarget` union it represents. */
@@ -67,6 +96,16 @@ export function targetFromRow(row: ForwardTargetsRow): ForwardTarget {
       trunkId: row.sipTrunkId,
       user: row.sipUser,
       headers: row.sipHeaders,
+      ...recordOf(row)
+    };
+  }
+  // The table's CHECKs set the three `web_socket_*` columns together.
+  if (row.webSocketUrl !== null && row.webSocketProtocol !== null) {
+    return {
+      kind: 'webSocket',
+      protocol: row.webSocketProtocol,
+      url: row.webSocketUrl,
+      sampleRate: sampleRateOf(row),
       ...recordOf(row)
     };
   }
@@ -149,8 +188,8 @@ export const MAX_HOPS = 3;
 
 /**
  * Counts one more hop for a `user` or `ringGroup` target re-entering at Entry; a `menu` target
- * re-enters without counting, and every other kind, `external` and `sip` included, neither counts
- * nor re-enters (§10.1 step 7).
+ * re-enters without counting, and every other kind, `external`, `sip` and `webSocket` included,
+ * neither counts nor re-enters (§10.1 step 7).
  */
 export function nextHop(
   hops: number,

@@ -22,6 +22,10 @@ import {
   crossSiteFormRejection,
   INTERNAL_PREFIX
 } from '#lib/server/auth/crossSiteForms.js';
+import {
+  authenticateSessionToken,
+  sessionTokenOf
+} from '#lib/server/auth/sessionTokens.js';
 import { getDb } from '#lib/server/db.js';
 import { startBackgroundJobs } from '#lib/server/jobs/background.js';
 import { limiter, type LimitKind } from '#lib/server/limiter.js';
@@ -149,7 +153,12 @@ const handleRequest: Handle = async ({ event, resolve }) => {
     return resolve(event, { transformPageChunk: fillLanguage });
   }
   const deps = { db: getDb(), jwtSecret: env.JWT_SECRET };
-  const bearer = await authenticateRequest(deps, event.request);
+  // A voice bot's session token acts on REST alone (§5.2 "Session tokens").
+  const sessionToken = sessionTokenOf(event.request);
+  const bearer =
+    sessionToken === null
+      ? await authenticateRequest(deps, event.request)
+      : await authenticateSessionToken(sessionToken);
   const link = bearer
     ? null
     : await authenticateLink(deps, 'download', event.url);

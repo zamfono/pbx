@@ -31,8 +31,9 @@ has legs but no user.
 released by a transfer, is the parker the ring-back rings, holds the call or dials the
 consultation. Without `legId` they take your own other party, so an admin or owner who is not in
 the call must name a leg (422 otherwise); that is how a call with no user in it, such as one a
-number forwards to a SIP target, is transferred. `calls.hangup` with `legId` hangs up that leg
-alone, as its phone hanging up would. A `user` names legs only of calls they control. A leg the
+number forwards to a SIP target, is transferred. A voice bot acts on its own call the same way,
+with the session token its stream carries (`forward-to-voice-bot`). `calls.hangup` with `legId`
+hangs up that leg alone, as its phone hanging up would. A `user` names legs only of calls they control. A leg the
 call does not hold is 404 `legNotFound`, one still ringing 409 `legNotUp`, an added party's 409
 `notBridged`; with `toCallId`, a leg other than the held party is 409 `notHeld`.
 

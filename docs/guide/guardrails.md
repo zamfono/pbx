@@ -52,8 +52,8 @@ that one of their phones rings or is connected in right now, and ends, transfers
 (`calls.hangup`, `calls.transfer`, `calls.consult`, `calls.hold`, `calls.addParty`) only one they
 placed, while their own phone is in it, or are connected in (`call-control`), as they park one
 (`calls.park`); every user sees the parked calls (`parking.list`), which only an admin ends.
-Recordings are `admin`/`owner` only, including of a user's own calls. A `sip` target, and an
-`external` one with `"record": true`, is admin-only everywhere: a user's own forwarding, OOO rule
+Recordings are `admin`/`owner` only, including of a user's own calls. A `sip` or `webSocket`
+target, and an `external` one with `"record": true`, is admin-only everywhere: a user's own forwarding, OOO rule
 or hours that names a new one is refused with 403. A user whose forwarding an admin pointed at one reads their rules with `users.getForwarding`
 (`GET /api/v1/users/{id}/forwarding`), in the shape `users.setForwarding`
 (`PUT /api/v1/users/{id}/forwarding`) takes, and sends them back edited: the `PUT` replaces the

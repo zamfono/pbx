@@ -123,7 +123,7 @@
 | `users.list` | `GET /api/v1/users` | Lists the tenant's live users, paginated. | admin | no |
 | `users.resetMfa` | `POST /api/v1/users/{id}/resetMfa` | Removes a user's two-factor methods and recovery codes and signs them out everywhere. | admin | yes |
 | `users.resetPassword` | `POST /api/v1/users/{id}/resetPassword` | Issues a new one-time link to set a user's password. | admin | no |
-| `users.setForwarding` | `PUT /api/v1/users/{id}/forwarding` | Replaces a user's call-forwarding rules as a whole; a user sets their own, without new sip or recording targets, an admin anyone's. | user | no |
+| `users.setForwarding` | `PUT /api/v1/users/{id}/forwarding` | Replaces a user's call-forwarding rules as a whole; a user sets their own, without new sip, webSocket or recording targets, an admin anyone's. | user | no |
 | `users.setPresence` | `PUT /api/v1/users/{id}/presence` | Sets a user's do-not-disturb state. | user | no |
 | `users.setVoicemailGreeting` | `PUT /api/v1/users/{id}/voicemailGreeting` | Sets a user's personal voicemail greeting from a WAV or MP3 upload, as recording it on *96 does; over MCP, answers with a link to upload the file to. | user | no |
 | `users.update` | `PATCH /api/v1/users/{id}` | Updates a user's profile; admins write every field, a user only their self-service subset. | user | no |

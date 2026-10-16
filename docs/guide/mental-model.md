@@ -47,7 +47,7 @@ that single tenant; there is no cross-tenant sharing.
 
 Every place that routes a call somewhere else — a DID, a menu option, a forward rule, an
 out-of-office rule, a group fallback, an opening-hours closed target — points at one of the same
-eight target kinds:
+nine target kinds:
 
 | Kind               | Meaning                                                            |
 | ------------------ | ------------------------------------------------------------------ |
@@ -55,6 +55,7 @@ eight target kinds:
 | `ringGroup`        | rings that group, entering the routing pipeline                    |
 | `external`         | dials an external number through the outbound routes               |
 | `sip`              | dials a SIP address over one trunk, no outbound route (admin-only) |
+| `webSocket`        | hands the call to a voice bot over a WebSocket (admin-only)        |
 | `mailboxUser`      | deposits the caller directly in a user's mailbox, no ringing       |
 | `mailboxRingGroup` | deposits the caller directly in a ring group's mailbox, no ringing |
 | `announcement`     | plays an audio asset and ends the call                             |
@@ -67,6 +68,9 @@ through the outbound routes, and `sip`, `{ "kind": "sip", "trunkId": "…", "use
 `sip:<user>@<host>` at the trunk's own hosts, such as an AI agent's endpoint
 (`forward-to-ai-agent`). A `sip` leg tells the far end who called through the target's
 headers; either leg tells it who forwarded only as far as the trunk's `diversion` allows.
+`webSocket`, `{ "kind": "webSocket", "protocol": "twilio", "url": "wss://…" }`, hands the call to
+a voice bot that takes calls over a WebSocket, in the Twilio Media Streams or the Vonage protocol
+(`forward-to-voice-bot`); like `external` and `sip` it neither counts a hop nor re-enters.
 
 ## Where to look next
 

@@ -68,7 +68,7 @@ describe('field descriptions reach tools/list and the OpenAPI document', () => {
 
   it('describes each forward-target kind inside a target', () => {
     const variants = toolProperties('dids.create').target?.oneOf ?? [];
-    expect(variants).toHaveLength(8);
+    expect(variants).toHaveLength(9);
     for (const variant of variants) {
       expect(variant.properties?.kind?.description).toEqual(DESCRIBED);
     }

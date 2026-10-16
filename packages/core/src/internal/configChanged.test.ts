@@ -100,7 +100,8 @@ describe('POST /internal/configChanged and presence (§3.1, §10.2)', () => {
         presence,
         recorder: idleRecorder,
         trunks: idleTrunks,
-        version: resolveVersion({})
+        version: resolveVersion({}),
+        sessions: { resolve: () => null }
       },
       ANY_FREE_PORT
     );
@@ -174,7 +175,8 @@ describe('POST /internal/configChanged and presence (§3.1, §10.2)', () => {
             return Promise.resolve();
           }
         },
-        version: resolveVersion({})
+        version: resolveVersion({}),
+        sessions: { resolve: () => null }
       },
       ANY_FREE_PORT
     );

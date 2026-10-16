@@ -3,7 +3,7 @@
  * Please do not edit it manually.
  */
 
-import type { AudioKind, AuditChannel, BackupRunStatus, BackupTargetKind, CallDirection, CallerIdHeader, CallLogLevel, CallStatus, DeviceKind, DeviceTransport, DiversionPolicy, ForwardedCallerId, HostDirection, Language, LogLevelOverride, MailKind, MaintenanceWork, NumberFormat, OAuthClientKind, PresenceStatus, QosRole, RingGroupForwardCondition, RingStrategy, SmtpSecurity, SsoProvider, TokenKind, TrunkAuthMode, TrunkTransport, UserForwardCondition, UserRole, WebhookStatus } from "../columnValues.js";
+import type { AudioKind, AuditChannel, BackupRunStatus, BackupTargetKind, CallDirection, CallerIdHeader, CallLogLevel, CallStatus, DeviceKind, DeviceTransport, DiversionPolicy, ForwardedCallerId, HostDirection, Language, LogLevelOverride, MailKind, MaintenanceWork, NumberFormat, OAuthClientKind, PresenceStatus, QosRole, RingGroupForwardCondition, RingStrategy, SmtpSecurity, SsoProvider, TokenKind, TrunkAuthMode, TrunkTransport, UserForwardCondition, UserRole, WebhookStatus, WebSocketProtocol } from "../columnValues.js";
 import type { ColumnType } from "kysely";
 import type { CountryCode } from "libphonenumber-js";
 
@@ -174,6 +174,9 @@ export interface ForwardTargets {
   sipTrunkId: string | null;
   sipUser: string | null;
   userId: string | null;
+  webSocketProtocol: WebSocketProtocol | null;
+  webSocketSampleRate: number | null;
+  webSocketUrl: string | null;
 }
 
 export interface MailTemplates {

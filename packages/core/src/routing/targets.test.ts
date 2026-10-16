@@ -41,6 +41,9 @@ describe('targetFromRow', () => {
     sipTrunkId: 'trunk-1',
     sipUser: 'proj_1',
     sipHeaders: [{ name: 'X-Called', value: '{{calledExtension}}' }],
+    webSocketProtocol: null,
+    webSocketUrl: null,
+    webSocketSampleRate: null,
     mailboxUserId: null,
     mailboxRingGroupId: null,
     announcementAudioId: null,
@@ -72,5 +75,27 @@ describe('targetFromRow', () => {
         recordCalls: 1
       })
     ).toEqual({ kind: 'external', number: '+15557777', record: true });
+  });
+
+  // §9.4 "WebSocket targets": the three columns read as one target, recording when set.
+  it("reads a webSocket target's columns", () => {
+    expect(
+      targetFromRow({
+        ...sipRow,
+        sipTrunkId: null,
+        sipUser: null,
+        sipHeaders: null,
+        webSocketProtocol: 'vonage',
+        webSocketUrl: 'wss://bot.example/a',
+        webSocketSampleRate: 24000,
+        recordCalls: 1
+      })
+    ).toEqual({
+      kind: 'webSocket',
+      protocol: 'vonage',
+      url: 'wss://bot.example/a',
+      sampleRate: 24000,
+      record: true
+    });
   });
 });

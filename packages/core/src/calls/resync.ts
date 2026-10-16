@@ -96,7 +96,15 @@ function watchBridges(ari: AriClient, bridges: AdoptedBridge[]): void {
   ari.on('event', onEvent);
 }
 
-type Adopted = { bridged: number; parked: number; unbridged: number };
+type Adopted = {
+  bridged: number;
+  parked: number;
+  bots: number;
+  unbridged: number;
+};
+
+// The channel technology of a voice bot's media stream (§9.4 "WebSocket targets").
+const BOT_MEDIA_PREFIX = 'AudioSocket/';
 
 /**
  * Sorts the bridges Asterisk still holds into watched conversations and parked calls (§10.1 "Boot
@@ -116,8 +124,14 @@ async function adoptBridges(deps: ResyncDeps): Promise<Adopted> {
   ]);
   const handled = (channelId: string): boolean =>
     deps.pipeline.tracks(channelId);
+  const botMedia = new Set(
+    channels
+      .filter(channel => channel.name.startsWith(BOT_MEDIA_PREFIX))
+      .map(channel => channel.id)
+  );
   const watched: AdoptedBridge[] = [];
   const parked: AdoptedBridge[] = [];
+  const bots: AdoptedBridge[] = [];
   for (const bridge of bridges) {
     if (bridge.channels.some(handled)) {
       continue;
@@ -125,6 +139,8 @@ async function adoptBridges(deps: ResyncDeps): Promise<Adopted> {
     const adopted = { id: bridge.id, channels: new Set(bridge.channels) };
     if (bridge.name === PARKED_BRIDGE_NAME && adopted.channels.size === 1) {
       parked.push(adopted);
+    } else if (bridge.channels.some(id => botMedia.has(id))) {
+      bots.push(adopted);
     } else {
       watched.push(adopted);
     }
@@ -139,13 +155,14 @@ async function adoptBridges(deps: ResyncDeps): Promise<Adopted> {
     )
     .map(channel => channel.id);
   await Promise.all([
-    ...parked.map(bridge => tearDown(ari, bridge)),
+    ...[...parked, ...bots].map(bridge => tearDown(ari, bridge)),
     ...unbridged.map(id => ari.channels.hangup(id).catch(ignoreGone))
   ]);
   watchBridges(ari, watched);
   return {
     bridged: watched.length,
     parked: parked.length,
+    bots: bots.length,
     unbridged: unbridged.length
   };
 }

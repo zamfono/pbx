@@ -18,7 +18,9 @@ export default defineConfig(
       // its own `npm run check` and `npm test` gate it (mockup/README.md).
       'mockup/**',
       // Claude Code's local, gitignored working files, outside every TypeScript project.
-      '.claude/**'
+      '.claude/**',
+      // The integration voice bot: node in a test container, outside every TypeScript project.
+      'test/integration/scenarios/*.cjs'
     ]
   },
   eslint.configs.all,
@@ -116,6 +118,8 @@ export default defineConfig(
             'destination_link_first_leg',
             'destination_link_second_leg',
             'destination_type',
+            'duration_ms',
+            'external_host',
             'is_external',
             'peer_status',
             'replace_channel',

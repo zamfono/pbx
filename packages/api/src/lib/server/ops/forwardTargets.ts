@@ -7,11 +7,27 @@ import { OpError, type Context } from './types.js';
 
 /**
  * Whether only an `admin` or `owner` sets or keeps `target` (§10.3 "Forward targets"): a `sip`
- * target, which sends calls to whatever host its trunk names (§9.4 "SIP targets"), and an
+ * target, which sends calls to whatever host its trunk names (§9.4 "SIP targets"), a `webSocket`
+ * one, which sends a call's audio to whatever URL it names (§9.4 "WebSocket targets"), and an
  * `external` one that records (§10.2 "Recording semantics").
  */
 export function isAdminTarget(target: TargetSpec): boolean {
-  return target.kind === 'sip' || (target.kind === 'external' && target.record);
+  return (
+    target.kind === 'sip' ||
+    target.kind === 'webSocket' ||
+    (target.kind === 'external' && target.record)
+  );
+}
+
+/** Why a `user` may not hold the admin target `target` (`assertMayHoldTarget`). */
+function adminTargetRefusal(target: TargetSpec): string {
+  if (target.kind === 'sip') {
+    return 'a sip target is set by an admin';
+  }
+  if (target.kind === 'webSocket') {
+    return 'a webSocket target is set by an admin';
+  }
+  return 'a recording target is set by an admin';
 }
 
 /**
@@ -24,18 +40,13 @@ export function isAdminTarget(target: TargetSpec): boolean {
  */
 export function assertMayHoldTarget(ctx: Context, target: TargetSpec): void {
   if (isAdminTarget(target) && ctx.actor.role === 'user') {
-    throw new OpError(
-      HTTP_FORBIDDEN,
-      target.kind === 'sip'
-        ? 'a sip target is set by an admin'
-        : 'a recording target is set by an admin'
-    );
+    throw new OpError(HTTP_FORBIDDEN, adminTargetRefusal(target));
   }
 }
 
 /**
  * Inserts a `forward_targets` row for `input`, owned by the caller's rule, and returns its id;
- * 403s for a `sip` target a `user` may not set, 404s when `input` points at a row that is not
+ * 403s for an admin target a `user` may not set, 404s when `input` points at a row that is not
  * live (§5.9).
  */
 export async function createTarget(

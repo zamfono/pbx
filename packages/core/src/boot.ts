@@ -8,6 +8,7 @@ import type { AmiClient } from './ami/client.js';
 import { ApiClient } from './apiClient.js';
 import type { AriClient } from './ari/client.js';
 import type { Logger } from './ari/types.js';
+import { BotSessions } from './calls/botSessions.js';
 import { STASIS_WAIT_MS } from './calls/legOriginate.js';
 import { Pipeline } from './calls/pipeline.js';
 import { Recorder } from './calls/recording.js';
@@ -71,7 +72,8 @@ export function buildPipeline(deps: {
     apiClient: new ApiClient(env.apiInternalUrl),
     logger: log,
     trunkChannels: new TrunkChannels({ ari, state }),
-    presence: deps.presence
+    presence: deps.presence,
+    bots: new BotSessions(ari, new URL(env.ariUrl).hostname)
   });
   return { pipeline, cdr, recorder };
 }

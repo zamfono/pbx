@@ -31,7 +31,7 @@ type KnownAriEvent =
       { cause: number; cause_txt: string; tech_cause?: number }
     >
   | ChannelEvent<'ChannelStateChange'>
-  | ChannelEvent<'ChannelDtmfReceived', { digit: string }>
+  | ChannelEvent<'ChannelDtmfReceived', { digit: string; duration_ms?: number }>
   | ChannelEvent<'ChannelHangupRequest', { cause?: number; soft?: boolean }>
   | ChannelEvent<'ChannelLeftBridge'>
   | ChannelEvent<

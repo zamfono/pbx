@@ -66,7 +66,7 @@ export function forwardValues(
 /** The caller's name (§10.2 "Phone book"): the phone book's, else an internal caller's own user
  * name, else empty. A failed lookup is logged and reads as no name, since a header never holds
  * up a call. */
-async function callerNameOf(
+export async function callerNameOf(
   pipeline: Pipeline,
   call: Call,
   snapshot: Snapshot
