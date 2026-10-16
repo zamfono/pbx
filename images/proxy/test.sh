@@ -41,8 +41,11 @@ case "$caps" in
 esac
 
 echo "==> caddy version"
-run 'caddy version' | grep -q '^v2\.11\.4' \
-  || fail "caddy version does not start with v2.11.4, the pin in images/proxy/Dockerfile"
+# The expected version is the runtime stage's tag, read from the Dockerfile, which alone names it.
+want=$(sed -n 's/^FROM caddy:\([0-9.]*\) AS runtime$/\1/p' images/proxy/Dockerfile)
+[ -n "$want" ] || fail "images/proxy/Dockerfile has no 'FROM caddy:<version> AS runtime' line"
+run 'caddy version' | grep -Eq "^v${want//./\\.}( |$)" \
+  || fail "caddy version does not start with v$want, the runtime stage's tag in images/proxy/Dockerfile"
 
 echo "==> the caddy-events-exec plugin is built in"
 run 'caddy list-modules' | grep -x 'events.handlers.exec' >/dev/null \
