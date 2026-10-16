@@ -13,10 +13,6 @@
     $props();
 
   const text = $derived(`${companyName}\n\n${codes.join('\n')}\n`);
-  // A `data:` link downloads without any script, so the codes can be saved in every browser.
-  const download = $derived(
-    `data:text/plain;charset=utf-8,${encodeURIComponent(text)}`
-  );
   // The copy button needs the Clipboard API, so it appears only once the page runs in a browser.
   let scripted = $state(false);
   let copied = $state(false);
@@ -46,7 +42,13 @@
       {copied ? dict.copied : dict.copy}
     </button>
   {/if}
-  <a class="auth-link" href={download} download="recovery-codes.txt">
+  <!-- A `data:` link downloads without any script, so the codes can be saved in every browser. It
+       stays inline: svelte/no-navigation-without-resolve sees the absolute URL only there. -->
+  <a
+    class="auth-link"
+    href={`data:text/plain;charset=utf-8,${encodeURIComponent(text)}`}
+    download="recovery-codes.txt"
+  >
     {dict.download}
   </a>
 </div>

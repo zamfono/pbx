@@ -52,6 +52,12 @@ once all of these hold:
 The commit message says which advisory the exception is for and why it is reachable. A
 vulnerability the code cannot reach waits out the seven days like any other update.
 
+A package that a root dev dependency peers on, such as `vite` (vitest) or `svelte` (the eslint and
+prettier plugins), is declared in the root `package.json` only, never also in a workspace. When a
+workspace names it too, a bump of the workspace's range alone (Dependabot's, say) nests a second
+copy under `packages/<name>/node_modules` while the root's tools keep the old one; for `vite`, the
+`test` key that `vitest/config` adds to the root copy's types then fails `npm run typecheck`.
+
 ## Contributor license agreement
 
 Zamfono is licensed under AGPL-3.0 (`LICENSE`), and 3angular Solutions GmbH, which publishes it,

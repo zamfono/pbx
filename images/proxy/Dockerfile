@@ -9,9 +9,9 @@
 # `images/proxy/Dockerfile`, which alone names them"); Dependabot bumps them in a pull request
 # that passes CI (the docker ecosystem entry for /images/proxy, .github/dependabot.yaml), the
 # plugin's pin moves by hand.
-FROM caddy:2.11.4-builder AS build
+FROM caddy:2.11.6-builder AS build
 WORKDIR /build
-# The builder image bakes in CADDY_VERSION=v2.11.4 (matching the FROM tag) and XCADDY_SETCAP=1,
+# The builder image bakes in CADDY_VERSION matching its FROM tag and XCADDY_SETCAP=1,
 # so `xcaddy build --with …` alone builds that Caddy version with the plugin added and already
 # applies `setcap cap_net_bind_service=+ep` to the binary it produces — the same capability the
 # upstream image's binary carries, so Caddy can still bind :80/:443 without running as root. The
@@ -19,7 +19,7 @@ WORKDIR /build
 # — `gh api repos/mholt/caddy-events-exec/tags`); it ships one Go module, `events.handlers.exec`.
 RUN xcaddy build --with github.com/mholt/caddy-events-exec@v0.1.0 --output /build/caddy
 
-FROM caddy:2.11.4 AS runtime
+FROM caddy:2.11.6 AS runtime
 # Links the published package to its repository (§6.3 "Images").
 LABEL org.opencontainers.image.source=https://github.com/zamfono/pbx
 
@@ -55,7 +55,7 @@ ARG ZAMFONO_REVISION
 LABEL org.opencontainers.image.revision=$ZAMFONO_REVISION
 
 # Runs the hook once for the certificate Caddy already holds, then execs the upstream command
-# (zamfono-proxy-entrypoint). Setting ENTRYPOINT clears the CMD inherited from caddy:2.11.4, so it
+# (zamfono-proxy-entrypoint). Setting ENTRYPOINT clears the CMD inherited from the caddy image, so it
 # is restated.
 ENTRYPOINT ["/usr/local/bin/zamfono-proxy-entrypoint"]
 CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
