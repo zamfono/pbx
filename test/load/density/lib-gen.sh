@@ -95,7 +95,7 @@ gen_containers() {
     --network "$GEN_NET" --ip "$TRUNK_IP" --cap-add NET_RAW --init -v "$GEN_DIR:/load-gen" \
     --entrypoint sleep "$DEVICES_IMAGE" infinity >/dev/null || fail "could not start the trunk generator"
   gen docker run -d --name "$GEN_NAME-$si-dev" --label "$GEN_LABEL" --restart unless-stopped \
-    --network "$GEN_NET" --ip "$DEVICES_IP" --init -v "$GEN_DIR:/load-gen" \
+    --network "$GEN_NET" --ip "$DEVICES_IP" --add-host "$FQDN:$STACK_IPV4" --init -v "$GEN_DIR:/load-gen" \
     --entrypoint sleep "$DEVICES_IMAGE" infinity >/dev/null || fail "could not start the device generator"
 }
 
@@ -109,10 +109,11 @@ gen_devices_start() {
     kind=${creds##*/creds-}
     kind=${kind%.csv}
     if [ "$kind" = opus ]; then
-      # The account names the FQDN, which the certificate carries and baresip verifies against
-      # Caddy's local CA; the TLS connection goes to the stack's address (no DNS needed).
+      # The account and its outbound proxy name the FQDN, which the certificate carries and
+      # baresip (4.x checks the host it connects to) verifies against Caddy's local CA; the
+      # device container resolves it to the stack's address (gen_containers' --add-host).
       registrar="$FQDN:5061;transport=tls"
-      extra=";outbound=\"sip:$STACK_IPV4:5061;transport=tls\""
+      extra=";outbound=\"sip:$FQDN:5061;transport=tls\""
     else
       registrar="$STACK_IPV4:5060;transport=udp"
       extra=

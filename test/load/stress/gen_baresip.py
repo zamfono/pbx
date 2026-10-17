@@ -38,6 +38,7 @@ poll_method		epoll
 sip_listen		0.0.0.0:{port}
 rtp_ports		20000-60000
 sip_cafile		{cafile}
+dns_getaddrinfo		yes
 call_local_timeout	120
 call_max_calls		{max_calls}
 call_hold_other_calls	no
