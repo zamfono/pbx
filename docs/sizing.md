@@ -2,8 +2,8 @@
 
 Measurements of Zamfono under load with the harnesses in `test/load/`: one stack (one tenant),
 taken on 2026-09-23/24 (sections 1 and 2), and many stacks sharing one host in the macvlan mode,
-taken on 2026-10-14/15 (section 3). They complement the informative sizing envelope in the specification
-(§6.6), which puts the ceiling at about **50 concurrent bridged calls** with the shipped RTP range
+taken on 2026-10-14/15 on x86 and on 2026-10-17 on ARM (section 3). They complement the
+informative sizing envelope in the specification (§6.6), which puts the ceiling at about **50 concurrent bridged calls** with the shipped RTP range
 (201 ports) — every load step below reached its target concurrency, confirming that ceiling.
 
 In sections 1 and 2, CPU figures are **percent of one core** (100 % = one fully used core); in
@@ -39,6 +39,10 @@ The limit is CPU; RAM (about 1 GB plus 0.31 GB per stack) would allow about 80 s
 tenants fit fewer users, since every stack costs CPU even when idle. Such a host needs
 `fs.inotify.max_user_instances` raised (`deploy/README.md` step 3). Details in section 3.
 
+On any host with many stacks, keep about 0.2 GB per stack of RAM free for the nightly backups:
+every stack's default `backup_cron` fires at the same minute, and a host already near its RAM
+limit ran out of memory when they did (section 3, "Nightly backups").
+
 Hetzner's shared-vCPU servers (CPX) carry more per euro but lose about 10 % of their capacity in
 the evening, when their neighbours are busy; sized for the evening:
 
@@ -53,6 +57,20 @@ With tenants of 10 users or fewer, a CPX32 is limited by RAM to about 16 stacks.
 stack; its single vCPU has no reserve when a neighbour takes CPU away (section 3, "Shared
 vCPUs"). A CPX02 runs one stack too, with a slower and less steady vCPU than the CPX12's and about
 200 MB of RAM to spare.
+
+Hetzner's ARM servers (CAX, shared Ampere Altra vCPUs) run the linux/arm64 images. An Ampere vCPU
+gets through between half and three quarters of an AMD one's calls, but costs far less, so the CAX
+hosts carry the most users per euro. They lost no capacity in the evening, but varied by a few
+percent through the day; sized for the whole day:
+
+| Host                                    | Every call AMR-WB ⇄ Opus, ⅔ recorded | Realistic mix               |
+| --------------------------------------- | ------------------------------------ | --------------------------- |
+| CAX41 (16 shared vCPU, 32 GB)           | about 540 users / 127 calls          | about 750 users / 168 calls |
+| CAX31 (8 shared vCPU, 16 GB)            | about 240 users / 66 calls           | about 320 users / 83 calls  |
+| CAX21 (4 shared vCPU, 8 GB)             | about 80 users / 30 calls            | about 110 users / 37 calls  |
+| CAX11 (2 shared vCPU, 4 GB), one tenant | about 40 users / 20 calls            | about 55 users / 24 calls   |
+
+A CAX11 also runs two or three stacks of 10–20 users (20–40 users in all).
 
 ## Users and concurrent calls
 
@@ -341,12 +359,74 @@ idle pages out and CPU p95 rose rather than fell (worst mix 92 % against 78 %); 
 against the out-of-memory killer. The recommendation at the top keeps about 10 % below these
 daytime limits for the evening.
 
+### ARM: Hetzner CAX41, CAX31, CAX21, CAX11
+
+The same method on Hetzner's ARM servers (shared Ampere Altra vCPUs, Debian 13, Docker 29.9)
+running the published linux/arm64 images, all four loaded at the same time from one x86 generator
+(CCX43) in Nuremberg on Saturday 2026-10-17. The limit searches ran at night, 00:30–09:00 UTC:
+
+| Tenant size | CAX41 (16 vCPU, 30.5 GB), worst   | CAX41, realistic     | CAX31 (8 vCPU, 15.2 GB), worst | CAX31, realistic    |
+| ----------- | --------------------------------- | -------------------- | ------------------------------ | ------------------- |
+| 10 users    | 55 stacks / 550 users / 129 calls | 71 / 710 / 160 calls | 25 / 250 / 68 calls            | 34 / 340 / 87 calls |
+| 20 users    | 31 / 620 / 143 calls              | 43 / 860 / 189 calls | 14 / 280 / 74 calls            | 19 / 380 / 95 calls |
+| 50 users    | 14 / 700 / 158 calls              | 18 / 900 / 197 calls | 6 / 300 / 78 calls             | 9 / 450 / 109 calls |
+| 200 users   | 4 / 800 / 178 calls               | 5 / 1000 / 216 calls | 1 / 200 / 57 calls             | 2 / 400 / 99 calls  |
+
+| Tenant size | CAX21 (4 vCPU, 7.6 GB), worst  | CAX21, realistic     | CAX11 (2 vCPU, 3.7 GB), worst | CAX11, realistic    |
+| ----------- | ------------------------------ | -------------------- | ----------------------------- | ------------------- |
+| 10 users    | 9 stacks / 90 users / 32 calls | 13 / 130 / 41 calls  | 2 / 20 / 13 calls             | 3 / 30 / 16 calls   |
+| 20 users    | 5 / 100 / 34 calls             | 7 / 140 / 44 calls   | 1 / 20 / 13 calls             | 2 / 40 / 19 calls   |
+| 50 users    | 2 / 100 / 34 calls             | 3 / 150 / 46 calls   | —                             | —                   |
+| One tenant  | 152 users / 47 calls           | 224 users / 62 calls | 47 users / 21 calls           | 63 users / 25 calls |
+
+Every failing step failed on CPU: no call failed, loss stayed at most 0.01 % and jitter p95 at
+most 5 ms within the limits (19 ms above them). The next step up from each limit failed.
+
+**Against x86.** At the 20-user worst mix, the CAX41 carried 620 users where the CPX62 (16 vCPU)
+carried 860, the CAX31 280 where the CCX33 (8) carried 420, and the CAX21 100 where the CPX32 (4)
+carried 200: an Ampere vCPU does between half and three quarters of the work of an AMD one here.
+With two vCPUs, the CAX11 holds one tenant of 47 users where the one-vCPU CPX12 holds 32, and
+it runs a few small stacks where a CPX12 runs one. At the October 2026 list prices this is 1.7
+(CAX21 against CPX32) to 4.4 (CAX31 against CCX33) times the users per euro.
+
+**RAM.** Host RAM under load is about 1–3 GB plus 0.28–0.31 GB per stack of 10 or 20 users
+(0.38–0.44 GB for 50 users, whose stacks carry more calls), as on x86. It never set a limit, but
+came close with 10-user tenants: the CAX41 at 71 stacks used 73 %, the CAX31 at 34 stacks 74 %.
+
+**Time of day.** Each host's 20-user worst-mix limit (the CAX11's one stack of 20 users) was run
+again every hour until 22:00 UTC; a repeat that failed was followed by one step down:
+
+| Host  | Night limit | Repeats within budget, 05:00–22:00 UTC | One step down          | Within budget every time |
+| ----- | ----------- | -------------------------------------- | ---------------------- | ------------------------ |
+| CAX41 | 31 stacks   | 0 of 11 (70–76 %), from 11:30          | 27: 10 of 11 (65–71 %) | 27 stacks (once 70.7 %)  |
+| CAX31 | 14 stacks   | 13 of 17 (65–80 %)                     | 12: 4 of 4 (63–67 %)   | 12 stacks                |
+| CAX21 | 5 stacks    | 13 of 17 (63–72 %)                     | 4: 4 of 4 (57–61 %)    | 4 stacks                 |
+| CAX11 | 1 stack     | 17 of 17 (48–56 %)                     | —                      | 1 stack                  |
+
+The repeats over budget fell in the morning and afternoon as often as in the evening, by at most
+a few points of CPU (the CAX31's worst, 80 %, at 06:44); unlike the CPX hosts, the CAX hosts showed
+no evening slowdown. Steal stayed 0.0 % throughout. The limits that held all day are 13 %
+(CAX41), 14 % (CAX31) and 20 % (CAX21, one stack of five) below the night search; the
+recommendation at the top uses them, and for the CAX11's one tenant 10 % below its night limit.
+
+**Nightly backups.** Every stack's default `backup_cron` (`0 3 * * *`) fires at the same minute.
+At 03:00 UTC the CAX41 was running 73 stacks of 10 users with 164 calls at 74 % RAM: within 14 s
+the `api` containers grew by about 135 MB each (9.8 GB together), the host reached 99 % RAM with
+no swap, the OOM killer ended an Asterisk, and the host did not answer ssh for about 15 minutes.
+The CAX31's 11 stacks grew by 2.2 GB (200 MB each) at the same moment; neither host showed this at
+any other hour. Nothing in it is ARM-specific: a full host of any kind needs that much RAM free
+at backup time, or its stacks' backup times spread out.
+
 ### Caveats
 
 - One dedicated host type (CCX33); most of its cells ran once (the spreading steps twice). Treat
   differences below ~10 % as noise. The shared hosts were measured over one day and night, so their
   evening figures are a single evening. The CPX02 ran only the handful of daytime runs above, so
   its figures are an estimate against the CPX12 rather than a full search.
+- The ARM hosts were measured over a single Saturday: their search at night, their repeats in the
+  day and evening. A weekday's neighbour load may differ. One CAX31 search step (11 stacks of 50
+  users, realistic mix) overlapped the backup wave; it failed, and the cell's limit rests on other
+  steps.
 - No WAN between the hosts (no loss, latency or jitter of its own); baresip and sipp stand in for
   real phones and trunks.
 - Calls were inbound only; transfers, ring groups, voicemail and outbound calls were not part of
@@ -408,6 +488,9 @@ docker buildx bake --load` in a checkout there) and the sipp image; the generato
     `GEN_PREFIX` (the shared-vCPU runs used 10.101/10.98, 10.102/10.97 and 10.103/10.96, each pair
     routed by the Cloud Network); the stock images then come from `ghcr.io/zamfono/*:<version>`,
     retagged as `zamfono/*:density`.
+  - An arm64 target with an x86 generator (the ARM runs, 10.101–10.104 with 10.98–10.95): build
+    the devices image on each host (`docker build -t zamfono/test-devices:density
+test/load/stress/devices`), so the generator has its own instead of a copy of the target's.
   - The per-call figures of section 3: one stack, `N=1 USERS=400 DEVICES=1
 MIX=alaw:1,g722:1,opus:2 RTP_PORT_END=11199 CALL_S=150`, `STEPS` P1-P4 each at 10, 25, 50 and
     100 calls, once with `REC_SHARE=0` and once with `0.67`.
