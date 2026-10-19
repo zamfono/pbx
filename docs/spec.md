@@ -129,7 +129,7 @@ Three long-running application services run per stack, plus the TLS proxy, the `
 
 **Codecs:** tenant default `settings.codecs_json`, per-trunk override `trunks.codecs_json` (§9.4, §11.4); default Opus, G.722, G.711 A-law — the image ships `opus`, `g722`, `amrwb`, `amr`, `alaw`, `ulaw`; "HD Voice" comes from the default order
 
-**Container base:** `asterisk` on Debian 13 (`trixie`) slim, installing from the Zamfono APT repository (built by the sibling `asterisk-builder` repo for Debian 13); `migrate`, `api` and `core` on `node:26-slim`, so `better-sqlite3` and `argon2` use glibc prebuilds; `updater` on `node:26-alpine`, which needs no native modules; `proxy` on the official Caddy image (§6.3 "Images")
+**Container base:** `asterisk` on Debian 13 (`trixie`) slim, installing from the Zamfono APT repository; `migrate`, `api` and `core` on `node:26-slim`, so `better-sqlite3` and `argon2` use glibc prebuilds; `updater` on `node:26-alpine`, which needs no native modules; `proxy` on the official Caddy image (§6.3 "Images")
 
 **Container runtime:** Docker Engine with Compose v2, or Podman ≥ 5 with `podman compose` — the stack is one Compose Specification file; CI brings it up on both runtimes (§6.3, §8)
 

@@ -8,9 +8,8 @@
 # the harness can encode the trunk side's AMR-WB pcap (make_amrwb_pcap.py), which neither the
 # host's nor the api image's ffmpeg can.
 #
-# baresip comes from the Zamfono APT repository (built by the sibling asterisk-builder repo for
-# Debian 13, amd64 and arm64; same archive keyring as images/asterisk): Debian ships baresip 1.1.0
-# in every suite. The package puts its modules under the multiarch libdir; the symlink gives the
+# baresip comes from the Zamfono APT repository (same archive keyring as images/asterisk): Debian
+# ships baresip 1.1.0 in every suite. The package puts its modules under the multiarch libdir; the symlink gives the
 # harness's configs one module_path for amd64 and arm64.
 FROM debian:trixie-slim
 RUN apt-get update \

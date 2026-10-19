@@ -5,7 +5,7 @@ FROM debian:trixie-slim
 # read what a RUN installed.
 LABEL org.opencontainers.image.source=https://github.com/zamfono/pbx
 
-# Zamfono APT repository (built by the sibling asterisk-builder repo for Debian 13, spec §4):
+# Zamfono APT repository (spec §4):
 # fetch its archive keyring package, register the source, install Asterisk 22 plus the module
 # and sound packages the stack needs (spec §9.1, §9.3, §9.4), and nftables and inotify-tools for
 # the ban helper (§5.6). ca-certificates stays installed:
