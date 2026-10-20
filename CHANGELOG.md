@@ -11,6 +11,17 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+## [0.6.3] - 2026-10-20
+
+### Fixed
+
+- A call that Asterisk transcodes could lose one side's audio for the rest of the call when that
+  far end switched its RTP source and the new stream's sequence numbers started a little below
+  the old one's, as a carrier's media gateway can between early media and the answer. A caller a
+  voice bot transferred to a mobile number, for example, heard nothing from them. Nothing was
+  logged. The cause was a Debian patch to Asterisk's translator; the Asterisk image now installs
+  Zamfono's Asterisk 22.10.1 package built without it (`+zamfono13.2`).
+
 ## [0.6.2] - 2026-10-20
 
 ### Added
@@ -715,7 +726,8 @@ The first 0.2 release; its `v0.2.0` tag was never published.
 
 The first tagged version, before any deployment.
 
-[Unreleased]: https://github.com/zamfono/pbx/compare/v0.6.2...HEAD
+[Unreleased]: https://github.com/zamfono/pbx/compare/v0.6.3...HEAD
+[0.6.3]: https://github.com/zamfono/pbx/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/zamfono/pbx/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/zamfono/pbx/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/zamfono/pbx/compare/v0.5.0...v0.6.0
