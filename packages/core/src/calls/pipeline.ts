@@ -20,6 +20,12 @@ import type { PipelineDeps } from './pipelineDeps.js';
 import { followTransfers } from './referTransfers.js';
 import { refuseCall, startsCall, WindDowns } from './windDown.js';
 
+// §7 level `qos`: the events that change where a channel's media goes, which sample it at once.
+const BRIDGE_MOVES: ReadonlySet<string> = new Set([
+  'ChannelEnteredBridge',
+  'ChannelLeftBridge'
+]);
+
 // One Pipeline per `core` process, wired directly to its `AriClient`'s event stream so
 // constructing it is the only wiring a caller needs to do, the transfers Asterisk executes on SIP
 // `REFER` included. The live state below is public so the call modules' functions, taking the
@@ -152,7 +158,8 @@ export class Pipeline {
    * §7 level `qos`: a call's channels are noted before and after each of its events is handled,
    * since handling one may take a leg out of the call (a leg the caller's hangup ends) and put
    * one in (a leg answering), and a channel's own `ChannelDestroyed` is handed on with the
-   * `RTPAUDIOQOS` it carries once that note is taken.
+   * `RTPAUDIOQOS` it carries once that note is taken. A channel joining or leaving a bridge has
+   * the media of the calls it is in sampled at once, before and after.
    */
   private async routeEvent(ev: AriEvent): Promise<void> {
     const channel = ev.channel;
@@ -172,6 +179,9 @@ export class Pipeline {
       if (call !== undefined) {
         this.deps.cdr.noteQosLegs(call);
       }
+    }
+    if (BRIDGE_MOVES.has(ev.type)) {
+      this.deps.cdr.sampleMedia([before, after], ev.type);
     }
   }
 

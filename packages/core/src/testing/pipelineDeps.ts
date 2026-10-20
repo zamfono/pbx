@@ -49,6 +49,7 @@ export function noopCdr(): PipelineDeps['cdr'] {
     finish: () => Promise.resolve(),
     noteQosLegs: () => undefined,
     channelEnded: () => Promise.resolve(),
+    sampleMedia: () => undefined,
     dialogs: {
       registerLeg: () => undefined,
       joinLeg: () => Promise.resolve()

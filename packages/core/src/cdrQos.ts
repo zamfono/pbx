@@ -7,7 +7,8 @@
  * channel is hung up, ARI's `DELETE /channels/{id}` before its hangup request), and publishes
  * the channel's `ChannelDestroyed` only after that; ari.conf's `channelvars` makes every event
  * carry the variable in `channel.channelvars`. So each leg's row comes from its own
- * `ChannelDestroyed`, pushed to the core, and nothing reads a channel's statistics while it runs.
+ * `ChannelDestroyed`, pushed to the core, and from no statistics read while it runs (those go to
+ * the call's log alone, `mediaTimeline.ts`).
  *
  * Which calls a channel's row belongs to is noted while the channel is part of them (`note`):
  * the caller's own channel from the start, a leg once it is up. A channel may end before its call

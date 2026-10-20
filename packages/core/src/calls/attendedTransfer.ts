@@ -73,6 +73,7 @@ export function handOver(
     }
     pipeline.registerCall(consultation);
     callPartiesChanged(pipeline.deps, consultation);
+    pipeline.deps.cdr.sampleMedia([consultation], 'onward');
     return;
   }
   const leg = consultation.legs.get(secondLeg);
@@ -96,6 +97,7 @@ export function handOver(
       : { targetRecords: transferee.targetRecords })
   });
   callPartiesChanged(pipeline.deps, consultation);
+  pipeline.deps.cdr.sampleMedia([consultation], 'onward');
 }
 
 /** A `link` join: the transferee moves into the consultation's bridge and the Local pair ends. */

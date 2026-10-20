@@ -126,6 +126,7 @@ export async function startOnwardCall(
     snapshot.settings.language
   );
   child.log.event({ event: 'entry', ...entry.trace, parentCallId: parent.id });
+  pipeline.deps.cdr.sampleMedia([child], 'onward');
   route(child).catch(
     logFailure(pipeline.deps.logger, 'onward routing', { callId: child.id })
   );

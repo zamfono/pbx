@@ -5,7 +5,12 @@ import { HTTP_NOT_FOUND, HTTP_OK } from '@zamfono/shared';
 
 import { splitResource, type RouteResult } from './fakeHttp.js';
 
-export type Bridge = { id: string; name: string; channels: string[] };
+export type Bridge = {
+  id: string;
+  name: string;
+  technology: string;
+  channels: string[];
+};
 
 function routeBridgeAction(
   method: string,
@@ -50,6 +55,8 @@ export function routeBridge(
     const bridge: Bridge = {
       id: params.bridgeId ?? randomUUID(),
       name: params.name ?? '',
+      // What Asterisk picks for a mixing bridge of two channels whose media it relays.
+      technology: 'simple_bridge',
       channels: []
     };
     bridges.set(bridge.id, bridge);

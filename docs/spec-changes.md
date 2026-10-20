@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-20 · §7 Per-call diagnostics level.** Level `qos` adds a media timeline to `calls.log`: while the call runs, each of its channels with a `call_qos` row is sampled over ARI about every 2 s and at once on a bridge join or leave, the core closing the call (the call a transfer ends) and a transferee's onward call starting, each sample a `media` line with the packets sent and received since the previous sample, the remote and local RTP addresses, the read and write formats and the bridge with its technology.
+*Why:* `qos` stored only each leg's totals at hang-up, which show that Asterisk stopped sending but not when, where to or in which bridge, and an admin cannot reach Asterisk's CLI inside the stack, so a fault such as no audio to a caller after a bot's transfer (TASK-68) could not be diagnosed from what the call left behind (TASK-69). Kept at `qos` rather than a new level, since `qos` already means media quality and has the overrides with their expiry.
+
 **2026-10-20 · §10.3 Extensions & DIDs.** `PATCH /dids/{id}` edits a DID's label as well as its target; only `number` stays immutable, like a block's `base`.
 *Why:* a label is read only when a call needs it (the `Diversion` name, `{{forwardedByName}}`, `didLabel`), so nothing stops it changing, and number blocks already allowed it; renaming a number meant deleting and recreating it, after unbinding it as main number and caller ID. The product owner: "Is it really impossible to update a number's label after it has been created?", then "yes, please".
 

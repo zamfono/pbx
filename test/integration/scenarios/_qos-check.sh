@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # §7 level `qos`, §11 `call_qos`: the newest call in the history, answered and bridged, has one
-# row per leg, the caller's and the callee's, however the call ended. The core reads no channel's
-# statistics while a call runs; each row is what Asterisk set on its leg as it hung up, pushed
-# with the leg's ChannelDestroyed, so the trunk side hanging up first still has its row.
+# row per leg, the caller's and the callee's, however the call ended. No row comes from the
+# statistics the core samples while a call runs (its media timeline, which goes to the log); each
+# is what Asterisk set on its leg as it hung up, pushed with the leg's ChannelDestroyed, so the
+# trunk side hanging up first still has its row.
 # sipp sends no RTCP, so a round trip is never measured here: it is held to be null or a real
 # one, never a 0 standing in for an unmeasured one. Jitter and loss are measured on a leg that
 # received RTP; with `measured`, the scenario's sides both played audio (sipp's pcap), so every

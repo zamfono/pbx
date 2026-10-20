@@ -153,9 +153,10 @@ export async function closeCall(
   hangup: 'all' | readonly string[],
   callerCause?: number
 ): Promise<void> {
-  // §7: the channels whose `call_qos` rows this call has are noted before the legs below stop
-  // counting as up.
+  // §7: the channels whose `call_qos` rows this call has are noted, and their media sampled, before
+  // the legs below stop counting as up: a transfer's call the transferee leaves closes here.
   pipeline.deps.cdr.noteQosLegs(call);
+  pipeline.deps.cdr.sampleMedia([call], 'close');
   traceSystemEnd(call);
   if (call.depositing === true) {
     // §10.2 "Voicemail": a caller in a mailbox deposit is hung up like one ending the message

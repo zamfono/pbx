@@ -139,7 +139,10 @@ export type BridgesApi = {
   addChannel: (bridgeId: string, channelId: string) => Promise<void>;
   removeChannel: (bridgeId: string, channelId: string) => Promise<void>;
   destroy: (bridgeId: string) => Promise<void>;
-  list: () => Promise<{ id: string; name: string; channels: string[] }[]>;
+  /** `technology` is the bridge's mixing technology (simple_bridge, softmix, native_rtp, …). */
+  list: () => Promise<
+    { id: string; name: string; technology: string; channels: string[] }[]
+  >;
   startMoh: (bridgeId: string, mohClass?: string) => Promise<void>;
   play: (bridgeId: string, media: string) => Promise<{ id: string }>;
 };

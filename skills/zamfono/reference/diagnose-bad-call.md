@@ -72,6 +72,16 @@ arguments:
      `txPackets` counts what Asterisk sent, not what arrived. The far end hears nothing while its
      own leg reads a healthy `txPackets`; ask the person on that side, or read the other leg's
      `rxPackets`, which shows whether audio reached Asterisk to be relayed at all.
+   - At `qos` the log also holds each leg's media timeline, one `media` line about every 2 s and
+     one at each bridge join or leave, transfer (`on`: `close` in the call left, `onward` in the
+     next) and call close: the packets `sent` and `received` since the previous line, `rtpDest`
+     (the far end's address Asterisk sends to; with symmetric RTP, the one the far end's packets
+     came from) and `rtpSrc` (Asterisk's own), `readFormat` and
+     `writeFormat`, and the `bridgeId` with its `bridgeTechnology`. `sent` dropping to 0 shows
+     when Asterisk stopped sending and, by the lines around it, in which bridge; an `rtpDest` that
+     is a private address of a device behind NAT, or one that changes mid-call, points at NAT; a
+     leg in no bridge, or in a different bridge from its peer, is not connected to it; a
+     `readFormat` differing from the peer's `writeFormat` is a transcoding bridge.
 4. For a trunk suspected of failing calls outbound, check `trunks.get` (`GET /api/v1/trunks/{id}`)
    for its registration and reachability status before reading its call log; an `unreachable` trunk
    is skipped in trunk-order failover and in emergency-call dialling alike, and a trunk without

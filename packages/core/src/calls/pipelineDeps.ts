@@ -31,6 +31,8 @@ export type PipelineDeps = {
     noteQosLegs(call: Call): void;
     /** §7 level `qos`: a channel's `ChannelDestroyed`, carrying its `RTPAUDIOQOS`. */
     channelEnded(channel: Channel): Promise<void>;
+    /** §7 level `qos`: samples the calls' media at once, `on` naming what prompted it. */
+    sampleMedia(calls: Iterable<Call | undefined>, on: string): void;
     /** §7: joins a leg's SIP dialog to its call (`callDialogs.ts`). */
     dialogs: {
       registerLeg(call: Call, channelId: string): void;

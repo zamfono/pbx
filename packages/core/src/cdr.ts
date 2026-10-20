@@ -18,6 +18,7 @@ import { QosRows } from './cdrQos.js';
 import type { EventBus } from './internal/eventBus.js';
 import type { ConfigCache } from './internal/snapshot.js';
 import type { StateStore } from './internal/stateStore.js';
+import { MediaTimeline } from './mediaTimeline.js';
 import { RtcpQos } from './rtcpQos.js';
 
 type CdrWriterDeps = {
@@ -77,6 +78,9 @@ export class CdrWriter {
 
   private readonly qos: QosRows;
 
+  /** §7 level `qos`: each call's media timeline. */
+  private readonly media: MediaTimeline;
+
   /** §7: each channel's SIP dialog joined to its call and its RTCP reports to the channel. */
   readonly dialogs: CallDialogs;
 
@@ -97,6 +101,7 @@ export class CdrWriter {
       rtcp
     );
     this.dialogs = new CallDialogs(deps.ari, rtcp, deps.log);
+    this.media = new MediaTimeline(deps.ari, deps.log, deps.now);
     // §7 level `qos`: a `ChannelDestroyed` sent while the connection was down never arrives.
     deps.ari.on('connected', () => {
       this.qos.resync().catch(logFailure(this.deps.log, 'qos resync'));
@@ -119,6 +124,7 @@ export class CdrWriter {
         : this.dialogs.joinLeg(call, call.callerChannelId);
     // §7 level `qos`: the caller's channel has a `call_qos` row from the start.
     this.qos.note(call);
+    this.media.track(call);
     if (call.log.level === 'sip') {
       await joined;
     }
@@ -154,6 +160,7 @@ export class CdrWriter {
       return;
     }
     this.finished.add(call);
+    await this.media.settled(call);
     if (call.log.level === 'sip') {
       await new Promise(resolve => {
         setTimeout(resolve, this.deps.sipTailMs ?? SIP_TAIL_MS);
@@ -202,6 +209,15 @@ export class CdrWriter {
   /** A channel's `ChannelDestroyed`: the `call_qos` row its `RTPAUDIOQOS` gives, for each call it
    * was noted for (§7 level `qos`). The notes are taken synchronously; the write settles later. */
   channelEnded(channel: Channel): Promise<void> {
+    this.media.forget(channel.id);
     return this.qos.channelEnded(channel);
+  }
+
+  /** Samples the media of `calls` still open now, `on` naming what prompted it (§7 level `qos`);
+   * each call's log waits for the sample before it is written. */
+  sampleMedia(calls: Iterable<Call | undefined>, on: string): void {
+    this.media
+      .sample(calls, on)
+      .catch(logFailure(this.deps.log, 'media sample'));
   }
 }

@@ -108,6 +108,7 @@ export async function handleOutbound(
       event: 'transferredFrom',
       parentCallId: transfer.parentCallId
     });
+    pipeline.deps.cdr.sampleMedia([call], 'onward');
   }
   call.log.event({ event: 'entry', dialAction: action.kind, dialed });
   markCallerInCall(pipeline, call, action);

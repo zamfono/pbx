@@ -4,7 +4,9 @@
 # with its target; the admin's transfer naming the caller's leg was accepted. The call closed
 # answered with the transfer in its trace, and its log holds the BYE that released the SIP
 # target's side and the target's 200 to it (§7 level `sip`). The caller's onward call, linked to
-# it through `parent_call_id`, was answered by 101.
+# it through `parent_call_id`, was answered by 101. The transferred caller's media timeline (§7
+# level `qos`, which `sip` adds to) runs through both: the call it left sampled it as it closed,
+# and the onward call as it started and while it ran, in 101's bridge at least once.
 set -euo pipefail
 
 api_base=$1
@@ -17,14 +19,19 @@ read -r call_id leg_id <<<"$(bash "$here/_api-control-check.sh" 1)"
 parent=$(await_ended_call "$call_id" 15)
 # At level `sip` the onward call, like every call, reaches the history a few seconds after it ends.
 poll 15 1 onward_ended "$call_id" || { echo "the onward call of $call_id never ended" >&2; exit 1; }
-PYTHONPATH="$here" python3 - "$parent" "$(api GET /calls)" \
-  "$(cat "$(state_file api-control.legs)")" "$leg_id" "$(user_with_ext 101)" \
-  "$(trunk_named ci-trunk)" <<'PY'
+calls=$(api GET /calls)
+child_id=$(python3 -c '
+import json, sys
+print(next(c["id"] for c in json.loads(sys.argv[1])["items"] if c["parentCallId"] == sys.argv[2]))
+' "$calls" "$call_id")
+PYTHONPATH="$here" python3 - "$parent" "$calls" \
+  "$(cat "$(state_file api-control.legs)")" "$(api GET "/calls/$child_id")" "$leg_id" \
+  "$(user_with_ext 101)" "$(trunk_named ci-trunk)" <<'PY'
 import json, re, sys
 from _call_trace import trace
 
-parent, calls, legs = (json.loads(arg) for arg in sys.argv[1:4])
-leg_id, member, trunk = sys.argv[4:7]
+parent, calls, legs, onward = (json.loads(arg) for arg in sys.argv[1:5])
+leg_id, member, trunk = sys.argv[5:8]
 
 problems = []
 roles = [(leg["role"], leg.get("trunkId"), "userId" in leg, bool(leg.get("target")))
@@ -50,6 +57,20 @@ if child is None:
 elif child["status"] != "answered" or child["answeredByUserId"] != member:
     problems.append("the onward call ended %s, answered by %s, not by 101"
                     % (child["status"], child["answeredByUserId"]))
+transferee = next((l.get("transferee") for l in trace(parent) if l.get("event") == "transfer"),
+                  None)
+def timeline(call):
+    return [l for l in trace(call) if l.get("event") == "media" and l.get("channelId") == transferee]
+if not [l for l in timeline(parent) if l.get("on") == "close"]:
+    problems.append("the call the caller left has no media sample of the caller as it closed")
+caller_media = timeline(onward)
+if not [l for l in caller_media if l.get("on") == "onward"]:
+    problems.append("the onward call has no media sample of the caller as it started")
+if not [l for l in caller_media if "on" not in l and l.get("bridgeId") and l.get("bridgeTechnology")
+        and isinstance(l.get("sent"), int) and l.get("readFormat") and l.get("rtpDest")]:
+    problems.append("the onward call's timeline has no periodic sample of the caller in a bridge, "
+                    "with its counters, formats and RTP address: %s" % caller_media)
+print("media timeline of the transferred caller in %s: %s" % (onward["id"], caller_media))
 if problems:
     sys.exit("; ".join(problems) + ": " + json.dumps(parent)[:1200])
 PY
