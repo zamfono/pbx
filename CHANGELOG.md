@@ -11,6 +11,13 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+### Fixed
+
+- Opus calls conceal lost packets again, with Opus's own packet-loss concealment and forward
+  error correction, which 0.6.3's Asterisk had lost along with the translator patch it left out.
+  The Asterisk image now installs Zamfono's Asterisk 22.10.1 package with a fixed version of that
+  patch (`+zamfono13.3`), which keeps the audio of a far end that switches its RTP source.
+
 ## [0.6.3] - 2026-10-20
 
 ### Fixed
