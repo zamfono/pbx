@@ -11,6 +11,8 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+## [0.6.4] - 2026-10-20
+
 ### Fixed
 
 - Opus calls conceal lost packets again, with Opus's own packet-loss concealment and forward
@@ -733,7 +735,8 @@ The first 0.2 release; its `v0.2.0` tag was never published.
 
 The first tagged version, before any deployment.
 
-[Unreleased]: https://github.com/zamfono/pbx/compare/v0.6.3...HEAD
+[Unreleased]: https://github.com/zamfono/pbx/compare/v0.6.4...HEAD
+[0.6.4]: https://github.com/zamfono/pbx/compare/v0.6.3...v0.6.4
 [0.6.3]: https://github.com/zamfono/pbx/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/zamfono/pbx/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/zamfono/pbx/compare/v0.6.0...v0.6.1
