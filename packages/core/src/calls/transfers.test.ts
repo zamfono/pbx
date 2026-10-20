@@ -127,6 +127,8 @@ describe('transfers', () => {
     call.didId = (
       await db.selectFrom('dids').select('id').executeTakeFirstOrThrow()
     ).id;
+    // An override raised the call's level above the tenant's `events` (§7).
+    call.log.raise('qos');
 
     fakeAri.emit({
       type: 'BridgeBlindTransfer',
@@ -181,6 +183,8 @@ describe('transfers', () => {
     });
     expect(child?.id).not.toBe(call.id);
     expect(child?.parentCallId).toBe(call.id);
+    // §7: the onward call records at least at its parent's level.
+    expect(child?.log.level).toBe('qos');
     // The same row a transfer over the API gives the original inbound caller: still inbound,
     // through the parent's DID, and without a calling user.
     expect(child?.direction).toBe('inbound');
@@ -472,11 +476,15 @@ describe('transfers', () => {
       'PJSIP/e101-a-00000002'
     );
     const bridgeId = call.bridgeId ?? '';
+    // An override raised the call's level above the tenant's `events` (§7).
+    call.log.raise('qos');
 
     const child = await transferCall(pipeline, call, {
       target: '102',
       actorUserId: transferrerId
     });
+    // §7: the onward call records at least at its parent's level.
+    expect(child.log.level).toBe('qos');
     // The child call rings the target in the background, which answers `answerAfterMs` later.
     await eventually(() => {
       expect(originatedEndpoints().at(-1)).toMatchObject({
@@ -689,6 +697,8 @@ describe('transfers', () => {
       transferrerId,
       targetId
     );
+    // An override raised the original's level above the tenant's `events` (§7).
+    original.call.log.raise('sip');
     const bridge2 = consultation.bridgeId ?? '';
     // Asterisk merged the two bridges into the consultation's.
     await ari.bridges.removeChannel(bridge2, secondId);
@@ -715,6 +725,8 @@ describe('transfers', () => {
     expect(originalRow.endedAt).not.toBeNull();
     expect(originalRow.log).toContain('"event":"attendedTransfer"');
     expect(consultation.parentCallId).toBe(original.call.id);
+    // §7: the consultation carrying the conversation on records at least at its parent's level.
+    expect(consultation.log.level).toBe('sip');
     expect(consultation.bridgeId).toBe(bridge2);
     expect(pipeline.callByChannel.get(original.callerId)).toBe(consultation);
     expect(pipeline.callByChannel.has(secondId)).toBe(false);

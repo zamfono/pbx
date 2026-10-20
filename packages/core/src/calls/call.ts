@@ -174,6 +174,14 @@ export function newCall(params: NewCallParams): Call {
   };
 }
 
+/** Makes `child` a row of `parent`'s (`parent_call_id`): a transfer's onward call, a `*5` added
+ * leg, an attended transfer's consultation. It records at least at `parent`'s level (§7), so a
+ * conversation watched at a level stays watched at it wherever it goes on. */
+export function linkParent(child: Call, parent: Call): void {
+  child.parentCallId = parent.id;
+  child.log.raise(parent.log.level);
+}
+
 /** The caller's own channel of a call routed from one: every step that answers, plays to, records
  * or bridges the caller runs only for such a call, never for one with no caller channel. */
 export function callerChannel(call: Call): string {

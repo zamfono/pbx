@@ -17,7 +17,7 @@ import { logFailure } from '../ari/failures.js';
 import { ActionError, notBridged } from './actionError.js';
 import { dialAddPartyTarget } from './addParty.js';
 import { resolveAddedTarget } from './addPartyTarget.js';
-import { newCall, type Call } from './call.js';
+import { linkParent, newCall, type Call } from './call.js';
 import { ownBridge, transferrerChannel } from './callLookup.js';
 import { extensionOf } from './extensionOwner.js';
 import { settleStatus } from './missedCall.js';
@@ -136,7 +136,7 @@ export async function addPartyOnRequest(
     throw notBridged();
   }
   const leg = await newAddedLeg(pipeline, call, byChannelId, req, 'addParty');
-  leg.parentCallId = call.id;
+  linkParent(leg, call);
   dialAddedLeg(pipeline, leg, bridgeId, req.target, () => {
     call.threeWayInitiatorChannelId = byChannelId;
   });

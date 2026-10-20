@@ -86,6 +86,7 @@ async function onBlindTransfer(
       const { userId, targetRecords } = transfereeOf(call, transferee.id);
       setPendingTransfer(pipeline, diallingHalf ?? transferee.id, {
         parentCallId: call.id,
+        parentLogLevel: call.log.level,
         transferrerUserId,
         transfereeUserId: userId,
         ...(targetRecords === undefined

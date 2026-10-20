@@ -18,7 +18,7 @@ import { logFailure, logUnlessGone } from '../ari/failures.js';
 import { ActionError } from './actionError.js';
 import { dialAddedLeg, newAddedLeg } from './addedParty.js';
 import { handOver } from './attendedTransfer.js';
-import type { Call } from './call.js';
+import { linkParent, type Call } from './call.js';
 import { ownBridge } from './callLookup.js';
 import { callUp } from './callState.js';
 import { consultationLive, endHold, holdOf, holdParty } from './hold.js';
@@ -112,7 +112,7 @@ export async function transferToConsultation(
     actorUserId: req.actorUserId,
     parentCallId: call.id
   });
-  consultation.parentCallId = call.id;
+  linkParent(consultation, call);
   // A conversation of its own from here on, ended by either of its two parties leaving.
   delete consultation.addedLeg;
   handOver(pipeline, consultation, consultation.callerChannelId, transferee);

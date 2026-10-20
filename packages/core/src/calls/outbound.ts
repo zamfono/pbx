@@ -90,6 +90,10 @@ export async function handleOutbound(
     call.callerTargetRecords = transfer.transfereeTargetRecords;
   }
   call.parentCallId = transfer?.parentCallId ?? null;
+  if (transfer !== null) {
+    // §7: an onward call records at least at its parent's level, as `linkParent` has it.
+    call.log.raise(transfer.parentLogLevel);
+  }
   call.didId = transfer?.didId ?? null;
   const asUser =
     transfer === null ? call.callerUserId : transfer.transferrerUserId;

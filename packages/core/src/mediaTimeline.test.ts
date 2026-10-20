@@ -61,12 +61,18 @@ function mediaLines(call: Call): Record<string, unknown>[] {
 }
 
 describe('MediaTimeline', () => {
-  it('logs each sample with the packets since the previous one, where the RTP goes, the formats and the bridge', async () => {
+  it('logs each sample with the packets since the previous one, the RTP addresses, SSRCs, encryption and hold, the formats and the bridge', async () => {
     const variables = new Map([
       ['caller:CHANNEL(rtcp,txcount)', '100'],
       ['caller:CHANNEL(rtcp,rxcount)', '90'],
       ['caller:CHANNEL(rtp,dest)', '203.0.113.5:4000'],
       ['caller:CHANNEL(rtp,src)', '10.0.0.2:10000'],
+      ['caller:CHANNEL(rtcp,local_ssrc)', '1234567'],
+      ['caller:CHANNEL(rtcp,remote_ssrc)', '7654321'],
+      ['caller:CHANNEL(rtp,secure)', '1'],
+      ['caller:CHANNEL(rtp,hold)', '0'],
+      ['caller:CHANNEL(onhold)', '0'],
+      ['caller:CHANNEL(audionativeformat)', '(g722)'],
       ['caller:CHANNEL(audioreadformat)', 'g722'],
       ['caller:CHANNEL(audiowriteformat)', 'alaw']
     ]);
@@ -94,6 +100,12 @@ describe('MediaTimeline', () => {
         received: 90,
         rtpSrc: '10.0.0.2:10000',
         rtpDest: '203.0.113.5:4000',
+        localSsrc: '1234567',
+        remoteSsrc: '7654321',
+        secure: true,
+        rtpHold: false,
+        onHold: false,
+        nativeFormat: 'g722',
         readFormat: 'g722',
         writeFormat: 'alaw',
         bridgeId: 'b1',

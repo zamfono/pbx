@@ -10,7 +10,7 @@ import { newId, type CallLogLevel } from '@zamfono/shared';
 import { logFailure } from '../ari/failures.js';
 import { userById, type Snapshot } from '../internal/snapshot.js';
 import { setChannelLanguage } from '../prompts.js';
-import { newCall, type Call, type Transferee } from './call.js';
+import { linkParent, newCall, type Call, type Transferee } from './call.js';
 import { raiseLogLevel } from './callLogLevel.js';
 import { presentCallerUserId } from './callLookup.js';
 import { extensionOf } from './extensionOwner.js';
@@ -108,7 +108,7 @@ export async function startOnwardCall(
     logLevel: entry.logLevel,
     callLogMaxBytes: pipeline.deps.callLogMaxBytes
   });
-  child.parentCallId = parent.id;
+  linkParent(child, parent);
   const { userId, targetRecords } = transfereeOf(parent, transferee);
   child.callerUserId = userId;
   if (targetRecords !== undefined) {

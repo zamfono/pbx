@@ -3,7 +3,7 @@ import { ignoreGone } from '../ari/failures.js';
 import type { Snapshot } from '../internal/snapshot.js';
 import { SIP_FORBIDDEN, SIP_TEMPORARILY_UNAVAILABLE } from '../sipCodes.js';
 import { resolveAddedTarget, type AddedTarget } from './addPartyTarget.js';
-import { type Call } from './call.js';
+import { linkParent, type Call } from './call.js';
 import { activeCallOf, channelOf } from './callLookup.js';
 import { dialEmergency } from './emergency.js';
 import { dialSipTarget } from './forwardDial.js';
@@ -195,7 +195,7 @@ export async function addParty(
     return;
   }
 
-  call.parentCallId = active.id;
+  linkParent(call, active);
   call.addedLeg = true;
   const snapshot = await pipeline.deps.cache.get();
   const joined = await dialAddPartyTarget(

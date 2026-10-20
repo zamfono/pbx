@@ -14,7 +14,7 @@ import { newId } from '@zamfono/shared';
 
 import type { AriEventOf } from '../ari/events.js';
 import { ignoreGone, logFailure } from '../ari/failures.js';
-import type { Call, Transferee } from './call.js';
+import { linkParent, type Call, type Transferee } from './call.js';
 import { otherChannelIn, presentCallerUserId } from './callLookup.js';
 import { callPartiesChanged } from './callState.js';
 import { endHold } from './hold.js';
@@ -137,7 +137,7 @@ async function carryOn(
   parent: { call: Call; secondLeg: string; transfereeId: string }
 ): Promise<void> {
   const { call: original, secondLeg, transfereeId } = parent;
-  consultation.parentCallId = original.id;
+  linkParent(consultation, original);
   const transferee = transfereeOf(original, transfereeId);
   handOver(pipeline, consultation, secondLeg, transferee);
   if (ev.destination_type === 'bridge' && ev.destination_bridge !== undefined) {

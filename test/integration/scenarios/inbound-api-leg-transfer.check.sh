@@ -66,10 +66,14 @@ if not [l for l in timeline(parent) if l.get("on") == "close"]:
 caller_media = timeline(onward)
 if not [l for l in caller_media if l.get("on") == "onward"]:
     problems.append("the onward call has no media sample of the caller as it started")
+# sipp's caller sends plain RTP and holds nothing.
 if not [l for l in caller_media if "on" not in l and l.get("bridgeId") and l.get("bridgeTechnology")
-        and isinstance(l.get("sent"), int) and l.get("readFormat") and l.get("rtpDest")]:
+        and isinstance(l.get("sent"), int) and l.get("readFormat") and l.get("nativeFormat")
+        and l.get("rtpDest") and l.get("localSsrc") and l.get("secure") is False
+        and l.get("rtpHold") is False and l.get("onHold") is False]:
     problems.append("the onward call's timeline has no periodic sample of the caller in a bridge, "
-                    "with its counters, formats and RTP address: %s" % caller_media)
+                    "with its counters, formats, RTP address, SSRC, encryption and hold state: %s"
+                    % caller_media)
 print("media timeline of the transferred caller in %s: %s" % (onward["id"], caller_media))
 if problems:
     sys.exit("; ".join(problems) + ": " + json.dumps(parent)[:1200])

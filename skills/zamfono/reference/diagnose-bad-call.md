@@ -76,12 +76,17 @@ arguments:
      one at each bridge join or leave, transfer (`on`: `close` in the call left, `onward` in the
      next) and call close: the packets `sent` and `received` since the previous line, `rtpDest`
      (the far end's address Asterisk sends to; with symmetric RTP, the one the far end's packets
-     came from) and `rtpSrc` (Asterisk's own), `readFormat` and
-     `writeFormat`, and the `bridgeId` with its `bridgeTechnology`. `sent` dropping to 0 shows
+     came from) and `rtpSrc` (Asterisk's own), `localSsrc` and `remoteSsrc`, `secure` (SRTP),
+     `rtpHold` (the stream held by its SDP direction) and `onHold`, `nativeFormat`, `readFormat`
+     and `writeFormat`, and the `bridgeId` with its `bridgeTechnology`. `sent` dropping to 0 shows
      when Asterisk stopped sending and, by the lines around it, in which bridge; an `rtpDest` that
      is a private address of a device behind NAT, or one that changes mid-call, points at NAT; a
      leg in no bridge, or in a different bridge from its peer, is not connected to it; a
-     `readFormat` differing from the peer's `writeFormat` is a transcoding bridge.
+     `readFormat` differing from the peer's `writeFormat` is a transcoding bridge; `rtpHold` or
+     `onHold` true explains silence by hold; a `localSsrc` that changes while `sent` stops points
+     at a device dropping Asterisk's new stream.
+   - A transfer's onward call is logged at least at the level of the call it came from, so an
+     override that covered the call before the transfer also covers the conversation after it.
 4. For a trunk suspected of failing calls outbound, check `trunks.get` (`GET /api/v1/trunks/{id}`)
    for its registration and reachability status before reading its call log; an `unreachable` trunk
    is skipped in trunk-order failover and in emergency-call dialling alike, and a trunk without

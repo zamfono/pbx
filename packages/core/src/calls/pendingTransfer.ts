@@ -16,11 +16,15 @@
  * `StasisStart` can arrive before the `BridgeBlindTransfer` that describes it, so a Local
  * channel's entry is waited for.
  */
+import type { CallLogLevel } from '@zamfono/shared';
+
 import type { Channel } from '../ari/types.js';
 import type { Pipeline } from './pipeline.js';
 
 type PendingTransfer = {
   parentCallId: string;
+  /** The parent's diagnostics level, which the onward call starts at, at least (§7). */
+  parentLogLevel: CallLogLevel;
   /** The user whose routes, caller-ID and CLIR the onward call uses. */
   transferrerUserId: string;
   /** The transferee, the onward call's caller: their user, `null` for an outside party. */

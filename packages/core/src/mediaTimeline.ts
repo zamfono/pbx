@@ -6,14 +6,17 @@
  *
  * A sample holds the packets the channel's RTP instance sent and received since the channel's
  * previous sample, the remote address its RTP goes to (which symmetric RTP takes from the
- * packets that arrive) and Asterisk's own local one, its read and write formats, and the bridge it is in with that bridge's technology. A channel with
- * nothing to read and in no bridge is gone, and has no sample.
+ * packets that arrive) and Asterisk's own local one, both SSRCs, whether the stream is encrypted
+ * and whether it or the channel is held, its native, read and write formats, and the bridge it is
+ * in with that bridge's technology. A channel with nothing to read and in no bridge is gone, and
+ * has no sample.
  */
 import type { CallLogLevel } from '@zamfono/shared';
 
 import { logFailure } from './ari/failures.js';
 import type { BridgesApi, ChannelsApi, Logger } from './ari/types.js';
 import type { Call } from './calls/call.js';
+import { formatNames } from './calls/codecTrace.js';
 import { qosTargets } from './qosTargets.js';
 
 // §7: the timeline is level `qos`'s, and `sip` adds to it; below, no channel is read.
@@ -22,12 +25,18 @@ const TIMELINE_LEVELS: ReadonlySet<CallLogLevel> = new Set(['qos', 'sip']);
 const SAMPLE_INTERVAL_MS = 2000;
 
 /** The channel functions a sample reads, by the field each fills (chan_pjsip's `rtcp` and `rtp`
- * types of `CHANNEL()`; the formats are any channel's). */
+ * types of `CHANNEL()`; the hold state and the formats are any channel's). */
 const READS = {
   sent: 'CHANNEL(rtcp,txcount)',
   received: 'CHANNEL(rtcp,rxcount)',
   rtpDest: 'CHANNEL(rtp,dest)',
   rtpSrc: 'CHANNEL(rtp,src)',
+  localSsrc: 'CHANNEL(rtcp,local_ssrc)',
+  remoteSsrc: 'CHANNEL(rtcp,remote_ssrc)',
+  secure: 'CHANNEL(rtp,secure)',
+  rtpHold: 'CHANNEL(rtp,hold)',
+  onHold: 'CHANNEL(onhold)',
+  nativeFormat: 'CHANNEL(audionativeformat)',
   readFormat: 'CHANNEL(audioreadformat)',
   writeFormat: 'CHANNEL(audiowriteformat)'
 } as const;
@@ -35,6 +44,11 @@ const READS = {
 type Reads = Record<keyof typeof READS, string | null>;
 
 type Counters = { sent: number; received: number };
+
+/** A `1`/`0` flag Asterisk printed, `undefined` for none. */
+function flag(value: string | null): boolean | undefined {
+  return value === null ? undefined : value === '1';
+}
 
 /** A count Asterisk printed, `null` for none. */
 function count(value: string | null): number | null {
@@ -167,6 +181,12 @@ export class MediaTimeline {
         ...this.deltas(channelId, values),
         rtpSrc: values.rtpSrc ?? undefined,
         rtpDest: values.rtpDest ?? undefined,
+        localSsrc: values.localSsrc ?? undefined,
+        remoteSsrc: values.remoteSsrc ?? undefined,
+        secure: flag(values.secure),
+        rtpHold: flag(values.rtpHold),
+        onHold: flag(values.onHold),
+        nativeFormat: formatNames(values.nativeFormat) ?? undefined,
         readFormat: values.readFormat ?? undefined,
         writeFormat: values.writeFormat ?? undefined,
         bridgeId: bridge?.id,

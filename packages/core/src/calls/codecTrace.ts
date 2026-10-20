@@ -10,18 +10,24 @@ import type { Pipeline } from './pipeline.js';
 // Asterisk renders a format list as `(ulaw|alaw)`, and an empty one as `(nothing)`.
 const FORMAT_LIST = /^\((?<names>.*)\)$/u;
 
+/** The names of a format list Asterisk printed (`ulaw|alaw`), `null` for none. */
+export function formatNames(value: string | null): string | null {
+  const names = value?.match(FORMAT_LIST)?.groups?.names ?? value ?? '';
+  return names === '' || names === 'nothing' ? null : names;
+}
+
 /** `CHANNEL(audionativeformat)` of `channelId`, the codec its media was negotiated to; `null`
  * when the channel has none (or is gone). */
 async function nativeCodec(
   pipeline: Pipeline,
   channelId: string
 ): Promise<string | null> {
-  const value = await pipeline.deps.ari.channels.getVariable(
-    channelId,
-    'CHANNEL(audionativeformat)'
+  return formatNames(
+    await pipeline.deps.ari.channels.getVariable(
+      channelId,
+      'CHANNEL(audionativeformat)'
+    )
   );
-  const names = value?.match(FORMAT_LIST)?.groups?.names ?? value ?? '';
-  return names === '' || names === 'nothing' ? null : names;
 }
 
 /**

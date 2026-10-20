@@ -16,8 +16,15 @@ why the specified behaviour changed; the commit history, how.
 - At diagnostics level `qos`, a call's log holds a media timeline for each leg: about every 2 s,
   and at once on each bridge join or leave, transfer and call close, a `media` line with the
   packets sent and received since the previous one, the far end's and Asterisk's own RTP
-  address, the read and write formats, and the bridge with its technology. `calls.get` returns it
-  in `log`, so a call without audio can be diagnosed without Asterisk's CLI.
+  address, both SSRCs, the SRTP and hold state, the native, read and write formats, and the
+  bridge with its technology. `calls.get` returns it in `log`, so a call without audio can be
+  diagnosed without Asterisk's CLI.
+
+### Changed
+
+- A transfer's onward call, an attended transfer's consultation and an added party are logged at
+  least at the diagnostics level of the call they come from, so an override set for a user, trunk
+  or ring group keeps covering the conversation after a transfer.
 
 ## [0.6.1] - 2026-10-20
 
