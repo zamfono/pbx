@@ -11,6 +11,8 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-10-20
+
 ### Added
 
 - At diagnostics level `qos`, a call's log holds a media timeline for each leg: about every 2 s,
@@ -713,7 +715,8 @@ The first 0.2 release; its `v0.2.0` tag was never published.
 
 The first tagged version, before any deployment.
 
-[Unreleased]: https://github.com/zamfono/pbx/compare/v0.6.1...HEAD
+[Unreleased]: https://github.com/zamfono/pbx/compare/v0.6.2...HEAD
+[0.6.2]: https://github.com/zamfono/pbx/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/zamfono/pbx/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/zamfono/pbx/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/zamfono/pbx/compare/v0.4.2...v0.5.0
