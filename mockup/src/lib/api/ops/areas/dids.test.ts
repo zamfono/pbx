@@ -82,7 +82,19 @@ describe('dids', () => {
     ).toBe(true);
   });
 
-  test('updates the target only and refuses a missing target row', () => {
+  test('relabels a number, keeping its target', () => {
+    const before = as<{ items: Did[] }>('dids.list', {}).items.find(
+      row => row.id === DID.hotline
+    );
+    const did = as<Did>('dids.update', { id: DID.hotline, label: 'Support' });
+    expect(did.label).toBe('Support');
+    expect(did.target).toEqual(before?.target);
+    expect(store.db.audit[0]?.changes.map(change => change.field)).toEqual([
+      'label'
+    ]);
+  });
+
+  test('updates the target and refuses a missing target row', () => {
     const did = as<Did>('dids.update', {
       id: DID.hotline,
       target: { kind: 'ringGroup', ringGroupId: RG.empfang }

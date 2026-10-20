@@ -532,6 +532,40 @@ describe('audit.undo of a forward-target change', () => {
     expect(await externalOf(db, row.targetId)).toBe('+491111111');
   });
 
+  it('restores the DID label a relabel replaced, keeping its target', async () => {
+    const db = await makeTestDb();
+    await seedSettings(db);
+    const did = (await runOperation(
+      db,
+      'dids.create',
+      {
+        number: '+4989000002',
+        label: 'Sales',
+        target: { kind: 'external', external: '+491111111' }
+      },
+      asConfirmedRun()
+    )) as { id: string };
+    const relabelled = (await runOperation(
+      db,
+      'dids.update',
+      { id: did.id, label: 'Support' },
+      asConfirmedRun()
+    )) as { label: string | null; target: { external: string } };
+    expect(relabelled.label).toBe('Support');
+    expect(relabelled.target.external).toBe('+491111111');
+    const entry = await latestAuditEntry(db, did.id);
+
+    await runOperation(db, 'audit.undo', { id: entry.id }, asConfirmedRun());
+
+    const row = await db
+      .selectFrom('dids')
+      .select(['label', 'targetId'])
+      .where('id', '=', did.id)
+      .executeTakeFirstOrThrow();
+    expect(row.label).toBe('Sales');
+    expect(await externalOf(db, row.targetId)).toBe('+491111111');
+  });
+
   it('restores the out-of-office target a retarget replaced', async () => {
     const db = await makeTestDb();
     await seedSettings(db);

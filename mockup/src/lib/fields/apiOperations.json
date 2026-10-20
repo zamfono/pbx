@@ -276,7 +276,7 @@
   "users.setForwarding": {
     "method": "PUT",
     "path": "/users/{id}/forwarding",
-    "summary": "Replaces a user's call-forwarding rules as a whole; a user sets their own, without new sip or recording targets, an admin anyone's.",
+    "summary": "Replaces a user's call-forwarding rules as a whole; a user sets their own, without new sip, webSocket or recording targets, an admin anyone's.",
     "fields": {
       "id": {
         "type": "string",
@@ -1034,7 +1034,7 @@
         "description": null
       },
       "target": {
-        "type": "object|object|object|object|object|object|object|object",
+        "type": "object|object|object|object|object|object|object|object|object",
         "required": true,
         "description": "Where a call to this number goes; a numeric DID for a user with no caller ID of their own becomes it."
       }
@@ -1043,7 +1043,7 @@
   "dids.update": {
     "method": "PATCH",
     "path": "/dids/{id}",
-    "summary": "Changes a DID's forward target; number and label are fixed at creation",
+    "summary": "Changes a DID's label or forward target; the number is immutable",
     "fields": {
       "id": {
         "type": "string",
@@ -1051,9 +1051,14 @@
         "in": "path",
         "description": null
       },
+      "label": {
+        "type": "string|null",
+        "required": false,
+        "description": null
+      },
       "target": {
-        "type": "object|object|object|object|object|object|object|object",
-        "required": true,
+        "type": "object|object|object|object|object|object|object|object|object",
+        "required": false,
         "description": "Where a call to this number goes; a numeric DID for a user with no caller ID of their own becomes it."
       }
     }
@@ -1116,7 +1121,7 @@
         "description": "How many digits follow the base, e.g. 2 for +498912347xx; null or left out: any number of digits, none included (open-ended)."
       },
       "fallbackTarget": {
-        "type": "object|object|object|object|object|object|object|object|null",
+        "type": "object|object|object|object|object|object|object|object|object|null",
         "required": false,
         "description": "Where a call for a number in the block that no DID holds goes; null: the tenant-wide settings.fallbackTarget, else 404. The digits behind the base are never read as an extension."
       }
@@ -1144,7 +1149,7 @@
         "description": "How many digits follow the base, e.g. 2 for +498912347xx; null or left out: any number of digits, none included (open-ended)."
       },
       "fallbackTarget": {
-        "type": "object|object|object|object|object|object|object|object|null",
+        "type": "object|object|object|object|object|object|object|object|object|null",
         "required": false,
         "description": "Where a call for a number in the block that no DID holds goes; null: the tenant-wide settings.fallbackTarget, else 404. The digits behind the base are never read as an extension."
       }
@@ -2419,7 +2424,7 @@
         "description": "Lets an unmapped string that is a live user or ring-group extension route to it; off by default."
       },
       "fallbackTarget": {
-        "type": "object|object|object|object|object|object|object|object",
+        "type": "object|object|object|object|object|object|object|object|object",
         "required": true,
         "description": "Where the call goes after the last attempt."
       }
@@ -2475,7 +2480,7 @@
         "description": "Lets an unmapped string that is a live user or ring-group extension route to it; off by default."
       },
       "fallbackTarget": {
-        "type": "object|object|object|object|object|object|object|object",
+        "type": "object|object|object|object|object|object|object|object|object",
         "required": false,
         "description": "Where the call goes after the last attempt."
       }
@@ -2570,7 +2575,7 @@
         "description": "When the rule ends, after startsAt; null: until deactivated. Active periods within a scope must not overlap."
       },
       "target": {
-        "type": "object|object|object|object|object|object|object|object",
+        "type": "object|object|object|object|object|object|object|object|object",
         "required": true,
         "description": "Where the scope's calls go while the rule is in effect, ahead of opening hours (see zamfono.help vacation-rule)."
       }
@@ -2603,7 +2608,7 @@
         "description": "When the rule ends, after startsAt; null: until deactivated. Active periods within a scope must not overlap."
       },
       "target": {
-        "type": "object|object|object|object|object|object|object|object",
+        "type": "object|object|object|object|object|object|object|object|object",
         "required": false,
         "description": "Where the scope's calls go while the rule is in effect, ahead of opening hours (see zamfono.help vacation-rule)."
       }
@@ -2644,7 +2649,7 @@
         "description": "Whether the schedule applies (on by default); off, it is kept and the scope follows the tenant's."
       },
       "closedTarget": {
-        "type": "object|object|object|object|object|object|object|object",
+        "type": "object|object|object|object|object|object|object|object|object",
         "required": true,
         "description": "Where inbound and forwarded calls go outside every open interval; internal calls ignore opening hours."
       },
@@ -3140,7 +3145,7 @@
         "description": "Dialled prefixes for the ten keys pickup, dndOn, dndOff, mailbox, ownVoicemail, deposit, addParty, clirOn, clirOff and park, all sent together; each starts with * or # and none is a prefix of another."
       },
       "fallbackTarget": {
-        "type": "object|object|object|object|object|object|object|object|null",
+        "type": "object|object|object|object|object|object|object|object|object|null",
         "required": false,
         "description": "The tenant-wide fallback for a number in a block that no DID holds and for a number outside every DID and block; null: such calls are released with 404 (see zamfono.help numbers)."
       },

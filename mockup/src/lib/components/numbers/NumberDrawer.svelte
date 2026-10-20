@@ -1,7 +1,7 @@
 <!--
-  Adds a number (`dids.create`) or changes where its calls go (`dids.update`). Number and label are
-  fixed at creation; the number is normalised with the company's country, and a provider's account
-  string is kept as it is.
+  Adds a number (`dids.create`) or changes its label and where its calls go (`dids.update`). The
+  number is fixed at creation; it is normalised with the company's country, and a provider's
+  account string is kept as it is.
 -->
 <script lang="ts">
   import Trash2 from '@lucide/svelte/icons/trash-2';
@@ -43,8 +43,10 @@
       : { kind: 'external', external: '', record: false };
   }
 
+  const initialLabel = (): string => did?.label ?? '';
+
   let number = $state('');
-  let label = $state('');
+  let label = $state(initialLabel());
   let target = $state<ForwardTarget>(initialTarget());
   let errors = $state<Record<string, string>>({});
   let saving = $state(false);
@@ -96,7 +98,7 @@
           )
         : await run<Did>(
             'dids.update',
-            { id: did.id, target },
+            { id: did.id, label: label.trim() || null, target },
             {
               success: 'numbers.updated',
               successParams: { number: formatPhone(did.number) }
@@ -182,15 +184,11 @@
     {/if}
 
     <FormField entity="did" key="label" error={errors.label ?? null}>
-      {#if did === null}
-        <TextInput
-          id="did-label"
-          bind:value={label}
-          placeholder={t('numbers.labelPlaceholder')}
-        />
-      {:else}
-        <DisplayValue>{did.label ?? '—'}</DisplayValue>
-      {/if}
+      <TextInput
+        id="did-label"
+        bind:value={label}
+        placeholder={t('numbers.labelPlaceholder')}
+      />
     </FormField>
 
     <FormField

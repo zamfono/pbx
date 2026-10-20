@@ -48,7 +48,7 @@
 | `dids.create` | `POST /api/v1/dids` | Adds a DID, a phone number the tenant owns, and the forward target its calls go to (zamfono.help numbers) | admin | no |
 | `dids.delete` | `DELETE /api/v1/dids/{id}` | Soft-deletes a DID unless it is the main number or presented as caller ID | admin | yes |
 | `dids.list` | `GET /api/v1/dids` | Lists the tenant's DIDs | admin | no |
-| `dids.update` | `PATCH /api/v1/dids/{id}` | Changes a DID's forward target; number and label are fixed at creation | admin | no |
+| `dids.update` | `PATCH /api/v1/dids/{id}` | Changes a DID's label or forward target; the number is immutable | admin | no |
 | `hours.delete` | `DELETE /api/v1/users/{id}/hours`, `DELETE /api/v1/ringGroups/{id}/hours`, `DELETE /api/v1/menus/{id}/hours`, `DELETE /api/v1/tenant/hours` | Removes a scope's opening-hours schedule | user | yes |
 | `hours.get` | `GET /api/v1/users/{id}/hours`, `GET /api/v1/ringGroups/{id}/hours`, `GET /api/v1/menus/{id}/hours`, `GET /api/v1/tenant/hours` | Reads a scope's opening-hours schedule | user | no |
 | `hours.set` | `PUT /api/v1/users/{id}/hours`, `PUT /api/v1/ringGroups/{id}/hours`, `PUT /api/v1/menus/{id}/hours`, `PUT /api/v1/tenant/hours` | Replaces a scope's weekly opening-hours schedule and the target its calls go to while closed | user | no |

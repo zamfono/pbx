@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-20 · §10.3 Extensions & DIDs.** `PATCH /dids/{id}` edits a DID's label as well as its target; only `number` stays immutable, like a block's `base`.
+*Why:* a label is read only when a call needs it (the `Diversion` name, `{{forwardedByName}}`, `didLabel`), so nothing stops it changing, and number blocks already allowed it; renaming a number meant deleting and recreating it, after unbinding it as main number and caller ID. The product owner: "Is it really impossible to update a number's label after it has been created?", then "yes, please".
+
 **2026-10-16 · §10.5 Tools.** A tool call's arguments are validated by the MCP SDK (`McpServer`) against the operation's own input schema before the operation runs, and an invalid one is refused as a tool execution error in the SDK's words, no longer as REST's 422 problem; RBAC and auditing are unchanged.
 *Why:* the MCP server moves to `@modelcontextprotocol/server` (TASK-61), whose low-level `Server` is marked deprecated in favour of `McpServer`, and `McpServer.registerTool` validates before the tool runs. The product owner, offered keeping the low-level `Server`, `McpServer` with the tools handled per method, or `McpServer` for everything: "Do "option 2"".
 

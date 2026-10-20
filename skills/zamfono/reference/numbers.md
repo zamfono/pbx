@@ -19,8 +19,8 @@ A **DID** is one phone number the tenant owns, with the forward target its calls
 `number` is stored as the trunk boundary produces it: the international form, `+` and digits.
 A national number is accepted and normalized with the tenant's `settings.country`, so
 `089123456` for a German tenant is stored as `+4989123456`; `0049…` becomes `+49…`. A DID's
-`number` and `label` are fixed once created; `dids.update` (`PATCH /api/v1/dids/{id}`) changes its
-target. The first numeric DID whose target is a user who presents no number yet becomes that
+`number` is fixed once created; `dids.update` (`PATCH /api/v1/dids/{id}`) changes its `label` or
+`target`. The first numeric DID whose target is a user who presents no number yet becomes that
 user's caller ID (`callerIdDidId`).
 
 Numbers are not bound to a trunk: a call is matched by its called number alone, whichever trunk

@@ -1,8 +1,9 @@
 /**
  * Numbers (`ops/dids/`, admin): the phone numbers the tenant owns and where their calls go
- * (§10.3 "Extensions & DIDs", §11.3). A number is fixed at creation, its target editable; the main
- * number and a number presented as caller ID cannot be deleted. Also the forward-target checks the
- * numbers and number blocks share (`forwardTargetSpec.ts`'s `assertTargetAvailable`).
+ * (§10.3 "Extensions & DIDs", §11.3). A number is fixed at creation, its label and target
+ * editable; the main number and a number presented as caller ID cannot be deleted. Also the
+ * forward-target checks the numbers and number blocks share (`forwardTargetSpec.ts`'s
+ * `assertTargetAvailable`).
  */
 import { conflict, invalid, notFound, type BlockingRef } from '../../errors';
 import { newId } from '../../ids';
@@ -257,20 +258,34 @@ defineOp<{ number: string; label?: string | null; target: ForwardTarget }, Did>(
   }
 );
 
-defineOp<{ id: string; target: ForwardTarget }, Did>({
+defineOp<{ id: string; label?: string | null; target?: ForwardTarget }, Did>({
   name: 'dids.update',
   minRole: 'admin',
   run: (ctx, input) => {
     const before = liveDid(ctx.db, input.id);
-    assertTarget(ctx.db, 'target', input.target);
-    const row: Did = { ...before, target: input.target };
+    if (input.target !== undefined) {
+      assertTarget(ctx.db, 'target', input.target);
+    }
+    const row: Did = {
+      ...before,
+      label: input.label === undefined ? before.label : input.label,
+      target: input.target ?? before.target
+    };
     ctx.put('dids', row);
-    const callerId = setCallerIdIfUnset(ctx, input.target, row);
+    const callerId =
+      input.target === undefined
+        ? []
+        : setCallerIdIfUnset(ctx, input.target, row);
     ctx.audit({
       entityKind: 'did',
       entityId: row.id,
       changes: [
-        { field: 'target', from: before.target, to: input.target },
+        ...(row.label === before.label
+          ? []
+          : [{ field: 'label', from: before.label, to: row.label }]),
+        ...(input.target === undefined
+          ? []
+          : [{ field: 'target', from: before.target, to: input.target }]),
         ...callerId
       ]
     });
