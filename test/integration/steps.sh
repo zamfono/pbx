@@ -1,7 +1,7 @@
 # Sourced by `run.sh`: the stack's own prerequisites (bring-up and tenant configuration — REUSE
 # skips both, run.sh's own usage block) as functions, plus the selectable named steps that sit
-# either side of the scenario loop in a full run (`runtime-asserts`, `prompts`, `caddy`, `backups`
-# and `updater`; `trunk-status` and `cert-sync` wrap their own files' bodies as
+# either side of the scenario loop in a full run (`runtime-asserts`, `prompts`, `caddy`, `stun`,
+# `backups` and `updater`; `trunk-status` and `cert-sync` wrap their own files' bodies as
 # `run_trunk_status_step`/`run_cert_sync_step`, called directly by run.sh).
 #
 # Reads and sets `run.sh`'s own compose, run_dir, here, api_base, API_PORT, FWD, RUNTIME,
@@ -77,6 +77,15 @@ step_caddy() {
     "$api_base") || fail "the login's forms gave no access token through Caddy"
   api GET /users >/dev/null || fail "GET /users did not answer through Caddy"
   echo '   /healthz, the login and GET /users answered through Caddy, /readyz 404'
+}
+
+# §6.1 STUN: a Binding request from `sipp`, a peer on `internal`, to the stack's 3478/udp names that
+# peer's own address and port (stun-binding.py). Selectable as `stun`; cheap enough to run on
+# every shard.
+step_stun() {
+  echo '== §6.1 STUN: a Binding request to 3478/udp names the asking address =='
+  dc exec -T sipp python3 - zamfono <"$here/stun-binding.py" \
+    || fail "the stack's STUN server did not name the asking address"
 }
 
 # curl's own configuration, for every curl its caller runs, which declares CURL_HOME `local -x`:

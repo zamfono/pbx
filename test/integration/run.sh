@@ -179,6 +179,7 @@ if [ -n "${UPGRADE_FROM:-}" ] && [ "$reused" = false ]; then
 fi
 
 name_selected caddy && step_caddy
+name_selected stun && step_stun
 
 if [ "$reused" = true ]; then
   load_state

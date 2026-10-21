@@ -26,7 +26,7 @@ export function stackIpv4(env: {
   return address;
 }
 
-/** §6.1 "One IP, two listeners": the fixed SIP-TLS port every client, Ringotel included, dials. */
+/** §6.1 "One IP, three listeners": the fixed SIP-TLS port every client, Ringotel included, dials. */
 export const SIP_TLS_PORT = 5061;
 
 /** §9.1: the fixed port of the plain SIP transports, UDP and TCP alike. */

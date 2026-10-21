@@ -67,8 +67,9 @@ carrier-grade NAT and, on some carriers, a public IP that changes over the sessi
       passes on that connection.
 - [ ] Switching mid-call between Wi-Fi and cellular does not drop the call outright; note
       whether audio glitches or recovers. `icesupport = yes` (`rtp.conf`) is the only NAT aid
-      configured on the media path beyond `rewrite_contact`/`rtp_symmetric`/`force_rport` — there
-      is no STUN or TURN server configured — so this is the environment most likely to expose a
+      configured on the media path beyond `rewrite_contact`/`rtp_symmetric`/`force_rport` — Asterisk
+      uses no STUN or TURN server, and the tested clients leave the stack's own STUN server unset
+      — so this is the environment most likely to expose a
       NAT a session can't traverse; record whatever happens rather than assuming it will recover.
 - [ ] Backgrounding the app for several minutes, then calling its user's extension, still rings
       it. Push wake-up is the softphone vendor's own concern (§9.3), so this only checks that the

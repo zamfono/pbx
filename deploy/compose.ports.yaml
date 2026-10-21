@@ -1,5 +1,5 @@
 # compose.ports.yaml — the stack uses the host's address; ports are published on netns, the owner
-# of the shared namespace, so they cover Asterisk and Caddy alike. Every port maps 1:1.
+# of the shared namespace, so they cover Asterisk, STUN and Caddy alike. Every port maps 1:1.
 # EXTERNAL_IPV4, the host's public IPv4, is required in this mode (§6.1).
 services:
   netns:
@@ -9,6 +9,7 @@ services:
       - "5060:5060/udp"
       - "5060:5060/tcp"
       - "5061:5061/tcp"
+      - "3478:3478/udp"                         # STUN (stun)
       - "${RTP_PORT_START:-10000}-${RTP_PORT_END:-10200}:\
          ${RTP_PORT_START:-10000}-${RTP_PORT_END:-10200}/udp"   # one string; the escaped line break joins it
 

@@ -23,18 +23,20 @@ assert_runtime_ordering() {
     || fail "§6.3 Runtimes depends_on ordering did not hold (see above)"
 }
 
-# §6.3 Runtimes: "the shared network namespace of `asterisk` and `proxy`, which both join `netns`
+# §6.3 Runtimes: "the network namespace `asterisk`, `stun` and `proxy` share with `netns`
 # (`network_mode: service:`)". The namespace's identity (`net:[inode]`), not the contents of `/proc/net/dev`:
 # its byte counters move between the two execs whenever the stack is talking, which failed the
 # check at random.
 assert_shared_namespace() {
-  echo '== §6.3 Runtimes: asterisk and proxy share the netns network namespace =='
-  local netns_ns proxy_ns asterisk_ns
+  echo '== §6.3 Runtimes: asterisk, stun and proxy share the netns network namespace =='
+  local netns_ns proxy_ns asterisk_ns stun_ns
   netns_ns=$(dc exec -T netns readlink /proc/self/ns/net)
   proxy_ns=$(dc exec -T proxy readlink /proc/self/ns/net)
   asterisk_ns=$(dc exec -T asterisk readlink /proc/self/ns/net)
+  stun_ns=$(dc exec -T stun readlink /proc/self/ns/net)
   [ -n "$netns_ns" ] && [ "$proxy_ns" = "$netns_ns" ] && [ "$asterisk_ns" = "$netns_ns" ] \
-    || fail "asterisk and proxy do not share netns's network namespace (network_mode: service:)"
+    && [ "$stun_ns" = "$netns_ns" ] \
+    || fail "asterisk, stun and proxy do not share netns's network namespace (network_mode: service:)"
 }
 
 # §6.6: Asterisk may hold 65536 open files (compose.yaml's `ulimits`), not the runtime's default

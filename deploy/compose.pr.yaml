@@ -13,6 +13,8 @@ services:
     image: ghcr.io/zamfono/proxy-pr:${ZAMFONO_PR:?set it to the PR number}
   asterisk:
     image: ghcr.io/zamfono/asterisk-pr:${ZAMFONO_PR:?set it to the PR number}
+  stun:
+    image: ghcr.io/zamfono/asterisk-pr:${ZAMFONO_PR:?set it to the PR number}
   migrate:
     image: ghcr.io/zamfono/migrate-pr:${ZAMFONO_PR:?set it to the PR number}
   core:

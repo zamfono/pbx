@@ -28,6 +28,10 @@ services:
     image: ${ASTERISK_IMAGE:?set by density.sh}
     pull_policy: missing
 
+  stun:
+    image: ${ASTERISK_IMAGE:?set by density.sh}
+    pull_policy: missing
+
   migrate:
     image: ${MIGRATE_IMAGE:?set by density.sh}
     pull_policy: missing

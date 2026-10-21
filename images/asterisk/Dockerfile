@@ -7,8 +7,9 @@ LABEL org.opencontainers.image.source=https://github.com/zamfono/pbx
 
 # Zamfono APT repository (spec §4):
 # fetch its archive keyring package, register the source, install Asterisk 22 plus the module
-# and sound packages the stack needs (spec §9.1, §9.3, §9.4), and nftables and inotify-tools for
-# the ban helper (§5.6). ca-certificates stays installed:
+# and sound packages the stack needs (spec §9.1, §9.3, §9.4), nftables and inotify-tools for
+# the ban helper (§5.6), and coturn for the STUN server the `stun` service runs from this image
+# (§6.1). ca-certificates stays installed:
 # transport-tls checks a trunk provider's certificate against its bundle (§9.4 "Signaling").
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates curl \
@@ -33,6 +34,7 @@ RUN apt-get update \
        asterisk-prompt-de \
        asterisk-moh-opsound-wav \
        asterisk-moh-opsound-g722 \
+       coturn \
        gettext-base \
        inotify-tools \
        nftables \

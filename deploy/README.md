@@ -102,6 +102,7 @@ Allow inbound, in the provider's firewall and the host's (if any):
 | 443         | TCP       | REST API, MCP, `/healthz`                                           |
 | 5060        | UDP + TCP | SIP for trunks and allowlisted desk phones                          |
 | 5061        | TCP       | SIP over TLS                                                        |
+| 3478        | UDP       | STUN, for phones set to ask the stack for their public address      |
 | 10000–10200 | UDP       | RTP; use your own range if you set `RTP_PORT_START`/`RTP_PORT_END`  |
 
 Leave outbound open: the stack reaches Let's Encrypt, your SIP trunk, your mail relay and your
@@ -389,7 +390,7 @@ docker compose pull
 docker compose up -d
 ```
 
-**Podman** refuses to replace `netns` while `asterisk` and `proxy` still share its network
+**Podman** refuses to replace `netns` while `asterisk`, `stun` and `proxy` still share its network
 namespace, so `up -d` after a pull fails with "has dependent containers which must be removed
 before it". Remove the containers first — `down` keeps every volume — or, with the boot unit of step 7,
 restart it, which does the same:
@@ -413,9 +414,9 @@ and without Litestream's copy, before `up -d`
 ([`docs/guide/restore.md`](https://github.com/zamfono/pbx/blob/main/docs/guide/restore.md),
 "Rolling back a release").
 
-`asterisk` and `proxy` live in the network namespace of `netns`, which holds the stack's address
-and published ports: either may restart or be recreated alone. Recreate `netns` only with the
-whole stack (`up -d`), since both would stay on the old namespace.
+`asterisk`, `stun` and `proxy` live in the network namespace of `netns`, which holds the stack's
+address and published ports: each may restart or be recreated alone. Recreate `netns` only with
+the whole stack (`up -d`), since they would stay on the old namespace.
 
 ## Continuous replication
 

@@ -32,7 +32,8 @@ networks:
 # starts with them present: `pull_policy: missing` keeps a `pull` (update.sh's, host-update.sh)
 # from asking a registry for an image the run already holds or none publishes.
 services:
-  # The namespace `asterisk` and `proxy` join, from the `proxy` image under test like compose.yaml's.
+  # The namespace `asterisk`, `stun` and `proxy` join, from the `proxy` image under test like
+  # compose.yaml's.
   netns:
     image: ${PROXY_IMAGE:?set by run.sh}
     pull_policy: missing
@@ -56,6 +57,10 @@ services:
     environment:
       SIP_UDP_ENABLED: 'true'
       SIP_TCP_ENABLED: 'true'
+
+  stun:
+    image: ${ASTERISK_IMAGE:?set by run.sh}
+    pull_policy: missing
 
   migrate:
     image: ${MIGRATE_IMAGE:?set by run.sh}

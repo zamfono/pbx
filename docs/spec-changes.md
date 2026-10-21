@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-21 · §6.1, §6.2.2 step 1, §6.3, §10.4 `manual`.** The stack offers a STUN server of its own on 3478/udp: a `stun` service, coturn from the `asterisk` image in the shared network namespace, answering Binding requests alone (no TURN, no TCP, TLS or DTLS listener, no RFC 5780), and the ports mode publishes the port.
+*Why:* the product owner: "i want to *offer* STUN to external phones", so a phone that asks for a STUN server need not use a third party's; not for Ringotel ("it's not meant for Ringotel"). TLS and TCP were left out after "why `--no-tls`?": a phone wants the mapping of the UDP port its RTP uses, which a TCP connection's does not tell.
+
 **2026-10-20 · §7 Per-call diagnostics level.** A call with a parent (`parent_call_id`: a transfer's onward call, an attended transfer's consultation, an added party) is at least at its parent's level; a `media` sample also holds both SSRCs, whether the stream is encrypted, its RTP and channel hold state and the native format.
 *Why:* an onward call was at the tenant default plus the transferring user's override, so a bot's transfer (whose leg has no user) dropped the conversation back to `events` exactly where TASK-68's fault shows, and the reporter's override on the user or phone recorded only the call before it. The product owner: "i think "start at no lower than its parent's level" is a good rule in general, don't you?", and on the fields `CHANNEL()` offers beyond the first ones: "add all the additional channels as well, especially if they are indeed "cheap additions"".
 

@@ -20,9 +20,10 @@ entered into the client by hand. `devices.revealCredentials`
 | `codecs`          | The tenant's codecs in order of preference                                 |
 | `voicemailCode`   | The feature code that dials the user's own voicemail                       |
 
-No STUN server, ICE or outbound proxy is needed: Zamfono handles NAT itself. A `plain` device
-registers only from an address on its allowlist (see `remote-workers`). Two clients are verified
-against Zamfono and recommended.
+No STUN server, ICE or outbound proxy is needed: Zamfono handles NAT itself. A client that wants a
+STUN server anyway can use Zamfono's own, `server`:3478 (UDP). A `plain` device registers only
+from an address on its allowlist (see `remote-workers`). Two clients are verified against Zamfono
+and recommended.
 
 ## Groundwire (Acrobits)
 

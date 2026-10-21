@@ -78,7 +78,7 @@ check_dns() {
 check_ports_free() {
   local busy
   busy=$({ ss -Hltnu 2>/dev/null || true; } | awk '{print $1, $5}' |
-    { grep -E '(tcp .*:(80|443|5060|5061)|udp .*:5060)$' || true; } | sort -u | tr '\n' ';')
+    { grep -E '(tcp .*:(80|443|5060|5061)|udp .*:(3478|5060))$' || true; } | sort -u | tr '\n' ';')
   if [[ -n $busy ]]; then
     warn "ports the stack publishes are already in use on this host: ${busy%;}"
   fi

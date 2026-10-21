@@ -52,6 +52,9 @@ services:
       SIP_UDP_ENABLED: 'true'
       SIP_TCP_ENABLED: 'true'
 
+  stun:
+    image: ${ASTERISK_IMAGE:?set by session.sh}
+
   migrate:
     image: ${MIGRATE_IMAGE:?set by session.sh}
 
