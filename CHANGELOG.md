@@ -11,6 +11,12 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+### Added
+
+- An empty key for a `yealink` device's key list, `{"kind": "empty"}`, so keys can skip line
+  keys: `PUT /devices/{id}/blf` with two keys, three empty ones and a third puts the third on
+  line key 6.
+
 ### Fixed
 
 - A provisioned Yealink phone no longer warns "User default pwd is in use": the provisioning file
