@@ -18,11 +18,36 @@ why the specified behaviour changed; the commit history, how.
 - An update through the API, by hand or automatic, leaves the new `stun` service unstarted, since
   the running release's `update.sh` does not know it yet: run `docker compose up -d` once
   afterwards, or leave it to the next update. An update with `update.sh` on the host starts it.
+- A client of `PUT /devices/{id}/blf` sends each key as an object, a BLF key as
+  `{"kind": "blf", "ext": "205"}`; a bare extension such as `"205"` is refused, and
+  `GET /devices/{id}/blf` answers in the same shape.
 
 ### Added
 
+- A DND toggle feature code, `*92` (`dndToggle`), next to `*90`/`*91`. A stack whose codes
+  already use `*92` gets the first free one of `*93`, `*94`, `*98`, `*99`, `#92`, `#93`, `#94`.
 - A STUN server on 3478/udp, so a phone that wants one can use the stack's own, `<FQDN>:3478`,
   rather than a third party's. It answers STUN alone, with no TURN relay.
+- Yealink desk phones as a device kind of their own, `yealink`: creating one returns a
+  provisioning link that the phone fetches its whole configuration from, and again every night,
+  so a rotated password, a changed key list or new codecs reach it without hand edits, and sets a
+  random admin password for the phone's web interface, revealed with the device's credentials.
+  `POST /devices/{id}/provisioningLink` replaces a leaked link. See the help topic
+  `yealink-desk-phones`.
+- `PUT /devices/{id}/blf` sets a `yealink` device's line keys, with quick-dial keys to outside
+  numbers, feature keys for a DND toggle with a lamp, voicemail and park, mailbox keys with a lamp
+  for the user's own or a ring group's mailbox, and the account's line key;
+  `PATCH /devices/{id}` takes its `ringtone`.
+- A device's message indicator can leave ring-group mailboxes out: `mwiRingGroups` on
+  `POST /users/{id}/devices` and `PATCH /devices/{id}` names the groups it counts besides the
+  user's own mailbox, `null` (every group, as before and the default for existing devices) or
+  `[]` (own mailbox only, the default for new `yealink` devices).
+
+### Changed
+
+- `GET/PUT /devices/{id}/blf`: every key is an object with a `kind`; a BLF key is
+  `{"kind": "blf", "ext": "205"}` where it was the bare extension `"205"`, which is no longer
+  accepted.
 
 ## [0.6.4] - 2026-10-20
 
