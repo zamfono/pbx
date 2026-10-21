@@ -3,11 +3,12 @@
  * pickup in `pickup.ts` and `*5` in `addParty.ts`. */
 import type { FeatureCodeKey } from '@zamfono/shared';
 
+import { ignoreGone } from '../ari/failures.js';
 import { userById } from '../internal/snapshot.js';
 import type { Presence } from '../presence.js';
 import { SIP_FORBIDDEN, SIP_NOT_FOUND } from '../sipCodes.js';
 import { addParty } from './addParty.js';
-import { type Call } from './call.js';
+import { callerChannel, type Call } from './call.js';
 import { extensionOf, ownerForExt } from './extensionOwner.js';
 import { concludeFeature } from './featureCall.js';
 import { mailboxAccess, ownVoicemail } from './mailbox.js';
@@ -38,6 +39,11 @@ async function setDnd(
   // hint and status from the config snapshot, so it must reload after this write.
   pipeline.deps.cache.invalidate();
   await presence.refreshUser(call.callerUserId);
+  // Answered before the hangup: an unanswered channel's hangup reaches the phone as 603 Decline,
+  // which it shows as a failed call although the code worked.
+  await pipeline.deps.ari.channels
+    .answer(callerChannel(call))
+    .catch(ignoreGone);
   await concludeFeature(pipeline, call, 'answered');
 }
 

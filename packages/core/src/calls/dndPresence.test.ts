@@ -73,6 +73,14 @@ describe('do not disturb and call presence', () => {
       )
       .at(-1);
     expect(hint?.body).toEqual({ deviceState: 'BUSY' });
+    // Answered, so the phone sees a completed call rather than 603 Decline.
+    expect(
+      fakeAri.calls.some(
+        entry =>
+          entry.method === 'POST' &&
+          entry.path === `channels/${channel.id}/answer`
+      )
+    ).toBe(true);
   });
 
   /** The last state written to `device`, from the fake ARI's request log. */
