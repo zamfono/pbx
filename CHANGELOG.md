@@ -11,6 +11,8 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-10-21
+
 ### Fixed
 
 - Dialling a DND code (`*90`, `*91`, `*92`) no longer shows as a failed or declined call on the
@@ -780,7 +782,8 @@ The first 0.2 release; its `v0.2.0` tag was never published.
 
 The first tagged version, before any deployment.
 
-[Unreleased]: https://github.com/zamfono/pbx/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/zamfono/pbx/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/zamfono/pbx/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/zamfono/pbx/compare/v0.6.4...v0.7.0
 [0.6.4]: https://github.com/zamfono/pbx/compare/v0.6.3...v0.6.4
 [0.6.3]: https://github.com/zamfono/pbx/compare/v0.6.2...v0.6.3
