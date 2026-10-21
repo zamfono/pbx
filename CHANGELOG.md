@@ -11,6 +11,19 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+### Upgrade notes
+
+- Mode A: allow 3478/udp inbound in the provider's firewall and the host's, as deploy/README.md
+  step 3 now lists it.
+- An update through the API, by hand or automatic, leaves the new `stun` service unstarted, since
+  the running release's `update.sh` does not know it yet: run `docker compose up -d` once
+  afterwards, or leave it to the next update. An update with `update.sh` on the host starts it.
+
+### Added
+
+- A STUN server on 3478/udp, so a phone that wants one can use the stack's own, `<FQDN>:3478`,
+  rather than a third party's. It answers STUN alone, with no TURN relay.
+
 ## [0.6.4] - 2026-10-20
 
 ### Fixed
