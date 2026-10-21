@@ -6,19 +6,20 @@ entered into the client by hand. `devices.revealCredentials`
 (`GET /api/v1/devices/{id}/credentials`, admin, audited) returns the same set later; after
 `devices.rotate` (`POST /api/v1/devices/{id}/rotate`) only the `password` changes.
 
-| Field             | Meaning                                                                    |
-| ----------------- | -------------------------------------------------------------------------- |
-| `server`          | The stack's FQDN, the SIP server to register with                          |
-| `domain`          | The SIP domain, the same FQDN                                              |
-| `transport`       | `tls` for a `tls` device; `udp` and/or `tcp` for a `plain` one, use either |
-| `port`            | `5061` for `tls`, `5060` for `udp`/`tcp`                                   |
-| `username`        | The SIP username, also the authentication username                         |
-| `password`        | The SIP password                                                           |
-| `extension`       | The user's extension                                                       |
-| `displayName`     | The user's name, the caller ID the phone shows                             |
-| `mediaEncryption` | `srtp` (SDES-SRTP, mandatory) for `tls`; `none` for `plain`                |
-| `codecs`          | The tenant's codecs in order of preference                                 |
-| `voicemailCode`   | The feature code that dials the user's own voicemail                       |
+| Field             | Meaning                                                                     |
+| ----------------- | --------------------------------------------------------------------------- |
+| `server`          | The stack's FQDN, the SIP server to register with                           |
+| `domain`          | The SIP domain, the same FQDN                                               |
+| `transport`       | `tls` for a `tls` device; `udp` and/or `tcp` for a `plain` one, use either  |
+| `port`            | `5061` for `tls`, `5060` for `udp`/`tcp`                                    |
+| `username`        | The SIP username, also the authentication username                          |
+| `password`        | The SIP password                                                            |
+| `extension`       | The user's extension                                                        |
+| `displayName`     | The user's name, the caller ID the phone shows                              |
+| `mediaEncryption` | `srtp` (SDES-SRTP, mandatory) for `tls`; `none` for `plain`                 |
+| `codecs`          | The tenant's codecs in order of preference                                  |
+| `voicemailCode`   | The feature code that dials the user's own voicemail                        |
+| `adminPassword`   | `null`; a `yealink` desk phone's admin password (see `yealink-desk-phones`) |
 
 No STUN server, ICE or outbound proxy is needed: Zamfono handles NAT itself. A client that wants a
 STUN server anyway can use Zamfono's own, `server`:3478 (UDP). A `plain` device registers only
@@ -56,5 +57,6 @@ and recommended.
   - Leave STUN and ICE off.
   - Settings, Codecs: enable the entries of `codecs` in that order.
 
-Zamfono provisions nothing client-specific for `manual` devices: any other client is set up from
-the same fields.
+Zamfono provisions nothing client-specific for `manual` softphones: any other client is set up from
+the same fields. A Yealink desk phone is better created as kind `yealink`, which fetches its whole
+configuration from a link (see `yealink-desk-phones`).

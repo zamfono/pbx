@@ -19,7 +19,7 @@ const ENC_COLUMNS: readonly {
   [T in EncTable]: { table: T; columns: readonly EncColumn<T>[] };
 }[EncTable][] = [
   { table: 'backupTargets', columns: ['secretEnc'] },
-  { table: 'devices', columns: ['sipPasswordEnc'] },
+  { table: 'devices', columns: ['sipPasswordEnc', 'adminPasswordEnc'] },
   {
     table: 'settings',
     columns: ['ringotelApiTokenEnc', 'smtpPasswordEnc', 'ssoClientSecretEnc']

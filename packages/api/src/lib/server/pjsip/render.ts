@@ -1,4 +1,9 @@
-import { mwiMailboxOf, presenceHintDevice } from '@zamfono/shared';
+import {
+  dndHintDevice,
+  mwiHintDevice,
+  mwiMailboxOf,
+  presenceHintDevice
+} from '@zamfono/shared';
 
 import { MOH_CLASSES_DIR } from '../audio/mohLayout.js';
 import {
@@ -41,11 +46,11 @@ function assertSafeDevice(device: Device, ringGroupIds: string[]): void {
 const DEVICE_QUALIFY_FREQUENCY_S = 30;
 
 /**
- * A device's dynamic AOR: `max_contacts` per §10.4 (3 default for `ringotel`, 1 for `manual`),
+ * A device's dynamic AOR: `max_contacts` per §10.4 (3 default for `ringotel`, 1 otherwise),
  * `qualify_frequency` so the device's reachability reaches the core, and `mailboxes` so PJSIP
  * accepts the device's message-summary subscription (§9.3 "MWI"): the owner's own mailbox
- * followed by every ring group the owner belongs to, so MWI for a group mailbox reaches its
- * members (§5.3).
+ * followed by the ring groups the owner belongs to that the device's indicator counts, every one
+ * unless it names some (`mwiRingGroupIds`), so MWI for a group mailbox reaches its members (§5.3).
  */
 function renderDeviceAor(
   device: Device,
@@ -53,9 +58,14 @@ function renderDeviceAor(
   ringGroupIds: string[]
 ): string {
   const maxContacts = device.kind === 'ringotel' ? ringotelMaxRegs : 1;
+  const picked = device.mwiRingGroupIds;
+  const counted =
+    picked === null
+      ? ringGroupIds
+      : ringGroupIds.filter(id => picked.includes(id));
   const mailboxes = [
     mwiMailboxOf({ userId: device.userId }),
-    ...ringGroupIds.map(ringGroupId => mwiMailboxOf({ ringGroupId }))
+    ...counted.map(ringGroupId => mwiMailboxOf({ ringGroupId }))
   ].join(',');
   return [
     `[${device.sipUsername}]`,
@@ -174,8 +184,20 @@ function renderUsersConf(input: RenderInput, skipped: SkippedRow[]): string {
   return joinSections(sections);
 }
 
-/** Every extension's hint, by extension; a parking slot is known by its extension alone. */
+// The `dndToggle` and `mailbox` codes prefix the DND and mailbox hints' extensions; the API takes
+// any code starting with `*` or `#` (§9.3), so one with anything but `*`, `#` and digits gets no
+// such hints rather than a broken dialplan line.
+const FEATURE_CODE_PATTERN = /^[*#0-9]+$/u;
+
+/**
+ * Every extension's hint, by extension, a parking slot known by its extension alone; each user's
+ * DND hint, `<dndToggle code><ext>`, and each user's and ring group's mailbox hint,
+ * `<mailbox code><ext>`, which a desk phone's DND and mailbox keys watch and dial (§9.3).
+ */
 function renderHintsConf(input: RenderInput, skipped: SkippedRow[]): string {
+  const { dndToggleCode: dndCode, mailboxCode } = input.settings;
+  const dndHints = FEATURE_CODE_PATTERN.test(dndCode);
+  const mailboxHints = FEATURE_CODE_PATTERN.test(mailboxCode);
   const holders: (Pick<SkippedRow, 'type' | 'id'> & { ext: string })[] = [
     ...input.users.map(user => ({ type: 'user' as const, ...user })),
     ...input.ringGroups.map(group => ({
@@ -193,7 +215,14 @@ function renderHintsConf(input: RenderInput, skipped: SkippedRow[]): string {
     ({ type, id }) => ({ type, id }),
     ({ type, ext }) => {
       assertExtension(ext, `${type}.ext`);
-      return [`exten => ${ext},hint,${presenceHintDevice(ext)}`];
+      const hints = [`exten => ${ext},hint,${presenceHintDevice(ext)}`];
+      if (type === 'user' && dndHints) {
+        hints.push(`exten => ${dndCode}${ext},hint,${dndHintDevice(ext)}`);
+      }
+      if (type !== 'parkingSlot' && mailboxHints) {
+        hints.push(`exten => ${mailboxCode}${ext},hint,${mwiHintDevice(ext)}`);
+      }
+      return hints;
     },
     skipped
   );

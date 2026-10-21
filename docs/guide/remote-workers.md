@@ -13,7 +13,7 @@ Two things to tell a remote worker before they treat their extension as their on
   phone's own cellular network, which reaches the emergency centre where the worker is. See
   `emergency-calls`.
 - **A `plain`-transport device only works from an allow-listed address.** `tls` devices (the
-  default for a mobile softphone) register from anywhere; a `plain` device — typically a desk
+  default for a mobile softphone) register from anywhere; a `plain` device — a `manual` desk
   phone kept off TLS — is restricted to its admin-configured IP allowlist, so it will not
   register at all from home unless that address is added.
 - **Repeated failed SIP attempts ban their source address.** A phone with a stale password, or

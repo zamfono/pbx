@@ -9,7 +9,7 @@ import {
 
 import { ownActingUser } from '../gates.js';
 import { defineOperation } from '../types.js';
-import { deviceOut, toDeviceOut } from './_shared.js';
+import { deviceOut, toDevicesOut } from './_shared.js';
 
 /** `GET /users/{id}/devices` (§10.3): a `user` actor lists only their own devices (§5.3). */
 export const list = defineOperation({
@@ -38,6 +38,6 @@ export const list = defineOperation({
       .limit(limit + 1)
       .execute();
     const { page, nextCursor } = offsetPage(ctx.operation, rows, offset, limit);
-    return { items: page.map(toDeviceOut), nextCursor };
+    return { items: await toDevicesOut(ctx.db, page), nextCursor };
   }
 });

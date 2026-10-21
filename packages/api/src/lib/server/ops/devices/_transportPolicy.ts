@@ -49,15 +49,15 @@ export function assertPlainTransportEnabled(): void {
   }
 }
 
-/** Throws 422 for a `ringotel` device on `plain` transport (§11.2 `devices` CHECK). */
+/** Throws 422 for a device other than `manual` on `plain` transport (§11.2 `devices` CHECK). */
 export function assertKindTransport(
   kind: DeviceKind,
   transport: DeviceTransport
 ): void {
-  if (kind === 'ringotel' && transport !== 'tls') {
+  if (kind !== 'manual' && transport !== 'tls') {
     throw new OpError(
       HTTP_UNPROCESSABLE_CONTENT,
-      'devices: a ringotel device must use the tls transport'
+      `devices: a ${kind} device must use the tls transport`
     );
   }
 }

@@ -1,5 +1,6 @@
 import { HTTP_CONFLICT, type ReloadKind } from '@zamfono/shared';
 
+import type { DroppedBlfKey } from '../devices/_shared.js';
 import { propagate } from '../propagate.js';
 import { liftCoveredBans } from '../sipAllowlist/_shared.js';
 import { renderSipBanListAfterCommit } from '../sipBans/_shared.js';
@@ -109,7 +110,7 @@ export async function revertDevices(
 /** Re-inserts the `device_blf_keys` rows the extension's own removal cascaded away (§5.9). */
 export async function revertBlfKeys(
   ctx: Context,
-  keys: { deviceId: string; ext: string; position: number }[]
+  keys: DroppedBlfKey[]
 ): Promise<void> {
   if (keys.length === 0) {
     return;

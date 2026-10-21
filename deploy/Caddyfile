@@ -18,13 +18,14 @@
 
 {$FQDN} {
 	# access log to stdout, shipped with the container logs (§7), without the credentials a URI
-	# carries in its query: a set-password token, an upload link's access token, an SSO code
+	# carries: in its query a set-password token, an upload link's access token, an SSO code, in
+	# its path a provisioning link's token (§10.4). One filter per field, so the URI's is one
+	# multi_regexp.
 	log {
 		format filter {
-			request>uri query {
-				delete token
-				delete access_token
-				delete code
+			request>uri multi_regexp {
+				regexp ^/provision/[^/?]+ /provision/REDACTED
+				regexp ([?&](?:token|access_token|code)=)[^&]* ${1}REDACTED
 			}
 			request>headers>Referer query {
 				delete token

@@ -73,7 +73,8 @@ describe("devices: a manual device's connection settings (§10.4)", () => {
       displayName: 'Anna Huber',
       mediaEncryption: 'srtp',
       codecs: ['g722', 'alaw'],
-      voicemailCode: '*99'
+      voicemailCode: '*99',
+      adminPassword: null
     });
   });
 

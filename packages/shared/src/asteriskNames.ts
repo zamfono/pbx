@@ -15,3 +15,15 @@ export function trunkSectionName(trunkId: string): string {
 export function presenceHintDevice(ext: string): string {
   return `Stasis:presence-${ext}`;
 }
+
+/** The custom device state the hint of the mailbox owned by extension `ext` watches,
+ * `Stasis:mwi-<ext>`: `BUSY` while the mailbox holds new messages (§9.3 "BLF and presence"). */
+export function mwiHintDevice(ext: string): string {
+  return `Stasis:mwi-${ext}`;
+}
+
+/** The custom device state a user's DND hint watches, `Stasis:dnd-<ext>`: `BUSY` while DND is on
+ * (§9.3 "BLF and presence"). */
+export function dndHintDevice(ext: string): string {
+  return `Stasis:dnd-${ext}`;
+}

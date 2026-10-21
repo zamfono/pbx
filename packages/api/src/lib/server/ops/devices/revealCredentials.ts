@@ -15,12 +15,12 @@ import { liveDevice, sipCredentialsOut } from './_shared.js';
 
 /**
  * `GET /devices/{id}/credentials` (§5.2): reveals a device's SIP credentials, audited, never
- * undoable; a `manual` device's as its full connection settings (§10.4 "`manual`").
+ * undoable; a `manual` or `yealink` device's as its full connection settings (§10.4).
  */
 export const revealCredentials = defineOperation({
   name: 'devices.revealCredentials',
   description:
-    "Reveals a device's SIP credentials; a manual device's as its full connection settings.",
+    "Reveals a device's SIP credentials; a manual or yealink device's as its full connection settings.",
   input: z.object({ id: z.string() }).strict(),
   output: z.union([connectionSettingsOut, sipCredentialsOut]),
   problems: [HTTP_NOT_FOUND],
@@ -35,7 +35,7 @@ export const revealCredentials = defineOperation({
       'devices.sipPasswordEnc',
       row.sipPasswordEnc
     ).toString('utf8');
-    if (row.kind === 'manual') {
+    if (row.kind !== 'ringotel') {
       return connectionSettings(ctx.db, row, password);
     }
     return { sipUsername: row.sipUsername, sipPassword: password };

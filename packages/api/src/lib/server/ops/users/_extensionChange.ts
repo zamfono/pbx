@@ -67,6 +67,11 @@ async function renameExtension(
     .where('ext', '=', oldExt)
     .execute();
   await ctx.db
+    .updateTable('deviceBlfKeys')
+    .set({ mailboxExt: newExt })
+    .where('mailboxExt', '=', oldExt)
+    .execute();
+  await ctx.db
     .updateTable('extensions')
     .set({ ext: newExt })
     .where('ext', '=', oldExt)

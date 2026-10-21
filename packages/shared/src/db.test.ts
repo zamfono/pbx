@@ -1,18 +1,18 @@
 import { expect, test } from 'vitest';
 
-import { isDbOpen, openDb, pendingMigrations } from './db.js';
-import { migrateForTest, MIGRATIONS_DIR } from './testDb.js';
+import { isDbOpen, migrator, openDb, pendingMigrations } from './db.js';
+import { migrateForTest, MIGRATIONS_DIR, seedSettings } from './testDb.js';
 
 test('migrates and enforces the schema', async () => {
   const db = openDb(':memory:');
-  expect(await pendingMigrations(db, MIGRATIONS_DIR)).toHaveLength(10);
+  expect(await pendingMigrations(db, MIGRATIONS_DIR)).toHaveLength(13);
   await migrateForTest(db);
   expect(await pendingMigrations(db, MIGRATIONS_DIR)).toEqual([]);
 
   const tables = (await db.introspection.getTables())
     .map(table => table.name)
     .sort();
-  expect(tables).toHaveLength(51);
+  expect(tables).toHaveLength(52);
 
   // settings.smtp_check_interval_s: 900 by default, NULL for no periodic relay check (§11.4)
   const settings = (await db.introspection.getTables()).find(
@@ -158,4 +158,32 @@ test('isDbOpen answers until the database is closed', async () => {
   expect(await isDbOpen(db)).toBe(true);
   await db.destroy();
   expect(await isDbOpen(db)).toBe(false);
+});
+
+test('the dndToggle migration gives a stack that remapped its codes a code of its own (§9.3)', async () => {
+  const db = openDb(':memory:');
+  const steps = migrator(db, MIGRATIONS_DIR);
+  await steps.migrateTo('1792310400000_yealink_devices');
+  const remapped = {
+    pickup: '*8',
+    dndOn: '*90',
+    dndOff: '*91',
+    mailbox: '*95',
+    ownVoicemail: '*96',
+    deposit: '*97',
+    addParty: '*5',
+    clirOn: '#31#',
+    clirOff: '*31#',
+    park: '*92'
+  };
+  await seedSettings(db, { featureCodesJson: JSON.stringify(remapped) });
+  await steps.migrateToLatest();
+  const row = await db
+    .selectFrom('settings')
+    .select('featureCodesJson')
+    .executeTakeFirstOrThrow();
+  expect(JSON.parse(row.featureCodesJson)).toEqual({
+    ...remapped,
+    dndToggle: '*93'
+  });
 });

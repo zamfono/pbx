@@ -3,11 +3,12 @@
  * pickup in `pickup.ts` and `*5` in `addParty.ts`. */
 import type { FeatureCodeKey } from '@zamfono/shared';
 
+import { userById } from '../internal/snapshot.js';
 import type { Presence } from '../presence.js';
 import { SIP_FORBIDDEN, SIP_NOT_FOUND } from '../sipCodes.js';
 import { addParty } from './addParty.js';
 import { type Call } from './call.js';
-import { ownerForExt } from './extensionOwner.js';
+import { extensionOf, ownerForExt } from './extensionOwner.js';
 import { concludeFeature } from './featureCall.js';
 import { mailboxAccess, ownVoicemail } from './mailbox.js';
 import { park } from './parking.js';
@@ -40,6 +41,27 @@ async function setDnd(
   await concludeFeature(pipeline, call, 'answered');
 }
 
+/**
+ * `*92`, or `*92<own ext>` as a desk phone's DND key dials it: toggles the caller's DND (§9.3).
+ * Any other extension after the code is refused, since nobody sets another person's DND.
+ */
+async function toggleDnd(
+  pipeline: Pipeline,
+  presence: Presence,
+  call: Call,
+  ext: string
+): Promise<void> {
+  const snapshot = await pipeline.deps.cache.get();
+  const user = userById(snapshot, call.callerUserId);
+  const ownExt =
+    user === null ? null : extensionOf(snapshot, { userId: user.id });
+  if (user === null || (ext !== '' && ext !== ownExt)) {
+    await release(pipeline, call, SIP_FORBIDDEN, 'failed');
+    return;
+  }
+  await setDnd(pipeline, presence, call, user.dnd !== 1);
+}
+
 /** `*97<ext>`: deposits the caller in `ext`'s mailbox without ringing (§9.3), through
  * `deposit()`. */
 async function depositFeature(
@@ -68,6 +90,7 @@ export async function handleFeature(
     pickup: () => pickupByExtension(pipeline, call, rest),
     dndOn: () => setDnd(pipeline, presence, call, true),
     dndOff: () => setDnd(pipeline, presence, call, false),
+    dndToggle: () => toggleDnd(pipeline, presence, call, rest),
     mailbox: () => mailboxAccess(pipeline, call, rest),
     ownVoicemail: () => ownVoicemail(pipeline, call),
     deposit: () => depositFeature(pipeline, call, rest),

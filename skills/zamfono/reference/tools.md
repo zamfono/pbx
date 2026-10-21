@@ -33,14 +33,15 @@
 | `contacts.get` | `GET /api/v1/contacts/{id}` | Reads one live contact by id. | user | no |
 | `contacts.list` | `GET /api/v1/contacts` | Lists the tenant's live phone-book contacts. | user | no |
 | `contacts.update` | `PATCH /api/v1/contacts/{id}` | Updates a contact's details; `phones` replaces the number set as a whole. | admin | no |
-| `devices.create` | `POST /api/v1/users/{id}/devices` | Creates a SIP device for a user; a manual device's connection settings are returned once. | user | no |
+| `devices.create` | `POST /api/v1/users/{id}/devices` | Creates a SIP device for a user; a manual or yealink device's connection settings, and a yealink device's provisioning link, are returned once. | user | no |
 | `devices.delete` | `DELETE /api/v1/devices/{id}` | Soft-deletes a device. | user | yes |
-| `devices.getBlf` | `GET /api/v1/devices/{id}/blf` | Reads a ringotel device's BLF panel. | user | no |
+| `devices.getBlf` | `GET /api/v1/devices/{id}/blf` | Reads a device's key list: a ringotel device's BLF panel, or a manual device's line keys. | user | no |
 | `devices.list` | `GET /api/v1/users/{id}/devices` | Lists a user's live devices, paginated. | user | no |
-| `devices.revealCredentials` | `GET /api/v1/devices/{id}/credentials` | Reveals a device's SIP credentials; a manual device's as its full connection settings. | admin | no |
+| `devices.provisioningLink` | `POST /api/v1/devices/{id}/provisioningLink` | Replaces a yealink desk phone's provisioning link, shown once; the old link stops working. | admin | no |
+| `devices.revealCredentials` | `GET /api/v1/devices/{id}/credentials` | Reveals a device's SIP credentials; a manual or yealink device's as its full connection settings. | admin | no |
 | `devices.rotate` | `POST /api/v1/devices/{id}/rotate` | Rotates a device's SIP password. | admin | yes |
-| `devices.setBlf` | `PUT /api/v1/devices/{id}/blf` | Replaces a ringotel device's BLF panel as a whole. | user | no |
-| `devices.update` | `PATCH /api/v1/devices/{id}` | Updates a device's label or, for a plain device, its IP allowlist. | user | no |
+| `devices.setBlf` | `PUT /api/v1/devices/{id}/blf` | Replaces a device's key list as a whole: a ringotel device's BLF panel, or a yealink device's line keys. | user | no |
+| `devices.update` | `PATCH /api/v1/devices/{id}` | Updates a device's label, a plain device's IP allowlist, a yealink device's ringtone or the ring groups its message indicator counts. | user | no |
 | `didBlocks.create` | `POST /api/v1/didBlocks` | Adds a number block: a base and a fixed digit count, or open-ended; groups DIDs and gives unassigned numbers in it a fallback (zamfono.help numbers) | admin | no |
 | `didBlocks.delete` | `DELETE /api/v1/didBlocks/{id}` | Soft-deletes a number block once no live DID falls within it | admin | yes |
 | `didBlocks.list` | `GET /api/v1/didBlocks` | Lists the tenant's number blocks with their digit counts and fallback targets | admin | no |

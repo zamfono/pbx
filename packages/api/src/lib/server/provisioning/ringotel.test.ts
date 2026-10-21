@@ -91,7 +91,7 @@ describe('buildBranchProvision', () => {
       {
         codecsJson: '["opus","g722","alaw"]',
         featureCodesJson:
-          '{"pickup":"*8","dndOn":"*90","dndOff":"*91","mailbox":"*95","ownVoicemail":"*96","deposit":"*97","addParty":"*5","clirOn":"#31#","clirOff":"*31#","park":"*70"}',
+          '{"pickup":"*8","dndOn":"*90","dndOff":"*91","dndToggle":"*92","mailbox":"*95","ownVoicemail":"*96","deposit":"*97","addParty":"*5","clirOn":"#31#","clirOff":"*31#","park":"*70"}',
         ringotelMaxRegs: 3,
         emergencyNumbersJson: '["112","110"]'
       },
@@ -120,7 +120,7 @@ describe('buildBranchProvision', () => {
       {
         codecsJson: '["opus"]',
         featureCodesJson:
-          '{"pickup":"*8","dndOn":"*90","dndOff":"*91","mailbox":"*95","ownVoicemail":"*96","deposit":"*97","addParty":"*5","clirOn":"#31#","clirOff":"*31#","park":"*70"}',
+          '{"pickup":"*8","dndOn":"*90","dndOff":"*91","dndToggle":"*92","mailbox":"*95","ownVoicemail":"*96","deposit":"*97","addParty":"*5","clirOn":"#31#","clirOff":"*31#","park":"*70"}',
         ringotelMaxRegs: 3,
         emergencyNumbersJson: '["112","110"]'
       },

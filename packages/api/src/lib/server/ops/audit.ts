@@ -20,6 +20,7 @@ const SECRET_FIELDS = new Set([
   'secret',
   'token',
   'sipPassword',
+  'adminPassword',
   'smtpPassword',
   'ssoClientSecret',
   'ringotelApiToken'

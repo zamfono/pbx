@@ -71,5 +71,5 @@ parked call itself again and may hang it up or transfer it like any call they ar
 
 Each slot has a BLF hint that reads in use while a call is parked there, so a lamp per slot shows
 where the waiting callers are. On a `manual` device the lamps are configured on the phone itself;
-on a Ringotel device, add the slots to the device's BLF list with `devices.setBlf`
+on a Ringotel or `yealink` device, add the slots to the device's key list with `devices.setBlf`
 (`PUT /api/v1/devices/{id}/blf`).

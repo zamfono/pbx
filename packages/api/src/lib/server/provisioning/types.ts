@@ -18,8 +18,9 @@ export type PushReceipt = { remoteId: string } | null;
 
 /**
  * A device provisioning provider (§10.4). `ringotel` is the one that pushes; a `manual` device is
- * entered into its phone by hand, so nothing is pushed for it and it needs no provider. Every
- * method but the first three is optional.
+ * entered into its phone by hand, and a `yealink` phone fetches its file from its link (§10.4),
+ * so nothing is pushed for either and neither needs a provider. Every method but the first three
+ * is optional.
  */
 export type ProvisioningProvider = {
   onDeviceCreated(

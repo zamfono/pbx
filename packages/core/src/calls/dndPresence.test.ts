@@ -75,6 +75,72 @@ describe('do not disturb and call presence', () => {
     expect(hint?.body).toEqual({ deviceState: 'BUSY' });
   });
 
+  /** The last state written to `device`, from the fake ARI's request log. */
+  function lastState(device: string): unknown {
+    return fakeAri.calls
+      .filter(
+        entry =>
+          entry.method === 'PUT' && entry.path === `deviceStates/${device}`
+      )
+      .at(-1)?.body;
+  }
+
+  /** Runs `*92<rest>` for the user at extension 201, returning their `dnd` afterwards. */
+  async function toggle(userId: string, rest: string): Promise<number> {
+    const channel = fakeAri.addChannel({});
+    const call = newInternalCall(channel.id, 'e201', `*92${rest}`);
+    call.callerUserId = userId;
+    pipeline.registerCall(call);
+    await cdr.open(call);
+    await handleFeature(pipeline, presence, call, 'dndToggle', rest);
+    const row = await db
+      .selectFrom('users')
+      .select('dnd')
+      .where('id', '=', userId)
+      .executeTakeFirstOrThrow();
+    return row.dnd;
+  }
+
+  it('*92 and *92<own ext> toggle dnd and the DND hint; another extension is refused', async () => {
+    await setUp();
+    const userId = await seedUser(db);
+    await seedExtension(db, '201', { userId });
+
+    expect(await toggle(userId, '201')).toBe(1);
+    expect(lastState('Stasis:dnd-201')).toEqual({ deviceState: 'BUSY' });
+    expect(await toggle(userId, '')).toBe(0);
+    expect(lastState('Stasis:dnd-201')).toEqual({ deviceState: 'NOT_INUSE' });
+    expect(await toggle(userId, '202')).toBe(0);
+  });
+
+  it("a config refresh writes each mailbox's lamp under its current extension", async () => {
+    await setUp();
+    const userId = await seedUser(db);
+    await seedExtension(db, '201', { userId });
+    await db
+      .insertInto('voicemails')
+      .values({
+        id: newId(),
+        caller: '+15559999',
+        createdAt: nowIso(),
+        durationS: 5,
+        filename: 'x.wav',
+        mailboxUserId: userId
+      })
+      .execute();
+
+    await presence.refreshAll();
+    expect(lastState('Stasis:mwi-201')).toEqual({ deviceState: 'BUSY' });
+
+    await db
+      .updateTable('extensions')
+      .set({ ext: '202' })
+      .where('ext', '=', '201')
+      .execute();
+    await presence.refreshAll();
+    expect(lastState('Stasis:mwi-202')).toEqual({ deviceState: 'BUSY' });
+  });
+
   it("*90 at level qos writes the feature call's call_qos row from its channel's hangup (§7)", async () => {
     await setUp();
     const userId = await seedUser(db);

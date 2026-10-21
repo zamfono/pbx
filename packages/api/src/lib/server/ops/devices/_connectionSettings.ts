@@ -8,6 +8,7 @@ import {
   type Db
 } from '@zamfono/shared';
 
+import { decrypt, keyringFromEnv } from '#lib/server/secretbox.js';
 import {
   plainSipTransports,
   SIP_PLAIN_PORT,
@@ -19,7 +20,7 @@ import { requireUserExtension } from '../users/_extensions.js';
 import { liveUser } from '../users/_shared.js';
 import type { DeviceRow } from './_shared.js';
 
-/** A `manual` device's connection settings (§10.4 "`manual`"), what a phone set up by hand asks for. */
+/** A `manual` or `yealink` device's connection settings (§10.4), what a phone set up by hand asks for. */
 export const connectionSettingsOut = z.object({
   server: z
     .string()
@@ -43,7 +44,13 @@ export const connectionSettingsOut = z.object({
     .enum(['srtp', 'none'])
     .describe('SDES-SRTP, mandatory, for a tls device; none for a plain one.'),
   codecs: codecsSchema.describe('The codecs in order of preference.'),
-  voicemailCode: z.string().describe('The own-voicemail feature code.')
+  voicemailCode: z.string().describe('The own-voicemail feature code.'),
+  adminPassword: z
+    .string()
+    .nullable()
+    .describe(
+      "A yealink device's admin password for the phone's web interface; null for a manual device."
+    )
 });
 export type ConnectionSettings = z.infer<typeof connectionSettingsOut>;
 
@@ -70,6 +77,14 @@ export async function connectionSettings(
     mediaEncryption: tls ? 'srtp' : 'none',
     codecs: codecsColumn.decode(settings.codecsJson),
     voicemailCode: featureCodesColumn.decode(settings.featureCodesJson)
-      .ownVoicemail
+      .ownVoicemail,
+    adminPassword:
+      device.adminPasswordEnc === null
+        ? null
+        : decrypt(
+            keyringFromEnv(env),
+            'devices.adminPasswordEnc',
+            device.adminPasswordEnc
+          ).toString('utf8')
   };
 }

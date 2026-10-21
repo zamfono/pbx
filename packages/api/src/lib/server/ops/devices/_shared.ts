@@ -13,12 +13,27 @@ import {
 import { assertNoLiveHolder } from '../liveHolder.js';
 import { liveRow } from '../rows.js';
 import type { Context } from '../types.js';
+import {
+  loadMwiRingGroups,
+  mwiRingGroupsSchema,
+  type MwiRingGroups
+} from './_mwiRingGroups.js';
 
 /** A `devices` row as Kysely's `CamelCasePlugin` maps it (§11.2); never carries the raw password. */
 export type DeviceRow = Selectable<DB['devices']>;
 
-/** One `device_blf_keys` row, as an audit diff records the keys a removed extension drops. */
-export type DroppedBlfKey = { deviceId: string; ext: string; position: number };
+/**
+ * One `device_blf_keys` row, as an audit diff records the keys a removed extension drops: a BLF
+ * key (`ext`), or a `yealink` device's mailbox key (`mailboxExt`, `label`), which entries recorded
+ * before mailbox keys never hold.
+ */
+export type DroppedBlfKey = {
+  deviceId: string;
+  position: number;
+  ext?: string | null;
+  mailboxExt?: string | null;
+  label?: string | null;
+};
 
 /** Throws 409 while `userId` already has a live `ringotel` device (`devices_one_ringotel_per_user`). */
 export async function assertNoExistingRingotelDevice(
@@ -42,6 +57,23 @@ export const deviceOut = z.object({
   transport: z.enum(DEVICE_TRANSPORTS),
   allowedIps: allowedIpsSchema.nullable(),
   sipUsername: z.string(),
+  ringtone: z
+    .string()
+    .nullable()
+    .describe(
+      "A yealink device's built-in ringtone, written into its provisioning link's file; null: the phone's own."
+    ),
+  mwiRingGroups: mwiRingGroupsSchema,
+  provisionedAt: z
+    .string()
+    .nullable()
+    .describe(
+      "When the phone last fetched its provisioning link's file, ISO 8601."
+    ),
+  provisionedFrom: z
+    .string()
+    .nullable()
+    .describe('The client address of that fetch.'),
   // Not its latest REGISTER refresh; whether it is registered now is live state (§10.1).
   lastRegisteredAt: z
     .string()
@@ -58,7 +90,7 @@ export const sipCredentialsOut = z.object({
 });
 
 /** The wire shape of a device, never its encrypted password (§5.2 "SIP credentials"). */
-export function toDeviceOut(row: DeviceRow): DeviceOut {
+function toDeviceOut(row: DeviceRow, mwiRingGroups: MwiRingGroups): DeviceOut {
   return {
     id: row.id,
     userId: row.userId,
@@ -67,9 +99,28 @@ export function toDeviceOut(row: DeviceRow): DeviceOut {
     transport: row.transport,
     allowedIps: allowedIpsColumn.nullable().decode(row.allowedIpsJson),
     sipUsername: row.sipUsername,
+    ringtone: row.ringtone,
+    mwiRingGroups,
+    provisionedAt: row.provisionedAt,
+    provisionedFrom: row.provisionedFrom,
     lastRegisteredAt: row.lastRegisteredAt,
     createdAt: row.createdAt
   };
+}
+
+/** The wire shape of each of `rows`, in order (§10.3). */
+export async function toDevicesOut(
+  db: Db,
+  rows: DeviceRow[]
+): Promise<DeviceOut[]> {
+  const groups = await loadMwiRingGroups(db, rows);
+  return rows.map(row => toDeviceOut(row, groups.get(row.id) ?? null));
+}
+
+/** The wire shape of one device (§10.3). */
+export async function deviceOutOf(db: Db, row: DeviceRow): Promise<DeviceOut> {
+  const groups = await loadMwiRingGroups(db, [row]);
+  return toDeviceOut(row, groups.get(row.id) ?? null);
 }
 
 /** Loads a live device by id, or throws `OpError(404)`. */
@@ -96,7 +147,7 @@ export async function loadDroppedBlfKeys(
 ): Promise<DroppedBlfKey[]> {
   return ctx.db
     .selectFrom('deviceBlfKeys')
-    .select(['deviceId', 'ext', 'position'])
-    .where('ext', '=', ext)
+    .select(['deviceId', 'position', 'ext', 'mailboxExt', 'label'])
+    .where(eb => eb.or([eb('ext', '=', ext), eb('mailboxExt', '=', ext)]))
     .execute();
 }

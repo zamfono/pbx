@@ -117,11 +117,22 @@ export interface Contacts {
 
 export interface DeviceBlfKeys {
   deviceId: string;
-  ext: string;
+  ext: string | null;
+  feature: string | null;
+  isLineKey: Generated<number>;
+  label: string | null;
+  mailboxExt: string | null;
+  number: string | null;
   position: number;
 }
 
+export interface DeviceMwiRingGroups {
+  deviceId: string;
+  ringGroupId: string;
+}
+
 export interface Devices {
+  adminPasswordEnc: Buffer | null;
   allowedIpsJson: string | null;
   createdAt: string;
   deletedAt: string | null;
@@ -129,6 +140,11 @@ export interface Devices {
   kind: DeviceKind;
   label: string;
   lastRegisteredAt: string | null;
+  mwiAllRingGroups: Generated<number>;
+  provisionedAt: string | null;
+  provisionedFrom: string | null;
+  provisioningTokenHash: string | null;
+  ringtone: string | null;
   sipPasswordEnc: Buffer;
   sipUsername: string;
   transport: Generated<DeviceTransport>;
@@ -597,6 +613,7 @@ export interface DB {
   contactPhones: ContactPhones;
   contacts: Contacts;
   deviceBlfKeys: DeviceBlfKeys;
+  deviceMwiRingGroups: DeviceMwiRingGroups;
   devices: Devices;
   didBlocks: DidBlocks;
   dids: Dids;

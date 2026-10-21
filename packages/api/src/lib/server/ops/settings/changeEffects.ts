@@ -6,10 +6,13 @@ import type { Context } from '../types.js';
 import type { SettingsColumns, SettingsRow } from './_shared.js';
 import { pushProfileAfterCommit } from './profilePush.js';
 
-/** The reload kinds a changed set of columns requires (§3.1): `pjsip` and/or `moh`. The hold
- * music is each device endpoint's `moh_suggest` (§10.2 "Hold music"), so it moves PJSIP too. */
-export function reloadKindsFor(columns: SettingsColumns): ('pjsip' | 'moh')[] {
-  const kinds: ('pjsip' | 'moh')[] = [];
+/** The reload kinds a changed set of columns requires (§3.1): `pjsip`, `moh` and/or `dialplan`.
+ * The hold music is each device endpoint's `moh_suggest` (§10.2 "Hold music"), so it moves PJSIP
+ * too; the `dndToggle` code prefixes every user's DND hint (§9.3), so the codes move the dialplan. */
+export function reloadKindsFor(
+  columns: SettingsColumns
+): ('pjsip' | 'moh' | 'dialplan')[] {
+  const kinds: ('pjsip' | 'moh' | 'dialplan')[] = [];
   if (
     'codecsJson' in columns ||
     'ringotelMaxRegs' in columns ||
@@ -19,6 +22,9 @@ export function reloadKindsFor(columns: SettingsColumns): ('pjsip' | 'moh')[] {
   }
   if ('holdMohAudioId' in columns) {
     kinds.push('moh');
+  }
+  if ('featureCodesJson' in columns) {
+    kinds.push('dialplan');
   }
   return kinds;
 }

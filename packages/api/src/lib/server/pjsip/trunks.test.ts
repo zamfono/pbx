@@ -46,7 +46,9 @@ function renderTrunk(trunk: Trunk): string {
       codecs: ['alaw'],
       ringotelMaxRegs: 3,
       extLength: 3,
-      holdMohClass: 'default'
+      holdMohClass: 'default',
+      dndToggleCode: '*92',
+      mailboxCode: '*95'
     },
     users: [],
     devices: [],
@@ -144,7 +146,9 @@ describe('renderTrunksConf username', () => {
           codecs: ['alaw'],
           ringotelMaxRegs: 3,
           extLength: 3,
-          holdMohClass: 'default'
+          holdMohClass: 'default',
+          dndToggleCode: '*92',
+          mailboxCode: '*95'
         },
         users: [],
         devices: [],
@@ -182,7 +186,9 @@ describe('renderTrunksConf registration retries', () => {
         codecs: ['alaw'],
         ringotelMaxRegs: 3,
         extLength: 3,
-        holdMohClass: 'default'
+        holdMohClass: 'default',
+        dndToggleCode: '*92',
+        mailboxCode: '*95'
       },
       users: [],
       devices: [],
@@ -279,7 +285,9 @@ describe('renderTrunksConf inbound_auth source restriction', () => {
         codecs: ['alaw'],
         ringotelMaxRegs: 3,
         extLength: 3,
-        holdMohClass: 'default'
+        holdMohClass: 'default',
+        dndToggleCode: '*92',
+        mailboxCode: '*95'
       },
       users: [],
       devices: [],

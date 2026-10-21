@@ -170,13 +170,19 @@ curl -sk -D - -o /dev/null "https://localhost:$port/auth/login" \
   | grep -ix "content-security-policy: frame-ancestors 'none'"$'\r' >/dev/null \
   || fail "a page was answered without Content-Security-Policy: frame-ancestors 'none'"
 
-echo "==> the access log keeps no credential a URI carries in its query (§7)"
+echo "==> the access log keeps no credential a URI carries in its query or a provisioning link's path (§7, §10.4)"
 curl -sk -o /dev/null -H "Referer: https://localhost/auth/setPassword?token=secret-referer" \
   "https://localhost:$port/upload/audio?token=secret-t&access_token=secret-a&code=secret-c&kept=1"
 logged=$(docker logs "$tag-proxy" 2>&1 | grep '"uri":"/upload/audio?.*kept=1"') \
   || fail "the access log has no line for the request with its query's other parameters"
 if grep -q secret <<<"$logged"; then
   fail "the access log kept a credential: $logged"
+fi
+curl -sk -o /dev/null "https://localhost:$port/provision/secret-provisioning-token/y000000000000.cfg"
+logged=$(docker logs "$tag-proxy" 2>&1 | grep '"uri":"/provision/REDACTED/y000000000000.cfg"') \
+  || fail "the access log has no line for the provisioning fetch with its file name"
+if docker logs "$tag-proxy" 2>&1 | grep -q secret-provisioning-token; then
+  fail "the access log kept a provisioning link's token"
 fi
 
 echo "PASS: images/proxy"

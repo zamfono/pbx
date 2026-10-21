@@ -24,7 +24,10 @@ import './index.js';
 /** Anna at 101 with a ringotel device whose BLF panel shows `keys`; answers her id. */
 async function annaWithPanel(db: Db, keys: string[]): Promise<string> {
   const anna = await createUser(db, '101');
-  await run(db, 'devices.setBlf', { id: await ringotelDevice(db, anna), keys });
+  await run(db, 'devices.setBlf', {
+    id: await ringotelDevice(db, anna),
+    keys: keys.map(ext => ({ kind: 'blf', ext }))
+  });
   return anna;
 }
 
@@ -53,7 +56,7 @@ const CASES: UndoCase[] = [
       const anna = await annaWithPanel(db, ['102']);
       await run(db, 'devices.setBlf', {
         id: await ringotelDevice(db, ben),
-        keys: ['101']
+        keys: [{ kind: 'blf', ext: '101' }]
       });
       await run(db, 'ringGroups.create', {
         name: 'Sales',
@@ -113,7 +116,7 @@ const CASES: UndoCase[] = [
       );
       await run(db, 'devices.setBlf', {
         id: await ringotelDevice(db, anna),
-        keys: [group.ext]
+        keys: [{ kind: 'blf', ext: group.ext }]
       });
       return group.id;
     },

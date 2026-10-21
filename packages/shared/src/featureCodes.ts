@@ -4,6 +4,7 @@ const FEATURE_CODE_KEYS = [
   'pickup',
   'dndOn',
   'dndOff',
+  'dndToggle',
   'mailbox',
   'ownVoicemail',
   'deposit',
@@ -42,6 +43,7 @@ export type FeatureCodes = z.infer<typeof featureCodesSchema>;
 /** Codes dialled with an extension or number appended (§9.3 table). */
 export const CODES_WITH_ARGUMENT: ReadonlySet<FeatureCodeKey> = new Set([
   'pickup',
+  'dndToggle',
   'mailbox',
   'deposit',
   'addParty',

@@ -173,13 +173,19 @@ describe('audit.undo of a whole-list replace', () => {
     await runOperation(
       db,
       'devices.setBlf',
-      { id, keys: ['102'] },
+      { id, keys: [{ kind: 'blf', ext: '102' }] },
       asConfirmedRun()
     );
     await runOperation(
       db,
       'devices.setBlf',
-      { id, keys: ['101', '102'] },
+      {
+        id,
+        keys: [
+          { kind: 'blf', ext: '101' },
+          { kind: 'blf', ext: '102' }
+        ]
+      },
       asConfirmedRun()
     );
 
@@ -190,7 +196,7 @@ describe('audit.undo of a whole-list replace', () => {
       'devices.getBlf',
       { id },
       asConfirmedRun()
-    )) as { keys: string[] };
-    expect(read.keys).toEqual(['102']);
+    )) as { keys: unknown[] };
+    expect(read.keys).toEqual([{ kind: 'blf', ext: '102' }]);
   });
 });

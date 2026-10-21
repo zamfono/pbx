@@ -117,7 +117,7 @@ describe('a ringotel device created before provisioning.ringotelSetup (§10.4)',
     await runOperation(
       db,
       'devices.setBlf',
-      { id: device.device.id, keys: ['101'] },
+      { id: device.device.id, keys: [{ kind: 'blf', ext: '101' }] },
       asConfirmedRun()
     );
 
@@ -268,7 +268,7 @@ describe('a ringotel device whose Ringotel user is missing (§10.4, §5.2)', () 
     await runOperation(
       db,
       'devices.setBlf',
-      { id, keys: ['101'] },
+      { id, keys: [{ kind: 'blf', ext: '101' }] },
       asConfirmedRun()
     );
 

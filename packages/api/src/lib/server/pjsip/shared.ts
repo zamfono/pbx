@@ -23,6 +23,10 @@ export type RenderInput = {
     ringotelMaxRegs: number;
     extLength: number;
     holdMohClass: string;
+    // The `dndToggle` and `mailbox` feature codes, the prefixes of every user's DND hint and
+    // every user's and ring group's mailbox hint (§9.3).
+    dndToggleCode: string;
+    mailboxCode: string;
   };
   // name: the display name a device's calls carry as caller-ID name (§11.2 `users.name`).
   // ringGroupIds: the ring groups the user belongs to (§5.3), so a device AOR can list
@@ -36,6 +40,9 @@ export type RenderInput = {
     allowedIps: string[] | null;
     sipUsername: string;
     sipPassword: string;
+    // The ring groups its message indicator counts besides the own mailbox (§9.3 "MWI"); null
+    // for every group the user belongs to.
+    mwiRingGroupIds: string[] | null;
   }[];
   ringGroups: { id: string; ext: string }[];
   parkingSlots: string[];

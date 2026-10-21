@@ -163,7 +163,7 @@ describe('an operation that calls Ringotel leaves the file writable to another c
         runOperation(
           stack.db,
           'devices.setBlf',
-          { id: deviceId, keys: ['998'] },
+          { id: deviceId, keys: [{ kind: 'blf', ext: '998' }] },
           owner
         )
     );

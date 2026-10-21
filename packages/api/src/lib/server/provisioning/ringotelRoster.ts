@@ -137,8 +137,11 @@ export async function deviceBlfKeys(
     .selectFrom('deviceBlfKeys')
     .select('ext')
     .where('deviceId', '=', deviceId)
+    .where('ext', 'is not', null)
     .orderBy('position')
+    .$narrowType<{ ext: string }>()
     .execute();
+  // A BLF key alone has an `ext`; the other kinds are a `yealink` device's, never pushed.
   return rows.map(row => row.ext);
 }
 

@@ -29,6 +29,9 @@ export function stackIpv4(env: {
 /** §6.1 "One IP, three listeners": the fixed SIP-TLS port every client, Ringotel included, dials. */
 export const SIP_TLS_PORT = 5061;
 
+/** §6.1 "STUN": the fixed UDP port of the stack's own STUN server. */
+export const STUN_PORT = 3478;
+
 /** §9.1: the fixed port of the plain SIP transports, UDP and TCP alike. */
 export const SIP_PLAIN_PORT = 5060;
 

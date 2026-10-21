@@ -206,7 +206,7 @@ describe('devices.create/delete/rotate/setBlf: provisioning wiring (§10.4)', ()
     await runOperation(
       db,
       'devices.setBlf',
-      { id: device.device.id, keys: ['701'] },
+      { id: device.device.id, keys: [{ kind: 'blf', ext: '701' }] },
       asRun()
     );
 
@@ -302,15 +302,15 @@ describe('devices', () => {
       runOperation(
         db,
         'devices.setBlf',
-        { id: device.device.id, keys: ['701'] },
+        { id: device.device.id, keys: [{ kind: 'blf', ext: '701' }] },
         asRun()
       )
-    ).resolves.toMatchObject({ keys: ['701'] });
+    ).resolves.toMatchObject({ keys: [{ kind: 'blf', ext: '701' }] });
     await expect(
       runOperation(
         db,
         'devices.setBlf',
-        { id: device.device.id, keys: ['999'] },
+        { id: device.device.id, keys: [{ kind: 'blf', ext: '999' }] },
         asRun()
       )
     ).rejects.toMatchObject({ status: 422 });

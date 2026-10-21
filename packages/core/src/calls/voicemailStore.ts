@@ -4,7 +4,12 @@
  * behalf (§3.1 "Mail"). Separate from the deposit flow itself, which is about the call. The MWI
  * push after any later mailbox change (§9.3 "MWI", `refreshMwi`) reads the same counts.
  */
-import { mwiMailboxOf, type Db, type MailRequest } from '@zamfono/shared';
+import {
+  mwiHintDevice,
+  mwiMailboxOf,
+  type Db,
+  type MailRequest
+} from '@zamfono/shared';
 
 import type { AriClient } from '../ari/client.js';
 import { logFailure } from '../ari/failures.js';
@@ -43,17 +48,100 @@ export async function mailboxFull(
   return oldMessages + newMessages >= limit;
 }
 
-/** Recomputes `mailbox`'s MWI counts and pushes them (§9.3 "MWI"): called after core's own DTMF
- * mailbox menu changes a read flag or deletes a message, and by the internal route `api` calls
- * after doing the same. */
+/** The extension owning `mailbox`, whose hint is the mailbox's lamp (§9.3); `null` for a user
+ * without one, who has no lamp. */
+async function mailboxExtension(
+  db: Db,
+  mailbox: Owner
+): Promise<string | null> {
+  const row = await (
+    'userId' in mailbox
+      ? db.selectFrom('extensions').where('userId', '=', mailbox.userId)
+      : db
+          .selectFrom('extensions')
+          .where('ringGroupId', '=', mailbox.ringGroupId)
+  )
+    .select('ext')
+    .executeTakeFirst();
+  return row?.ext ?? null;
+}
+
+/** Sets the lamp of the mailbox extension `ext` owns: `BUSY` while it holds new messages. */
+async function pushLamp(
+  ari: AriClient,
+  ext: string,
+  newMessages: number
+): Promise<void> {
+  await ari.deviceStates
+    .put(mwiHintDevice(ext), newMessages > 0 ? 'BUSY' : 'NOT_INUSE')
+    .catch(logFailure(ari.log, 'mailbox hint update', { ext }));
+}
+
+/** Pushes `mailbox`'s counts to Asterisk and its lamp, the mailbox hint's device state (§9.3
+ * "MWI", "BLF and presence"). A failed PUT is logged; the next change writes both again. */
+async function pushMwi(
+  deps: { ari: AriClient; db: Db },
+  mailbox: Owner
+): Promise<void> {
+  const [{ oldMessages, newMessages }, ext] = await Promise.all([
+    mwiCounts(deps.db, mailbox),
+    mailboxExtension(deps.db, mailbox)
+  ]);
+  await Promise.all([
+    deps.ari.mailboxes
+      .put(mwiMailboxOf(mailbox), oldMessages, newMessages)
+      .catch(logFailure(deps.ari.log, 'MWI update')),
+    ext === null ? undefined : pushLamp(deps.ari, ext, newMessages)
+  ]);
+}
+
+/** Recomputes `mailbox`'s MWI counts and lamp and pushes them (§9.3 "MWI"): called after core's
+ * own DTMF mailbox menu changes a read flag or deletes a message, and by the internal route `api`
+ * calls after doing the same. */
 export async function refreshMwi(
   deps: { ari: AriClient; db: Db },
   mailbox: Owner
 ): Promise<void> {
-  const { oldMessages, newMessages } = await mwiCounts(deps.db, mailbox);
-  await deps.ari.mailboxes
-    .put(mwiMailboxOf(mailbox), oldMessages, newMessages)
-    .catch(logFailure(deps.ari.log, 'MWI update'));
+  await pushMwi(deps, mailbox);
+}
+
+/**
+ * Writes the lamp of every user's and ring group's mailbox under its extension (§9.3), as the
+ * presence and DND hints are: at boot, after an Asterisk restart and after every configuration
+ * change, so a renumbered mailbox's lamp is right at once.
+ */
+export async function resyncMwiLamps(deps: {
+  ari: AriClient;
+  db: Db;
+}): Promise<void> {
+  const [owners, unread] = await Promise.all([
+    deps.db
+      .selectFrom('extensions')
+      .select(['ext', 'userId', 'ringGroupId'])
+      .where(eb =>
+        eb.or([eb('userId', 'is not', null), eb('ringGroupId', 'is not', null)])
+      )
+      .execute(),
+    deps.db
+      .selectFrom('voicemails')
+      .select(['mailboxUserId', 'mailboxRingGroupId'])
+      .where('read', '=', 0)
+      .execute()
+  ]);
+  const counts = new Map<string, number>();
+  for (const row of unread) {
+    const owner = row.mailboxUserId ?? row.mailboxRingGroupId ?? '';
+    counts.set(owner, (counts.get(owner) ?? 0) + 1);
+  }
+  await Promise.all(
+    owners.map(row =>
+      pushLamp(
+        deps.ari,
+        row.ext,
+        counts.get(row.userId ?? row.ringGroupId ?? '') ?? 0
+      )
+    )
+  );
 }
 
 type DepositContext = {
@@ -89,10 +177,7 @@ export async function persistVoicemail(ctx: DepositContext): Promise<void> {
     .execute();
 
   const name = mwiMailboxOf(mailbox);
-  const { oldMessages, newMessages } = await mwiCounts(db, mailbox);
-  await pipeline.deps.ari.mailboxes
-    .put(name, oldMessages, newMessages)
-    .catch(logFailure(pipeline.deps.logger, 'MWI update', { callId: call.id }));
+  await pushMwi({ ari: pipeline.deps.ari, db }, mailbox);
   pipeline.deps.bus.emit({
     type: 'voicemail.new',
     voicemailId: id,

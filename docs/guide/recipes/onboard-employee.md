@@ -23,6 +23,8 @@ arguments:
      record them now, or use `devices.revealCredentials` (`GET /api/v1/devices/{id}/credentials`)
      later, which is audited as a reveal — and hand them to the employee for their softphone (see
      `tested-softphones`) or desk phone.
+   - A Yealink desk phone is kind `yealink`: the response also carries its `provisioningLink`,
+     which is entered once on the phone (see `yealink-desk-phones`).
    - With `ringotel`, the credentials are pushed to Ringotel instead of returned, and the device
      onboards through Ringotel's own activation e-mail and QR code; no credentials need to be
      typed in by hand. The stack must be connected to Ringotel first (`ringotel-setup`). A

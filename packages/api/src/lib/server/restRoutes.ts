@@ -132,6 +132,7 @@ const STATIC_ROUTES: RouteTuple[] = [
   ['DELETE', '/devices/{id}', 'devices.delete'],
   ['GET', '/devices/{id}/credentials', 'devices.revealCredentials'],
   ['POST', '/devices/{id}/rotate', 'devices.rotate'],
+  ['POST', '/devices/{id}/provisioningLink', 'devices.provisioningLink'],
   ['GET', '/devices/{id}/blf', 'devices.getBlf'],
   ['PUT', '/devices/{id}/blf', 'devices.setBlf'],
   [

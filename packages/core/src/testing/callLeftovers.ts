@@ -67,11 +67,15 @@ export async function callRows(
   return rows.map(row => ({ status: row.status, ended: row.endedAt !== null }));
 }
 
-/** The hints whose last device state shows a call (§9.3), with that state. */
+/** The presence hints whose last device state shows a call (§9.3), with that state; a DND or
+ * mailbox lamp may stay lit after a call. */
 function busyHints(fakeAri: FakeAri): [string, string][] {
   const hints = new Map<string, string>();
   for (const entry of fakeAri.calls) {
-    if (entry.method === 'PUT' && entry.path.startsWith('deviceStates/')) {
+    if (
+      entry.method === 'PUT' &&
+      entry.path.startsWith('deviceStates/Stasis:presence-')
+    ) {
       const body = entry.body as { deviceState?: string };
       hints.set(entry.path, body.deviceState ?? '');
     }

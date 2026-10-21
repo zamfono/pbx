@@ -18,6 +18,7 @@ import { isEvent, type AriEvent, type AriEventOf } from './ari/events.js';
 import { logFailure } from './ari/failures.js';
 import type { DeviceState, Logger } from './ari/types.js';
 import { extensionOf } from './calls/extensionOwner.js';
+import { resyncMwiLamps } from './calls/voicemailStore.js';
 import type { EventBus } from './internal/eventBus.js';
 import {
   userById,
@@ -115,15 +116,16 @@ export class Presence {
     await this.refreshAll();
   }
 
-  /** Recomputes every live user's hint and status from a fresh snapshot: at boot, and after each
-   * `/internal/configChanged` (§3.1), since `api`'s writes (DND through `PUT /users/{id}/presence`,
-   * a deleted device, a renumbered extension) change what they fold from (§9.3, §10.2). Only a
-   * real transition reaches `presence_log` and `/events`. */
+  /** Recomputes every live user's hint and status, and every mailbox's lamp, from a fresh
+   * snapshot: at boot, and after each `/internal/configChanged` (§3.1), since `api`'s writes (DND
+   * through `PUT /users/{id}/presence`, a deleted device, a renumbered extension) change what they
+   * fold from (§9.3, §10.2). Only a real transition reaches `presence_log` and `/events`. */
   async refreshAll(): Promise<void> {
     const snapshot = await this.deps.cache.get();
-    await Promise.all(
-      snapshot.users.map(user => this.refreshUser(user.id, snapshot))
-    );
+    await Promise.all([
+      ...snapshot.users.map(user => this.refreshUser(user.id, snapshot)),
+      resyncMwiLamps({ ari: this.deps.ari, db: this.deps.db })
+    ]);
   }
 
   /** Follows the endpoint state Asterisk publishes as `PeerStatusChange` on each transition:
@@ -210,7 +212,10 @@ export class Presence {
     const ext = extensionOf(snapshot, { userId });
     if (ext !== null) {
       const calls = [...(this.callFlags.get(userId)?.values() ?? [])];
-      await this.hints.push(ext, userHint(calls, dnd, registered));
+      await Promise.all([
+        this.hints.push(ext, userHint(calls, dnd, registered)),
+        this.hints.pushDnd(ext, dnd)
+      ]);
     }
     await this.writeStatus(userId, userStatus(flags, dnd, registered), flags);
   }

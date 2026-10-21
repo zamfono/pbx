@@ -125,7 +125,7 @@ describe('deposit', () => {
   });
 
   it('records the caller with the configured cap and emits voicemail.new plus a mail request', async () => {
-    const userId = await seedUser(db);
+    const userId = await seedUser(db, { ext: '201' });
     const channel = fakeAri.addChannel({});
     const call = newCall({
       id: newId(),
@@ -196,6 +196,12 @@ describe('deposit', () => {
     );
     expect(mwiCall?.path).toContain(userId);
     expect(mwiCall?.body).toEqual({ oldMessages: 0, newMessages: 1 });
+    // The mailbox key's lamp (§9.3): lit while the mailbox holds new messages.
+    const lamp = fakeAri.calls.find(
+      entry =>
+        entry.method === 'PUT' && entry.path === 'deviceStates/Stasis:mwi-201'
+    );
+    expect(lamp?.body).toEqual({ deviceState: 'BUSY' });
 
     const voicemailEvent = envelopes.find(
       envelope => envelope.type === 'voicemail.new'

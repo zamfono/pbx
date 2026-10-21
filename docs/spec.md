@@ -83,7 +83,7 @@ Three long-running application services run per stack, plus the TLS proxy, the `
 
 **Write ownership.** Each SQLite table has a primary writer. Both processes read everything; WAL mode, `busy_timeout` and transactions that begin `IMMEDIATE` make concurrent writers safe (a read-only transaction begins `DEFERRED` and takes no write lock), so a cross-write is allowed where a flow naturally lands in the other process.
 
-- `api` owns the configuration tables: users, devices, trunks, trunk_hosts, outbound_routes, outbound_route_users, outbound_route_user_groups, outbound_route_numbers, dids, did_blocks, ring_groups, ring_group_members, user_groups, user_group_users, user_group_groups, extensions, device_blf_keys, forward_targets, user_forward_rules, ring_group_forward_rules, opening_hours, opening_hours_intervals, audio_assets, contacts, contact_phones, settings, ooo_rules, menus, menu_targets, blocked_numbers, sip_allowlist, sip_bans, mail_templates, tokens, oauth_clients, personal_access_tokens, totp_credentials, webauthn_credentials, recovery_codes, webhooks, webhook_deliveries, backup_targets, backup_runs, update_state, maintenance_gate, audit_log.
+- `api` owns the configuration tables: users, devices, trunks, trunk_hosts, outbound_routes, outbound_route_users, outbound_route_user_groups, outbound_route_numbers, dids, did_blocks, ring_groups, ring_group_members, user_groups, user_group_users, user_group_groups, extensions, device_blf_keys, device_mwi_ring_groups, forward_targets, user_forward_rules, ring_group_forward_rules, opening_hours, opening_hours_intervals, audio_assets, contacts, contact_phones, settings, ooo_rules, menus, menu_targets, blocked_numbers, sip_allowlist, sip_bans, mail_templates, tokens, oauth_clients, personal_access_tokens, totp_credentials, webauthn_credentials, recovery_codes, webhooks, webhook_deliveries, backup_targets, backup_runs, update_state, maintenance_gate, audit_log.
 - `core` owns the runtime tables: calls, call_qos, voicemails, recordings, presence_log.
 - Known cross-writes: `api` updates and deletes `voicemails` and `recordings` rows through their REST endpoints and, after a voicemail change, calls `core`'s internal `/internal/mwi/{mailbox}` so the MWI counts follow (§9.3). `core` toggles `users.dnd` through the `*90`/`*91` feature codes and stamps `devices.last_registered_at` when a `PeerStatusChange` event reports the device's endpoint `Reachable`, a timestamp of an event rather than a state: the last time the device became reachable, not its latest REGISTER, since Asterisk raises no event for a registration refresh; a greeting recorded by phone (§10.2) makes `core` insert the `audio_assets` row, write its file to `media/prompts/` and set the mailbox's `mailbox_audio_id`. Live state such as a trunk's registration status never lands in a table (§10.1); `api` reads it from the core when a request needs it.
 
@@ -192,7 +192,7 @@ The first-boot owner needs none of them: their password hash is seeded (§6.3). 
 
 **Session tokens.** A voice bot a `webSocket` target hands a call to (§9.4 "WebSocket targets") gets a session token in its stream's metadata: `zcs_` followed by 256 random bits in base64url, minted by `core` for that bot's leg and held in its memory alone, looked up by its SHA-256 through `GET /internal/callSessions/{sha256}`, which answers the call and the bot's leg, or 404. It is accepted on REST alone, as a bearer token, and acts as the bot on its own live call: `calls.hangup`, `calls.transfer`, `calls.hold`, `calls.resume` and `calls.park` with that call's id, the bot's leg id as the actor `core` records; any other call or operation is refused with 403, and an action that takes the actor's own other party names the leg instead (§10.3 "Live calls"). It stops working when the bot's leg leaves the call, however it leaves, so a leaked token is worthless once the call is over.
 
-**SIP credentials.** The response that creates a `manual` device returns the SIP credentials; for a provisioned device they are pushed to the provider. Afterwards an `admin` or `owner` can reveal a device's credentials with `GET /devices/{id}/credentials`, which is audited as `devices.revealCredentials`, so who looked at a password and when is always answerable. `POST /devices/{id}/rotate` generates a new password, re-pushes it for provisioned devices and returns it, for a credential suspected leaked. Trunk passwords, webhook secrets and the `*_enc` settings are write-only: they are re-entered from the provider's side, never read back.
+**SIP credentials.** The response that creates a `manual` device returns the SIP credentials; for a provisioned device they are pushed to the provider. Afterwards an `admin` or `owner` can reveal a device's credentials with `GET /devices/{id}/credentials`, which is audited as `devices.revealCredentials`, so who looked at a password and when is always answerable; for a `yealink` device it carries the phone's admin password too (§10.4). `POST /devices/{id}/rotate` generates a new password, re-pushes it for provisioned devices and returns it, for a credential suspected leaked. Trunk passwords, webhook secrets and the `*_enc` settings are write-only: they are re-entered from the provider's side, never read back.
 
 ### 5.3 Authorization
 
@@ -203,7 +203,7 @@ Every operation (§10.3) performs its own RBAC check, so REST, MCP, undo and UI 
 
 ### 5.4 Secrets
 
-All stored secrets are encrypted at rest with libsodium's XChaCha20-Poly1305 IETF AEAD (`crypto_aead_xchacha20poly1305_ietf`) under `SECRETBOX_KEY` from `.env`: SIP passwords and every `*_enc` column in `trunks`, `webhooks`, `backup_targets`, `totp_credentials` and `settings`, and the dynamic OAuth client ids (§5.2). Every blob is `version(1 byte) || nonce(24) || ciphertext`; the version byte is a generation counter that names the key the blob was written with. Every blob is bound to its purpose, the AEAD's additional data: a stored secret's `<table>.<column>`, a sealed cookie's name, the client ids' own label; a blob made for one purpose never decrypts as another.
+All stored secrets are encrypted at rest with libsodium's XChaCha20-Poly1305 IETF AEAD (`crypto_aead_xchacha20poly1305_ietf`) under `SECRETBOX_KEY` from `.env`: SIP passwords and every `*_enc` column in `devices`, `trunks`, `webhooks`, `backup_targets`, `totp_credentials` and `settings`, and the dynamic OAuth client ids (§5.2). Every blob is `version(1 byte) || nonce(24) || ciphertext`; the version byte is a generation counter that names the key the blob was written with. Every blob is bound to its purpose, the AEAD's additional data: a stored secret's `<table>.<column>`, a sealed cookie's name, the client ids' own label; a blob made for one purpose never decrypts as another.
 
 **Key rotation** is a redeploy, never a command. `.env` holds `SECRETBOX_KEY` (generation N) and, during a rotation, `SECRETBOX_KEY_PREVIOUS` (generation N−1); a read decrypts with the key its version byte names, and a byte matching neither is refused. `api` refuses to start when both keys carry the same generation. At boot, before it serves a request, `api` sweeps every `*_enc` column and re-encrypts each blob still on the previous generation under the current key, then logs `key rotation: {n} re-encrypted, {m} remaining`; `m` counts the blobs the current key cannot decrypt, a non-zero `m` after the sweep is a secret nobody can read, and `/healthz` reports the same count as `secrets:keyRotation`. The procedure:
 
@@ -228,6 +228,7 @@ The limits are constants of the implementation:
 | Forgot-password request (`POST /auth/resetRequest`) | account        | 3 per hour                          | accepted silently, no further mail                  |
 | Forgot-password request                             | client address | 30 per hour                         | 429                                                 |
 | Client registration (`/oauth/register`)             | client address | 60 per minute                       | 429 (a CPU guard only; the endpoint writes nothing) |
+| Provisioning link (`GET /provision/*`, §10.4)        | client address | 300 per minute                      | 429 (a CPU guard only, sized for an office's phones starting at once; the token's 256 random bits make guessing infeasible) |
 
 **Account lock.** The lock is a fixed window. A code at the second step of a login (§5.2 "Two-factor authentication") counts as an attempt too, and a correct password's attempt stays counted until the second step has passed. Attempts made while locked neither count nor extend it, so nobody can keep an account locked by hammering the form. That protects the owners' break-glass accounts too. A successful login resets the account's counter. The login form answers a locked account exactly as it answers a wrong password, so the lock reveals nothing about the account's existence. Counters and locks live in `api`'s memory, so an `api` restart clears them; the limits are a brake, the passwords' strength is the guarantee.
 
@@ -715,13 +716,14 @@ services:
 
 {$FQDN} {
 	# access log to stdout, shipped with the container logs (§7), without the credentials a URI
-	# carries in its query: a set-password token, an upload link's access token, an SSO code
+	# carries: in its query a set-password token, an upload link's access token, an SSO code, in
+	# its path a provisioning link's token (§10.4). One filter per field, so the URI's is one
+	# multi_regexp.
 	log {
 		format filter {
-			request>uri query {
-				delete token
-				delete access_token
-				delete code
+			request>uri multi_regexp {
+				regexp ^/provision/[^/?]+ /provision/REDACTED
+				regexp ([?&](?:token|access_token|code)=)[^&]* ${1}REDACTED
 			}
 			request>headers>Referer query {
 				delete token
@@ -961,14 +963,14 @@ Clients are third-party classic SIP softphones such as Ringotel; desk phones are
 
 **One endpoint per device.** A user may have several devices, and each is its own PJSIP endpoint. An inbound call to the user rings all registered devices of that user; the core dials them in parallel. A device registered several times (a Ringotel app on desktop and mobile, §10.4) rings on each reachable contact, as a leg of that device's: the core reads the contacts over AMI (`PJSIPShowEndpoint`) and dials each at `PJSIP/<endpoint>/<contact URI>`, since `PJSIP/<endpoint>` alone reaches only one.
 
-**Naming.** Endpoints are named `e<ext>-d<slug>`, for example `e101-d3kx7`; the slug is a short random identifier generated once per device. A user has at most one extension, and only a user with one has devices (§11.2), so all their devices share the `e<ext>` part and differ only by slug. SIP passwords are 24 random characters generated by the application. Changing a user's extension renames their endpoints: the configuration is regenerated and reloaded, the provisioning provider re-pushes the new names (§10.4), and `manual` devices must be updated by hand. The `PATCH /users/{id}` response and the audit entry list the affected devices.
+**Naming.** Endpoints are named `e<ext>-d<slug>`, for example `e101-d3kx7`; the slug is a short random identifier generated once per device. A user has at most one extension, and only a user with one has devices (§11.2), so all their devices share the `e<ext>` part and differ only by slug. SIP passwords are 24 random characters generated by the application. Changing a user's extension renames their endpoints: the configuration is regenerated and reloaded, the provisioning provider re-pushes the new names (§10.4), `manual` devices must be updated by hand, and a `yealink` phone takes the new name at its next fetch (§10.4). The `PATCH /users/{id}` response and the audit entry list the affected devices.
 
 **Transport policy.** The policy is declared per device in `devices.transport`:
 
 - `tls`: SIP over TLS with SRTP, from anywhere, no IP restriction.
-- `plain`: UDP or TCP, only from the device's admin-configured IP allowlist, rendered as `permit=<devices.allowed_ips_json>`; typically office addresses for desk phones. Creating a `plain` device is refused while both plain transports are disabled (`SIP_UDP_ENABLED`, `SIP_TCP_ENABLED`, §9.1).
+- `plain`: UDP or TCP, only from the device's admin-configured IP allowlist, rendered as `permit=<devices.allowed_ips_json>`; typically office addresses for desk phones; `manual` devices alone. Creating a `plain` device is refused while both plain transports are disabled (`SIP_UDP_ENABLED`, `SIP_TCP_ENABLED`, §9.1).
 
-PJSIP transports carry no ACL and an endpoint ACL applies to every transport alike, so a `tls` device's credentials are technically accepted over UDP and TCP as well, and any device's over `transport-tls-noverify` where its port is reachable (§9.1). This is an accepted residual risk (§5.6): the passwords are 24 random characters, and a leaked credential is equally usable over TLS. Hardware desk phones are supported registration-only in the MVP, without auto-provisioning (no vendor templates, no DHCP option 66, no TFTP).
+PJSIP transports carry no ACL and an endpoint ACL applies to every transport alike, so a `tls` device's credentials are technically accepted over UDP and TCP as well, and any device's over `transport-tls-noverify` where its port is reachable (§9.1). This is an accepted residual risk (§5.6): the passwords are 24 random characters, and a leaked credential is equally usable over TLS. Hardware desk phones are `manual` devices, or `yealink` devices that fetch their whole configuration from a provisioning link (§10.4), without DHCP option 66, TFTP or a vendor's redirect service.
 
 **NAT.** Clients work from the office and from home without a VPN. Endpoints carry `rewrite_contact=yes`, `rtp_symmetric=yes`, `force_rport=yes` and `direct_media=no`. Media always flows through Asterisk, which recording, presence and internal routing depend on. A device endpoint's `from_domain` is the stack's `FQDN`, the domain the device registers in, so every request Asterisk sends a device, a call, an OPTIONS probe or an MWI `NOTIFY`, names it as the `From` host, where the transport's bound address, the container's own in the ports mode, would stand otherwise (§9.4 "Caller-ID"). A call to a device never withholds its caller, so the `anonymous.invalid` host that `from_domain` overrides is never wanted there.
 
@@ -976,18 +978,21 @@ PJSIP transports carry no ACL and an endpoint ACL applies to every transport ali
 
 - a user, the first that applies: `RINGING` while any of their devices rings, a call waiting during a call included, `INUSE` in a call, `BUSY` on DND, `UNAVAILABLE` with no registered device, else `NOT_INUSE`;
 - a ring group: `RINGING` while any call rings the group, else `NOT_INUSE`;
-- a parking slot: `INUSE` while a call is parked there, so a BLF key per slot shows where the waiting callers are.
+- a parking slot: `INUSE` while a call is parked there, so a BLF key per slot shows where the waiting callers are;
+- a user's DND, a second hint per user at `<dndToggle code><ext>` (`*92205`) watching `Stasis:dnd-<ext>`: `BUSY` while the user's DND is on, else `NOT_INUSE`, so a desk phone's DND key lights while DND is on whoever set it, and dials the toggle when pressed;
+- a mailbox, a hint per user and ring group at `<mailbox code><ext>` (`*95600`) watching `Stasis:mwi-<ext>`: `BUSY` while the mailbox holds new messages, else `NOT_INUSE`, so a desk phone's mailbox key lights while there is something to hear, and opens the mailbox when pressed (`*95`, permission-checked).
 
-Any registered device may subscribe to any hint; which lamps a device shows is the device's own configuration: on a manual device it is set on the phone, on a `ringotel` device it is the user's own list of extensions and parking slots (`device_blf_keys`, §10.4), or every extension of the tenant when that list is empty. One-click transfer and pickup in third-party clients use their native SIP transfer; pickup is also available through the `*8<ext>` feature code, handled in Stasis.
+Any registered device may subscribe to any hint; which lamps a device shows is the device's own configuration: on a `manual` device it is set on the phone, on a `yealink` device it is the device's key list (`device_blf_keys`, §10.4); on a `ringotel` device it is the user's own list of extensions and parking slots (`device_blf_keys`, §10.4), or every extension of the tenant when that list is empty. One-click transfer and pickup in third-party clients use their native SIP transfer; pickup is also available through the `*8<ext>` feature code, handled in Stasis.
 
-**MWI.** The core sets message counts per mailbox through the ARI mailboxes API (`res_mwi_external`), and PJSIP notifies the subscribed devices.
+**MWI.** The core sets message counts per mailbox through the ARI mailboxes API (`res_mwi_external`), and PJSIP notifies the subscribed devices. A device's message indicator counts its user's own mailbox and the ring-group mailboxes its `mwiRingGroups` names among the user's groups, `null` for every group they belong to, `[]` for the own mailbox alone, the AOR's `mailboxes`; a new `yealink` device gets `[]`, so its indicator means what its message key opens and group mailboxes go on mailbox keys, any other kind `null`. With the counts the core sets the mailbox's hint (BLF and presence above), and every mailbox's at its start, after an Asterisk restart and after every configuration change, as it does every user's presence and DND hint, so a renumbered mailbox's lamp is right at once.
 
-**Feature codes** are handled in Stasis, since the clients are third-party. The codes are the values of `settings.feature_codes_json`, a JSON object with one fixed camelCase key per action: `pickup`, `dndOn`, `dndOff`, `mailbox`, `ownVoicemail`, `deposit`, `addParty`, `clirOn`, `clirOff`, `park`. Each value is the dialled prefix; `pickup`, `mailbox`, `deposit`, `addParty`, `clirOn` and `clirOff` are followed by an extension or number, the others are dialled alone. The defaults below are the column's default value; an admin remaps a code through `PATCH /settings`.
+**Feature codes** are handled in Stasis, since the clients are third-party. The codes are the values of `settings.feature_codes_json`, a JSON object with one fixed camelCase key per action: `pickup`, `dndOn`, `dndOff`, `dndToggle`, `mailbox`, `ownVoicemail`, `deposit`, `addParty`, `clirOn`, `clirOff`, `park`. Each value is the dialled prefix; `pickup`, `mailbox`, `deposit`, `addParty`, `clirOn` and `clirOff` are followed by an extension or number, `dndToggle` by nothing or the caller's own extension, the others are dialled alone. The defaults below are the column's default value; an admin remaps a code through `PATCH /settings`.
 
 | Code                | Function                                                                                                                                                       |
 | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `*8<ext>`           | directed pickup; any user may pick up any ringing call in the tenant, and the picker is recorded as the answerer in the history                                |
 | `*90` / `*91`       | DND on / off                                                                                                                                                   |
+| `*92`, `*92<own ext>` | DND toggle; with an extension, only the caller's own, the form a desk phone's DND key dials as its BLF target (BLF and presence above); another extension is refused |
 | `*95<ext>`          | mailbox access for the user or ring group owning `<ext>`; permission-checked: own mailbox, or member of the group                                              |
 | `*96`               | own voicemail access: listen, delete, and record the personal greeting (§10.2)                                                                                 |
 | `*97<ext>`          | deposit the caller in the mailbox of the user or ring group owning `<ext>`, without ringing; the usual transfer target for "put them through to her voicemail" |
@@ -1278,7 +1283,7 @@ Timers, the hop counter and busy handling live entirely in the core.
 
 **Click-to-dial.** `POST /calls` with a target, an extension or an external number, originates a call on behalf of a user. The core rings the user's devices first, or with the optional `deviceId` that one device of theirs alone; when one answers, it dials the target exactly as if that device had dialled it, so CLIR, routes, caller-ID and the channel cap all apply. A parking slot as target retrieves the call parked there, as dialling it does, and the optional `clir` is the call's own CLIR, as `#31#`/`*31#` give it (§9.4), which an emergency call ignores. A `user` may originate for themselves, an `admin` for any user. The call is a normal `calls` row with the originating actor in its routing trace (§7). A user with no registered device, or a named device without a registered contact, is refused with a 409 problem whose `detail` names the cause, `noRegisteredDevice`, and the attempt appears in the history with a trace line; a `deviceId` that is not a live device of the user's is refused with 404. This is the operation behind a CRM's call button and the MCP assistant's "call John".
 
-**Device provisioning.** See §10.4: `manual` devices, set up by hand from their connection settings, and the `ringotel` provider. QR-code login is provided by Ringotel's own onboarding flow.
+**Device provisioning.** See §10.4: `manual` devices, set up by hand from their connection settings, `yealink` desk phones, provisioned from a link, and the `ringotel` provider. QR-code login is provided by Ringotel's own onboarding flow.
 
 #### Mail
 
@@ -1417,7 +1422,7 @@ The endpoints by area, as a sketch, each with the minimum role it needs:
 
 **Personal access tokens** (min. role: user (own) / admin; an owner's owner-only) — `GET/POST /users/{id}/personalAccessTokens` (`POST` takes `name` and an optional `expiresAt` and returns the token once; `GET` lists the user's tokens, never their values, with `createdBy`, `createdAt`, `expiresAt`, `lastUsedAt` and `revokedAt`), `POST /personalAccessTokens/{id}/revoke` (§5.2)
 
-**Devices** (min. role: user (own, `tls` only) / admin; `plain` devices, reveal and rotate admin) — `GET /users/{id}/devices`, `POST` (transport class + allowlist for `plain`, refused while both plain transports are disabled, §9.3; returns a `manual` device's connection settings, §10.4), `PATCH /devices/{id}` (label, `allowedIps`), `DELETE /devices/{id}`, `GET /devices/{id}/credentials` (reveal, audited; a `manual` device's connection settings), `POST /devices/{id}/rotate` (new password, re-pushed and returned), `GET/PUT /devices/{id}/blf` (the `ringotel` device's BLF panel, an ordered list of extensions and parking slots replaced as a whole, §10.4)
+**Devices** (min. role: user (own, `tls` only) / admin; `plain` devices, reveal and rotate admin) — `GET /users/{id}/devices`, `POST` (transport class + allowlist for `plain`, refused while both plain transports are disabled, §9.3; returns a `manual` or `yealink` device's connection settings and a `yealink` device's provisioning link, §10.4), `PATCH /devices/{id}` (label, `allowedIps`, a `yealink` device's `ringtone`, `mwiRingGroups`, also taken by `POST`, §9.3 "MWI"), `DELETE /devices/{id}`, `GET /devices/{id}/credentials` (reveal, audited; a `manual` or `yealink` device's connection settings), `POST /devices/{id}/rotate` (new password, re-pushed and returned), `POST /devices/{id}/provisioningLink` (admin; a new provisioning link for a `yealink` device, returned once, revoking the one before, §10.4), `GET/PUT /devices/{id}/blf` (the device's key list, replaced as a whole, §10.4: entries told apart by `kind`: `{kind: "blf", ext}` on an extension or parking slot, for both kinds; on a `yealink` device also `{kind: "quickDial", number, label}`, `{kind: "feature", feature, label}`, `{kind: "mailbox", ext, label}` and `{kind: "line"}`)
 
 **Provisioning** (min. role: owner) — `POST /provisioning/ringotel/setup` (input: Ringotel `domain`, `region`, `packageid`) — runs `createOrganization` + `createBranch` (§10.4) and stores the ids in `settings`; a `region` or `packageid` the account does not offer is refused with 422 before anything is created, naming the ones it does, and a domain the account already has with 409, naming its organization and the adoption call that takes it over. `GET /provisioning/ringotel/options` lists those choices live (`getRegions`, `getPackages`, each package with the registrations per user it allows), since Ringotel adds regions and the packages are the account's own. Setup and adoption set `ringotel_max_regs` to the package's while it is still at its default (§11.4). `POST /provisioning/ringotel/adopt` (input: `orgId`, `domain`, optional `branchId`; confirmed) takes over an organization that already exists instead (§10.4)
 
@@ -1500,7 +1505,7 @@ An **OpenAPI 3.1 document** is generated at build time from the REST route table
 
 ### 10.4 Device provisioning (modular)
 
-Provisioning is a pluggable interface with two MVP implementations:
+Provisioning is a pluggable interface with two MVP implementations, `manual` and `ringotel`; a third kind, `yealink`, needs no provider, since its phone fetches its configuration (below):
 
 ```ts
 interface ProvisioningProvider {
@@ -1522,9 +1527,22 @@ interface ProvisioningProvider {
 - `extension` and `displayName`: the user's extension and name, the caller ID the phone shows;
 - `mediaEncryption`: `srtp` for a `tls` device, `none` for a `plain` one;
 - `codecs`: `settings.codecs_json` in order;
-- `voicemailCode`: the own-voicemail feature code (§9.3).
+- `voicemailCode`: the own-voicemail feature code (§9.3);
+- `adminPassword`: a `yealink` device's admin password for its phone's web interface (below), `null` for a `manual` one.
 
 No STUN server or outbound proxy is needed: Asterisk handles NAT itself (§9.1). A phone that asks for a STUN server anyway can have the stack's own, `<FQDN>:3478` (§6.1). The admin guide documents tested bring-your-own clients and maps these fields onto each: Groundwire (Acrobits' retail app; one-time purchase, vendor-run push, BLF; the recommended no-subscription mobile option) and MicroSIP (Windows desktop, which needs no push).
+
+**`yealink`** is a Yealink desk phone (T7x/T8x firmware) that fetches its whole configuration from a **provisioning link** entered once on the phone, and fetches it again daily, so later changes reach it without hand edits. It is always `tls`, like a `ringotel` device: a phone that fetches its link over HTTPS against the stack's certificate can register over SIP-TLS against the same one, so `plain` would gain it nothing. `POST /users/{id}/devices` answers it once with its connection settings, as a `manual` device's, and its link, `https://<FQDN>/provision/<token>/`, the token 32 random bytes in base64url of which the device keeps only the SHA-256 (`devices.provisioning_token_hash`). `POST /devices/{id}/provisioningLink` (admin, audited, never undoable, §5.2) answers once with a new link and revokes the one before; the link lives and dies with the device, so a deletion revokes it and its undo restores it. Creation also generates the phone's admin password, 24 random characters (`devices.admin_password_enc`), which the phone's web interface then asks for in place of the factory one; the phone keeps it after the device is deleted, until a factory reset. A new `yealink` device's key list holds its line key and a DND key, `[{kind: "line"}, {kind: "feature", feature: "dndToggle", label: "DND"}]`.
+
+`GET /provision/<token>/<file>` takes no other authentication and renders the file on every request from the data of that moment, so a rotated password, a renamed endpoint (§9.3), a changed key list or tenant profile reach the phone at its next fetch. The phone appends its own file names to the link: a `<file>` ending in `.cfg` gets the configuration, any other, Yealink's `.boot` files included, a 404, as does a token of no live `yealink` device. An answered fetch records its time and client address on the device (`provisioned_at`, `provisioned_from`) rather than an audit entry. The file carries:
+
+- the account from the connection settings above, with the device's label as the account label, SIP over TLS with SRTP compulsory, every codec outside `codecs` disabled (the T7x/T8x line has no Opus, so a tenant's `opus` is left out), and the voicemail key dialling `voicemailCode` with MWI subscribed;
+- the phone's own DND and call forwarding disabled, since DND and forwarding live in the core, which lamps, API and forwarding read;
+- the key list (`device_blf_keys`, set through `PUT /devices/{id}/blf`) on the line keys in order from the first: a `blf` entry, an extension or parking slot, as a BLF key labelled as for Ringotel (its owner's name, "Parking 701") that picks up a ringing call through the `pickup` code, a `quickDial` entry as a quick-dial key, a `feature` entry as a key dialling that feature code (`ownVoicemail` or `park`, §9.3) or, for `dndToggle`, as a BLF key on the user's DND hint (§9.3 "BLF and presence"), lit while DND is on and toggling it when pressed, a `mailbox` entry, the extension of the user's own mailbox or of a ring group's they belong to, as a BLF key on that mailbox's hint, lit while it holds new messages and opening it when pressed, a `line` entry as the account's line key, which shows its registration and calls; every other line key is emptied;
+- the tenant's time zone (`settings.timezone`, mapped onto the vendor's zone names) and language (`settings.language`), and the device's `ringtone`, a name from the phone's built-in ringtones (NULL = the phone's own choice);
+- certificates checked against the phone's trusted roots for the fetch and SIP-TLS alike, SIP requests accepted only from the server, the admin password, the stack's STUN server `<FQDN>:3478`, a daily fetch, and no blinking power LED in power-saving mode.
+
+The phone's network (VLAN, 802.1X, Wi-Fi, static addresses: a wrong value strands it), volumes, firmware and dial plan stay on the phone, since the core routes every call, emergency calls included.
 
 **`ringotel`** drives the Ringotel Admin API: RPC-style `POST https://shell.ringotel.co/api` with a Bearer API key and `{"method": …, "params": …}` bodies. Object mapping:
 
@@ -1562,7 +1580,7 @@ An existing branch takes these values at its next push (setup, adoption, a roste
 
 A Ringotel user registers up to `maxregs` times (desktop and mobile). That number is `settings.ringotel_max_regs` (§11.4, default 3, the value the Admin API's examples use): the provider writes it into the branch profile, and the endpoint renderer writes the same value as every `ringotel` device's `max_contacts`, so changing the setting moves both sides in one operation. Endpoints carry `remove_existing=yes`, so a reinstalled or roaming app replaces its own stale contact instead of being refused until that contact expires. A `manual` device is one phone and gets `max_contacts=1` with the same `remove_existing=yes`; PJSIP's own default of 0 would accept no registration at all.
 
-**Colleague presence (BLF).** The provider maintains the branch's `blfs` provision list (`[{number, title}]`), one indicator per user and ring-group extension in the tenant (parking slots show under the branch's `callpark.slots`), pushed via `updateBranch` on every user or extension change; that is what a device shows by default. The roster push (`onRosterChanged`, with the `updateUser` of each user whose extension, SIP username, name or e-mail moved) runs once the change committed and propagated, as a device's push does, so a Ringotel outage never fails a user, ring group or parking slot write and a renamed app registers against an endpoint Asterisk holds. While Ringotel is set up, the write sets `settings.ringotel_roster_pending` in its own transaction; a push Ringotel took clears it, and a refusal keeps it set, is logged and is a `warnings` entry of the result. Every attempt is appended to `audit_log` as `ringotel.roster` on the settings (§5.7) with `outcome` (`pushed`, `refused`, `skipped`), `trigger` and, unless pushed, `reason`, attributed to the caller (`trigger` the operation that changed the roster). `api` pushes the whole roster, every live user's `updateUser` included, once more at its start and at each Asterisk start, after the pending tenant profile (Tenant profile push) and with the same rules: channel `job`, `trigger` `api.start` or `asterisk.started`, a stack no longer set up with Ringotel drops the marker as `skipped`, and no timer retries, so nothing loops. Setup and adoption, which write the whole roster, clear it. `GET /system/info` shows the marker as `ringotel.rosterPending`, and `/healthz` as its check `ringotel:roster`. A user narrows their own device's panel through `PUT /devices/{id}/blf`, an ordered list of extensions and parking slots stored in `device_blf_keys` and pushed as the Ringotel user's `options.blfs` via `updateUser`, with each title taken from the extension's owner or reading "Parking 701"; an empty list means the branch default. Whether Ringotel treats the per-user list as a replacement of the branch list or as an addition is not stated in the Admin API description and is settled on a live branch. The apps subscribe to the §9.3 hints and display PBX-truth presence, desk-phone calls and DND included. Ringotel's own in-app presence reflects only calls its cloud handles.
+**Colleague presence (BLF).** The provider maintains the branch's `blfs` provision list (`[{number, title}]`), one indicator per user and ring-group extension in the tenant (parking slots show under the branch's `callpark.slots`), pushed via `updateBranch` on every user or extension change; that is what a device shows by default. The roster push (`onRosterChanged`, with the `updateUser` of each user whose extension, SIP username, name or e-mail moved) runs once the change committed and propagated, as a device's push does, so a Ringotel outage never fails a user, ring group or parking slot write and a renamed app registers against an endpoint Asterisk holds. While Ringotel is set up, the write sets `settings.ringotel_roster_pending` in its own transaction; a push Ringotel took clears it, and a refusal keeps it set, is logged and is a `warnings` entry of the result. Every attempt is appended to `audit_log` as `ringotel.roster` on the settings (§5.7) with `outcome` (`pushed`, `refused`, `skipped`), `trigger` and, unless pushed, `reason`, attributed to the caller (`trigger` the operation that changed the roster). `api` pushes the whole roster, every live user's `updateUser` included, once more at its start and at each Asterisk start, after the pending tenant profile (Tenant profile push) and with the same rules: channel `job`, `trigger` `api.start` or `asterisk.started`, a stack no longer set up with Ringotel drops the marker as `skipped`, and no timer retries, so nothing loops. Setup and adoption, which write the whole roster, clear it. `GET /system/info` shows the marker as `ringotel.rosterPending`, and `/healthz` as its check `ringotel:roster`. A user narrows their own device's panel through `PUT /devices/{id}/blf`, an ordered list of extensions and parking slots (`{kind: "blf", ext}` entries) stored in `device_blf_keys` and pushed as the Ringotel user's `options.blfs` via `updateUser`, with each title taken from the extension's owner or reading "Parking 701"; an empty list means the branch default. Whether Ringotel treats the per-user list as a replacement of the branch list or as an addition is not stated in the Admin API description and is settled on a live branch. The apps subscribe to the §9.3 hints and display PBX-truth presence, desk-phone calls and DND included. Ringotel's own in-app presence reflects only calls its cloud handles.
 
 **After a restart.** A new Asterisk holds none of the registrations over TLS or TCP the one before held, the Ringotel apps' among them, whether Asterisk alone restarted, the stack or an update recreated it: it removes them at start, and the `astdb` volume keeps only those over UDP (§9.1). `core` reports when the Asterisk it is connected to started (`asteriskStartedAt` of its internal `GET /internal/version`, read from ARI's `startup_time`, `null` while ARI is down), and announces it on the internal event stream each time its ARI connection opens, as an `asterisk.started` frame for `api` alone that is never relayed to `/events` or webhooks; `api` also reads `/internal/version` each time that stream connects or reconnects, since a start announced while it was down went unheard, and nothing polls. For an Asterisk start it has not handled, while Ringotel is set up, `api` calls `onPbxRestarted` once: the provider sends `updateBranch` with the branch's fields and `rereg: true`, the Shell's "Reset registrations", and Ringotel re-registers every user of the connection. The attempt is appended to `audit_log` as `ringotel.rereg` (channel `job`, entity `settings`, `outcome` `reregistered` or `refused` with `reason`, and `asteriskStartedAt`), and a refusal is logged; it is never retried for the same start, so nothing loops. `settings.ringotel_registered_at` is what remembers across an `api` restart: the re-registration, a refused one included, setup and adoption set it to their time, and a start older than it needs nothing, since the apps registered against that Asterisk afterwards. A normal push never sends `rereg`. The trunks of the stack itself that register over TCP or TLS are registered afresh by `core` for each such start (§9.4 "Provisioning and status").
 
@@ -1576,7 +1594,7 @@ The Admin API description carries no provision object for caller-ID restriction;
 2. SessionCloud/SessionTalk: transparent low pricing, explicit Asterisk support, QR credential provisioning, multi-tenant branding; a match for the cost-conscious 5–20-seat segment.
 3. Bria: only on concrete customer demand; quote-based enterprise sales and the least API-shaped provisioning.
 
-Linphone and Zoiper are not candidates for mobile, since their push reliability would fall to Zamfono, which §2.3 rules out. Desk-phone auto-provisioning (vendor templates, redirect servers) is a separate future provider family.
+Linphone and Zoiper are not candidates for mobile, since their push reliability would fall to Zamfono, which §2.3 rules out. Desk-phone vendors beyond Yealink become kinds of their own beside `yealink`, each a renderer of the same provisioning link, one at a time; redirect services and DHCP option 66 stay out.
 
 ### 10.5 MCP interface
 
@@ -1727,11 +1745,21 @@ CREATE TABLE users (
 --   kind:               the provisioning provider (§10.4)
 --   sip_username:       'e<ext>-d<slug>' (§9.3); renamed on extension change
 --   transport:          'tls' (any source) or 'plain' (UDP/TCP from allowed_ips_json only,
---                       §9.3); only 'manual' devices may be 'plain', every provisioned kind is 'tls'
+--                       §9.3); only 'manual' devices may be 'plain', every other kind is 'tls'
 --   allowed_ips_json:   JSON array of IPs/CIDRs of either family, rendered as the endpoint's permit
 --                       list; required for 'plain', NULL for 'tls'
 --   sip_password_enc:   recoverable by design — Asterisk needs the plaintext in pjsip_users.conf;
 --                       revealed to admins only through the audited operation (§5.2)
+--   ringtone:           a 'yealink' device's ringtone, one of its phone's built-in ones, written into
+--                       its provisioning link's file (§10.4); NULL = the phone's own choice
+--   provisioning_token_hash: SHA-256 (hex) of the token of a 'yealink' device's provisioning link
+--                       (§10.4); set for every 'yealink' device and only for one
+--   admin_password_enc: a 'yealink' device's phone admin password, generated with the device
+--                       (§10.4); revealed with the SIP credentials (§5.2)
+--   provisioned_at, provisioned_from: time and client address of the link's latest answered fetch
+--   mwi_all_ring_groups: 1 = the device's message indicator counts every ring group's mailbox its
+--                       user belongs to besides the own (§9.3 "MWI"); 0 = only those of
+--                       device_mwi_ring_groups; set at creation, 0 for 'yealink', else 1
 --   last_registered_at: cross-written by core when a PeerStatusChange event reports the
 --                       endpoint Reachable: when the device last became reachable, not its latest
 --                       REGISTER refresh, which raises no event (§3)
@@ -1739,29 +1767,64 @@ CREATE TABLE devices (
   id                 TEXT    PRIMARY KEY,
   user_id            TEXT    NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   label              TEXT    NOT NULL,
-  kind               TEXT    NOT NULL CHECK (kind IN ('manual','ringotel')),
+  kind               TEXT    NOT NULL CHECK (kind IN ('manual','ringotel','yealink')),
   transport          TEXT    NOT NULL DEFAULT 'tls' CHECK (transport IN ('tls','plain')),
   allowed_ips_json   TEXT,
   sip_username       TEXT    NOT NULL UNIQUE,
   sip_password_enc   BLOB    NOT NULL,
+  ringtone           TEXT,
+  provisioning_token_hash TEXT UNIQUE,
+  admin_password_enc BLOB,
+  provisioned_at     TEXT,
+  provisioned_from   TEXT,
+  mwi_all_ring_groups INTEGER NOT NULL DEFAULT 1 CHECK (mwi_all_ring_groups IN (0,1)),
   last_registered_at TEXT,
   created_at         TEXT    NOT NULL,
   deleted_at         TEXT,
   CHECK ((transport = 'plain') = (allowed_ips_json IS NOT NULL)),
-  CHECK (kind = 'manual' OR transport = 'tls')
+  CHECK (kind = 'manual' OR transport = 'tls'),
+  CHECK ((kind = 'yealink') = (provisioning_token_hash IS NOT NULL)
+         AND (kind = 'yealink') = (admin_password_enc IS NOT NULL)
+         AND (kind = 'yealink' OR ringtone IS NULL))
 );
 
--- device_blf_keys — the BLF panel of a 'ringotel' device (§10.4); no rows = the branch default, every
--- user and group extension in the tenant. Replaced as a whole by PUT /devices/{id}/blf. A key watches
--- an extension of any kind, a person's, a group's or a parking slot; the FK removes the key when the
--- extension row goes, with its owner's soft delete (§5.9) or a slot's removal.
---   position: order of the lamps on the panel
+-- device_blf_keys — a device's key list (§10.4): a 'ringotel' device's BLF panel, no rows = the
+-- branch default, every user and group extension in the tenant; a 'yealink' device's line keys,
+-- starting as its line key and a DND key, no rows = none. Replaced as a whole by
+-- PUT /devices/{id}/blf. A key is one of five kinds, each in a column of its own: a BLF key
+-- watching an extension of any kind, a person's, a group's or a parking slot (ext), and on a
+-- 'yealink' device alone a quick-dial key to an outside number (number), a feature key (feature,
+-- the §9.3 key of a code dialled alone), a mailbox key (mailbox_ext, the user's own mailbox or a
+-- ring group's they belong to) or the account's line key (is_line_key, at most one); the FKs
+-- remove a key when its extension row goes, with its owner's soft delete (§5.9) or a slot's
+-- removal.
+--   position: order of the keys
+--   label:    the text on a quick-dial, feature or mailbox key; a BLF key is labelled by its
+--             extension's owner, the line key by the phone
 CREATE TABLE device_blf_keys (
-  device_id TEXT    NOT NULL REFERENCES devices(id)     ON DELETE CASCADE,
-  ext       TEXT    NOT NULL REFERENCES extensions(ext) ON DELETE CASCADE,
-  position  INTEGER NOT NULL,
-  PRIMARY KEY (device_id, ext),
-  UNIQUE (device_id, position)
+  device_id   TEXT    NOT NULL REFERENCES devices(id)     ON DELETE CASCADE,
+  position    INTEGER NOT NULL,
+  ext         TEXT    REFERENCES extensions(ext) ON DELETE CASCADE,
+  number      TEXT,
+  feature     TEXT    CHECK (feature IN ('dndToggle','ownVoicemail','park')),
+  mailbox_ext TEXT    REFERENCES extensions(ext) ON DELETE CASCADE,
+  is_line_key INTEGER NOT NULL DEFAULT 0 CHECK (is_line_key IN (0,1)),
+  label       TEXT,
+  PRIMARY KEY (device_id, position),
+  UNIQUE (device_id, ext),
+  UNIQUE (device_id, mailbox_ext),
+  CHECK ((ext IS NOT NULL) + (number IS NOT NULL) + (feature IS NOT NULL)
+         + (mailbox_ext IS NOT NULL) + is_line_key = 1),
+  CHECK ((label IS NOT NULL) = (number IS NOT NULL OR feature IS NOT NULL OR mailbox_ext IS NOT NULL))
+);
+
+-- device_mwi_ring_groups — the ring groups whose mailboxes a device's message indicator counts
+-- besides its user's own while devices.mwi_all_ring_groups = 0, the only time it has rows (§9.3
+-- "MWI"); one the user no longer belongs to counts no more, so membership changes need no cleanup.
+CREATE TABLE device_mwi_ring_groups (
+  device_id     TEXT NOT NULL REFERENCES devices(id)     ON DELETE CASCADE,
+  ring_group_id TEXT NOT NULL REFERENCES ring_groups(id) ON DELETE CASCADE,
+  PRIMARY KEY (device_id, ring_group_id)
 );
 
 -- trunks — PSTN connectivity (§9.4).
@@ -2135,7 +2198,7 @@ CREATE TABLE ring_group_forward_rules (
 -- settings — tenant configuration as one typed row (id = 1); the columns are the definitive
 -- registry, meaning and defaults per column in §11.4. Seeded at first boot (§6.3).
 --   *_enc:              secretbox ciphertext, write-only on the wire (§5.4)
---   feature_codes_json: { action: dialledPrefix } with the ten fixed keys of §9.3; codes start with
+--   feature_codes_json: { action: dialledPrefix } with the eleven fixed keys of §9.3; codes start with
 --                       * or # and none is a prefix of another (checked by the operation)
 --   fallback_target_id: tenant-wide fallback forward target (§11.3), owned by this column
 CREATE TABLE settings (
@@ -2157,7 +2220,7 @@ CREATE TABLE settings (
   -- numbering and routing
   ext_length                 INTEGER NOT NULL DEFAULT 3 CHECK (ext_length >= 2),
   emergency_numbers_json     TEXT    NOT NULL,
-  feature_codes_json         TEXT    NOT NULL DEFAULT '{"pickup":"*8","dndOn":"*90","dndOff":"*91","mailbox":"*95","ownVoicemail":"*96","deposit":"*97","addParty":"*5","clirOn":"#31#","clirOff":"*31#","park":"*70"}',
+  feature_codes_json         TEXT    NOT NULL DEFAULT '{"pickup":"*8","dndOn":"*90","dndOff":"*91","dndToggle":"*92","mailbox":"*95","ownVoicemail":"*96","deposit":"*97","addParty":"*5","clirOn":"#31#","clirOff":"*31#","park":"*70"}',
   fallback_target_id         TEXT    REFERENCES forward_targets(id) ON DELETE RESTRICT,
   -- call behaviour
   codecs_json                TEXT    NOT NULL DEFAULT '["opus","g722","alaw"]',
@@ -2732,6 +2795,10 @@ CREATE INDEX contact_phones_number ON contact_phones (number);
 CREATE INDEX backup_runs_target     ON backup_runs (target_id, started_at);
 CREATE INDEX webhook_deliveries_webhook ON webhook_deliveries (webhook_id);
 
+-- device_blf_keys_one_line_key — a key list holds the account's line key once at most (§10.4).
+CREATE UNIQUE INDEX device_blf_keys_one_line_key ON device_blf_keys (device_id)
+  WHERE is_line_key = 1;
+
 -- devices_one_ringotel_per_user — a Ringotel device is the user's Ringotel account (§10.4).
 CREATE UNIQUE INDEX devices_one_ringotel_per_user ON devices (user_id)
   WHERE kind = 'ringotel' AND deleted_at IS NULL;
@@ -2814,7 +2881,7 @@ A DID's `number` is what the trunk boundary produces (§9.4): the international 
 | `smtp_check_interval_s` 👑 | seconds between background checks of the relay, at least 60, at most 86400; NULL = none besides those at `api` start and after a change of the relay (§10.2 "Relay check") | `900` | §10.2 |
 | `ext_length` | fixed extension length, at least 2; seeded once, read-only through the API (a change is a renumbering, §12); stored rather than kept in `.env` so a restore cannot disagree with the extensions | `.env` seed at first boot (§6.3), else `3` | §11 |
 | `emergency_numbers_json` 👑 | JSON array of digit strings; always route as external, never valid extensions; also pushed into the Ringotel branch profile | country seed at first boot, `["112"]` for a country without one (§6.3) | §10.1, §10.4 |
-| `feature_codes_json` | JSON object `{ action: dialledPrefix }` with the ten fixed keys `pickup`, `dndOn`, `dndOff`, `mailbox`, `ownVoicemail`, `deposit`, `addParty`, `clirOn`, `clirOff`, `park`; every code starts with `*` or `#` and none is a prefix of another | the §9.3 codes | §9.3 |
+| `feature_codes_json` | JSON object `{ action: dialledPrefix }` with the eleven fixed keys `pickup`, `dndOn`, `dndOff`, `dndToggle`, `mailbox`, `ownVoicemail`, `deposit`, `addParty`, `clirOn`, `clirOff`, `park`; every code starts with `*` or `#` and none is a prefix of another | the §9.3 codes | §9.3 |
 | `fallback_target_id` | FK → `forward_targets`, owned by this column; tenant-wide target for block numbers without a `dids` row and for numbers outside every block; NULL = release with 404 | NULL | §11.3 |
 | `codecs_json` | ordered JSON array of codec names offered to devices and to trunks without their own list; values limited to the codecs the image ships (§9.1) | `["opus","g722","alaw"]` | §9.4 |
 | `clir` | tenant default for withholding the caller number; overridden per trunk, per user and per call | `0` | §9.4 |
@@ -2897,7 +2964,7 @@ Nothing in this section is designed by this document, and nothing in this docume
 - `reference/*.md`, copied from the same `docs/guide/` files that `zamfono.help` serves (§10.5);
 - a tool catalog generated from the operation registry and the REST route table, so it cannot drift; the guide names each step by its operation, the MCP tool, with the REST call beside it.
 
-**Extension renumbering.** A guided change of `settings.ext_length`: every extension, parking slot and endpoint name is rewritten in one operation, the provisioning provider re-pushes every device, and `manual` devices are listed for hand updates. The MVP fixes the length at first boot (§6.3, §11.4).
+**Extension renumbering.** A guided change of `settings.ext_length`: every extension, parking slot and endpoint name is rewritten in one operation, the provisioning provider re-pushes every device, `yealink` phones take the new names at their next fetch, and `manual` devices are listed for hand updates. The MVP fixes the length at first boot (§6.3, §11.4).
 
 **Session management.** Listing and revoking a user's refresh tokens and OAuth clients through the API. The MVP revokes on soft delete and on refresh-token replay (§5.2, §5.9).
 

@@ -22,7 +22,9 @@ const input: RenderInput = {
     codecs: ['opus', 'g722', 'alaw'],
     ringotelMaxRegs: 3,
     extLength: 3,
-    holdMohClass: 'm2'
+    holdMohClass: 'm2',
+    dndToggleCode: '*92',
+    mailboxCode: '*95'
   },
   users: [{ id: 'u1', ext: '101', name: 'Anna Huber', ringGroupIds: ['rg1'] }],
   devices: [
@@ -33,7 +35,8 @@ const input: RenderInput = {
       transport: 'plain',
       allowedIps: ['10.0.0.0/8'],
       sipUsername: 'e101-d3kx7',
-      sipPassword: 'a1B2c3D4e5F6g7H8i9J0k1L2'
+      sipPassword: 'a1B2c3D4e5F6g7H8i9J0k1L2',
+      mwiRingGroupIds: null
     },
     {
       id: 'd2',
@@ -42,7 +45,8 @@ const input: RenderInput = {
       transport: 'tls',
       allowedIps: null,
       sipUsername: 'e101-dz9k2',
-      sipPassword: 'z9Y8x7W6v5U4t3S2r1Q0p9O8'
+      sipPassword: 'z9Y8x7W6v5U4t3S2r1Q0p9O8',
+      mwiRingGroupIds: null
     }
   ],
   ringGroups: [{ id: 'rg1', ext: '600' }],
@@ -389,11 +393,43 @@ describe('render', () => {
     expect(usersConf).toContain('allow = !all,opus,g722,alaw');
   });
 
-  test('the hints file has one hint per user, ring group and parking slot', () => {
+  test('the hints file has one hint per user, ring group and parking slot, and a DND hint per user', () => {
     const hints = rendered['extensions_hints.conf'];
     expect(hints).toContain('exten => 101,hint,Stasis:presence-101');
+    expect(hints).toContain('exten => *92101,hint,Stasis:dnd-101');
     expect(hints).toContain('exten => 600,hint,Stasis:presence-600');
     expect(hints).toContain('exten => 701,hint,Stasis:presence-701');
+    expect(hints).not.toContain('Stasis:dnd-600');
+    expect(hints).not.toContain('Stasis:dnd-701');
+    expect(hints).toContain('exten => *95101,hint,Stasis:mwi-101');
+    expect(hints).toContain('exten => *95600,hint,Stasis:mwi-600');
+    expect(hints).not.toContain('*95701');
+  });
+
+  test("a device's indicator counts the own mailbox and the ring groups it names, every one for null", () => {
+    // Both fixture devices are Anna's, so every AOR's `mailboxes` is the same.
+    const aorMailboxes = (
+      mwiRingGroupIds: string[] | null
+    ): string | undefined =>
+      configValues(
+        render({
+          ...input,
+          devices: input.devices.map(device => ({ ...device, mwiRingGroupIds }))
+        }).files['pjsip_users.conf'],
+        'mailboxes'
+      )[0];
+    expect(aorMailboxes(null)).toBe('user:u1,ringGroup:rg1');
+    expect(aorMailboxes([])).toBe('user:u1');
+    expect(aorMailboxes(['rg1', 'rg-left'])).toBe('user:u1,ringGroup:rg1');
+  });
+
+  test('a dndToggle code that is not dialplan-safe leaves the DND hints out', () => {
+    const hints = render({
+      ...input,
+      settings: { ...input.settings, dndToggleCode: '*9\n[x]' }
+    }).files['extensions_hints.conf'];
+    expect(hints).toContain('exten => 101,hint,Stasis:presence-101');
+    expect(hints).not.toContain('Stasis:dnd-');
   });
 
   test('musiconhold.conf has one files-mode class per moh asset', () => {

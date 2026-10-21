@@ -218,7 +218,10 @@ describe('a ringotel device reaches Ringotel once Asterisk holds it (§10.4)', (
 
   it.each([
     ['devices.rotate', (id: string) => ({ id })],
-    ['devices.setBlf', (id: string) => ({ id, keys: ['998'] })]
+    [
+      'devices.setBlf',
+      (id: string) => ({ id, keys: [{ kind: 'blf', ext: '998' }] })
+    ]
   ])(
     '%s recovers, rather than recreates, a restored device whose user Ringotel deleted within 24 h',
     async (operation, input) => {

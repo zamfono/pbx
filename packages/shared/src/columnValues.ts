@@ -30,12 +30,20 @@ export const CALL_LOG_LEVELS = ['none', ...LOG_LEVEL_OVERRIDES] as const;
 export type CallLogLevel = (typeof CALL_LOG_LEVELS)[number];
 
 /** `devices.kind`. */
-export const DEVICE_KINDS = ['manual', 'ringotel'] as const;
+export const DEVICE_KINDS = ['manual', 'ringotel', 'yealink'] as const;
 export type DeviceKind = (typeof DEVICE_KINDS)[number];
 
 /** `devices.transport`: TLS, or the stack's plain SIP transports. */
 export const DEVICE_TRANSPORTS = ['tls', 'plain'] as const;
 export type DeviceTransport = (typeof DEVICE_TRANSPORTS)[number];
+
+/** `device_blf_keys.feature`: the feature codes a `manual` device's feature key dials (§10.4). */
+export const DEVICE_KEY_FEATURES = [
+  'dndToggle',
+  'ownVoicemail',
+  'park'
+] as const;
+export type DeviceKeyFeature = (typeof DEVICE_KEY_FEATURES)[number];
 
 /** `trunks.transport`. */
 export const TRUNK_TRANSPORTS = ['udp', 'tcp', 'tls'] as const;

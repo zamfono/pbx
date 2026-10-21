@@ -2,8 +2,14 @@
  * The render's input (§9.1, §9.3, §9.4): every live user, device, ring group, parking slot, trunk
  * and hold-music asset the generated Asterisk configuration names, read from the database.
  */
-import { allowedIpsColumn, codecsColumn, type Db } from '@zamfono/shared';
+import {
+  allowedIpsColumn,
+  codecsColumn,
+  featureCodesColumn,
+  type Db
+} from '@zamfono/shared';
 
+import { loadMwiRingGroups } from './ops/devices/_mwiRingGroups.js';
 import { loadParkingSlots } from './ops/parking/_shared.js';
 import { loadSettings } from './ops/settings/_shared.js';
 import type { RenderInput } from './pjsip/shared.js';
@@ -53,6 +59,7 @@ async function loadDevices(
     .where('devices.deletedAt', 'is', null)
     .where('users.deletedAt', 'is', null)
     .execute();
+  const mwiRingGroups = await loadMwiRingGroups(db, rows);
   return rows.map(row => ({
     id: row.id,
     userId: row.userId,
@@ -64,7 +71,8 @@ async function loadDevices(
       kr,
       'devices.sipPasswordEnc',
       row.sipPasswordEnc
-    ).toString('utf8')
+    ).toString('utf8'),
+    mwiRingGroupIds: mwiRingGroups.get(row.id) ?? null
   }));
 }
 
@@ -155,6 +163,7 @@ export async function loadRenderInput(
   fqdn: string
 ): Promise<RenderInput> {
   const settings = await loadSettings(db);
+  const featureCodes = featureCodesColumn.decode(settings.featureCodesJson);
   const [users, devices, ringGroups, parkingSlots, trunks, moh] =
     await Promise.all([
       loadUsers(db),
@@ -170,7 +179,9 @@ export async function loadRenderInput(
       codecs: codecsColumn.decode(settings.codecsJson),
       ringotelMaxRegs: settings.ringotelMaxRegs,
       extLength: settings.extLength,
-      holdMohClass: holdMohClass(settings.holdMohAudioId, moh)
+      holdMohClass: holdMohClass(settings.holdMohAudioId, moh),
+      dndToggleCode: featureCodes.dndToggle,
+      mailboxCode: featureCodes.mailbox
     },
     users,
     devices,

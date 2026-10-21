@@ -77,7 +77,7 @@ export const settingsInputSchema = z
     featureCodes: featureCodesSchema
       .optional()
       .describe(
-        'Dialled prefixes for the ten keys pickup, dndOn, dndOff, mailbox, ownVoicemail, deposit, addParty, clirOn, clirOff and park, all sent together; each starts with * or # and none is a prefix of another.'
+        'Dialled prefixes for the eleven keys pickup, dndOn, dndOff, dndToggle, mailbox, ownVoicemail, deposit, addParty, clirOn, clirOff and park, all sent together; each starts with * or # and none is a prefix of another.'
       ),
     fallbackTarget: targetSpecSchema
       .nullable()

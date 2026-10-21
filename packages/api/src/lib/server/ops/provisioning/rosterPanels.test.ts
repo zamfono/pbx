@@ -60,7 +60,7 @@ describe('the Ringotel roster push re-renders the per-user panels (§10.4)', () 
     await runOperation(
       db,
       'devices.setBlf',
-      { id: device.id, keys: ['101'] },
+      { id: device.id, keys: [{ kind: 'blf', ext: '101' }] },
       asConfirmedRun()
     );
 

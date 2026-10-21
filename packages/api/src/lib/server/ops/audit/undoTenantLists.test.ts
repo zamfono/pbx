@@ -140,7 +140,7 @@ describe('audit.undo of a parking or mail-template change', () => {
     await runOperation(
       db,
       'devices.setBlf',
-      { id: device.id, keys: ['701'] },
+      { id: device.id, keys: [{ kind: 'blf', ext: '701' }] },
       asConfirmedRun()
     );
     await runOperation(db, 'parking.set', { slots: [] }, asConfirmedRun());
@@ -161,8 +161,8 @@ describe('audit.undo of a parking or mail-template change', () => {
       'devices.getBlf',
       { id: device.id },
       asConfirmedRun()
-    )) as { keys: string[] };
-    expect(blf.keys).toEqual(['701']);
+    )) as { keys: unknown[] };
+    expect(blf.keys).toEqual([{ kind: 'blf', ext: '701' }]);
   });
 
   it('takes a mail-template override back to the one before, then to none', async () => {

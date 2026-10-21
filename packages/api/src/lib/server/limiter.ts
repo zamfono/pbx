@@ -12,6 +12,7 @@ const LOGIN_ADDRESS_LIMIT = 60;
 const TOKEN_LIMIT = 60;
 const RESET_ADDRESS_LIMIT = 30;
 const REGISTER_LIMIT = 60;
+const PROVISION_LIMIT = 300;
 
 // §5.5 account lock: five failures within this window lock the account for the same duration.
 const LOGIN_FAILURE_LIMIT = 5;
@@ -22,14 +23,20 @@ const ACCOUNT_LOCK_MS = 900_000;
 const RESET_ACCOUNT_LIMIT = 3;
 
 export type LimitKind =
-  'loginAddress' | 'token' | 'resetAddress' | 'resetAccount' | 'register';
+  | 'loginAddress'
+  | 'token'
+  | 'resetAddress'
+  | 'resetAccount'
+  | 'register'
+  | 'provision';
 
 const CHECK_LIMITS: Record<LimitKind, { max: number; windowMs: number }> = {
   loginAddress: { max: LOGIN_ADDRESS_LIMIT, windowMs: MS_PER_MINUTE },
   token: { max: TOKEN_LIMIT, windowMs: MS_PER_MINUTE },
   resetAddress: { max: RESET_ADDRESS_LIMIT, windowMs: MS_PER_HOUR },
   resetAccount: { max: RESET_ACCOUNT_LIMIT, windowMs: MS_PER_HOUR },
-  register: { max: REGISTER_LIMIT, windowMs: MS_PER_MINUTE }
+  register: { max: REGISTER_LIMIT, windowMs: MS_PER_MINUTE },
+  provision: { max: PROVISION_LIMIT, windowMs: MS_PER_MINUTE }
 };
 
 type FixedWindow = { start: number; count: number };

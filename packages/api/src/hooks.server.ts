@@ -74,14 +74,15 @@ export const init: ServerInit = async () => {
 // The one `/api/v1/*` route served without a bearer token (§10.3).
 const OPENAPI_ROUTE = `${API_PREFIX}/openapi.json`;
 
-// §5.5's per-address limit for the two endpoints it can be applied to by route alone. The
+// §5.5's per-address limit for the endpoints it can be applied to by route alone. The
 // login and forgot-password limits key on the account the request body names, and the login's
 // address limit counts submissions rather than views of the page, so both live in the handler
 // that reads that body (the `login` form in `authorize.remote.ts`; `requestPasswordReset`, which
 // `POST /auth/resetRequest` and the forgot-password page's form share).
 const RATE_LIMITED_ROUTES: Partial<Record<string, LimitKind>> = {
   '/oauth/token': 'token',
-  '/oauth/register': 'register'
+  '/oauth/register': 'register',
+  '/provision/[token]/[file]': 'provision'
 };
 
 /** 429 problem+json once the route's own §5.5 address limit is exceeded, else `null` to let the request through. */
