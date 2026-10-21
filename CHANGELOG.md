@@ -11,6 +11,14 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+### Fixed
+
+- A call to one's own extension rang the phone it was placed from too, as call waiting, which
+  then logged it as a missed call. So did any call to a user still placing another: a phone
+  that is dialling now counts as busy.
+- A phone that stopped ringing because another device answered, the user's own, a ring-group
+  member's or a pickup's, logged a missed call. The CANCEL now says "Call completed elsewhere".
+
 ## [0.7.2] - 2026-10-21
 
 ### Added
