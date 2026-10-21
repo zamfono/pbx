@@ -11,6 +11,12 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+### Fixed
+
+- A provisioned Yealink phone no longer warns "User default pwd is in use": the provisioning file
+  now sets the generated admin password on the phone's `user` web login too, which kept its
+  factory password. A phone picks it up on its next fetch.
+
 ## [0.7.1] - 2026-10-21
 
 ### Fixed
