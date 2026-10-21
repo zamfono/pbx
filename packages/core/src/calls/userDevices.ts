@@ -43,7 +43,9 @@ export function registeredDevices(
 const CHANNEL_SEQUENCE_SUFFIX = /-[0-9a-f]{8}$/u;
 
 /** The SIP usernames of the devices carrying a call right now: every `PJSIP/` channel that is up,
- * whether the device placed the call or answered it. */
+ * whether the device placed the call or answered it, and every one still placing a call, which
+ * Asterisk holds in `Ring` until it is answered, so a device calling its own user's extension is
+ * not rung by that call. */
 export async function busyDevices(pipeline: Pipeline): Promise<Set<string>> {
   const channels =
     (await pipeline.deps.ari.channels
@@ -51,7 +53,10 @@ export async function busyDevices(pipeline: Pipeline): Promise<Set<string>> {
       .catch(logFailure(pipeline.deps.logger, 'channel list'))) ?? [];
   const busy = new Set<string>();
   for (const channel of channels) {
-    if (channel.state === 'Up' && channel.name.startsWith('PJSIP/')) {
+    if (
+      (channel.state === 'Up' || channel.state === 'Ring') &&
+      channel.name.startsWith('PJSIP/')
+    ) {
       busy.add(
         channel.name.slice('PJSIP/'.length).replace(CHANNEL_SEQUENCE_SUFFIX, '')
       );

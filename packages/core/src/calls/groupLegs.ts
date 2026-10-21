@@ -4,6 +4,7 @@
  * (`ringGroupOriginate.ts`), its win (`ringGroupWin.ts`) and a pickup of it (`groupPickup.ts`).
  */
 import { logUnlessGone } from '../ari/failures.js';
+import type { HangupOptions } from '../ari/types.js';
 import type { Pipeline } from './pipeline.js';
 
 export type GroupLeg = {
@@ -41,17 +42,19 @@ export function hangupMemberSiblings(
   }
 }
 
-/** Ends every still-ringing tracked leg; called once a batch concludes, win or not. */
+/** Ends every still-ringing tracked leg; called once a batch concludes, win or not, `opts` being
+ * `ANSWERED_ELSEWHERE` for a win. */
 export async function hangupAllRinging(
   pipeline: Pipeline,
-  tracked: Map<string, GroupLeg>
+  tracked: Map<string, GroupLeg>,
+  opts?: HangupOptions
 ): Promise<void> {
   const ringing = [...tracked].filter(([, leg]) => leg.state === 'ringing');
   await Promise.all(
     ringing.map(([channelId, leg]) => {
       leg.state = 'ended';
       return pipeline.deps.ari.channels
-        .hangup(channelId)
+        .hangup(channelId, opts)
         .catch(logUnlessGone(pipeline.deps.logger, 'losing leg hangup'));
     })
   );

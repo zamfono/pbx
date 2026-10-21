@@ -14,6 +14,7 @@ import { findLiveCall } from './callLookup.js';
 import { ownerForExt } from './extensionOwner.js';
 import { closeFeatureCall } from './featureCall.js';
 import { activeBatchHasRingingLeg, stopGroupRinging } from './groupPickup.js';
+import { ANSWERED_ELSEWHERE } from './legs.js';
 import type { Pipeline } from './pipeline.js';
 import { release, type Owner } from './release.js';
 
@@ -65,7 +66,7 @@ async function bridgePickup(
     ringing.map(async other => {
       other.state = 'ended';
       pipeline.callByChannel.delete(other.channelId);
-      await ari.channels.hangup(other.channelId).catch(
+      await ari.channels.hangup(other.channelId, ANSWERED_ELSEWHERE).catch(
         logUnlessGone(pipeline.deps.logger, 'ringing leg hangup', {
           callId: target.id
         })

@@ -278,6 +278,19 @@ describe('user step against registration', () => {
     expect(originatedEndpoints(fakeAri)).toEqual([contactEndpoint('e101-db')]);
   });
 
+  // A call to one's own extension: the device placing it is in `Ring` until it is answered.
+  it('never rings the device placing the call on that call', async () => {
+    const userId = await seedUserWithDevices(rig, ['e101-da', 'e101-db']);
+    await register('e101-da');
+    await register('e101-db');
+    fakeAri.addChannel({ name: 'PJSIP/e101-da-0000002a', state: 'Ring' });
+    presence.setCallState(userId, 'inCall', '101', null, call.id);
+
+    await runUserStep(pipeline, call, await pipeline.deps.cache.get(), userId);
+
+    expect(originatedEndpoints(fakeAri)).toEqual([contactEndpoint('e101-db')]);
+  });
+
   it('applies the busy rule at once when the only registered device carries a call', async () => {
     const userId = await seedUserWithDevices(rig, ['e101-da']);
     await seedAnnouncementRule(db, userId, 'busy', 'busy.wav');
@@ -463,6 +476,31 @@ describe('user step against registration', () => {
     expect(bridged(answering)).toBe(true);
     expect(traceEvents(call, 'ringOutcome')).toEqual([]);
     expect(playedMedia(fakeAri, callerChannel.id)).toEqual([]);
+  });
+
+  // RFC 3326 "Call completed elsewhere" on the CANCEL, so the other phone logs no missed call.
+  it('hangs up the other phones as answered elsewhere once one answers', async () => {
+    const userId = await seedUserWithDevices(rig, ['e101-da', 'e101-db']);
+    await register('e101-da');
+    await register('e101-db');
+
+    const step = runUserStep(
+      pipeline,
+      call,
+      await pipeline.deps.cache.get(),
+      userId
+    );
+    await eventually(() => {
+      expect(traceEvents(call, 'rungDevice')).toHaveLength(2);
+    });
+    const [answering = '', other = ''] = placedChannelIds(fakeAri);
+    answer(answering);
+    await step;
+
+    const hangup = fakeAri.calls.find(
+      entry => entry.method === 'DELETE' && entry.path === `channels/${other}`
+    );
+    expect(hangup?.qs).toBe('reason=answered_elsewhere');
   });
 
   // The other order: the ring timed out first, so a phone answering afterwards is not bridged

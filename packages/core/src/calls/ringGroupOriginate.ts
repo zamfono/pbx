@@ -12,6 +12,7 @@ import type { Call } from './call.js';
 import { softphoneCallerId } from './contactName.js';
 import type { GroupLeg } from './groupLegs.js';
 import { originateLeg } from './legOriginate.js';
+import { ANSWERED_ELSEWHERE } from './legs.js';
 import type { Pipeline } from './pipeline.js';
 import { originateExternalLeg } from './ringGroupExternal.js';
 import { contactLegs, devicesToRing, type ContactLeg } from './userDevices.js';
@@ -32,7 +33,7 @@ function hangUpIfAlreadyWon(
     return;
   }
   leg.state = 'ended';
-  pipeline.deps.ari.channels.hangup(leg.channelId).catch(
+  pipeline.deps.ari.channels.hangup(leg.channelId, ANSWERED_ELSEWHERE).catch(
     logUnlessGone(pipeline.deps.logger, 'ringing leg hangup', {
       callId: call.id
     })

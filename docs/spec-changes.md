@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-21 · §10.1 step 4.** A leg still ringing when another answers, the call's own, a ring group's or one a pickup takes, is hung up as answered elsewhere, its CANCEL carrying RFC 3326's `Reason: SIP;cause=200;text="Call completed elsewhere"`.
+*Why:* a phone whose ring a colleague's or the user's other device answered logged it as a missed call. The product owner: "i called myself from my yealink and the phone showed a missed call. (ringotel rang too and i picked up in there, but still...)".
+
 **2026-10-21 · §10.4 `yealink`.** The Yealink file sets the device's admin password on both of the phone's web accounts, `admin` and `user`, where it set `admin` alone.
 *Why:* the `user` account kept its factory password, so the phone warned about it. The product owner: "my provisioned Yealink T87W shows the warning "User default pwd is in use."".
 

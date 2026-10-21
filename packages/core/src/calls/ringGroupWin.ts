@@ -6,6 +6,7 @@ import { ignoreGone, logUnlessGone } from '../ari/failures.js';
 import { bridgeAnswered, claimAnswer } from './answer.js';
 import { takeJoinBridge, type Call, type Leg } from './call.js';
 import { hangupAllRinging, type GroupLeg } from './groupLegs.js';
+import { ANSWERED_ELSEWHERE } from './legs.js';
 import type { Pipeline } from './pipeline.js';
 
 /**
@@ -75,7 +76,7 @@ export async function winBatch(
     winningLeg,
     takeJoinBridge(call)
   );
-  await hangupAllRinging(pipeline, tracked);
+  await hangupAllRinging(pipeline, tracked, ANSWERED_ELSEWHERE);
   // §9.3 "a user: ... INUSE in a call"; a leg whose join failed is hung up.
   if (winningLeg.userId !== null && joined) {
     pipeline.deps.presence.setCallState(

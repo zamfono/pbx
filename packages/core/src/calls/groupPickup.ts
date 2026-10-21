@@ -8,6 +8,7 @@
 import { logUnlessGone } from '../ari/failures.js';
 import type { Call } from './call.js';
 import type { GroupLeg } from './groupLegs.js';
+import { ANSWERED_ELSEWHERE } from './legs.js';
 import type { Pipeline } from './pipeline.js';
 import type { BatchOutcome } from './ringGroupRace.js';
 
@@ -75,7 +76,7 @@ export function stopGroupRinging(
   for (const [channelId, leg] of active.tracked) {
     if (leg.state === 'ringing') {
       leg.state = 'ended';
-      pipeline.deps.ari.channels.hangup(channelId).catch(
+      pipeline.deps.ari.channels.hangup(channelId, ANSWERED_ELSEWHERE).catch(
         logUnlessGone(pipeline.deps.logger, 'ringing leg hangup', {
           callId: call.id
         })

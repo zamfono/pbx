@@ -4,6 +4,7 @@
 
 import type { AriEventOf } from '../ari/events.js';
 import { ignoreGone, logFailure } from '../ari/failures.js';
+import type { HangupOptions } from '../ari/types.js';
 import { bridgeAnswered, claimAnswer } from './answer.js';
 import type { Call, Leg } from './call.js';
 import { callPartiesChanged } from './callState.js';
@@ -65,10 +66,23 @@ export function untrackLeg(pipeline: Pipeline, call: Call, leg: Leg): void {
   call.legs.delete(leg.channelId);
 }
 
+/** The hangup of a leg still ringing when another answered: its CANCEL carries `Reason: SIP;
+ * cause=200;text="Call completed elsewhere"` (RFC 3326, `res_pjsip_rfc3326`), so the phone logs no
+ * missed call. */
+export const ANSWERED_ELSEWHERE: HangupOptions = {
+  reason: 'answered_elsewhere'
+};
+
 /** Ends `leg` and hangs up its still-live channel; never for a channel that already ended itself. */
-export function hangupLeg(pipeline: Pipeline, leg: Leg): Promise<void> {
+export function hangupLeg(
+  pipeline: Pipeline,
+  leg: Leg,
+  opts?: HangupOptions
+): Promise<void> {
   endLeg(pipeline, leg.channelId, leg);
-  return pipeline.deps.ari.channels.hangup(leg.channelId).catch(ignoreGone);
+  return pipeline.deps.ari.channels
+    .hangup(leg.channelId, opts)
+    .catch(ignoreGone);
 }
 
 /**
@@ -100,7 +114,7 @@ async function winLeg(
       .filter(
         other => other.channelId !== leg.channelId && other.state === 'ringing'
       )
-      .map(other => hangupLeg(pipeline, other))
+      .map(other => hangupLeg(pipeline, other, ANSWERED_ELSEWHERE))
   );
   pipeline.pendingRing.delete(call.id);
   // §9.3 "a user: ... INUSE in a call"; a leg whose join failed is hung up.
@@ -135,7 +149,7 @@ async function handOverLeg(
   await Promise.all(
     [...call.legs.values()]
       .filter(other => other.state === 'ringing')
-      .map(other => hangupLeg(pipeline, other))
+      .map(other => hangupLeg(pipeline, other, ANSWERED_ELSEWHERE))
   );
   pending.handOver?.(leg);
   pending.resolve('answered');

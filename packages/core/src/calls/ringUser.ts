@@ -14,6 +14,7 @@ import { softphoneCallerId } from './contactName.js';
 import { findMeLegsPending, scheduleFindMeLegs } from './findMe.js';
 import { originateLeg } from './legOriginate.js';
 import {
+  ANSWERED_ELSEWHERE,
   hangupLeg,
   trackLeg,
   untrackLeg,
@@ -94,7 +95,11 @@ async function ringDevice(
   const raceOver =
     call.answeredAt !== null || !pipeline.pendingRing.has(call.id);
   if (raceOver && tracked?.state === 'ringing') {
-    await hangupLeg(pipeline, tracked);
+    await hangupLeg(
+      pipeline,
+      tracked,
+      call.answeredAt === null ? undefined : ANSWERED_ELSEWHERE
+    );
   }
 }
 
