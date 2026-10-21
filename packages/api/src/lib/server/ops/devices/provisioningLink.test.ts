@@ -194,6 +194,7 @@ describe("devices.setBlf: a yealink device's line keys (§10.4)", () => {
       { kind: 'blf', ext: '701' },
       { kind: 'quickDial', number: '+43123456789', label: 'Taxi' },
       { kind: 'feature', feature: 'park', label: 'Park' },
+      { kind: 'empty' },
       { kind: 'blf', ext: '205' }
     ];
     await runOperation(db, 'devices.setBlf', { id, keys }, asRun());
@@ -293,6 +294,9 @@ describe("devices.setBlf: a yealink device's line keys (§10.4)", () => {
       /CHECK/u
     );
     await expect(insert({ feature: 'park' })).rejects.toThrow(/CHECK/u);
+    await expect(insert({ isEmpty: 1, isLineKey: 1 })).rejects.toThrow(
+      /CHECK/u
+    );
   });
 
   it('refuses a second line key, a number that is not E.164, and a manual device', async () => {

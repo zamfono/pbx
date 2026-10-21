@@ -48,13 +48,20 @@ export const deviceKey = z.discriminatedUnion('kind', [
       .describe(
         "The account's line key, showing its registration and calls; at most one, yealink devices only."
       )
+  }),
+  z.strictObject({
+    kind: z
+      .literal('empty')
+      .describe(
+        'An empty key, so the keys after it move further along; yealink devices only.'
+      )
   })
 ]);
 export type DeviceKey = z.infer<typeof deviceKey>;
 
 /**
- * `key` as its `device_blf_keys` columns, one per kind (§11.2). `isLineKey` is always set: a
- * multi-row insert writes every column any row names, NULL where a row leaves one out.
+ * `key` as its `device_blf_keys` columns, one per kind (§11.2). `isLineKey` and `isEmpty` are
+ * always set: a multi-row insert writes every column any row names, NULL where a row leaves one out.
  */
 export function keyColumns(key: DeviceKey): {
   ext?: string;
@@ -62,19 +69,37 @@ export function keyColumns(key: DeviceKey): {
   feature?: DeviceKeyFeature;
   mailboxExt?: string;
   isLineKey: number;
+  isEmpty: number;
   label?: string;
 } {
   switch (key.kind) {
     case 'blf':
-      return { ext: key.ext, isLineKey: 0 };
+      return { ext: key.ext, isLineKey: 0, isEmpty: 0 };
     case 'quickDial':
-      return { number: key.number, label: key.label, isLineKey: 0 };
+      return {
+        number: key.number,
+        label: key.label,
+        isLineKey: 0,
+        isEmpty: 0
+      };
     case 'feature':
-      return { feature: key.feature, label: key.label, isLineKey: 0 };
+      return {
+        feature: key.feature,
+        label: key.label,
+        isLineKey: 0,
+        isEmpty: 0
+      };
     case 'mailbox':
-      return { mailboxExt: key.ext, label: key.label, isLineKey: 0 };
+      return {
+        mailboxExt: key.ext,
+        label: key.label,
+        isLineKey: 0,
+        isEmpty: 0
+      };
     case 'line':
-      return { isLineKey: 1 };
+      return { isLineKey: 1, isEmpty: 0 };
+    case 'empty':
+      return { isLineKey: 0, isEmpty: 1 };
     default:
       throw new Error(`devices: unknown key kind '${String(key)}'`);
   }
@@ -100,7 +125,15 @@ export async function loadDeviceKeys(
 ): Promise<DeviceKey[]> {
   const rows = await db
     .selectFrom('deviceBlfKeys')
-    .select(['ext', 'number', 'feature', 'mailboxExt', 'isLineKey', 'label'])
+    .select([
+      'ext',
+      'number',
+      'feature',
+      'mailboxExt',
+      'isLineKey',
+      'isEmpty',
+      'label'
+    ])
     .where('deviceId', '=', deviceId)
     .orderBy('position')
     .execute();
@@ -123,6 +156,6 @@ export async function loadDeviceKeys(
     if (row.mailboxExt !== null) {
       return { kind: 'mailbox', ext: row.mailboxExt, label };
     }
-    return { kind: 'line' };
+    return row.isEmpty === 1 ? { kind: 'empty' } : { kind: 'line' };
   });
 }

@@ -122,7 +122,7 @@ export const setBlf = defineOperation({
     ) {
       throw new OpError(
         HTTP_UNPROCESSABLE_CONTENT,
-        'devices: quick-dial, feature, mailbox and line keys apply only to yealink devices'
+        'devices: quick-dial, feature, mailbox, line and empty keys apply only to yealink devices'
       );
     }
     if (input.keys.filter(key => key.kind === 'line').length > 1) {

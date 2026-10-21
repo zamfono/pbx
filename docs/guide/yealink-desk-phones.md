@@ -52,7 +52,9 @@ The device record shows when and from which address the phone last fetched its f
     messages, and pressing it opens the mailbox;
   - `{"kind": "feature", "feature": "park", "label": "Park"}` (or `ownVoicemail`): a key dialling
     that feature code (pressed during a call, `park` parks it and the phone hears the slot
-    number).
+    number);
+  - `{"kind": "empty"}`: a key left empty, so the keys after it move further along: three of
+    them after two keys put the next key on the sixth.
 
   A new device starts with two keys: its line key and a DND key labelled "DND". Every key after
   the list is emptied; an empty list leaves no keys at all.

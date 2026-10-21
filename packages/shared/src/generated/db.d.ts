@@ -119,6 +119,7 @@ export interface DeviceBlfKeys {
   deviceId: string;
   ext: string | null;
   feature: string | null;
+  isEmpty: Generated<number>;
   isLineKey: Generated<number>;
   label: string | null;
   mailboxExt: string | null;

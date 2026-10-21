@@ -1422,7 +1422,7 @@ The endpoints by area, as a sketch, each with the minimum role it needs:
 
 **Personal access tokens** (min. role: user (own) / admin; an owner's owner-only) — `GET/POST /users/{id}/personalAccessTokens` (`POST` takes `name` and an optional `expiresAt` and returns the token once; `GET` lists the user's tokens, never their values, with `createdBy`, `createdAt`, `expiresAt`, `lastUsedAt` and `revokedAt`), `POST /personalAccessTokens/{id}/revoke` (§5.2)
 
-**Devices** (min. role: user (own, `tls` only) / admin; `plain` devices, reveal and rotate admin) — `GET /users/{id}/devices`, `POST` (transport class + allowlist for `plain`, refused while both plain transports are disabled, §9.3; returns a `manual` or `yealink` device's connection settings and a `yealink` device's provisioning link, §10.4), `PATCH /devices/{id}` (label, `allowedIps`, a `yealink` device's `ringtone`, `mwiRingGroups`, also taken by `POST`, §9.3 "MWI"), `DELETE /devices/{id}`, `GET /devices/{id}/credentials` (reveal, audited; a `manual` or `yealink` device's connection settings), `POST /devices/{id}/rotate` (new password, re-pushed and returned), `POST /devices/{id}/provisioningLink` (admin; a new provisioning link for a `yealink` device, returned once, revoking the one before, §10.4), `GET/PUT /devices/{id}/blf` (the device's key list, replaced as a whole, §10.4: entries told apart by `kind`: `{kind: "blf", ext}` on an extension or parking slot, for both kinds; on a `yealink` device also `{kind: "quickDial", number, label}`, `{kind: "feature", feature, label}`, `{kind: "mailbox", ext, label}` and `{kind: "line"}`)
+**Devices** (min. role: user (own, `tls` only) / admin; `plain` devices, reveal and rotate admin) — `GET /users/{id}/devices`, `POST` (transport class + allowlist for `plain`, refused while both plain transports are disabled, §9.3; returns a `manual` or `yealink` device's connection settings and a `yealink` device's provisioning link, §10.4), `PATCH /devices/{id}` (label, `allowedIps`, a `yealink` device's `ringtone`, `mwiRingGroups`, also taken by `POST`, §9.3 "MWI"), `DELETE /devices/{id}`, `GET /devices/{id}/credentials` (reveal, audited; a `manual` or `yealink` device's connection settings), `POST /devices/{id}/rotate` (new password, re-pushed and returned), `POST /devices/{id}/provisioningLink` (admin; a new provisioning link for a `yealink` device, returned once, revoking the one before, §10.4), `GET/PUT /devices/{id}/blf` (the device's key list, replaced as a whole, §10.4: entries told apart by `kind`: `{kind: "blf", ext}` on an extension or parking slot, for both kinds; on a `yealink` device also `{kind: "quickDial", number, label}`, `{kind: "feature", feature, label}`, `{kind: "mailbox", ext, label}`, `{kind: "line"}` and `{kind: "empty"}`)
 
 **Provisioning** (min. role: owner) — `POST /provisioning/ringotel/setup` (input: Ringotel `domain`, `region`, `packageid`) — runs `createOrganization` + `createBranch` (§10.4) and stores the ids in `settings`; a `region` or `packageid` the account does not offer is refused with 422 before anything is created, naming the ones it does, and a domain the account already has with 409, naming its organization and the adoption call that takes it over. `GET /provisioning/ringotel/options` lists those choices live (`getRegions`, `getPackages`, each package with the registrations per user it allows), since Ringotel adds regions and the packages are the account's own. Setup and adoption set `ringotel_max_regs` to the package's while it is still at its default (§11.4). `POST /provisioning/ringotel/adopt` (input: `orgId`, `domain`, optional `branchId`; confirmed) takes over an organization that already exists instead (§10.4)
 
@@ -1538,7 +1538,7 @@ No STUN server or outbound proxy is needed: Asterisk handles NAT itself (§9.1).
 
 - the account from the connection settings above, with the device's label as the account label, SIP over TLS with SRTP compulsory, every codec outside `codecs` disabled (the T7x/T8x line has no Opus, so a tenant's `opus` is left out), and the voicemail key dialling `voicemailCode` with MWI subscribed;
 - the phone's own DND and call forwarding disabled, since DND and forwarding live in the core, which lamps, API and forwarding read;
-- the key list (`device_blf_keys`, set through `PUT /devices/{id}/blf`) on the line keys in order from the first: a `blf` entry, an extension or parking slot, as a BLF key labelled as for Ringotel (its owner's name, "Parking 701") that picks up a ringing call through the `pickup` code, a `quickDial` entry as a quick-dial key, a `feature` entry as a key dialling that feature code (`ownVoicemail` or `park`, §9.3) or, for `dndToggle`, as a BLF key on the user's DND hint (§9.3 "BLF and presence"), lit while DND is on and toggling it when pressed, a `mailbox` entry, the extension of the user's own mailbox or of a ring group's they belong to, as a BLF key on that mailbox's hint, lit while it holds new messages and opening it when pressed, a `line` entry as the account's line key, which shows its registration and calls; every other line key is emptied;
+- the key list (`device_blf_keys`, set through `PUT /devices/{id}/blf`) on the line keys in order from the first: a `blf` entry, an extension or parking slot, as a BLF key labelled as for Ringotel (its owner's name, "Parking 701") that picks up a ringing call through the `pickup` code, a `quickDial` entry as a quick-dial key, a `feature` entry as a key dialling that feature code (`ownVoicemail` or `park`, §9.3) or, for `dndToggle`, as a BLF key on the user's DND hint (§9.3 "BLF and presence"), lit while DND is on and toggling it when pressed, a `mailbox` entry, the extension of the user's own mailbox or of a ring group's they belong to, as a BLF key on that mailbox's hint, lit while it holds new messages and opening it when pressed, a `line` entry as the account's line key, which shows its registration and calls, an `empty` entry as a line key left empty, so the entries after it move further along; every other line key is emptied;
 - the tenant's time zone (`settings.timezone`, mapped onto the vendor's zone names) and language (`settings.language`), and the device's `ringtone`, a name from the phone's built-in ringtones (NULL = the phone's own choice);
 - certificates checked against the phone's trusted roots for the fetch and SIP-TLS alike, SIP requests accepted only from the server, the admin password on both of the phone's web accounts (`admin` and `user`, which otherwise keeps its factory password and the phone warns about it), the stack's STUN server `<FQDN>:3478`, a daily fetch, and no blinking power LED in power-saving mode.
 
@@ -1791,11 +1791,12 @@ CREATE TABLE devices (
 -- device_blf_keys — a device's key list (§10.4): a 'ringotel' device's BLF panel, no rows = the
 -- branch default, every user and group extension in the tenant; a 'yealink' device's line keys,
 -- starting as its line key and a DND key, no rows = none. Replaced as a whole by
--- PUT /devices/{id}/blf. A key is one of five kinds, each in a column of its own: a BLF key
+-- PUT /devices/{id}/blf. A key is one of six kinds, each in a column of its own: a BLF key
 -- watching an extension of any kind, a person's, a group's or a parking slot (ext), and on a
 -- 'yealink' device alone a quick-dial key to an outside number (number), a feature key (feature,
 -- the §9.3 key of a code dialled alone), a mailbox key (mailbox_ext, the user's own mailbox or a
--- ring group's they belong to) or the account's line key (is_line_key, at most one); the FKs
+-- ring group's they belong to), the account's line key (is_line_key, at most one) or an empty
+-- key (is_empty), which moves the keys after it further along; the FKs
 -- remove a key when its extension row goes, with its owner's soft delete (§5.9) or a slot's
 -- removal.
 --   position: order of the keys
@@ -1809,12 +1810,13 @@ CREATE TABLE device_blf_keys (
   feature     TEXT    CHECK (feature IN ('dndToggle','ownVoicemail','park')),
   mailbox_ext TEXT    REFERENCES extensions(ext) ON DELETE CASCADE,
   is_line_key INTEGER NOT NULL DEFAULT 0 CHECK (is_line_key IN (0,1)),
+  is_empty    INTEGER NOT NULL DEFAULT 0 CHECK (is_empty IN (0,1)),
   label       TEXT,
   PRIMARY KEY (device_id, position),
   UNIQUE (device_id, ext),
   UNIQUE (device_id, mailbox_ext),
   CHECK ((ext IS NOT NULL) + (number IS NOT NULL) + (feature IS NOT NULL)
-         + (mailbox_ext IS NOT NULL) + is_line_key = 1),
+         + (mailbox_ext IS NOT NULL) + is_line_key + is_empty = 1),
   CHECK ((label IS NOT NULL) = (number IS NOT NULL OR feature IS NOT NULL OR mailbox_ext IS NOT NULL))
 );
 

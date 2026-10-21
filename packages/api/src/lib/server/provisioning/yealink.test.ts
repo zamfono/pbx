@@ -140,6 +140,24 @@ describe('renderYealink (§10.4 "Provisioning link")', () => {
     expect(file.has('linekey.85.type')).toBe(false);
   });
 
+  it('leaves an empty key unset, the keys after it further along', () => {
+    const file = parse(
+      renderYealink(
+        input({
+          keys: [
+            { kind: 'blf', ext: '206', title: 'Ben' },
+            { kind: 'empty' },
+            { kind: 'blf', ext: '207', title: 'Cleo' }
+          ]
+        })
+      )
+    );
+    expect([...file].filter(([key]) => key.startsWith('linekey.2.'))).toEqual([
+      ['linekey.2.type', '0']
+    ]);
+    expect(file.get('linekey.3.value')).toBe('207');
+  });
+
   it('sets the admin password on both web accounts, admin and user', () => {
     const file = renderYealink(input());
     expect(file).toMatch(/^static\.security\.user_password = admin:adminpw$/mu);

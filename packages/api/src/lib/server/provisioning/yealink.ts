@@ -129,6 +129,8 @@ function keyLines(input: YealinkInput, key: YealinkKey): Line[] {
         ['value', `${input.codes.mailbox}${key.ext}`],
         ['label', key.label]
       ];
+    case 'empty':
+      return [['type', KEY_TYPE.none]];
     case 'quickDial':
       return [
         ['type', KEY_TYPE.speedDial],
@@ -158,10 +160,10 @@ function keyLines(input: YealinkInput, key: YealinkKey): Line[] {
 function lineKeyLines(input: YealinkInput): Line[] {
   const out: Line[] = [];
   for (let keyNo = 1; keyNo <= LINE_KEYS; keyNo++) {
-    const key = input.keys[keyNo - 1];
+    const key = input.keys[keyNo - 1] ?? { kind: 'empty' };
     const fields: Line[] =
-      key === undefined
-        ? [['type', KEY_TYPE.none]]
+      key.kind === 'empty'
+        ? keyLines(input, key)
         : [['line', 1], ...keyLines(input, key)];
     for (const [field, value] of fields) {
       out.push([`linekey.${keyNo}.${field}`, value]);
