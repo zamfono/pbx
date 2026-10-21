@@ -11,6 +11,11 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+### Fixed
+
+- Dialling a DND code (`*90`, `*91`, `*92`) no longer shows as a failed or declined call on the
+  phone; the code answers, sets DND and hangs up.
+
 ## [0.7.0] - 2026-10-21
 
 ### Upgrade notes
