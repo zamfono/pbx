@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-21 · §10.4 `yealink`.** The Yealink file sets the device's admin password on both of the phone's web accounts, `admin` and `user`, where it set `admin` alone.
+*Why:* the `user` account kept its factory password, so the phone warned about it. The product owner: "my provisioned Yealink T87W shows the warning "User default pwd is in use."".
+
 **2026-10-21 · §3.1, §9.3 MWI, §10.3 Devices, §11.2 `devices` and `device_mwi_ring_groups`.** A device's message indicator counts its user's own mailbox and the ring-group mailboxes its `mwiRingGroups` names among the user's groups: `null` for every group they belong to, as every device did so far, `[]` for the own mailbox alone. It is set on `POST /users/{id}/devices` and `PATCH /devices/{id}`, defaults to `[]` for a new `yealink` device and `null` for any other, and is stored as `devices.mwi_all_ring_groups` with a new table `device_mwi_ring_groups`; a group the user no longer belongs to counts no more.
 *Why:* the indicator lit for the user's and their groups' mailboxes alike while the phone's message key opens the own mailbox alone, so the light could promise messages the key does not find. The product owner: "should we make that configurable? Otherwise a user might see the blinking light, press the built-in "messages" button and hear that there are no messages available...", then "how about "A+": a per-device *list* of included ring groups in the indicator. possibly tri-state: `null`: include all groups; `[]`: own mailbox only"; on a JSON column versus a table: "i'd prefer to keep our house style...".
 

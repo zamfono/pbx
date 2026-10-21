@@ -217,7 +217,9 @@ export function renderYealink(input: YealinkInput): string {
     ['static.security.trust_certificates', 1],
     ['static.security.cn_validation', 1],
     ['sip.trust_ctrl', 1],
+    // Both web accounts, or the phone warns that `user` keeps its factory one.
     ['static.security.user_password', `admin:${input.adminPassword}`],
+    ['static.security.user_password', `user:${input.adminPassword}`],
     ['static.auto_provision.power_on', 1],
     ['static.auto_provision.weekly.enable', 1],
     ['static.auto_provision.weekly.dayofweek', '0123456'],

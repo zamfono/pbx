@@ -102,7 +102,8 @@ describe('renderYealink (§10.4 "Provisioning link")', () => {
       'static.security.trust_certificates': '1',
       'static.security.cn_validation': '1',
       'sip.trust_ctrl': '1',
-      'static.security.user_password': 'admin:adminpw',
+      // The map keeps the last of the two lines; the next test checks both.
+      'static.security.user_password': 'user:adminpw',
       'static.auto_provision.power_on': '1',
       'static.auto_provision.weekly.enable': '1',
       'static.auto_provision.weekly.dayofweek': '0123456',
@@ -137,6 +138,12 @@ describe('renderYealink (§10.4 "Provisioning link")', () => {
     expect(file.get('linekey.6.type')).toBe('0');
     expect(file.get('linekey.84.type')).toBe('0');
     expect(file.has('linekey.85.type')).toBe(false);
+  });
+
+  it('sets the admin password on both web accounts, admin and user', () => {
+    const file = renderYealink(input());
+    expect(file).toMatch(/^static\.security\.user_password = admin:adminpw$/mu);
+    expect(file).toMatch(/^static\.security\.user_password = user:adminpw$/mu);
   });
 
   it('no ringtone leaves the phone its own, and an empty key list leaves no keys', () => {
