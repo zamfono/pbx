@@ -31,7 +31,10 @@ group while it is a slot, and a menu's `allowExtensionDialing` never reaches one
    or every slot is taken; the call stays where it was. A phone's park key that transfers the call
    to the park code instead, as a Yealink's does, parks the other party the same way, the one who
    transferred as the parker; their phone leaves the call with the transfer, so no slot number is
-   read out, and with every slot taken the other party is hung up.
+   read out. Transferring the call to a free slot itself, as a slot's BLF key does when pressed
+   during a call, parks it on that slot. A transfer to a taken slot, or to the park code with
+   every slot taken, rings the parker back at once instead, as the ring-back below does, so the
+   other party is never dropped.
 2. **Retrieve.** Dialling the slot from any device takes the call: the retriever is connected to
    the parked party and the slot is free again. Dialling an empty slot plays a short error tone.
 3. **Ring-back.** A call still parked after `settings.parkingTimeoutS` seconds (default 300) rings

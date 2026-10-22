@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-22 · §10.2 Call parking.** A blind transfer to a free parking slot parks the transferee on that slot for the transferrer; one to a taken slot, or to `*70` with every slot taken, rings the transferrer back at once as the timeout does. Dialling a slot as a call of its own still only retrieves.
+*Why:* a Yealink's slot BLF key pressed during a call transfers the call to the slot, where the transferee found nothing to retrieve and was released with 404; to a taken slot they would have been connected to the parked party. Asked whether a transfer to an empty slot should park there, and how a taken slot should go, the product owner: "1. do it 2. b 3. leave it" (park on the slot; ring the transferrer back; dialling a slot stays retrieval only).
+
 **2026-10-22 · §10.2 Call parking.** A blind transfer to `*70` parks the transferee for the transferrer, the transfer's onward call being the parked call, with nothing read out.
 *Why:* a Yealink's park key sends the call to the park code as a `REFER`, so the transferee, an outside caller, dialled `*70` as no user and was released with 403. The product owner's report: "Pressing it during a call makes the phone send a blind transfer (REFER) to `*70`. [...] The call is lost, no slot is taken, and the user hears no slot number."
 

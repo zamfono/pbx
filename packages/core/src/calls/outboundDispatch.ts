@@ -21,8 +21,8 @@ import { noteBlindTransfer, noteNumberForward } from './forwardContext.js';
 import { enterTarget } from './inbound.js';
 import { dialExternal } from './outboundExternal.js';
 import { resolveDialedContext, toFor } from './outboundLookup.js';
-import { parkTransferee } from './parking.js';
 import { retrieveParkedCall } from './parkingRetrieval.js';
+import { parkTransferee } from './parkingTransfer.js';
 import type { Pipeline } from './pipeline.js';
 import { playToneAndWait } from './playback.js';
 import { release } from './release.js';
@@ -119,7 +119,8 @@ async function dialTrunk(
 async function dispatchExtension(
   pipeline: Pipeline,
   call: Call,
-  action: Extract<DialAction, { kind: 'extension' }>
+  action: Extract<DialAction, { kind: 'extension' }>,
+  dial: DialAs
 ): Promise<void> {
   // §10.1 step 3/7: an internal extension enters at Entry; it is the call's first hop, so it adds no hop.
   if (action.owner.kind === 'user') {
@@ -144,6 +145,11 @@ async function dispatchExtension(
       },
       null
     );
+    return;
+  }
+  // §10.2 "Call parking": a blind transfer to a slot parks the transferee there.
+  if (dial.blindTransfer === true && dial.asUser !== null) {
+    await parkTransferee(pipeline, call, dial.asUser, action.owner.ext);
     return;
   }
   // §10.1 Outbound step 3: a parking slot retrieves the call parked there, or plays the short
@@ -199,13 +205,13 @@ export async function dispatchAction(
     return;
   }
   if (action.kind === 'extension') {
-    await dispatchExtension(pipeline, call, action);
+    await dispatchExtension(pipeline, call, action, dial);
     return;
   }
   // `action.kind === 'feature'`: §9.3 "Feature codes". A blind transfer to the park code parks
   // the transferee for the transferrer (§10.2 "Call parking").
   if (action.key === 'park' && dial.blindTransfer === true && asUser !== null) {
-    await parkTransferee(pipeline, call, asUser);
+    await parkTransferee(pipeline, call, asUser, null);
     return;
   }
   await handleFeature(

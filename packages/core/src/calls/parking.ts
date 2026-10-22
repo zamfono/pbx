@@ -1,6 +1,7 @@
-/** `*70` and call parking (§10.2 "Call parking"): the park and its slot registry; retrieval is
- * `parkingRetrieval.ts` and the timeout ring-back `parkingRingback.ts`; the three share
- * `parking.test.ts`. */
+/** `*70` and call parking (§10.2 "Call parking"): the park and its slot registry; a park by
+ * blind transfer is `parkingTransfer.ts`, retrieval `parkingRetrieval.ts` and the timeout
+ * ring-back `parkingRingback.ts`; the park, retrieval and ring-back
+ * share `parking.test.ts`, the park by transfer `transfers.test.ts`. */
 import { MS_PER_SECOND } from '@zamfono/shared';
 
 import { ignoreGone, logFailure, logUnlessGone } from '../ari/failures.js';
@@ -53,7 +54,7 @@ export function releaseParkedChannel(
 }
 
 /** The lowest parking slot no call occupies (§10.2 "Call parking"), `null` when every slot is taken. */
-function lowestFreeSlot(
+export function lowestFreeSlot(
   snapshot: Snapshot,
   slots: ReadonlyMap<string, ParkedEntry>
 ): string | null {
@@ -110,10 +111,25 @@ async function dropParker(
   presence.setCallState(parkerUserId, 'idle', null, null, active.id);
 }
 
+/** Moves `partyChannelId`, a channel of `parked`, into a holding bridge with the hold music. */
+export async function holdParty(
+  pipeline: Pipeline,
+  snapshot: Snapshot,
+  parked: Call,
+  partyChannelId: string
+): Promise<void> {
+  await moveParkedParty(pipeline, parked, partyChannelId, 'holding');
+  // Tenant's own hold music class, falling back to Asterisk's `default` (§10.2 "Call parking",
+  // "Hold music"), the same resolution ring groups use for their `moh_audio_id`.
+  await pipeline.deps.ari.channels
+    .startMoh(partyChannelId, snapshot.settings.holdMohAudioId ?? undefined)
+    .catch(ignoreGone);
+}
+
 /** Puts `partyChannelId`, a channel of `parked`, on slot `ext` for `parkerUserId` (§10.2 "Call
  * parking"): the party waits in a holding bridge with the hold music, and the parker is rung back
  * on timeout. */
-async function holdInSlot(
+export async function holdInSlot(
   pipeline: Pipeline,
   presence: Presence,
   parked: Call,
@@ -123,12 +139,7 @@ async function holdInSlot(
   const { ext, parkerUserId, partyChannelId } = entry;
   const snapshot = await pipeline.deps.cache.get();
   const slots = pipeline.parkingSlots;
-  await moveParkedParty(pipeline, parked, partyChannelId, 'holding');
-  // Tenant's own hold music class, falling back to Asterisk's `default` (§10.2 "Call parking",
-  // "Hold music"), the same resolution ring groups use for their `moh_audio_id`.
-  await pipeline.deps.ari.channels
-    .startMoh(partyChannelId, snapshot.settings.holdMohAudioId ?? undefined)
-    .catch(ignoreGone);
+  await holdParty(pipeline, snapshot, parked, partyChannelId);
   parked.log.event({ event: 'parked', by: parkerUserId, ext, ...actor });
   const timer = setTimeout(() => {
     slots.delete(ext);
@@ -188,35 +199,6 @@ export async function parkParty(
     parker.actorUserId === undefined ? {} : { actorUserId: parker.actorUserId }
   );
   return ext;
-}
-
-/**
- * A blind transfer to `*70`, which is how a phone's park key often parks (a `REFER`): the
- * transferee, `call`'s own caller, is parked for the transferrer on the lowest free slot, and
- * `call`, the transfer's onward call, is the parked call from here on. The transferrer's phone
- * has left the call, so nobody hears the slot; with every slot taken the transferee is released
- * with 480 as `*70` would be.
- */
-export async function parkTransferee(
-  pipeline: Pipeline,
-  call: Call,
-  transferrerUserId: string
-): Promise<void> {
-  const snapshot = await pipeline.deps.cache.get();
-  const ext = lowestFreeSlot(snapshot, pipeline.parkingSlots);
-  if (ext === null) {
-    await release(pipeline, call, SIP_TEMPORARILY_UNAVAILABLE, 'failed');
-    return;
-  }
-  const partyChannelId = callerChannel(call);
-  await pipeline.deps.ari.channels.answer(partyChannelId).catch(ignoreGone);
-  await holdInSlot(
-    pipeline,
-    pipeline.deps.presence,
-    call,
-    { ext, parkerUserId: transferrerUserId, partyChannelId },
-    {}
-  );
 }
 
 /** The slot `*70` parks the other party of `userId`'s current call on, `null` when there is

@@ -8,6 +8,7 @@ import { contactEndpoint } from '../testing/ami/contacts.js';
 import { type FakeAri } from '../testing/ari/fake.js';
 import { isPlacement } from '../testing/ari/fakeDial.js';
 import { delivered, eventually } from '../testing/eventually.js';
+import { channelDestroyed } from '../testing/featureRig.js';
 import { noopLogger } from '../testing/pipelineDeps.js';
 import {
   answeredCall,
@@ -22,6 +23,7 @@ import { callerChannel, newCall, type Call } from './call.js';
 import { channelOf } from './callLookup.js';
 import { closeCall } from './liveCall.js';
 import { fromOf, userOfChannel } from './onwardCall.js';
+import type { ParkedEntry } from './parking.js';
 import type { Pipeline } from './pipeline.js';
 import { Recorder } from './recording.js';
 import { transferCall } from './transfers.js';
@@ -264,22 +266,23 @@ describe('transfers', () => {
     });
   });
 
-  it('parks the transferee for the transferrer on a blind transfer to the park code, as a park key sends it (§10.2)', async () => {
-    await setUp();
-    await seedExtension(db, '701', { isParkingSlot: 1 });
+  /** 101 answers an outside caller and blind-transfers them to `exten` by `REFER`; the caller
+   * re-enters as the onward call, and the transferrer's own id is returned. */
+  async function referTo(
+    exten: string
+  ): Promise<{ call: Call; callerId: string; transferrerId: string }> {
     const transferrerId = await seedUserWithDevice(rig, '101');
     const { call, callerId, legId } = await answered(
       transferrerId,
       'PJSIP/e101-a-00000002'
     );
-
     fakeAri.emit({
       type: 'BridgeBlindTransfer',
       timestamp: nowIso(),
       application: 'zamfono',
       channel: { id: legId, name: 'PJSIP/e101-a-00000002' },
       transferee: { id: callerId, name: 'PJSIP/trunk-1-00000001' },
-      exten: '*70',
+      exten,
       context: 'from-users',
       result: 'Success',
       is_external: false
@@ -289,28 +292,86 @@ describe('transfers', () => {
       type: 'StasisStart',
       timestamp: nowIso(),
       application: 'zamfono',
-      args: ['outbound', '*70'],
+      args: ['outbound', exten],
       channel: {
         id: callerId,
         name: 'PJSIP/trunk-1-00000001',
         state: 'Up',
         caller: { number: '+15559999', name: '' },
         connected: { number: '', name: '' },
-        dialplan: { context: 'from-users', exten: '*70' }
+        dialplan: { context: 'from-users', exten }
       }
     });
+    return { call, callerId, transferrerId };
+  }
+
+  /** The slot's entry once the onward call has parked there. */
+  function parkedOn(ext: string): Promise<ParkedEntry | undefined> {
+    return eventually(() => {
+      const entry = pipeline.parkingSlots.get(ext);
+      expect(entry).toBeDefined();
+      return entry;
+    });
+  }
+
+  it('parks the transferee for the transferrer on a blind transfer to the park code, as a park key sends it (§10.2)', async () => {
+    await setUp();
+    await seedExtension(db, '701', { isParkingSlot: 1 });
+    const { call, callerId, transferrerId } = await referTo('*70');
 
     // The outside caller waits on the lowest free slot instead of being refused as no user.
-    const entry = await eventually(() => {
-      const parked = pipeline.parkingSlots.get('701');
-      expect(parked).toBeDefined();
-      return parked;
-    });
+    const entry = await parkedOn('701');
     expect(entry?.partyChannelId).toBe(callerId);
     expect(entry?.parkerUserId).toBe(transferrerId);
     expect(entry?.call.parentCallId).toBe(call.id);
     expect(rig.hungUp(callerId)).toBe(false);
+
+    // The parked caller hanging up frees the slot, and the parked call ends as answered.
+    channelDestroyed(fakeAri, callerId);
+    await eventually(async () => {
+      expect(pipeline.parkingSlots.has('701')).toBe(false);
+      const row = await db
+        .selectFrom('calls')
+        .select('status')
+        .where('id', '=', entry?.call.id ?? '')
+        .executeTakeFirstOrThrow();
+      expect(row.status).toBe('answered');
+    });
   });
+
+  it('parks the transferee on the slot a blind transfer names, as a slot key sends it (§10.2)', async () => {
+    await setUp();
+    await seedExtension(db, '701', { isParkingSlot: 1 });
+    await seedExtension(db, '702', { isParkingSlot: 1 });
+    const { callerId } = await referTo('702');
+
+    expect((await parkedOn('702'))?.partyChannelId).toBe(callerId);
+    expect(pipeline.parkingSlots.has('701')).toBe(false);
+  });
+
+  it.each([
+    ['a taken slot', '701'],
+    ['the park code with no slot free', '*70']
+  ])(
+    'rings the transferrer back at once on a blind transfer to %s, never dropping the caller (§10.2)',
+    async (_label, exten) => {
+      await setUp();
+      await seedExtension(db, '701', { isParkingSlot: 1 });
+      const taken = { parkerUserId: 'someone' } as ParkedEntry;
+      pipeline.parkingSlots.set('701', taken);
+      const { callerId } = await referTo(exten);
+
+      await eventually(() => {
+        expect(
+          originatedEndpoints().some(
+            entry => entry.endpoint === contactEndpoint('e101-a')
+          )
+        ).toBe(true);
+      });
+      expect(pipeline.parkingSlots.get('701')).toBe(taken);
+      expect(rig.hungUp(callerId)).toBe(false);
+    }
+  );
 
   it("names the transferrer by the channel that sent the REFER, not by the call's answerer (§10.1)", async () => {
     await setUp();

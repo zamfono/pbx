@@ -40,7 +40,8 @@ The device record shows when and from which address the phone last fetched its f
     most one, usually first;
   - `{"kind": "blf", "ext": "205"}`: a BLF key on a user, ring group or parking slot, whose lamp
     shows its state; pressed while it rings, a user's or group's key picks the call up, a slot's
-    retrieves the call parked there;
+    retrieves the call parked there; pressed during a call, the phone blind-transfers the call to
+    the key's extension, so a free slot's key parks it there (a taken slot's rings you back);
   - `{"kind": "quickDial", "number": "+43123456789", "label": "Taxi"}`: a quick-dial key to an
     outside number (E.164);
   - `{"kind": "feature", "feature": "dndToggle", "label": "DND"}`: the DND key. Its lamp is lit
