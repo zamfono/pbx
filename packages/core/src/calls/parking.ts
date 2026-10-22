@@ -110,13 +110,57 @@ async function dropParker(
   presence.setCallState(parkerUserId, 'idle', null, null, active.id);
 }
 
+/** Puts `partyChannelId`, a channel of `parked`, on slot `ext` for `parkerUserId` (§10.2 "Call
+ * parking"): the party waits in a holding bridge with the hold music, and the parker is rung back
+ * on timeout. */
+async function holdInSlot(
+  pipeline: Pipeline,
+  presence: Presence,
+  parked: Call,
+  entry: { ext: string; parkerUserId: string; partyChannelId: string },
+  actor: { actorUserId?: string }
+): Promise<void> {
+  const { ext, parkerUserId, partyChannelId } = entry;
+  const snapshot = await pipeline.deps.cache.get();
+  const slots = pipeline.parkingSlots;
+  await moveParkedParty(pipeline, parked, partyChannelId, 'holding');
+  // Tenant's own hold music class, falling back to Asterisk's `default` (§10.2 "Call parking",
+  // "Hold music"), the same resolution ring groups use for their `moh_audio_id`.
+  await pipeline.deps.ari.channels
+    .startMoh(partyChannelId, snapshot.settings.holdMohAudioId ?? undefined)
+    .catch(ignoreGone);
+  parked.log.event({ event: 'parked', by: parkerUserId, ext, ...actor });
+  const timer = setTimeout(() => {
+    slots.delete(ext);
+    pipeline.parkedSlotByChannel.delete(partyChannelId);
+    presence
+      .setHint(ext, 'NOT_INUSE')
+      .catch(logFailure(pipeline.deps.logger, 'parking slot hint', { ext }));
+    ringParkerBack(pipeline, { parkerUserId, parked, partyChannelId }).catch(
+      logFailure(pipeline.deps.logger, 'parking ringback', {
+        callId: parked.id
+      })
+    );
+  }, snapshot.settings.parkingTimeoutS * MS_PER_SECOND);
+  timer.unref();
+  const parkedAt = pipeline.deps.now();
+  slots.set(ext, {
+    call: parked,
+    parkerUserId,
+    partyChannelId,
+    parkedAt,
+    timer
+  });
+  pipeline.parkedSlotByChannel.set(partyChannelId, ext);
+  await presence.setHint(ext, 'INUSE');
+}
+
 /**
  * Parks `conversation.party`, the other party of `active`'s own conversation (`bridgedParty`),
  * for `parker`, whose channel in it is `parker.channelId`, on the lowest free slot (§10.2 "Call
- * parking"): the party waits in a holding bridge with the hold music, the parker's own channel
- * in the call is hung up, and the parker is rung back on timeout. Shared by `*70` and
- * `POST /internal/calls/{id}/park`, whose `actorUserId` the trace line names. Returns the slot,
- * `null` with every slot taken and nothing moved.
+ * parking"): the parker's own channel in the call is hung up, and the party waits in the slot
+ * (`holdInSlot`). Shared by `*70` and `POST /internal/calls/{id}/park`, whose `actorUserId` the
+ * trace line names. Returns the slot, `null` with every slot taken and nothing moved.
  */
 export async function parkParty(
   pipeline: Pipeline,
@@ -128,51 +172,51 @@ export async function parkParty(
   const { userId: parkerUserId, channelId: parkerCh } = parker;
   const { bridgeId, party: partyChannelId } = conversation;
   const snapshot = await pipeline.deps.cache.get();
-  const slots = pipeline.parkingSlots;
-  const ext = lowestFreeSlot(snapshot, slots);
+  const ext = lowestFreeSlot(snapshot, pipeline.parkingSlots);
   if (ext === null) {
     return null;
   }
-  const ari = pipeline.deps.ari;
-  await ari.bridges.removeChannel(bridgeId, parkerCh).catch(ignoreGone);
-  await dropParker(pipeline, presence, active, parkerUserId, parkerCh);
-  await moveParkedParty(pipeline, active, partyChannelId, 'holding');
-  // Tenant's own hold music class, falling back to Asterisk's `default` (§10.2 "Call parking",
-  // "Hold music"), the same resolution ring groups use for their `moh_audio_id`.
-  await ari.channels
-    .startMoh(partyChannelId, snapshot.settings.holdMohAudioId ?? undefined)
+  await pipeline.deps.ari.bridges
+    .removeChannel(bridgeId, parkerCh)
     .catch(ignoreGone);
-  const actor =
-    parker.actorUserId === undefined ? {} : { actorUserId: parker.actorUserId };
-  active.log.event({ event: 'parked', by: parkerUserId, ext, ...actor });
-  const timer = setTimeout(() => {
-    slots.delete(ext);
-    pipeline.parkedSlotByChannel.delete(partyChannelId);
-    presence
-      .setHint(ext, 'NOT_INUSE')
-      .catch(logFailure(pipeline.deps.logger, 'parking slot hint', { ext }));
-    ringParkerBack(pipeline, {
-      parkerUserId,
-      parked: active,
-      partyChannelId
-    }).catch(
-      logFailure(pipeline.deps.logger, 'parking ringback', {
-        callId: active.id
-      })
-    );
-  }, snapshot.settings.parkingTimeoutS * MS_PER_SECOND);
-  timer.unref();
-  const parkedAt = pipeline.deps.now();
-  slots.set(ext, {
-    call: active,
-    parkerUserId,
-    partyChannelId,
-    parkedAt,
-    timer
-  });
-  pipeline.parkedSlotByChannel.set(partyChannelId, ext);
-  await presence.setHint(ext, 'INUSE');
+  await dropParker(pipeline, presence, active, parkerUserId, parkerCh);
+  await holdInSlot(
+    pipeline,
+    presence,
+    active,
+    { ext, parkerUserId, partyChannelId },
+    parker.actorUserId === undefined ? {} : { actorUserId: parker.actorUserId }
+  );
   return ext;
+}
+
+/**
+ * A blind transfer to `*70`, which is how a phone's park key often parks (a `REFER`): the
+ * transferee, `call`'s own caller, is parked for the transferrer on the lowest free slot, and
+ * `call`, the transfer's onward call, is the parked call from here on. The transferrer's phone
+ * has left the call, so nobody hears the slot; with every slot taken the transferee is released
+ * with 480 as `*70` would be.
+ */
+export async function parkTransferee(
+  pipeline: Pipeline,
+  call: Call,
+  transferrerUserId: string
+): Promise<void> {
+  const snapshot = await pipeline.deps.cache.get();
+  const ext = lowestFreeSlot(snapshot, pipeline.parkingSlots);
+  if (ext === null) {
+    await release(pipeline, call, SIP_TEMPORARILY_UNAVAILABLE, 'failed');
+    return;
+  }
+  const partyChannelId = callerChannel(call);
+  await pipeline.deps.ari.channels.answer(partyChannelId).catch(ignoreGone);
+  await holdInSlot(
+    pipeline,
+    pipeline.deps.presence,
+    call,
+    { ext, parkerUserId: transferrerUserId, partyChannelId },
+    {}
+  );
 }
 
 /** The slot `*70` parks the other party of `userId`'s current call on, `null` when there is

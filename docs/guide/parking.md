@@ -28,7 +28,10 @@ group while it is a slot, and a menu's `allowExtensionDialing` never reaches one
    call on hold. The other party moves to a holding bridge and hears the hold music
    (`settings.holdMohAudioId`, else the built-in default), the lowest free slot is taken, and its
    number is read out to the parker, who hangs up. The park fails when the parker is in no call
-   or every slot is taken; the call stays where it was.
+   or every slot is taken; the call stays where it was. A phone's park key that transfers the call
+   to the park code instead, as a Yealink's does, parks the other party the same way, the one who
+   transferred as the parker; their phone leaves the call with the transfer, so no slot number is
+   read out, and with every slot taken the other party is hung up.
 2. **Retrieve.** Dialling the slot from any device takes the call: the retriever is connected to
    the parked party and the slot is free again. Dialling an empty slot plays a short error tone.
 3. **Ring-back.** A call still parked after `settings.parkingTimeoutS` seconds (default 300) rings

@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-22 · §10.2 Call parking.** A blind transfer to `*70` parks the transferee for the transferrer, the transfer's onward call being the parked call, with nothing read out.
+*Why:* a Yealink's park key sends the call to the park code as a `REFER`, so the transferee, an outside caller, dialled `*70` as no user and was released with 403. The product owner's report: "Pressing it during a call makes the phone send a blind transfer (REFER) to `*70`. [...] The call is lost, no slot is taken, and the user hears no slot number."
+
 **2026-10-21 · §10.1 step 4.** A leg still ringing when another answers, the call's own, a ring group's or one a pickup takes, is hung up as answered elsewhere, its CANCEL carrying RFC 3326's `Reason: SIP;cause=200;text="Call completed elsewhere"`.
 *Why:* a phone whose ring a colleague's or the user's other device answered logged it as a missed call. The product owner: "i called myself from my yealink and the phone showed a missed call. (ringotel rang too and i picked up in there, but still...)".
 

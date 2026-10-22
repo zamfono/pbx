@@ -16,7 +16,7 @@ import {
   startRig,
   type Rig
 } from '../testing/pipelineRig.js';
-import { seedUserWithDevice } from '../testing/seedRows.js';
+import { seedExtension, seedUserWithDevice } from '../testing/seedRows.js';
 import { newAddedLeg } from './addedParty.js';
 import { callerChannel, newCall, type Call } from './call.js';
 import { channelOf } from './callLookup.js';
@@ -262,6 +262,54 @@ describe('transfers', () => {
         )
       ).toBe(true);
     });
+  });
+
+  it('parks the transferee for the transferrer on a blind transfer to the park code, as a park key sends it (§10.2)', async () => {
+    await setUp();
+    await seedExtension(db, '701', { isParkingSlot: 1 });
+    const transferrerId = await seedUserWithDevice(rig, '101');
+    const { call, callerId, legId } = await answered(
+      transferrerId,
+      'PJSIP/e101-a-00000002'
+    );
+
+    fakeAri.emit({
+      type: 'BridgeBlindTransfer',
+      timestamp: nowIso(),
+      application: 'zamfono',
+      channel: { id: legId, name: 'PJSIP/e101-a-00000002' },
+      transferee: { id: callerId, name: 'PJSIP/trunk-1-00000001' },
+      exten: '*70',
+      context: 'from-users',
+      result: 'Success',
+      is_external: false
+    });
+    await transferFollowed(call);
+    fakeAri.emit({
+      type: 'StasisStart',
+      timestamp: nowIso(),
+      application: 'zamfono',
+      args: ['outbound', '*70'],
+      channel: {
+        id: callerId,
+        name: 'PJSIP/trunk-1-00000001',
+        state: 'Up',
+        caller: { number: '+15559999', name: '' },
+        connected: { number: '', name: '' },
+        dialplan: { context: 'from-users', exten: '*70' }
+      }
+    });
+
+    // The outside caller waits on the lowest free slot instead of being refused as no user.
+    const entry = await eventually(() => {
+      const parked = pipeline.parkingSlots.get('701');
+      expect(parked).toBeDefined();
+      return parked;
+    });
+    expect(entry?.partyChannelId).toBe(callerId);
+    expect(entry?.parkerUserId).toBe(transferrerId);
+    expect(entry?.call.parentCallId).toBe(call.id);
+    expect(rig.hungUp(callerId)).toBe(false);
   });
 
   it("names the transferrer by the channel that sent the REFER, not by the call's answerer (§10.1)", async () => {

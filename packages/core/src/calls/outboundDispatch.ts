@@ -21,6 +21,7 @@ import { noteBlindTransfer, noteNumberForward } from './forwardContext.js';
 import { enterTarget } from './inbound.js';
 import { dialExternal } from './outboundExternal.js';
 import { resolveDialedContext, toFor } from './outboundLookup.js';
+import { parkTransferee } from './parking.js';
 import { retrieveParkedCall } from './parkingRetrieval.js';
 import type { Pipeline } from './pipeline.js';
 import { playToneAndWait } from './playback.js';
@@ -201,7 +202,12 @@ export async function dispatchAction(
     await dispatchExtension(pipeline, call, action);
     return;
   }
-  // `action.kind === 'feature'`: §9.3 "Feature codes".
+  // `action.kind === 'feature'`: §9.3 "Feature codes". A blind transfer to the park code parks
+  // the transferee for the transferrer (§10.2 "Call parking").
+  if (action.key === 'park' && dial.blindTransfer === true && asUser !== null) {
+    await parkTransferee(pipeline, call, asUser);
+    return;
+  }
   await handleFeature(
     pipeline,
     pipeline.deps.presence,
