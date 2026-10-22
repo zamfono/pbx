@@ -11,6 +11,13 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+### Fixed
+
+- A Park key on a `yealink` device hung up the caller instead of parking them: the phone sends
+  the call to `*70` as a blind transfer, which was refused because the caller is no user. A
+  blind transfer to the park code now parks the caller on the lowest free slot, with the user
+  who transferred as the parker; the phone hears no slot number.
+
 ## [0.7.3] - 2026-10-21
 
 ### Fixed
