@@ -13,10 +13,13 @@ why the specified behaviour changed; the commit history, how.
 
 ### Fixed
 
-- A Park key on a `yealink` device hung up the caller instead of parking them: the phone sends
-  the call to `*70` as a blind transfer, which was refused because the caller is no user. A
-  blind transfer to the park code now parks the caller on the lowest free slot, with the user
-  who transferred as the parker; the phone hears no slot number.
+- A Park key on a `yealink` device hung up the caller instead of parking them: the phone sent
+  the call to `*70` as a blind transfer, which was refused because the caller is no user. The
+  key is now the phone's own park key, which holds the call and dials `*70`, so the phone hears
+  the slot number again, and the phone shows a Park soft key during calls. The phones take it at
+  their next configuration fetch.
+- A blind transfer to the park code, as a softphone's or another phone's park key may send, now
+  parks the caller on the lowest free slot, with the user who transferred as the parker.
 - A parking slot's BLF key pressed during a call hung up the caller: the phone transfers the call
   to the slot, which found nothing to retrieve. A blind transfer to a free slot now parks the
   caller there. One to a taken slot, or to `*70` with every slot taken, rings the user who
