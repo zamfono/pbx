@@ -6,7 +6,7 @@
  */
 import { ANONYMOUS, type Db } from '@zamfono/shared';
 
-import { logFailure } from '../ari/failures.js';
+import { logFailure, logUnlessGone } from '../ari/failures.js';
 import type { Call } from './call.js';
 import type { Pipeline } from './pipeline.js';
 
@@ -39,6 +39,18 @@ export function formatCallerId(number: string, name: string): string {
   return safeName === '' ? number : `"${safeName}" <${number}>`;
 }
 
+/** `number` with the phone book's name for it, as an originate `callerId`; a lookup that fails
+ * leaves the bare number. */
+export function phoneCallerId(
+  pipeline: Pipeline,
+  number: string,
+  callId: string
+): Promise<string> {
+  return contactName(pipeline.deps.db, number)
+    .catch(logFailure(pipeline.deps.logger, 'phone book lookup', { callId }))
+    .then(name => formatCallerId(number, name ?? ''));
+}
+
 /** The caller ID a leg pushed to a softphone presents for `call` (§10.2 "Phone book"): the
  * caller's number with the phone book's name for it, looked up once per call
  * (`Call.softphoneCallerId`), since a ring group rings its members batch by batch, a user's
@@ -50,11 +62,23 @@ export function softphoneCallerId(
   if (call.softphoneCallerId !== undefined) {
     return call.softphoneCallerId;
   }
-  const lookup = contactName(pipeline.deps.db, call.from)
-    .catch(
-      logFailure(pipeline.deps.logger, 'phone book lookup', { callId: call.id })
-    )
-    .then(name => formatCallerId(call.from, name ?? ''));
+  const lookup = phoneCallerId(pipeline, call.from, call.id);
   call.softphoneCallerId = lookup;
   return lookup;
+}
+
+/** Names `callerId` as the party a device's own call reaches, before that call is answered: a
+ * retrieval or a pickup, whose phone dialled a slot or a code. chan_pjsip asserts the channel's
+ * connected line in the 200 OK (`send_pai`), so the phone shows that party, not what it dialled;
+ * device endpoints send no connected-line update later (§9.3 "Connected party"). */
+export async function presentConnectedParty(
+  pipeline: Pipeline,
+  channelId: string,
+  callerId: string
+): Promise<void> {
+  await pipeline.deps.ari.channels
+    .setVar(channelId, 'CONNECTEDLINE(all)', callerId)
+    .catch(
+      logUnlessGone(pipeline.deps.logger, 'connected line', { channelId })
+    );
 }

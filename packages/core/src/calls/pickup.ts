@@ -11,6 +11,7 @@ import { SIP_NOT_FOUND } from '../sipCodes.js';
 import { bridgeAnswered, claimAnswer } from './answer.js';
 import { callerChannel, type Call, type Leg } from './call.js';
 import { findLiveCall } from './callLookup.js';
+import { presentConnectedParty, softphoneCallerId } from './contactName.js';
 import { ownerForExt } from './extensionOwner.js';
 import { closeFeatureCall } from './featureCall.js';
 import { activeBatchHasRingingLeg, stopGroupRinging } from './groupPickup.js';
@@ -57,6 +58,12 @@ async function bridgePickup(
   leg: Leg
 ): Promise<void> {
   const ari = pipeline.deps.ari;
+  // The picker's phone shows the caller, as the ringing phones did, not the code it dialled.
+  await presentConnectedParty(
+    pipeline,
+    picker.channelId,
+    await softphoneCallerId(pipeline, target)
+  );
   await ari.channels.answer(picker.channelId).catch(ignoreGone);
   const joined = await bridgeAnswered(pipeline, target, leg);
   const ringing = [...target.legs.values()].filter(

@@ -12,6 +12,7 @@ import { defaultChannel } from '../testing/ari/fakeChannel.js';
 import { isPlacement } from '../testing/ari/fakeDial.js';
 import { eventually } from '../testing/eventually.js';
 import {
+  connectedLineBeforeAnswer,
   memberRinging,
   newInternalCall,
   registerWithPresence,
@@ -98,6 +99,10 @@ describe('pickup', () => {
 
     expect(target.answeredByUserId).toBe(pickerUserId);
     expect(target.status).toBe('answered');
+    // The picker's phone shows the caller, not `*8101` (§9.3 "Connected party").
+    expect(connectedLineBeforeAnswer(fakeAri, pickerChannel.id)).toBe(
+      '+15559999'
+    );
     const bridgeCreates = fakeAri.calls.filter(
       entry => entry.method === 'POST' && entry.path === 'bridges'
     );

@@ -61,6 +61,28 @@ export function hintPutsFor(
     .map(entry => entry.body as { deviceState?: string });
 }
 
+/** The connected line the core set on `channelId` before answering it, which its 200 OK asserts
+ * (§9.3 "Connected party"); `null` when none was set first. */
+export function connectedLineBeforeAnswer(
+  fakeAri: FakeAri,
+  channelId: string
+): string | null {
+  const calls = fakeAri.calls;
+  const answer = calls.findIndex(
+    entry =>
+      entry.method === 'POST' && entry.path === `channels/${channelId}/answer`
+  );
+  const set = calls
+    .slice(0, answer === -1 ? calls.length : answer)
+    .find(
+      entry =>
+        entry.method === 'POST' &&
+        entry.path === `channels/${channelId}/variable` &&
+        (entry.body as { variable?: string }).variable === 'CONNECTEDLINE(all)'
+    );
+  return (set?.body as { value?: string } | undefined)?.value ?? null;
+}
+
 /** Asterisk reporting `channelId` gone. */
 export function channelDestroyed(fakeAri: FakeAri, channelId: string): void {
   fakeAri.emit({

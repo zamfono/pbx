@@ -123,6 +123,9 @@ function formatCallerId(name: string, ext: string): string {
 // of every request Asterisk sends the device: its calls, OPTIONS probes and unsolicited MWI
 // NOTIFYs would otherwise name the transport's bound address, the container's own in the ports
 // mode, which `external_signaling_address` leaves in `From` (§9.3 "NAT").
+// `send_pai` asserts the channel's connected line, so the 200 OK to a retrieval or a pickup names
+// the party the core set there; `send_connected_line = no` sends no update during a call, whose
+// bridged leg carries the caller's identity, not its own (§9.3 "Connected party").
 function renderDeviceEndpoint(
   device: Device,
   owner: RenderInput['users'][number],
@@ -143,7 +146,9 @@ function renderDeviceEndpoint(
     'rtp_symmetric = yes',
     'force_rport = yes',
     'direct_media = no',
-    `from_domain = ${input.fqdn}`
+    `from_domain = ${input.fqdn}`,
+    'send_pai = yes',
+    'send_connected_line = no'
   ];
   if (device.transport === 'tls') {
     lines.push('media_encryption = sdes');

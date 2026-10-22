@@ -17,6 +17,7 @@ import { eventually } from '../testing/eventually.js';
 import {
   callsRow,
   channelDestroyed,
+  connectedLineBeforeAnswer,
   hintPutsFor,
   newInternalCall,
   startFeatureRig
@@ -170,6 +171,10 @@ describe('parking', () => {
 
     expect(outcome).toBe('retrieved');
     expect(activeCall.answeredByUserId).toBe(retrieverUserId);
+    // The retriever's phone shows the parked caller, not `701` (§9.3 "Connected party").
+    expect(connectedLineBeforeAnswer(fakeAri, retrieverChannel.id)).toBe(
+      '+15559999'
+    );
     // §10.2 "Call parking": the party waited in a `holding` bridge, the original conversation's
     // bridge being destroyed; retrieval moves them into a `mixing` bridge the retriever joins.
     const bridgeTypes = fakeAri.calls

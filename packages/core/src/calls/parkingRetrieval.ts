@@ -7,8 +7,10 @@ import { newId } from '@zamfono/shared';
 import { ignoreGone } from '../ari/failures.js';
 import type { Presence } from '../presence.js';
 import { callerChannel, type Call, type Leg } from './call.js';
+import { phoneCallerId, presentConnectedParty } from './contactName.js';
 import { closeFeatureCall } from './featureCall.js';
 import { trackLeg } from './legs.js';
+import { fromOf } from './onwardCall.js';
 import { takeParkedEntry } from './parking.js';
 import { moveParkedParty } from './parkingRingback.js';
 import type { Pipeline } from './pipeline.js';
@@ -76,6 +78,14 @@ export async function retrieveParkedCall(
     'mixing'
   );
   const channelId = callerChannel(call);
+  // The retriever's phone shows the parked party, as it showed them ringing, not the slot.
+  const snapshot = await pipeline.deps.cache.get();
+  const number = fromOf(parked, entry.partyChannelId, snapshot);
+  await presentConnectedParty(
+    pipeline,
+    channelId,
+    await phoneCallerId(pipeline, number, parked.id)
+  );
   await ari.channels.answer(channelId).catch(ignoreGone);
   await ari.bridges.addChannel(bridgeId, channelId).catch(ignoreGone);
   await joinRetriever(pipeline, parked, call);

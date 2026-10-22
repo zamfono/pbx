@@ -36,7 +36,7 @@ group while it is a slot, and a menu's `allowExtensionDialing` never reaches one
    every slot taken, rings the parker back at once instead, as the ring-back below does, so the
    other party is never dropped.
 2. **Retrieve.** Dialling the slot from any device takes the call: the retriever is connected to
-   the parked party and the slot is free again. Dialling an empty slot plays a short error tone.
+   the parked party, whom their phone shows instead of the slot, and the slot is free again. Dialling an empty slot plays a short error tone.
 3. **Ring-back.** A call still parked after `settings.parkingTimeoutS` seconds (default 300) rings
    the parker back as an internal call to the parker's own extension, so the parker's own rules
    apply: DND, forwarding, the mailbox. Only the parker's phones ring; when the parker's rules

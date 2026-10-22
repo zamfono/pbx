@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-22 · §9.3 Connected party.** A retrieval and a pickup name the party reached in the connected line the core sets before answering, which the 200 OK asserts in `P-Asserted-Identity`; device endpoints carry `send_pai = yes` and `send_connected_line = no`.
+*Why:* a retrieving phone showed the slot, a picking-up one the `*8` code. `send_connected_line` stays off because a leg the core places carries its caller's identity, so Asterisk's connected-line update on bridging would show a calling phone itself, or on an outbound call the tenant's own number. The product owner: "when retrieving a call – is it at all possible to show the "original" caller ID?", then "go ahead and implement (1)".
+
 **2026-10-22 · §10.4 `yealink`.** The Yealink file turns the phone's call park on in its feature-code mode (`features.call_park.enable`, `park_mode` 1, `park_code` the tenant's park code), and a `park` feature key is the phone's park key (type 10), not a speed dial.
 *Why:* a speed-dial key pressed during a call blind-transfers the call to `*70`, so the phone left the call and heard no slot number. On a T87W the product owner set the park mode to FAC by hand: the phone held the call and sent `INVITE sip:*70@…` as a call of its own, without an extension appended and without a `REFER`; the call parked on 701 and the slot was read out. The product owner: "from my point of view it worked :-)".
 
