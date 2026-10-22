@@ -317,8 +317,7 @@ describe('settings', () => {
         featureCodes: {
           ...(await defaultFeatureCodes()),
           dndOn: '*78',
-          ownVoicemail: '*76',
-          park: '*60'
+          ownVoicemail: '*76'
         }
       },
       asRun()
@@ -328,11 +327,9 @@ describe('settings', () => {
       ?.provision as {
       dnd: { on: string };
       vmail: { ext: string };
-      callpark: { park: string };
     };
     expect(provision.dnd.on).toBe('*78');
     expect(provision.vmail.ext).toBe('*76');
-    expect(provision.callpark.park).toBe('*60');
   });
 
   it('pushes the branch profile on an emergency-number change, which it carries (§10.1, §10.4)', async () => {

@@ -34,7 +34,12 @@ export type BranchProvision = {
     cfuoff: '';
     cfoff: '';
   };
-  callpark: { park: string; slots: { alias: string; slot: string }[] };
+  callpark: {
+    park: '';
+    retrieve: '';
+    subscribe: '';
+    slots: { alias: string; slot: string }[];
+  };
   // The keys below were read back with `getBranches` after toggling one Shell control at a time
   // (§10.4), as docs/ringotel.yaml documents them. `updateBranch` merges `provision` keys,
   // so a key once sent and later left out keeps its last value at Ringotel.
@@ -108,8 +113,13 @@ export function buildBranchProvision(
       cfuoff: '',
       cfoff: ''
     },
+    // Ringotel's "Asterisk" preset: the app parks by transferring to the slot, retrieves by
+    // dialling it and watches its hint, as the core takes them (§10.2); a prefix would be dialled
+    // before the slot. All three are sent, since `updateBranch` keeps a key left out.
     callpark: {
-      park: featureCodes.park,
+      park: '',
+      retrieve: '',
+      subscribe: '',
       slots: parkingSlots.map(ext => ({ alias: `Parking ${ext}`, slot: ext }))
     },
     // Internal calls pass through the core, since history, recording and presence depend on it

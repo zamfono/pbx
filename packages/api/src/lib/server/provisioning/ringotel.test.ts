@@ -110,7 +110,9 @@ describe('buildBranchProvision', () => {
     expect(provision.maxregs).toBe(3);
     expect(provision.blfs).toEqual([{ number: '101', title: 'Anna Huber' }]);
     expect(provision.callpark).toEqual({
-      park: '*70',
+      park: '',
+      retrieve: '',
+      subscribe: '',
       slots: [{ alias: 'Parking 701', slot: '701' }]
     });
   });

@@ -32,7 +32,7 @@ export function reloadKindsFor(
 // §10.4 onTenantProfileChanged: codecs and ringotelMaxRegs move the branch's provision object,
 // language moves the organization's; any of them re-pushes the active Ringotel provider, once the
 // write has committed and reached Asterisk ("Tenant profile push", `profilePush.ts`). The
-// provision object also carries the DND, voicemail and park feature codes ("Branch provision
+// provision object also carries the DND and voicemail feature codes ("Branch provision
 // profile"), so a feature-code change moves it too, or the app would dial retired codes.
 // The connection's `country`, the default the app reads phone numbers against to match callers to
 // contacts, follows the tenant's country, and its `emergency` list the tenant's emergency numbers.

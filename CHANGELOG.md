@@ -11,6 +11,13 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+### Fixed
+
+- Parking a call from the Ringotel app hung up the caller: the app put the park code before the
+  slot and transferred the call to `*70701`, which matches no code. The app is now set up with no
+  park, retrieve or subscription prefix, so it transfers the call to the slot itself, which parks
+  it there. The apps take it with the re-registration after the update restarts Asterisk.
+
 ## [0.7.4] - 2026-10-22
 
 ### Changed

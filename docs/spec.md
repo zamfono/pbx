@@ -1570,7 +1570,7 @@ The phone's network (VLAN, 802.1X, Wi-Fi, static addresses: a wrong value strand
   - `dnd.on` / `dnd.off` and `vmail.ext` carry the Zamfono feature codes (§9.3);
   - `vmail.unsolicited: false`, so the app subscribes for MWI as §9.3 describes;
   - the `forwarding` codes stay empty, since forwarding is configured through `PUT /users/{id}/forwarding` (§10.3) and a Ringotel-side forward would bypass the core;
-  - `callpark.park` is the park code and `callpark.slots` lists the parking-slot extensions, so the app shows the slots with their state.
+  - `callpark.park`, `callpark.retrieve` and `callpark.subscribe` are empty, Ringotel's "Asterisk" preset, since each is a prefix added to the slot: the app parks by transferring the call to the slot, retrieves by dialling it and subscribes to its hint (§10.2, §9.3); `callpark.slots` lists the parking-slot extensions, so the app shows the slots with their state.
 - the call-routing and registration keys, as `docs/ringotel.yaml` documents them after reading them back from a live branch, one Shell control at a time:
   - `internalRouting: 1` ("Route internal calls through PBX only"; Ringotel's default 2 routes them through the PBX only "if possible"), `extst: true` (users' calls to their own extension number) and `extvc: true` (video calls), so every call passes through the PBX, since history, recording and presence depend on the core seeing every call; the legacy `internal` key has no effect beside it and is not sent;
   - `keepCallerName: true` ("Prioritize Caller Name from the PBX"), so the caller-ID name set by the core's contact lookup (§10.2) wins over app-local contacts; `displayname: ""`, the name the app itself sends to the PBX, stays empty, since the core sets the caller-ID;

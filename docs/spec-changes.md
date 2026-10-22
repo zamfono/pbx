@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-22 · §10.4 Ringotel.** The branch provision sends `callpark.park`, `callpark.retrieve` and `callpark.subscribe` empty, Ringotel's "Asterisk" preset, where `callpark.park` carried the park code.
+*Why:* Ringotel adds each to the slot, so the app's park transferred the call to `*70701`, which no code matches; the transferee was released with 484. With no prefix the app transfers to the slot, which parks there (§10.2).
+
 **2026-10-22 · §9.3 Connected party.** A retrieval and a pickup name the party reached in the connected line the core sets before answering, which the 200 OK asserts in `P-Asserted-Identity`; device endpoints carry `send_pai = yes` and `send_connected_line = no`.
 *Why:* a retrieving phone showed the slot, a picking-up one the `*8` code. `send_connected_line` stays off because a leg the core places carries its caller's identity, so Asterisk's connected-line update on bridging would show a calling phone itself, or on an outbound call the tenant's own number. The product owner: "when retrieving a call – is it at all possible to show the "original" caller ID?", then "go ahead and implement (1)".
 
