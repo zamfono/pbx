@@ -11,6 +11,13 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+### Changed
+
+- A phone that retrieves a parked call, or picks up a call with `*8<ext>`, shows the caller,
+  with the phone book's name for them, instead of the slot or the code it dialled: the PBX names
+  them in its answer (`P-Asserted-Identity`), for phones that read the other party from that
+  header. A withheld caller stays withheld.
+
 ### Fixed
 
 - A Park key on a `yealink` device hung up the caller instead of parking them: the phone sent
