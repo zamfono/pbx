@@ -29,7 +29,7 @@ group while it is a slot, and a menu's `allowExtensionDialing` never reaches one
    (`settings.holdMohAudioId`, else the built-in default), the lowest free slot is taken, and its
    number is read out to the parker, who hangs up. The park fails when the parker is in no call
    or every slot is taken; the call stays where it was. A phone's park key that transfers the call
-   to the park code instead, as a Yealink's does, parks the other party the same way, the one who
+   to the park code instead, as a plain speed-dial key does, parks the other party the same way, the one who
    transferred as the parker; their phone leaves the call with the transfer, so no slot number is
    read out. Transferring the call to a free slot itself, as a slot's BLF key does when pressed
    during a call, parks it on that slot. A transfer to a taken slot, or to the park code with

@@ -52,9 +52,9 @@ The device record shows when and from which address the phone last fetched its f
     mailbox or a ring group's they belong to. Its lamp is lit while the mailbox holds new
     messages, and pressing it opens the mailbox;
   - `{"kind": "feature", "feature": "park", "label": "Park"}` (or `ownVoicemail`): a key dialling
-    that feature code (pressed during a call, `park` parks it on the lowest free slot; the phone
-    hands the call to the code as a blind transfer and leaves it, so it hears no slot number, and
-    a BLF key on the slot shows where the call waits);
+    that feature code (pressed during a call, `park` parks it and the phone hears the slot
+    number: it holds the call and dials the park code itself, as its Park soft key during a call
+    does too);
   - `{"kind": "empty"}`: a key left empty, so the keys after it move further along: three of
     them after two keys put the next key on the sixth.
 

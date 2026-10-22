@@ -37,7 +37,8 @@ function input(overrides: Partial<YealinkInput> = {}): YealinkInput {
       { kind: 'blf', ext: '206', title: 'Ben' },
       { kind: 'quickDial', number: '+43123456789', label: 'Taxi' },
       { kind: 'feature', feature: 'dndToggle', label: 'DND' },
-      { kind: 'mailbox', ext: '600', label: 'Support VM' }
+      { kind: 'mailbox', ext: '600', label: 'Support VM' },
+      { kind: 'feature', feature: 'park', label: 'Park' }
     ],
     codes,
     timeZone: 'Europe/Vienna',
@@ -95,6 +96,9 @@ describe('renderYealink (§10.4 "Provisioning link")', () => {
       'voice_mail.number.1': '*96',
       'features.dnd.allow': '0',
       'features.fwd.allow': '0',
+      'features.call_park.enable': '1',
+      'features.call_park.park_mode': '1',
+      'features.call_park.park_code': '*70',
       'static.sip.nat_stun.enable': '1',
       'static.sip.nat_stun.server': 'pbx.example.com',
       'static.sip.nat_stun.port': '3478',
@@ -135,7 +139,11 @@ describe('renderYealink (§10.4 "Provisioning link")', () => {
     expect(
       ['type', 'value', 'label'].map(field => file.get(`linekey.5.${field}`))
     ).toEqual(['16', '*95600', 'Support VM']);
-    expect(file.get('linekey.6.type')).toBe('0');
+    // The phone's own park key, dialling the park code above as a call of its own.
+    expect(
+      ['type', 'value', 'label'].map(field => file.get(`linekey.6.${field}`))
+    ).toEqual(['10', '', 'Park']);
+    expect(file.get('linekey.7.type')).toBe('0');
     expect(file.get('linekey.84.type')).toBe('0');
     expect(file.has('linekey.85.type')).toBe(false);
   });

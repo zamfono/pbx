@@ -44,7 +44,13 @@ export const YEALINK_RINGTONES = [
 // The T87W's line keys, the most of the line; a model with fewer ignores the rest.
 const LINE_KEYS = 84;
 
-const KEY_TYPE = { none: 0, speedDial: 13, line: 15, blf: 16 } as const;
+const KEY_TYPE = {
+  none: 0,
+  callPark: 10,
+  speedDial: 13,
+  line: 15,
+  blf: 16
+} as const;
 const TRANSPORT_TLS = 2;
 const SRTP_COMPULSORY = 2;
 
@@ -138,8 +144,15 @@ function keyLines(input: YealinkInput, key: YealinkKey): Line[] {
         ['label', key.label]
       ];
     case 'feature':
-      // `dndToggle` is a BLF key on the user's DND hint: lit while DND is on, toggling it when
-      // pressed (§9.3); the other codes are dialled as they are.
+      // `dndToggle`: a BLF key on the user's DND hint, lit while DND is on, toggling it (§9.3).
+      // `park`: the phone's park key, holding the call and dialling the code; the slot is read out.
+      if (key.feature === 'park') {
+        return [
+          ['type', KEY_TYPE.callPark],
+          ['value', ''],
+          ['label', key.label]
+        ];
+      }
       return key.feature === 'dndToggle'
         ? [
             ['type', KEY_TYPE.blf],
@@ -212,6 +225,10 @@ export function renderYealink(input: YealinkInput): string {
     // DND and forwarding live in the core (§9.3); feature keys dial its codes.
     ['features.dnd.allow', 0],
     ['features.fwd.allow', 0],
+    // FAC mode: the Park soft key and any park key hold the call and dial the park code (§10.2).
+    ['features.call_park.enable', 1],
+    ['features.call_park.park_mode', 1],
+    ['features.call_park.park_code', input.codes.park],
     ['static.sip.nat_stun.enable', 1],
     ['static.sip.nat_stun.server', input.stunServer],
     ['static.sip.nat_stun.port', STUN_PORT],

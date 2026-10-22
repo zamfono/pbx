@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-22 · §10.4 `yealink`.** The Yealink file turns the phone's call park on in its feature-code mode (`features.call_park.enable`, `park_mode` 1, `park_code` the tenant's park code), and a `park` feature key is the phone's park key (type 10), not a speed dial.
+*Why:* a speed-dial key pressed during a call blind-transfers the call to `*70`, so the phone left the call and heard no slot number. On a T87W the product owner set the park mode to FAC by hand: the phone held the call and sent `INVITE sip:*70@…` as a call of its own, without an extension appended and without a `REFER`; the call parked on 701 and the slot was read out. The product owner: "from my point of view it worked :-)".
+
 **2026-10-22 · §10.2 Call parking.** A blind transfer to a free parking slot parks the transferee on that slot for the transferrer; one to a taken slot, or to `*70` with every slot taken, rings the transferrer back at once as the timeout does. Dialling a slot as a call of its own still only retrieves.
 *Why:* a Yealink's slot BLF key pressed during a call transfers the call to the slot, where the transferee found nothing to retrieve and was released with 404; to a taken slot they would have been connected to the parked party. Asked whether a transfer to an empty slot should park there, and how a taken slot should go, the product owner: "1. do it 2. b 3. leave it" (park on the slot; ring the transferrer back; dialling a slot stays retrieval only).
 
