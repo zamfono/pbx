@@ -11,6 +11,8 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-10-29
+
 ### Added
 
 - `GET /api/v1/users/me` (MCP `users.me`) returns the user the caller acts as, and
@@ -884,7 +886,8 @@ The first 0.2 release; its `v0.2.0` tag was never published.
 
 The first tagged version, before any deployment.
 
-[Unreleased]: https://github.com/zamfono/pbx/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/zamfono/pbx/compare/v0.8.1...HEAD
+[0.8.1]: https://github.com/zamfono/pbx/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/zamfono/pbx/compare/v0.7.5...v0.8.0
 [0.7.5]: https://github.com/zamfono/pbx/compare/v0.7.4...v0.7.5
 [0.7.4]: https://github.com/zamfono/pbx/compare/v0.7.3...v0.7.4
