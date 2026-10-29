@@ -42,8 +42,10 @@ const USER_ANY_OPS = new Set([
   'contacts.get',
   'contacts.list',
   'parking.list',
+  'personalAccessTokens.current',
   'search.query',
   'system.info',
+  'users.me',
   'voicemails.list'
 ]);
 const USER_OWN_AREAS = ['hours', 'ooo', 'personalAccessTokens'];

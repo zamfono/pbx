@@ -11,6 +11,13 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+### Added
+
+- `GET /api/v1/users/me` (MCP `users.me`) returns the user the caller acts as, and
+  `GET /api/v1/personalAccessTokens/current` (MCP `personalAccessTokens.current`) the personal
+  access token it authenticated with, so a script can check that its token works, whose it is and
+  when it expires.
+
 ## [0.8.0] - 2026-10-29
 
 ### Upgrade notes

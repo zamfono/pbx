@@ -46,7 +46,7 @@ describe('a personal access token as bearer', () => {
   it('acts as its user on REST, MCP and /events alike, with no OAuth client', async () => {
     const deps = await seeded();
     expect(await authenticate(deps)).toEqual({
-      actor: owner,
+      actor: { ...owner, personalAccessTokenId: GRANT.id },
       personalAccessToken: GRANT
     });
     expect(
@@ -55,7 +55,10 @@ describe('a personal access token as bearer', () => {
         deps.raw,
         MCP_AUDIENCE
       )
-    ).toEqual({ actor: owner, personalAccessToken: GRANT });
+    ).toEqual({
+      actor: { ...owner, personalAccessTokenId: GRANT.id },
+      personalAccessToken: GRANT
+    });
     const request = new Request(MCP_AUDIENCE, {
       headers: { authorization: `Bearer ${deps.raw}` }
     });
@@ -64,7 +67,10 @@ describe('a personal access token as bearer', () => {
         { db: deps.db, jwtSecret: DEPS_SECRET },
         request
       )
-    ).toEqual({ actor: owner, personalAccessToken: GRANT });
+    ).toEqual({
+      actor: { ...owner, personalAccessTokenId: GRANT.id },
+      personalAccessToken: GRANT
+    });
   });
 
   it('acts with the role its user holds at the request', async () => {
@@ -75,7 +81,7 @@ describe('a personal access token as bearer', () => {
       .where('id', '=', owner.id)
       .execute();
     expect(await authenticate(deps)).toEqual({
-      actor: { ...owner, role: 'user' },
+      actor: { ...owner, role: 'user', personalAccessTokenId: GRANT.id },
       personalAccessToken: GRANT
     });
   });

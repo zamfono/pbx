@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-29 · §10.3 Users and Personal access tokens.** `GET /users/me` returns the user the caller's credential acts as, in the shape of `GET /users/{id}`, and `GET /personalAccessTokens/current` the personal access token it authenticated with, in the shape `GET /users/{id}/personalAccessTokens` lists it, 404 for a caller without one; both to any role.
+*Why:* a personal access token is opaque, so a client holding one could tell neither whether it works, nor whose it is, nor when it expires without already knowing the user's id. The product owner: "does the API provide some kind of "who am i" endpoint, to check if a PAT works and to whom it belongs?", then "let's implement it", and for the token's own details "instead of performing an additional database query _every authentication_, how about an additional endpoint?".
+
 **2026-10-29 · §6.3 Updates and Automatic updates, §7 Metrics, §10.3 System.** `system.update` takes `breaking: true`, with which the updater installs a breaking release, running `update.sh --yes`; without it a breaking release is refused as before. The automatic update never sets it, and the updater refuses it on an automatic request.
 *Why:* a breaking release could be installed only with `update.sh` on the host, so an owner without a shell could not take one. The product owner: "add the ability to install breaking changes over REST and MCP", and "the _auto_-updater shouldn't install breaking changes!".
 

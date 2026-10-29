@@ -75,6 +75,7 @@
 | `parking.list` | `GET /api/v1/parking/calls` | Lists the calls parked right now: slot, call, caller (null when withheld), parked since and by whom. | user | no |
 | `parking.set` | `PUT /api/v1/parking/slots` | Replaces the set of parking-slot extensions as a whole; an extension a user or ring group owns, or an emergency number, is refused | admin | no |
 | `personalAccessTokens.create` | `POST /api/v1/users/{id}/personalAccessTokens` | Creates a personal access token, acting as the user, for a server application; its value is returned once. | user | no |
+| `personalAccessTokens.current` | `GET /api/v1/personalAccessTokens/current` | Reads the personal access token the caller authenticated with, e.g. to see when it expires; 404 for a caller without one. | user | no |
 | `personalAccessTokens.list` | `GET /api/v1/users/{id}/personalAccessTokens` | Lists a user's personal access tokens, revoked and expired ones until the daily purge, paginated. | user | no |
 | `personalAccessTokens.revoke` | `POST /api/v1/personalAccessTokens/{id}/revoke` | Revokes a personal access token; the application using it loses access at once. | user | yes |
 | `presenceLog.snapshot` | `GET /api/v1/presence/log` | Snapshots each user's presence state as of a past timestamp. | admin | no |
@@ -122,6 +123,7 @@
 | `users.get` | `GET /api/v1/users/{id}` | Reads one live user by id. | user | no |
 | `users.getForwarding` | `GET /api/v1/users/{id}/forwarding` | Reads a user's call-forwarding rules in the shape users.setForwarding takes; a user reads their own, an admin anyone's. | user | no |
 | `users.list` | `GET /api/v1/users` | Lists the tenant's live users, paginated. | admin | no |
+| `users.me` | `GET /api/v1/users/me` | Reads the user the caller acts as, e.g. to check whose personal access token is in use. | user | no |
 | `users.resetMfa` | `POST /api/v1/users/{id}/resetMfa` | Removes a user's two-factor methods and recovery codes and signs them out everywhere. | admin | yes |
 | `users.resetPassword` | `POST /api/v1/users/{id}/resetPassword` | Issues a new one-time link to set a user's password. | admin | no |
 | `users.setForwarding` | `PUT /api/v1/users/{id}/forwarding` | Replaces a user's call-forwarding rules as a whole; a user sets their own, without new sip, webSocket or recording targets, an admin anyone's. | user | no |

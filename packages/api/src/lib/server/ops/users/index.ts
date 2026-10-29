@@ -6,6 +6,7 @@ import { erase } from './erase.js';
 import { get } from './get.js';
 import { getForwarding } from './getForwarding.js';
 import { list } from './list.js';
+import { me } from './me.js';
 import { resetMfa } from './resetMfa.js';
 import { resetPassword } from './resetPassword.js';
 import { setForwarding } from './setForwarding.js';
@@ -15,6 +16,7 @@ import { update } from './update.js';
 
 register(list);
 register(get);
+register(me);
 register(create);
 register(update);
 register(deleteUser);

@@ -74,6 +74,7 @@ export async function authenticateToken(
     return (
       auth && {
         ...auth,
+        actor: { ...auth.actor, personalAccessTokenId: pat.id },
         personalAccessToken: { id: pat.id, expiresAt: pat.expiresAt }
       }
     );

@@ -26,7 +26,10 @@ OAuth instead: they are told where to log in and continue on their own.
    straight away. A user may create tokens for themselves; an admin or owner creates them for any
    user, and only an owner for an owner.
 3. The application sends it as `Authorization: Bearer zpat_…` on `/api/v1/*` and `/mcp`, and in
-   the `/events` auth frame as `token`.
+   the `/events` auth frame as `token`. To check the token works and whose it is, `users.me`
+   (`GET /api/v1/users/me`) returns the user it acts as, and `personalAccessTokens.current`
+   (`GET /api/v1/personalAccessTokens/current`) the token itself, with its `id` and `expiresAt`;
+   a revoked or expired token gets 401.
 4. Check it is in use: `personalAccessTokens.list` (`GET /api/v1/users/{id}/personalAccessTokens`)
    shows each token's `lastUsedAt`, updated at most once a minute, never the token itself.
 5. Replace or withdraw it: create a new token under another name, switch the application over, then

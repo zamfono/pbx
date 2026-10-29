@@ -112,6 +112,8 @@ function scopeRoutes(suffix: string, entries: ScopeEntry[]): RouteTuple[] {
 
 // §10.3's REST surface table, one row per endpoint.
 const STATIC_ROUTES: RouteTuple[] = [
+  // Before `/users/{id}`, which would otherwise take `me` for an id: the first matching row wins.
+  ['GET', '/users/me', 'users.me'],
   ...crud('users', '/users', ALL_CRUD),
   ['POST', '/users/{id}/resetPassword', 'users.resetPassword'],
   ['POST', '/users/{id}/resetMfa', 'users.resetMfa'],
@@ -147,6 +149,7 @@ const STATIC_ROUTES: RouteTuple[] = [
     'personalAccessTokens.create',
     WITH_USER_ID
   ],
+  ['GET', '/personalAccessTokens/current', 'personalAccessTokens.current'],
   ['POST', '/personalAccessTokens/{id}/revoke', 'personalAccessTokens.revoke'],
   ['POST', '/provisioning/ringotel/setup', 'provisioning.ringotelSetup'],
   ['POST', '/provisioning/ringotel/adopt', 'provisioning.ringotelAdopt'],

@@ -11,12 +11,14 @@ import {
 import type { Effects } from './effects.js';
 
 /** The authenticated caller of an operation: a user, or a voice bot holding a session token for
- * one call, whose id is its leg's (§5.2 "Session tokens"). */
+ * one call, whose id is its leg's (§5.2 "Session tokens"); with the personal access token it
+ * presented, if any (§5.2). */
 export type Actor = {
   id: string;
   name: string;
   role: UserRole;
   callSession?: { callId: string };
+  personalAccessTokenId?: string;
 };
 
 /** Built by the runner for every call; `run` holds only what differs between operations (§10.3). */
