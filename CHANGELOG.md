@@ -11,6 +11,8 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-29
+
 ### Upgrade notes
 
 - A client of a list endpoint pages with `pageSize`, `pageToken` and `skip` instead of `limit`
@@ -21,7 +23,8 @@ why the specified behaviour changed; the commit history, how.
 
 - An owner can install a breaking release from the API or an MCP client: `system.update` with
   `breaking: true`, once its upgrade notes were read. The automatic update still never installs
-  one.
+  one. This takes effect from 0.8.0 on: 0.8.0 itself, a breaking release, is installed with
+  `update.sh` on the host.
 - Call history, the audit log, recordings, voicemails and the phone book sort by `orderBy`
   (`startedAt desc`, `durationS`, …). Recordings filter by `callId`, `userId`, `from` and `to`;
   voicemails by `userId`, `ringGroupId`, `read`, `from` and `to`; the phone book by `q`, matched
@@ -874,7 +877,8 @@ The first 0.2 release; its `v0.2.0` tag was never published.
 
 The first tagged version, before any deployment.
 
-[Unreleased]: https://github.com/zamfono/pbx/compare/v0.7.5...HEAD
+[Unreleased]: https://github.com/zamfono/pbx/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/zamfono/pbx/compare/v0.7.5...v0.8.0
 [0.7.5]: https://github.com/zamfono/pbx/compare/v0.7.4...v0.7.5
 [0.7.4]: https://github.com/zamfono/pbx/compare/v0.7.3...v0.7.4
 [0.7.3]: https://github.com/zamfono/pbx/compare/v0.7.2...v0.7.3
