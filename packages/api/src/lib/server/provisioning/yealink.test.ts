@@ -178,6 +178,13 @@ describe('renderYealink (§10.4 "Provisioning link")', () => {
     expect(file.get('linekey.1.type')).toBe('0');
   });
 
+  it('turns STUN off, its server cleared, while the stack runs none', () => {
+    const file = parse(renderYealink(input({ stunServer: null })));
+    expect(file.get('static.sip.nat_stun.enable')).toBe('0');
+    expect(file.get('static.sip.nat_stun.server')).toBe('');
+    expect(file.get('account.1.nat.nat_traversal')).toBe('0');
+  });
+
   it('keeps a line break in a name or label from starting a setting of its own', () => {
     const file = renderYealink(
       input({

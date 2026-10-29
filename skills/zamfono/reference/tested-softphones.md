@@ -22,7 +22,8 @@ entered into the client by hand. `devices.revealCredentials`
 | `adminPassword`   | `null`; a `yealink` desk phone's admin password (see `yealink-desk-phones`) |
 
 No STUN server, ICE or outbound proxy is needed: Zamfono handles NAT itself. A client that wants a
-STUN server anyway can use Zamfono's own, `server`:3478 (UDP). A `plain` device registers only
+STUN server anyway can use Zamfono's own, `server`:3478 (UDP), unless the operator has switched
+it off. A `plain` device registers only
 from an address on its allowlist (see `remote-workers`). Two clients are verified against Zamfono
 and recommended.
 

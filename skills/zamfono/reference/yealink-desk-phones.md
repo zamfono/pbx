@@ -65,8 +65,8 @@ The device record shows when and from which address the phone last fetched its f
   `ringtone`, one of the phone's built-in ones; `null` is the phone's own choice).
 - Security: certificates are checked for the fetch and for SIP-TLS, SIP requests are accepted only
   from the server, and the web interface takes the generated admin password.
-- Zamfono's own STUN server (`<FQDN>:3478`), a nightly fetch, and no blinking power LED in
-  power-saving mode.
+- Zamfono's own STUN server (`<FQDN>:3478`; STUN off where the operator has switched the server
+  off), a nightly fetch, and no blinking power LED in power-saving mode.
 
 Left on the phone: its network (VLAN, 802.1X, Wi-Fi, static addresses — a wrong value would strand
 it), volumes and brightness, its own call list, firmware, and dial plans, since Zamfono routes

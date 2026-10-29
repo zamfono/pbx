@@ -100,7 +100,7 @@ export type YealinkInput = {
   language: Language;
   ringtone: string | null;
   adminPassword: string;
-  stunServer: string;
+  stunServer: string | null;
   now: Date;
 };
 
@@ -229,10 +229,10 @@ export function renderYealink(input: YealinkInput): string {
     ['features.call_park.enable', 1],
     ['features.call_park.park_mode', 1],
     ['features.call_park.park_code', input.codes.park],
-    ['static.sip.nat_stun.enable', 1],
-    ['static.sip.nat_stun.server', input.stunServer],
+    ['static.sip.nat_stun.enable', input.stunServer === null ? 0 : 1],
+    ['static.sip.nat_stun.server', input.stunServer ?? ''],
     ['static.sip.nat_stun.port', STUN_PORT],
-    ['account.1.nat.nat_traversal', 1],
+    ['account.1.nat.nat_traversal', input.stunServer === null ? 0 : 1],
     ['static.security.trust_certificates', 1],
     ['static.security.cn_validation', 1],
     ['sip.trust_ctrl', 1],
@@ -294,7 +294,7 @@ export async function yealinkFile(db: Db, device: DeviceRow): Promise<string> {
     ringtone: device.ringtone,
     // A `yealink` device always has one (§11.2 `devices` CHECK).
     adminPassword: cs.adminPassword ?? '',
-    stunServer: env.FQDN,
+    stunServer: env.STUN_ENABLED ? env.FQDN : null,
     now: new Date()
   });
 }

@@ -55,15 +55,26 @@ services:
   # The STUN server phones can name to learn their public address (§6.1): coturn, from the asterisk
   # image, answering Binding requests on 3478/udp and nothing else. `-c /dev/null` skips Debian's
   # turnserver.conf, which logs to syslog and drops the RFC 3489 requests older phones send; no
-  # RESPONSE-ORIGIN, which would name the container's own address in the ports mode. SIGKILL, since
-  # it holds no state and ignores SIGTERM as PID 1.
+  # RESPONSE-ORIGIN, which would name the container's own address in the ports mode. STUN_ENABLED=false
+  # binds it to loopback, as the SIP transports' flags do theirs (§9.1). SIGKILL, since it holds no
+  # state and ignores SIGTERM as PID 1.
   stun:
     image: ghcr.io/zamfono/asterisk:${ZAMFONO_VERSION:-latest}   # its coturn package's turnserver
     network_mode: service:netns                 # the stack's address
     depends_on:
       - netns
+    environment:
+      STUN_ENABLED: ${STUN_ENABLED:-}
     user: turnserver
-    entrypoint: ["turnserver", "-c", "/dev/null", "--stun-only", "--no-tcp", "--no-tls", "--no-dtls", "--no-cli", "--no-rfc5780", "--response-origin-only-with-rfc5780", "--no-software-attribute", "--pidfile", "/dev/null", "--log-file", "stdout", "--simple-log"]
+    entrypoint:
+      - sh
+      - -c
+      - >-
+        [ "$$STUN_ENABLED" != false ] || set -- --listening-ip 127.0.0.1;
+        exec turnserver -c /dev/null --stun-only --no-tcp --no-tls --no-dtls --no-cli --no-rfc5780
+        --response-origin-only-with-rfc5780 --no-software-attribute --pidfile /dev/null
+        --log-file stdout --simple-log "$$@"
+      - stun
     stop_signal: SIGKILL
     restart: unless-stopped
 
@@ -123,6 +134,7 @@ services:
       HEP_ENABLED: ${HEP_ENABLED:-}             # false rejects call_log_level 'sip' (§7)
       SIP_UDP_ENABLED: ${SIP_UDP_ENABLED:-}     # false rejects trunks on that transport; both false reject plain devices (§9.3, §9.4)
       SIP_TCP_ENABLED: ${SIP_TCP_ENABLED:-}
+      STUN_ENABLED: ${STUN_ENABLED:-}           # false provisions phones without STUN (§10.4)
       TLS_RELOAD_HOUR: ${TLS_RELOAD_HOUR:-}     # certificate swap hour when settings.tls_reload_hour is NULL (§6.4)
       METRICS_TOKEN: ${METRICS_TOKEN:-}         # empty = GET /metrics answers 404 (§7)
       ZAMFONO_VERSION: ${ZAMFONO_VERSION:-latest}   # the tag pulled, reported as the version (§7)

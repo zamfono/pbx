@@ -102,6 +102,14 @@ if run_setup COUNTRY=UK || [ -e "$bundle_dir/x/.env" ]; then
   echo "setup.sh took COUNTRY=UK, which api's first boot refuses" >&2
   exit 1
 fi
+# An RTP range that takes in STUN's port, or ends below its start, is refused.
+for range in 'RTP_PORT_START=3000 RTP_PORT_END=4000' 'RTP_PORT_START=20000 RTP_PORT_END=19000'; do
+  # shellcheck disable=SC2086 # two NAME=VALUE words
+  if run_setup $range || [ -e "$bundle_dir/x/.env" ]; then
+    echo "setup.sh took $range" >&2
+    exit 1
+  fi
+done
 # A hash that is no Argon2id one, and an owner's password under 8 characters, are refused.
 if run_setup BOOTSTRAP_OWNER_PASSWORD_HASH=secret || [ -e "$bundle_dir/x/.env" ]; then
   echo "setup.sh took a BOOTSTRAP_OWNER_PASSWORD_HASH that is no Argon2id hash" >&2
@@ -125,6 +133,17 @@ run_setup FQDN=Pbx.Example.com
   echo "setup.sh wrote FQDN=Pbx.Example.com as given" >&2
   exit 1
 }
+rm -f "$bundle_dir/x/.env" "$bundle_dir/x/compose.override.yaml"
+# The listeners and the RTP range reach the services and the published ports.
+run_setup SIP_UDP_ENABLED=false STUN_ENABLED=false RTP_PORT_START=20000 RTP_PORT_END=20100
+net_config=$(cd "$bundle_dir/x" && docker compose config)
+for line in 'SIP_UDP_ENABLED: "false"' 'SIP_TCP_ENABLED: "true"' 'STUN_ENABLED: "false"' \
+  'RTP_PORT_START: "20000"' 'published: "20100"'; do
+  echo "$net_config" | grep -qF "$line" || {
+    echo "setup.sh's network answers did not reach compose: no $line" >&2
+    exit 1
+  }
+done
 rm -f "$bundle_dir/x/.env" "$bundle_dir/x/compose.override.yaml"
 run_setup TZ=Europe/Vienna
 [ "$(stat -c %a "$bundle_dir/x/.env")" = 600 ]

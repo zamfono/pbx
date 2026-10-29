@@ -47,7 +47,7 @@ function withDefault(fallback: string) {
   };
 }
 
-/** A switch that is on unless the value is the literal `false` (§7, §9.1). */
+/** A switch that is on unless the value is the literal `false` (§6.1, §7, §9.1). */
 const onUnlessFalse = {
   schema: (value: string | undefined): boolean => value !== 'false'
 };
@@ -97,6 +97,7 @@ export const variables = defineEnvVars({
   SMTP_SECURITY: optional,
   SMTP_USER: optional,
   STACK_IPV4: optional,
+  STUN_ENABLED: onUnlessFalse,
   TLS_RELOAD_HOUR: reloadHour,
   TZ: optional,
   UPDATER_TOKEN: optional,

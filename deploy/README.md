@@ -117,7 +117,8 @@ Two things that catch people out:
   the host the moment it is applied.
 
 To go TLS-only, set `SIP_UDP_ENABLED=false` and/or `SIP_TCP_ENABLED=false` in `.env` (step 5) and
-drop the matching 5060 rule.
+drop the matching 5060 rule; `STUN_ENABLED=false` likewise switches off STUN on 3478. `setup.sh`
+asks for these and for the RTP range if you choose to change the ports.
 
 ### Mode B — one IP per stack
 
@@ -168,8 +169,8 @@ dedicated server with a vSwitch; any provider that routes a subnet to you works 
    send its replies out through the host's address.
 
 Each stack's address is public and untranslated, and no host firewall sits in front of it. The
-ports it answers on are exactly those of the Mode A table; `SIP_UDP_ENABLED` and `SIP_TCP_ENABLED`
-are how such a stack goes TLS-only. The host cannot reach a stack's address from its parent
+ports it answers on are exactly those of the Mode A table; `SIP_UDP_ENABLED`, `SIP_TCP_ENABLED`
+and `STUN_ENABLED` are how such a stack switches those listeners off. The host cannot reach a stack's address from its parent
 interface (a macvlan property), so check a stack from outside.
 
 Raise the kernel's inotify limit on a host with more than a few stacks. Every stack's processes
@@ -231,7 +232,8 @@ busy ports, Docker's userland proxy or a missing `public` network:
 ./setup.sh
 ```
 
-It uses dialogs where `whiptail` is installed (as on every Debian and Ubuntu) and plain prompts
+Asked whether to change the ports, it also takes SIP over UDP and TCP, STUN and the RTP range;
+otherwise each keeps its default. It uses dialogs where `whiptail` is installed (as on every Debian and Ubuntu) and plain prompts
 elsewhere, or with `SETUP_PLAIN=1`. It never overwrites an `.env` that holds values, and refuses
 while the stack's `db` volume from an earlier start exists: for a fresh start, run
 `docker compose down -v` with the old `.env` first. For automation,

@@ -11,6 +11,13 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+### Added
+
+- `setup.sh` offers to change the ports the stack answers on: SIP over UDP and over TCP on 5060,
+  the STUN server on 3478/udp, and the RTP range. It refuses a range that takes in 3478 or 5060.
+- `STUN_ENABLED=false` in `.env` switches the STUN server off, as `SIP_UDP_ENABLED` and
+  `SIP_TCP_ENABLED` do the plain SIP transports. Provisioned Yealink phones then get STUN off.
+
 ### Fixed
 
 - Parking a call from the Ringotel app hung up the caller: the app put the park code before the

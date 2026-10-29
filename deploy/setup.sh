@@ -43,6 +43,13 @@ v_extlen() { [[ $1 =~ ^[0-9]+$ ]] && (($1 >= 2)); }
 v_port() { [[ $1 =~ ^[0-9]+$ ]] && (($1 >= 1 && $1 <= 65535)); }
 v_mode() { [[ $1 == ports || $1 == macvlan ]]; }
 v_security() { [[ $1 == tls || $1 == starttls ]]; }
+v_bool() { [[ $1 == true || $1 == false ]]; }
+v_rtp_start() { v_port "$1" && (($1 >= 1024)); }
+# Above the start, and clear of the other UDP ports in the stack's namespace: STUN and SIP.
+v_rtp_end() {
+  v_port "$1" && (($1 > RTP_PORT_START)) &&
+    ((RTP_PORT_START > 3478 || $1 < 3478)) && ((RTP_PORT_START > 5060 || $1 < 5060))
+}
 # An IANA name, such as Europe/Berlin, that the host's time zone database holds, where it has one;
 # api and core take any other TZ for UTC.
 v_tz() {
@@ -101,6 +108,20 @@ ask_mail() {
     SMTP_PASSWORD=$(ui_password "SMTP password" "The relay's password.") || ui_cancel
   fi
   ask MAIL_FROM v_email "Sender address" "The From: address of every mail the stack sends."
+}
+
+# The listeners an operator may switch off, and the RTP range (§6.1, §9.1); unasked, each keeps
+# its default.
+ask_network() {
+  if [[ -z ${SIP_UDP_ENABLED:-}${SIP_TCP_ENABLED:-}${STUN_ENABLED:-}${RTP_PORT_START:-}${RTP_PORT_END:-} ]]; then
+    [[ -n $interactive ]] || return 0
+    ui_yesno "Change the ports the stack answers on?\n\nBy default: SIP over UDP and TCP on 5060, SIP over TLS on 5061 (always on), STUN on 3478/udp and RTP on 10000-10200/udp." || return 0
+  fi
+  ask SIP_UDP_ENABLED v_bool "SIP over UDP" "true or false: SIP on 5060/udp, for trunks and allowlisted desk phones." true
+  ask SIP_TCP_ENABLED v_bool "SIP over TCP" "true or false: SIP on 5060/tcp, for the same." true
+  ask STUN_ENABLED v_bool "STUN" "true or false: the STUN server on 3478/udp, for phones that ask for their public address." true
+  ask RTP_PORT_START v_rtp_start "RTP start" "The first UDP port of the media range, 1024 or above." 10000
+  ask RTP_PORT_END v_rtp_end "RTP end" "The last UDP port of the media range, above $RTP_PORT_START; the range leaves out 3478 and 5060." 10200
 }
 
 # The owner's password, hashed now: the first boot needs its hash (§6.3 "First boot").
@@ -178,6 +199,7 @@ main() {
   ask BOOTSTRAP_OWNER_NAME v_nonempty "Owner name" "The first owner's full name."
   ask BOOTSTRAP_OWNER_EMAIL v_email "Owner email" "The first owner's email address, also the login."
   ask_mail
+  ask_network
   ask_password
 
   : "${JWT_SECRET:=$(random_base64)}"
@@ -195,14 +217,15 @@ main() {
   fi
 
   if [[ -n $interactive ]]; then
-    ui_yesno "Write .env with these values?\n\nMode: $ZAMFONO_MODE ($address)\nHost name: $FQDN\nCompany: $COMPANY_NAME\nMain number: $MAIN_DID ($COUNTRY)\nOwner: $BOOTSTRAP_OWNER_NAME <$BOOTSTRAP_OWNER_EMAIL>\nMail relay: ${SMTP_HOST:-none}" Write Abort ||
+    ui_yesno "Write .env with these values?\n\nMode: $ZAMFONO_MODE ($address)\nHost name: $FQDN\nCompany: $COMPANY_NAME\nMain number: $MAIN_DID ($COUNTRY)\nOwner: $BOOTSTRAP_OWNER_NAME <$BOOTSTRAP_OWNER_EMAIL>\nMail relay: ${SMTP_HOST:-none}\nSIP over UDP: ${SIP_UDP_ENABLED:-true}, over TCP: ${SIP_TCP_ENABLED:-true}, STUN: ${STUN_ENABLED:-true}\nRTP: ${RTP_PORT_START:-10000}-${RTP_PORT_END:-10200}/udp" Write Abort ||
       { echo "Setup aborted; nothing was written." >&2; exit 1; }
   fi
 
   write_env .env FQDN STACK_IPV4 EXTERNAL_IPV4 ARI_PASSWORD AMI_PASSWORD JWT_SECRET SECRETBOX_KEY \
     BACKUP_PASSWORD UPDATER_TOKEN CONTAINER_SOCKET SMTP_HOST SMTP_PORT SMTP_SECURITY SMTP_USER \
     SMTP_PASSWORD MAIL_FROM BOOTSTRAP_OWNER_EMAIL BOOTSTRAP_OWNER_NAME BOOTSTRAP_OWNER_PASSWORD_HASH \
-    COMPANY_NAME MAIN_DID COUNTRY EXT_LENGTH TZ
+    COMPANY_NAME MAIN_DID COUNTRY EXT_LENGTH TZ SIP_UDP_ENABLED SIP_TCP_ENABLED STUN_ENABLED \
+    RTP_PORT_START RTP_PORT_END
   ln -sfn "$overlay" compose.override.yaml
 
   echo "Wrote $PWD/.env (readable by root only), and linked compose.override.yaml to $overlay."

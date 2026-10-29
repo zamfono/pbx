@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-29 · §6.1 STUN, §6.2.2 step 1, §6.3 compose.yaml, Images and Environment, §10.4 `manual` and `yealink`.** `STUN_ENABLED` (`.env`, default `true`) switches the stack's STUN server off: `false` binds the `stun` service to `127.0.0.1`, as `SIP_UDP_ENABLED` and `SIP_TCP_ENABLED` do the plain SIP transports, and `api`, which now reads it too, provisions `yealink` devices with STUN off and the server cleared. `setup.sh` asks, on request, for these three switches and the RTP range, and refuses a range that takes in 3478 or 5060.
+*Why:* the product owner: "i'd like to be able to toggle UDP, TCP and STUN as well ad [sic] change the RTP range" in the setup script; the STUN server was always on, and the transports and RTP range could be set only by editing `.env`.
+
 **2026-10-22 · §10.4 Ringotel.** The branch provision sends `callpark.park`, `callpark.retrieve` and `callpark.subscribe` empty, Ringotel's "Asterisk" preset, where `callpark.park` carried the park code.
 *Why:* Ringotel adds each to the slot, so the app's park transferred the call to `*70701`, which no code matches; the transferee was released with 484. With no prefix the app transfers to the slot, which parks there (§10.2).
 
