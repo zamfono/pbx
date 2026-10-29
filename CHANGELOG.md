@@ -11,6 +11,15 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+### Changed
+
+- `update.sh`, and with it `system.update` and the automatic update, removes the images of
+  earlier releases once the updated stack is healthy, which until now piled up at a few GB
+  per release until the disk was full. Only Zamfono's own images that no container uses are
+  removed. It also refuses an update, changing nothing, with less than 3 GB free on the stack
+  directory's filesystem, where a full disk used to fail the update half way, leaving the stack
+  without `api` and `core`.
+
 ## [0.8.1] - 2026-10-29
 
 ### Added

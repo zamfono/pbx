@@ -365,13 +365,15 @@ cd /srv/zamfono
 ./update.sh --current  # the release this directory runs
 ```
 
-It downloads the release's bundle, checks it against the release's `SHA256SUMS`, unpacks it over
+It refuses to start with less than 3 GB free on the stack directory's filesystem, which a
+release's images need. It downloads the release's bundle, checks it against the release's `SHA256SUMS`, unpacks it over
 the stack directory (never touching `.env`), lists the settings a newer `.env.example`
 introduced, pulls the images and recreates the stack: on Podman
 through the boot unit of step 7 if there is one, otherwise taking the stack `down` first. It then
 waits up to three minutes for every service to report healthy; an update that stopped before
 that, a failed `up` or an unhealthy service, is finished by running `update.sh` again once the
-cause is fixed. It refuses an older release. A breaking one (a new minor while 0.x, a new major from 1.0.0 on) shows the release
+cause is fixed. Once the stack is healthy, it removes the Zamfono images no container uses, those
+of earlier releases; other images on the host stay. It refuses an older release. A breaking one (a new minor while 0.x, a new major from 1.0.0 on) shows the release
 notes in between and asks first; `--yes` answers for a run without a terminal.
 
 **From an MCP client or the API**, the owner updates without a shell: `system.info` shows the

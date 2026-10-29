@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 # shellcheck disable=SC2154 # runtime, compose, services, unit and updater are update.sh's
-# How update.sh recreates the stack on its new images and waits for it to report healthy (§6.3
-# "Updates"). Uses update.sh's runtime, compose, services, unit and WAIT_SECONDS.
+# How update.sh recreates the stack on its new images, waits for it to report healthy and then
+# removes the images an earlier release left (§6.3 "Updates"). Uses update.sh's runtime, compose, services, unit and WAIT_SECONDS.
 
 # Whether this Compose can `up --wait`: docker-compose can, Docker's own and the one `podman
 # compose` hands the files to as deploy/README.md step 2 installs it; podman-compose cannot.
@@ -66,4 +66,8 @@ recreate_stack() {
     "${compose[@]}" up -d "${wait_args[@]}" "${services[@]}" || unhealthy
   fi
   ((${#wait_args[@]} > 0)) || await_healthy
+  # Only the stack's own images, which carry its source label, so other projects' stay; an image a
+  # container still uses, the updater's during its own run, stays too.
+  "$runtime" image prune -a -f --filter label=org.opencontainers.image.source=https://github.com/zamfono/pbx \
+    >/dev/null || warn "could not remove the images of earlier releases"
 }

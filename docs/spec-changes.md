@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-29 · §6.3 Updates.** `update.sh` refuses an update, before downloading anything, while the stack directory's filesystem has less than 3 GB free, and once the recreated stack is healthy removes the stack's own images no container uses.
+*Why:* every update left the previous release's images behind, a few GB each, until a 19 GB disk filled: the next update's pull succeeded, and `migrate` then failed with `SQLITE_IOERR_SHMSIZE`, leaving the stack without `api` and `core`. The product owner: "should we add a "docker image prune" step to the updater?", then, for the removal after an update and a free-space check before the download, "let's do that".
+
 **2026-10-29 · §10.3 Users and Personal access tokens.** `GET /users/me` returns the user the caller's credential acts as, in the shape of `GET /users/{id}`, and `GET /personalAccessTokens/current` the personal access token it authenticated with, in the shape `GET /users/{id}/personalAccessTokens` lists it, 404 for a caller without one; both to any role.
 *Why:* a personal access token is opaque, so a client holding one could tell neither whether it works, nor whose it is, nor when it expires without already knowing the user's id. The product owner: "does the API provide some kind of "who am i" endpoint, to check if a PAT works and to whom it belongs?", then "let's implement it", and for the token's own details "instead of performing an additional database query _every authentication_, how about an additional endpoint?".
 

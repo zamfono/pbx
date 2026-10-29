@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# Updates this stack to a newer release (README.md, step 8): downloads that release's bundle,
-# checks it against the release's SHA256SUMS, pulls the images, unpacks the bundle over this
-# directory, moves .env's ZAMFONO_VERSION along by its form and lists the settings a newer
-# .env.example introduced, and recreates the stack. The `updater` service runs this same script
-# for `system.update` (§6.3 "Updates"). Compose reads compose.yaml and compose.override.yaml, the
+# Updates this stack to a newer release (README.md, step 8): checks there is room for its images,
+# downloads that release's bundle, checks it against the release's SHA256SUMS, pulls the images,
+# unpacks the bundle over this directory, moves .env's ZAMFONO_VERSION along by its form and lists
+# the settings a newer .env.example introduced, recreates the stack and, once it is healthy,
+# removes the stack's images no container uses. The `updater` service runs this same script for
+# `system.update` (§6.3 "Updates"). Compose reads compose.yaml and compose.override.yaml, the
 # link to the mode's overlay setup.sh makes, and compose.dr.yaml where the stack directory holds
 # one (§6.5).
 #
@@ -46,6 +47,8 @@ REPO=${ZAMFONO_REPO_URL:-https://github.com/zamfono/pbx}
 STACK_SERVICES=(netns asterisk stun migrate core api proxy)
 # How long `up` waits for the recreated services to report healthy.
 WAIT_SECONDS=180
+# The free space an update needs for its release's images, about 2.5 GB, with room to spare.
+MIN_FREE_GB=3
 # Names the release an update installed until its stack reports healthy, so that a rerun after a
 # failure there finishes that update rather than saying it is already on it.
 PENDING=.update-pending
@@ -65,7 +68,7 @@ for arg in "$@"; do
     --check) check_only=1 ;;
     --current) current_only=1 ;;
     -h | --help)
-      sed -n '2,28p' "$(basename "$0")" | sed 's/^# \{0,1\}//'
+      sed -n '2,29p' "$(basename "$0")" | sed 's/^# \{0,1\}//'
       exit 0
       ;;
     -*) fail "unknown option $arg" ;;
@@ -110,6 +113,19 @@ current_version() {
       cat VERSION
       ;;
   esac
+}
+
+# Fails, before anything is downloaded, unless the stack directory's filesystem has MIN_FREE_GB
+# free: a pull that fills the disk leaves the migrations failing with a disk I/O error.
+# ponytail: the stack directory's filesystem stands in for the runtime's image store, which the
+# updater's container cannot see; a host with /var/lib on a disk of its own is not checked.
+check_free_space() {
+  local free_kb
+  free_kb=$(df -Pk . | awk 'NR == 2 { print $4 }')
+  ((free_kb >= MIN_FREE_GB * 1024 * 1024)) ||
+    fail "only $((free_kb / 1024)) MB are free here and an update needs $MIN_FREE_GB GB for its images;" \
+      "nothing was changed. Free some, e.g. with \`$runtime image prune -a\`, which removes the" \
+      "images no container uses, and rerun"
 }
 
 # The newest release's version, from the redirect GitHub answers releases/latest with.
@@ -182,6 +198,7 @@ update_edge() {
   echo "edge -> edge (update)"
   [[ -z $check_only ]] || exit "$CHECK_UPDATE"
   outcome_start edge edge
+  check_free_space
   echo "Pulling the newest edge images ..."
   "${compose[@]}" pull "${services[@]}" || fail "pulling the edge images failed; nothing was changed"
   recreate_stack
@@ -250,6 +267,7 @@ main() {
   [[ $kind == update || -z $updater || -n $assume_yes ]] ||
     fail "$from to $target is a breaking update; run update.sh on the host"
   outcome_start "$from" "$target"
+  check_free_space
 
   work=$(mktemp -d)
   local base="$REPO/releases/download/v$target"

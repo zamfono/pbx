@@ -40,10 +40,11 @@ for _ in $(seq 1 50); do
   sleep 0.1
 done
 
-# The stub runtime and systemctl (test-stubs/), on PATH ahead of the real ones; podman is the same
-# stub as docker.
+# The stub runtime, systemctl and df (test-stubs/), on PATH ahead of the real ones; podman is the
+# same stub as docker.
 mkdir -p "$work/bin"
-cp "$repo_root/deploy/test-stubs/docker" "$repo_root/deploy/test-stubs/systemctl" "$work/bin/"
+cp "$repo_root/deploy/test-stubs/docker" "$repo_root/deploy/test-stubs/systemctl" \
+  "$repo_root/deploy/test-stubs/df" "$work/bin/"
 cp "$work/bin/docker" "$work/bin/podman"
 # No boot unit unless a case installs one.
 mkdir -p "$work/units"
@@ -121,6 +122,10 @@ grep -qx 'compose pull' "$work/runtime.log" ||
 grep -qx 'compose up -d --wait --wait-timeout 180' \
   "$work/runtime.log" || fail "no up -d --wait of the whole stack"
 grep -q 'rm -sf proxy' "$work/runtime.log" && fail "Docker needs no removal of proxy"
+# The images of earlier releases, the stack's own alone, once the stack is up.
+[[ $(tail -n1 "$work/runtime.log") == 'image prune -a -f --filter'\
+' label=org.opencontainers.image.source=https://github.com/zamfono/pbx' ]] ||
+  fail "no prune of the stack's unused images after up: $(cat "$work/runtime.log")"
 grep -q 'Updated 1.2.3 -> 1.2.4' "$work/out" || fail "no report of the update"
 echo "  - recorded in .update/state.json: running while it runs, then succeeded"
 record_is "$work/runtime.log.state" running 1.2.3 1.2.4
@@ -130,6 +135,7 @@ echo "  - an update whose stack does not come up healthy is finished by a rerun"
 fresh_stack
 STUB_FAIL_UP=1 update 1.2.4 >"$work/out" 2>&1 && fail "an update whose up failed reported success"
 grep -q 'did not report healthy' "$work/out" || fail "no word of the failed up: $(cat "$work/out")"
+grep -q 'image prune' "$work/runtime.log" && fail "an update whose up failed removed images"
 : >"$work/runtime.log"
 update 1.2.4 >"$work/out" 2>&1 || { cat "$work/out"; fail "the rerun failed"; }
 grep -q 'finishing it' "$work/out" || fail "the rerun did not finish the update: $(cat "$work/out")"
@@ -148,6 +154,14 @@ grep -q 'nothing was changed' "$work/out" || fail "no word of the failed pull: $
 [[ $(pin) == '1.2.3 ZAMFONO_VERSION:-1.2.3' ]] || fail "a failed pull left the stack at $(pin)"
 grep -q 'up -d' "$work/runtime.log" && fail "a failed pull still recreated the stack"
 record_is "$work/stack/.update/state.json" failed 1.2.3 1.2.4 'pulling the 1.2.4 images failed'
+
+echo "  - too little free space changes nothing"
+fresh_stack
+STUB_FREE_KB=1024 update 1.2.4 >"$work/out" 2>&1 && fail "an update on a full disk went on"
+grep -q 'only 1 MB are free here' "$work/out" || fail "no word of the full disk: $(cat "$work/out")"
+[[ $(pin) == '1.2.3 ZAMFONO_VERSION:-1.2.3' ]] || fail "a full disk left the stack at $(pin)"
+grep -qE ' (pull|up)( |$)' "$work/runtime.log" && fail "a full disk still pulled or recreated: $(cat "$work/runtime.log")"
+record_is "$work/stack/.update/state.json" failed 1.2.3 1.2.4 'only 1 MB are free here'
 
 fresh_stack
 update 1.2.4 >/dev/null 2>&1 || fail "the update to 1.2.4 failed"
