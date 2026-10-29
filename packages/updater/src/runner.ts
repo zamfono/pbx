@@ -26,13 +26,15 @@ export type Runner = {
   /** The updater's own run while it runs, else `.update/state.json` as it is now. */
   current: () => UpdateState;
   /**
-   * Starts `update.sh <to>`; the caller has checked that no update is running. Resolves once the
-   * run is recorded as `running`, with `finished`, which resolves once its outcome is on disk.
+   * Starts `update.sh <to>`, with `breaking` as `update.sh --yes <to>`, which takes a breaking
+   * release; the caller has checked that no update is running. Resolves once the run is recorded
+   * as `running`, with `finished`, which resolves once its outcome is on disk.
    */
   start: (
     from: string,
     to: string,
-    requester: RunRequester
+    requester: RunRequester,
+    breaking?: boolean
   ) => Promise<{ finished: Promise<void> }>;
   /** Resolves once the updater's own run, if one is running, has its outcome on disk. */
   idle: () => Promise<void>;
@@ -147,14 +149,14 @@ async function logTail(logFile: string): Promise<string> {
   }
 }
 
-/** `update.sh <to>` in the project's directory, as the updater's run (`ZAMFONO_UPDATER=1`). */
+/** `update.sh [--yes] <to>` in the project's directory, as the updater's run (`ZAMFONO_UPDATER=1`). */
 function spawnUpdate(
   script: string,
-  to: string,
+  args: string[],
   options: RunnerOptions,
   logFd: number
 ): ChildProcess {
-  return spawn('bash', [script, to], {
+  return spawn('bash', [script, ...args], {
     // The host's path, which main.ts links to the mounted stack directory: Compose resolves the
     // files' relative paths (./Caddyfile) against it, and the runtime reads them there.
     cwd: options.project.workingDir,
@@ -201,7 +203,7 @@ export async function createRunner(options: RunnerOptions): Promise<Runner> {
   return {
     current: () => (ownRun ? state : readState(options.stackDir, state, now())),
     idle: () => ownRunFinished,
-    async start(from, to, requester) {
+    async start(from, to, requester, breaking = false) {
       const done = Promise.withResolvers<undefined>();
       ownRunFinished = done.promise;
       const startedAt = now();
@@ -210,7 +212,8 @@ export async function createRunner(options: RunnerOptions): Promise<Runner> {
       ownRun = true;
       await persist(options.stackDir, state);
       const log = await open(logFile, 'w');
-      const child = spawnUpdate(script, to, options, log.fd);
+      const args = breaking ? ['--yes', to] : [to];
+      const child = spawnUpdate(script, args, options, log.fd);
       let ended = false;
       // A child that fails to spawn emits 'error', and may or may not emit 'close' after it.
       const end = (code: number | null): void => {

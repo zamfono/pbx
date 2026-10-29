@@ -77,8 +77,12 @@ function recordingUpdater(
   return {
     asked,
     status: () => Promise.reject(new Error('unused')),
-    update: async version => {
-      asked.push(version);
+    update: async (version, requester) => {
+      asked.push(
+        requester !== undefined && 'breaking' in requester && requester.breaking
+          ? `${String(version)} breaking`
+          : version
+      );
       return answer();
     }
   };
@@ -121,6 +125,22 @@ describe('system.update', () => {
       runStartedAt: started.startedAt,
       runRelease: null
     });
+  });
+
+  it('asks the updater for a breaking release with breaking set', async () => {
+    const db = await makeTestDb();
+    await backupFinished(db, MS_PER_MINUTE);
+    const updater = recordingUpdater(() =>
+      Promise.resolve({ state: 'running' })
+    );
+    vi.mocked(updaterClient).mockImplementation(() => updater);
+    await runOperation(
+      db,
+      'system.update',
+      { version: '0.1.0', breaking: true },
+      asOwner
+    );
+    expect(updater.asked).toEqual(['0.1.0 breaking']);
   });
 
   it('refuses without a recent backup, and leaves the updater alone', async () => {

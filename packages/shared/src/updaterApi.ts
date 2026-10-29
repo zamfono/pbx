@@ -22,6 +22,11 @@ export type UpdateState = {
 export type RunRequester =
   { trigger: 'manual'; by: string } | { trigger: 'automatic' };
 
+/** Who asks in `POST /update`'s body: a `RunRequester`, and for an owner's run whether it may
+ * take a breaking release, which the automatic update never does. */
+export type UpdateRequester =
+  RunRequester | { trigger: 'manual'; by: string; breaking: boolean };
+
 /** Who asked for a recorded run: a `RunRequester`, or `update.sh` run on the host. Absent from
  * the record while it holds no run. */
 export type RunTrigger = RunRequester | { trigger: 'host' };
@@ -40,7 +45,8 @@ export type UpdaterStatus = {
   latestError?: string;
   /** Whether `latest` is newer than `current` and non-breaking: what `POST /update` takes. */
   updatable: boolean;
-  /** Whether `latest` is newer and breaking: `update.sh` on the host takes it. */
+  /** Whether `latest` is newer and breaking: `POST /update` with `breaking`, or `update.sh` on
+   * the host, takes it. */
   breaking: boolean;
   last: UpdateState;
   /** Why the updater cannot update at all, such as a container without Compose labels. */

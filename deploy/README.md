@@ -377,10 +377,12 @@ notes in between and asks first; `--yes` answers for a run without a terminal.
 **From an MCP client or the API**, the owner updates without a shell: `system.info` shows the
 latest release, whether it can be installed this way, and how the last update went, run either
 way, and `system.update` installs it. It runs the same `update.sh` in the `updater` service, only to a newer
-release that is not breaking, and only once a backup run finished `ok` within the last hour. The
+release, a breaking one only when the owner sets `breaking: true` after reading its upgrade notes,
+and only once a backup run finished `ok` within the last hour. Notes that ask for work on the host,
+such as a new `.env` setting, still need `update.sh` there. The
 updater needs `UPDATER_TOKEN` and `CONTAINER_SOCKET` in `.env`, which `setup.sh` writes. With the owner's setting `autoUpdate` on (off by default), the stack installs such a
 release on its own, after a backup, at a quiet moment with no call in progress, and mails the
-owners when that fails or when a breaking release needs `update.sh` (`zamfono.help update-stack`).
+owners when that fails or when a breaking release waits for them, which it never installs on its own (`zamfono.help update-stack`).
 
 **By hand**, the steps `update.sh` takes are: unpack the new bundle over the stack directory, then
 pull and recreate:
@@ -559,7 +561,7 @@ scrape_configs:
 | `zamfono_config_propagation_pending`, `zamfono_config_propagation_failures_total` | pending is 1                                                               |
 | `zamfono_config_render_skipped_rows`                                              | above 0: `system.info` names the rows left out                             |
 | `zamfono_auto_update_failed`, `zamfono_auto_update_failed_attempts`               | 1                                                                          |
-| `zamfono_breaking_update_available`                                               | 1: a release waits for `update.sh`                                         |
+| `zamfono_breaking_update_available`                                               | 1: a breaking release waits for an owner                                   |
 | `zamfono_recording_mix_failures_total`                                            | it increases: raw recording files await salvage                            |
 | `zamfono_active_calls`, `zamfono_registered_devices`, `zamfono_db_bytes`          | for dashboards                                                             |
 | `zamfono_api_request_seconds`, `zamfono_build_info{version, revision}`            | for dashboards                                                             |

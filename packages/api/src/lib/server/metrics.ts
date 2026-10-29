@@ -184,7 +184,7 @@ async function backupAgeLines(db: Db, now: () => Date): Promise<string[]> {
 
 /**
  * §6.3 "Automatic updates": whether an automatic update failed and the failed attempts on its
- * release, and whether a breaking release waits for `update.sh`; all 0 without an updater.
+ * release, and whether a breaking release waits for an owner; all 0 without an updater.
  */
 async function updateLines(db: Db): Promise<string[]> {
   const news = await updateNews(db);

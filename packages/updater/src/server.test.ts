@@ -51,8 +51,8 @@ function fakeRunner(): Runner & { started: string[][] } {
   return {
     started,
     current: () => state,
-    start: (from, to, requester) => {
-      started.push([from, to]);
+    start: (from, to, requester, breaking) => {
+      started.push(breaking === true ? [from, to, 'breaking'] : [from, to]);
       state = { state: 'running', from, to, ...requester };
       return Promise.resolve({ finished: Promise.resolve() });
     },
@@ -188,9 +188,32 @@ describe('the updater API', () => {
     expect(breaking.status).toBe(HTTP_CONFLICT);
     expect(String(breaking.body.error)).toContain('update.sh');
     expect(
+      (
+        await call(base, 'POST', '/update', {
+          trigger: 'automatic',
+          version: '0.1.0',
+          breaking: true
+        })
+      ).status
+    ).toBe(HTTP_BAD_REQUEST);
+    expect(
       (await call(base, 'POST', '/update', { ...MANUAL, version: 'latest' }))
         .status
     ).toBe(HTTP_BAD_REQUEST);
+  });
+
+  it('takes a breaking release when the owner sets breaking, with update.sh --yes', async () => {
+    const runner = fakeRunner();
+    const base = await serve(
+      deps({ releases: fakeReleases([0, 1, 0]), runner })
+    );
+    const { status, body } = await call(base, 'POST', '/update', {
+      ...MANUAL,
+      breaking: true
+    });
+    expect(status).toBe(HTTP_ACCEPTED);
+    expect(body).toMatchObject({ state: 'running', to: '0.1.0' });
+    expect(runner.started).toEqual([['0.0.6', '0.1.0', 'breaking']]);
   });
 
   it.each([

@@ -73,11 +73,11 @@ grep -q ' up -d' "$work/runtime.log" && fail "an up after the unit's restart wit
 grep -q '^inspect --format ' "$work/runtime.log" || fail "the containers' health was not polled"
 rm "$work/units/zamfono-test.service"
 
-echo "  - the updater's run: never breaking, never itself"
+echo "  - the updater's run: breaking only with --yes, never itself"
 fresh_stack
 (cd "$work/stack" && ZAMFONO_UPDATER=1 \
   PATH="$work/bin:$PATH" STUB_LOG="$work/runtime.log" ZAMFONO_REPO_URL="http://127.0.0.1:$port" \
-  ./update.sh 2.0.0 </dev/null >/dev/null 2>&1) && fail "the updater ran a breaking update"
+  ./update.sh 2.0.0 </dev/null >/dev/null 2>&1) && fail "the updater ran a breaking update without --yes"
 (cd "$work/stack" && ZAMFONO_UPDATER=1 \
   PATH="$work/bin:$PATH" STUB_LOG="$work/runtime.log" ZAMFONO_REPO_URL="http://127.0.0.1:$port" \
   ./update.sh 1.2.4 </dev/null >"$work/out" 2>&1) || { cat "$work/out"; fail "the updater's run failed"; }
@@ -88,3 +88,8 @@ grep -qx 'compose rm -sf asterisk stun proxy' "$work/runtime.log" ||
 grep -qx 'compose up -d --wait --wait-timeout 180 netns asterisk stun'\
 ' migrate core api proxy' "$work/runtime.log" || fail "the updater recreated more than the stack"
 [[ ! -e $work/stack/.update ]] || fail "the updater's run wrote the record the updater keeps itself"
+(cd "$work/stack" && ZAMFONO_UPDATER=1 \
+  PATH="$work/bin:$PATH" STUB_LOG="$work/runtime.log" ZAMFONO_REPO_URL="http://127.0.0.1:$port" \
+  ./update.sh --yes 2.0.0 </dev/null >"$work/out" 2>&1) ||
+  { cat "$work/out"; fail "the updater's breaking update with --yes failed"; }
+[[ $(cat "$work/stack/VERSION") == 2.0.0 ]] || fail "the updater's --yes run did not install 2.0.0"

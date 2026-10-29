@@ -8,7 +8,7 @@
  * (`retryHeldOff`) until `MAX_AUTO_UPDATE_ATTEMPTS` attempts on it failed; a gate that gave up
  * `GIVE_UPS_PER_ATTEMPT` maintenance moments in a row is a failed attempt too, and a refusal
  * because an update is already running is none. Whatever the setting, a breaking release, which
- * only `update.sh` on the host installs, is reported too.
+ * it never installs and only an owner does, is reported too.
  */
 import pino from 'pino';
 

@@ -110,7 +110,7 @@ export async function setAutoUpdateFailure(
 /**
  * What `update_state` tells `/healthz` and `/metrics` (§6.3 "Automatic updates", §7): whether an
  * automatic update failed, with the failed attempts on its release, and whether a breaking
- * release waits for `update.sh`.
+ * release waits for an owner.
  */
 export type UpdateNews = {
   autoUpdateFailed: boolean;

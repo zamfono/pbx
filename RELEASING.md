@@ -15,7 +15,7 @@ a breaking change, minor for something new, patch for fixes. Two things are this
   everything an operator of a stack deals with, `CHANGELOG.md`'s audience: the REST and MCP
   operations, the `.env` settings, the compose files and the documented commands. A change is
   breaking when its release needs **Upgrade notes** the operator has to act on, such as a newly
-  required API field or a changed command. The choice has a consequence: `system.update` installs any newer
+  required API field or a changed command. The choice has a consequence: `system.update` and the automatic update install any newer
   release that is not breaking without an operator reading its notes, so a release it may take
   needs nothing beyond what `update.sh` does itself.
 - **Before 1.0.0**, where Semantic Versioning sets no rule ("anything MAY change at any time"),

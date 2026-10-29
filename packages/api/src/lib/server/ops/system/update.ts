@@ -19,13 +19,20 @@ const inputSchema = z
       .optional()
       .describe(
         'The release to update to, such as 0.2.0; left out, the latest (see zamfono.help update-stack).'
+      ),
+    breaking: z
+      .boolean()
+      .optional()
+      .describe(
+        'true takes a breaking release (update.breaking in system.info), once its upgrade notes at update.latest.url have been read and need nothing done on the host; refused without it.'
       )
   })
   .strict();
 
 /**
  * `POST /system/update` (§6.3 "Updates", §10.3): has the updater service take the stack to the
- * latest release, or to `version`, when that release is newer and non-breaking. Refused unless a
+ * latest release, or to `version`, when that release is newer and non-breaking, or breaking and
+ * `breaking` is set. Refused unless a
  * backup run finished `ok` within the last hour, so the update begins from a restorable point;
  * answers as soon as the updater has begun, and `system.info` reports how it went and who asked.
  * Not undoable: migrations only go forward (§6.3 "Upgrades").
@@ -33,7 +40,7 @@ const inputSchema = z
 export const update = defineOperation({
   name: 'system.update',
   description:
-    'Updates the stack to the latest release, or to version, if newer and non-breaking; needs a backup run finished ok within the last hour. system.info reports the progress.',
+    'Updates the stack to the latest release, or to version, if newer and non-breaking, or breaking with breaking: true once its upgrade notes were read; needs a backup run finished ok within the last hour. system.info reports the progress.',
   input: inputSchema,
   output: updateStateOut,
   // The updater's own refusals keep their status; anything else, or no updater, is a 503.
@@ -41,7 +48,7 @@ export const update = defineOperation({
   minRole: 'owner',
   pureAction: true,
   confirm: (_ctx, input) =>
-    `Update the stack to ${input.version ?? 'the latest release'}? Calls drop while it restarts, and only a restore from the backup undoes it.`,
+    `Update the stack to ${input.version ?? 'the latest release'}${input.breaking === true ? ', even a breaking release, whose upgrade notes you have read' : ''}? Calls drop while it restarts, and only a restore from the backup undoes it.`,
   entity: () => ({ kind: 'system', id: null }),
   run: async (ctx, input) => {
     setUndoable(ctx, false);
@@ -49,7 +56,11 @@ export const update = defineOperation({
       ctx.db,
       ctx.now,
       input.version,
-      { trigger: 'manual', by: ctx.actor.name },
+      {
+        trigger: 'manual',
+        by: ctx.actor.name,
+        breaking: input.breaking === true
+      },
       null
     );
   }

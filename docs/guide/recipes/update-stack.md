@@ -9,12 +9,13 @@ arguments:
 # Update the stack
 
 The owner installs a newer release without a shell on the host. The stack's `updater` service does
-the work; it takes only a published release that is newer than the running one and not breaking.
+the work; it takes only a published release that is newer than the running one, a breaking one
+only when asked to (see Breaking releases).
 
 1. Check what is available: `system.info` (`GET /api/v1/system/info`). Its `update` field names the
    `current` and the `latest` release. `updatable: true` means `system.update` can install it.
-   `breaking: true` means the release needs the operator: it is installed on the host with
-   `update.sh`, after reading its upgrade notes. `unavailable` says why the updater cannot run at
+   `breaking: true` means the release needs the operator to read its upgrade notes first (see
+   Breaking releases). `unavailable` says why the updater cannot run at
    all, usually a missing `UPDATER_TOKEN` or `CONTAINER_SOCKET` in `.env`. On a test stack whose
    `ZAMFONO_VERSION` is `edge`, `current` and `latest` both say `edge`, `latest` naming main's
    newest build; `updatable: true` means the stack runs an older one, and the update pulls it.
@@ -25,8 +26,8 @@ the work; it takes only a published release that is newer than the running one a
    (`GET /api/v1/backups/runs/{id}`) until its `status` is `ok`. The update is refused without a
    backup finished `ok` within the last hour, since migrations only go forward and the backup is the
    way back.
-3. Update: `system.update` (`POST /api/v1/system/update`), optionally with `version`. It asks for
-   confirmation and answers as soon as the updater has begun.
+3. Update: `system.update` (`POST /api/v1/system/update`), optionally with `version`, and with
+   `breaking: true` for a breaking release. It asks for confirmation and answers as soon as the updater has begun.
 4. Follow it with `system.info`: `update.last.state` goes from `running` to `succeeded` or `failed`,
    with the end of the updater's log in `error`, and `update.last.trigger` says who asked:
    `manual` (with the owner in `by`), `automatic` or `host` (`update.sh` on the host).
@@ -79,15 +80,16 @@ healthy shows that release as `current`; `system.update`, or the next attempt, f
 
 ## Breaking releases
 
-A breaking release (a new major from 1.0.0 on, a new minor before) is never installed by
-`system.update` or automatically, whether `autoUpdate` is on or not. The stack announces it:
+A breaking release (a new major from 1.0.0 on, a new minor before) is never installed
+automatically, whether `autoUpdate` is on or not, nor by `system.update` without `breaking: true`. The stack announces it:
 `system.info` shows the release in `update.latest` with `update.breaking: true`, `/metrics` has
 `zamfono_breaking_update_available 1`, and every owner gets one `breakingUpdate` mail per such
 release. `/healthz`, the public uptime check, says nothing of releases, since anyone can read it.
 Without `UPDATER_TOKEN` the stack asks no updater, updates nothing on its own and announces
 nothing: `/healthz` passes `update:automatic`, the `/metrics` update gauges are
-0, and `system.info` has no `autoUpdate.failed`. Read its upgrade notes, then install it on the host with
-`update.sh`.
+0, and `system.info` has no `autoUpdate.failed`. Read its upgrade notes, at `update.latest.url`, then install it with `system.update` and
+`breaking: true`, or on the host with `update.sh`. Notes that ask for work on the host, such as a
+new `.env` setting, need `update.sh` there.
 
 ## Undoing an update
 

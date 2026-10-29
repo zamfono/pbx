@@ -94,7 +94,7 @@ function refusal(
   to: string
 ): string {
   return {
-    breaking: `${current} to ${to} is a breaking update: read its upgrade notes and run update.sh on the host`,
+    breaking: `${current} to ${to} is a breaking update: read its upgrade notes, then ask again with breaking set, or run update.sh on the host`,
     notNewer: `${to} is not newer than ${current}, which the stack runs`,
     noRelease: PINS_NO_RELEASE
   }[verdict];
@@ -158,6 +158,21 @@ function edgeTarget(asked: unknown): string {
   return EDGE;
 }
 
+/** Whether `body` takes a breaking release, which only an owner's run does. */
+function breakingOf(body: unknown, requester: RunRequester): boolean {
+  const { breaking } = body as { breaking?: unknown };
+  if (breaking === undefined) {
+    return false;
+  }
+  if (typeof breaking !== 'boolean' || requester.trigger !== 'manual') {
+    throw new HttpError(
+      HTTP_BAD_REQUEST,
+      'breaking must be a boolean, and only with trigger manual'
+    );
+  }
+  return breaking;
+}
+
 async function update(deps: ServerDeps, body: unknown): Promise<UpdateState> {
   if (deps.runner === undefined) {
     throw new HttpError(
@@ -173,17 +188,23 @@ async function update(deps: ServerDeps, body: unknown): Promise<UpdateState> {
     throw new HttpError(HTTP_CONFLICT, PINS_NO_RELEASE);
   }
   const requester = requesterOf(body);
+  const breaking = breakingOf(body, requester);
   const asked = (body as { version?: unknown }).version;
   const to =
     current === EDGE ? edgeTarget(asked) : await releaseTarget(deps, asked);
   const verdict = await deps.checkUpdate(to);
-  if (verdict !== 'update') {
+  if (verdict !== 'update' && !(verdict === 'breaking' && breaking)) {
     throw new HttpError(
       HTTP_CONFLICT,
       refusal(verdict, formatStackVersion(current), to)
     );
   }
-  await deps.runner.start(formatStackVersion(current), to, requester);
+  await deps.runner.start(
+    formatStackVersion(current),
+    to,
+    requester,
+    verdict === 'breaking'
+  );
   return deps.runner.current();
 }
 

@@ -19,6 +19,9 @@ why the specified behaviour changed; the commit history, how.
 
 ### Added
 
+- An owner can install a breaking release from the API or an MCP client: `system.update` with
+  `breaking: true`, once its upgrade notes were read. The automatic update still never installs
+  one.
 - Call history, the audit log, recordings, voicemails and the phone book sort by `orderBy`
   (`startedAt desc`, `durationS`, …). Recordings filter by `callId`, `userId`, `from` and `to`;
   voicemails by `userId`, `ringGroupId`, `read`, `from` and `to`; the phone book by `q`, matched

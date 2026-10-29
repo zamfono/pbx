@@ -24,7 +24,8 @@
 #   ZAMFONO_RUNTIME         docker | podman, when both are installed
 #   ZAMFONO_REPO_URL        where releases are downloaded from, for a mirror of
 #                           https://github.com/zamfono/pbx
-#   ZAMFONO_UPDATER=1       the updater service's run: never breaking, never itself, no systemctl
+#   ZAMFONO_UPDATER=1       the updater service's run: breaking only with --yes, never itself,
+#                           no systemctl
 set -euo pipefail
 
 cd "$(dirname "$0")"
@@ -64,7 +65,7 @@ for arg in "$@"; do
     --check) check_only=1 ;;
     --current) current_only=1 ;;
     -h | --help)
-      sed -n '2,27p' "$(basename "$0")" | sed 's/^# \{0,1\}//'
+      sed -n '2,28p' "$(basename "$0")" | sed 's/^# \{0,1\}//'
       exit 0
       ;;
     -*) fail "unknown option $arg" ;;
@@ -246,7 +247,7 @@ main() {
   fi
   echo "$from -> $target ($kind)"
   [[ -z $check_only ]] || exit "$verdict"
-  [[ $kind == update || -z $updater ]] ||
+  [[ $kind == update || -z $updater || -n $assume_yes ]] ||
     fail "$from to $target is a breaking update; run update.sh on the host"
   outcome_start "$from" "$target"
 

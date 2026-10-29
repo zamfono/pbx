@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-29 · §6.3 Updates and Automatic updates, §7 Metrics, §10.3 System.** `system.update` takes `breaking: true`, with which the updater installs a breaking release, running `update.sh --yes`; without it a breaking release is refused as before. The automatic update never sets it, and the updater refuses it on an automatic request.
+*Why:* a breaking release could be installed only with `update.sh` on the host, so an owner without a shell could not take one. The product owner: "add the ability to install breaking changes over REST and MCP", and "the _auto_-updater shouldn't install breaking changes!".
+
 **2026-10-29 · §10.3 Conventions and OpenAPI document, Voicemail, Recordings, Phone book, time filters.** Lists page as Google's AIP-158 has it: `pageSize`, `pageToken` and `skip` in, `{ items, nextPageToken, totalSize }` out, where they took `limit` and `cursor` and returned `{ items, nextCursor }`. A page size above 200 counts as 200 instead of being refused, 0 is the default, and a token is refused under other parameters than the ones it was handed out for. Call history, the audit log, recordings, voicemails and contacts take AIP-132's `orderBy`; recordings filter by `callId`, `userId`, `from` and `to`, voicemails by `userId`, `ringGroupId`, `read`, `from` and `to`, contacts by `q`.
 *Why:* a server-side table needs a total, a way past pages, a sort order and filters on the lists that outgrow one page; recordings, voicemails and contacts took none, so a client could search only the page it held. Offered AIP-132, AIP-158 and AIP-160's filter language, the product owner: "okay. let's go with 132, 158 and typed filters where useful".
 

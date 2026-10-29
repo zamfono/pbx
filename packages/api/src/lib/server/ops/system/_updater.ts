@@ -6,7 +6,7 @@ import * as env from '$app/env/private';
 
 import {
   isRecord,
-  type RunRequester,
+  type UpdateRequester,
   type UpdaterStatus,
   type UpdateState
 } from '@zamfono/shared';
@@ -28,10 +28,11 @@ export class UpdaterRefusal extends Error {
 export type UpdaterClient = {
   /** `GET /status`, or with `fresh` `POST /check`, which asks GitHub now. */
   status: (fresh?: boolean) => Promise<UpdaterStatus>;
-  /** `POST /update`: the latest release, or `version`; resolves once the updater has begun. */
+  /** `POST /update`: the latest release, or `version`, a breaking one only with the owner's
+   * `breaking`; resolves once the updater has begun. */
   update: (
     version: string | undefined,
-    requester?: RunRequester
+    requester?: UpdateRequester
   ) => Promise<UpdateState>;
 };
 

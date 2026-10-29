@@ -6,7 +6,7 @@ import {
   HTTP_SERVICE_UNAVAILABLE,
   MS_PER_HOUR,
   type Db,
-  type RunRequester,
+  type UpdateRequester,
   type UpdateState
 } from '@zamfono/shared';
 
@@ -37,7 +37,8 @@ function passOn(error: unknown): never {
 
 /**
  * Hands an update to the updater (§6.3 "Updates"), the one path `system.update` and the
- * automatic update (`jobs/autoUpdate.ts`) share: the latest release, or `version`. Refused
+ * automatic update (`jobs/autoUpdate.ts`) share: the latest release, or `version`, a breaking
+ * one only with an owner's `breaking`, which the automatic update's requester cannot carry. Refused
  * unless `.env` sets `UPDATER_TOKEN` and a backup run finished `ok` within the last hour, so the
  * update begins from a restorable point. The updater records who asked with the run;
  * `update_state` keeps when it began and, for an automatic run, the `release` its failure counts
@@ -47,7 +48,7 @@ export async function requestUpdate(
   db: Db,
   now: string,
   version: string | undefined,
-  requester: RunRequester,
+  requester: UpdateRequester,
   release: string | null
 ): Promise<UpdateState> {
   const client = updaterClient();

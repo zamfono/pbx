@@ -40,7 +40,7 @@ export const updaterStatusOut = z.object({
   breaking: z
     .boolean()
     .describe(
-      'Whether latest is newer and breaking: update.sh on the host takes it.'
+      'Whether latest is newer and breaking: system.update with breaking: true, or update.sh on the host, takes it.'
     ),
   last: updateStateOut,
   unavailable: z
@@ -54,7 +54,7 @@ export const updaterStatusOut = z.object({
 export const updateOut = z
   .union([updaterStatusOut, z.object({ unavailable: z.string() })])
   .describe(
-    "The updater's view (§6.3): the latest release, whether system.update can take the stack there, and how the last update went and who asked for it; unavailable says why there is none."
+    "The updater's view (§6.3): the latest release, whether system.update can take the stack there (a breaking one with breaking: true), and how the last update went and who asked for it; unavailable says why there is none."
   );
 
 /** A process's version (`ZamfonoVersion`, §7 "Version"). */
