@@ -11,6 +11,8 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+## [0.7.5] - 2026-10-29
+
 ### Added
 
 - `setup.sh` offers to change the ports the stack answers on: SIP over UDP and over TCP on 5060,
@@ -843,7 +845,8 @@ The first 0.2 release; its `v0.2.0` tag was never published.
 
 The first tagged version, before any deployment.
 
-[Unreleased]: https://github.com/zamfono/pbx/compare/v0.7.4...HEAD
+[Unreleased]: https://github.com/zamfono/pbx/compare/v0.7.5...HEAD
+[0.7.5]: https://github.com/zamfono/pbx/compare/v0.7.4...v0.7.5
 [0.7.4]: https://github.com/zamfono/pbx/compare/v0.7.3...v0.7.4
 [0.7.3]: https://github.com/zamfono/pbx/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/zamfono/pbx/compare/v0.7.1...v0.7.2
