@@ -2,12 +2,7 @@ import { z } from 'zod';
 
 import { nationalForm, type CountryCode, type Db } from '@zamfono/shared';
 
-import {
-  decodeOffsetCursor,
-  offsetPage,
-  pageInput,
-  pageOutput
-} from '#lib/server/pagination.js';
+import { arrayPage, pageInput, pageOutput } from '#lib/server/pagination.js';
 
 import { phoneDigits, tenantCountry } from '../contacts/_shared.js';
 import { defineOperation } from '../types.js';
@@ -180,7 +175,8 @@ async function phoneNeedle(
     : null;
 }
 
-async function searchContacts(db: Db, needle: string): Promise<Hit[]> {
+/** The contacts whose name, company or one of whose numbers matches the lowercase `needle`. */
+export async function searchContacts(db: Db, needle: string): Promise<Hit[]> {
   const [contacts, phones, numberNeedle] = await Promise.all([
     db
       .selectFrom('contacts')
@@ -254,7 +250,6 @@ export const searchQuery = defineOperation({
   scope: 'any',
   readOnly: true,
   run: async (ctx, input) => {
-    const offset = decodeOffsetCursor(ctx.operation, input.cursor);
     const needle = input.q.toLowerCase();
     const includeEmail = ADMIN_ROLES.has(ctx.actor.role);
     const [users, ringGroups, contacts] = await Promise.all([
@@ -263,12 +258,11 @@ export const searchQuery = defineOperation({
       searchContacts(ctx.db, needle)
     ]);
     const hits = [...users, ...ringGroups, ...contacts];
-    const { page, nextCursor } = offsetPage(
+    const { page, nextPageToken, totalSize } = arrayPage(
       ctx.operation,
-      hits.slice(offset, offset + input.limit + 1),
-      offset,
-      input.limit
+      input,
+      hits
     );
-    return { items: page, nextCursor };
+    return { items: page, nextPageToken, totalSize };
   }
 });

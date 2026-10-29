@@ -1,10 +1,14 @@
+import { z } from 'zod';
+
 import {
-  decodeIdCursor,
-  keysetPage,
+  orderByInput,
+  orderOf,
   pageInput,
-  pageOutput
+  pageOutput,
+  sqlPage
 } from '#lib/server/pagination.js';
 
+import { instantInput, tenantInstantReader } from '../instantInput.js';
 import { defineOperation } from '../types.js';
 import {
   ringGroupIdsForUser,
@@ -12,7 +16,36 @@ import {
   voicemailOut
 } from './_shared.js';
 
-const inputSchema = pageInput.strict();
+const inputSchema = z
+  .object({
+    userId: z
+      .string()
+      .optional()
+      .describe("Only the voicemails in this user's own mailbox."),
+    ringGroupId: z
+      .string()
+      .optional()
+      .describe("Only the voicemails in this ring group's mailbox."),
+    read: z
+      .boolean()
+      .optional()
+      .describe(
+        'true only the voicemails listened to, false only the new ones.'
+      ),
+    from: instantInput
+      .optional()
+      .describe(
+        "Only voicemails left at or after this ISO 8601 time, any offset (none: the tenant's time zone)."
+      ),
+    to: instantInput
+      .optional()
+      .describe(
+        "Only voicemails left before this ISO 8601 time, any offset (none: the tenant's time zone), or before the end of this date."
+      ),
+    orderBy: orderByInput(['createdAt', 'durationS', 'caller'], 'newest first'),
+    ...pageInput.shape
+  })
+  .strict();
 
 /**
  * `GET /voicemails` (§5.3, §10.3): a `user` sees their own mailbox plus the mailboxes of the
@@ -28,11 +61,6 @@ export const list = defineOperation({
   scope: 'any',
   readOnly: true,
   run: async (ctx, input) => {
-    const { limit } = input;
-    const cursor =
-      input.cursor === undefined
-        ? undefined
-        : decodeIdCursor(ctx.operation, input.cursor);
     const ringGroupIds =
       ctx.actor.role === 'user'
         ? await ringGroupIdsForUser(ctx.db, ctx.actor.id)
@@ -50,17 +78,34 @@ export const list = defineOperation({
         )
       );
     }
-    if (cursor !== undefined) {
-      query = query.where('id', '<', cursor);
+    if (input.userId !== undefined) {
+      query = query.where('mailboxUserId', '=', input.userId);
     }
-    const rows = await query
-      .orderBy('id', 'desc')
-      .limit(limit + 1)
-      .execute();
-    const { page, nextCursor } = keysetPage(ctx.operation, rows, limit);
+    if (input.ringGroupId !== undefined) {
+      query = query.where('mailboxRingGroupId', '=', input.ringGroupId);
+    }
+    if (input.read !== undefined) {
+      query = query.where('read', '=', input.read ? 1 : 0);
+    }
+    if (input.from !== undefined || input.to !== undefined) {
+      const instants = await tenantInstantReader(ctx.db);
+      if (input.from !== undefined) {
+        query = query.where('createdAt', '>=', instants.start(input.from));
+      }
+      if (input.to !== undefined) {
+        query = query.where('createdAt', '<', instants.end(input.to));
+      }
+    }
+    const { page, nextPageToken, totalSize } = await sqlPage(
+      ctx.operation,
+      input,
+      query,
+      orderOf(input.orderBy, [['id', 'desc']])
+    );
     return {
       items: page.map(toVoicemailOut),
-      nextCursor
+      nextPageToken,
+      totalSize
     };
   }
 });

@@ -34,46 +34,58 @@ import { E164, normaliseNumber } from '../validate';
 /* Paging and instants, shared by the call-related areas               */
 /* ------------------------------------------------------------------ */
 
-export type PageInput = { limit?: number; cursor?: string };
-export type Page<T> = { items: T[]; nextCursor: string | null };
+export type PageInput = {
+  pageSize?: number;
+  pageToken?: string;
+  skip?: number;
+};
+export type Page<T> = {
+  items: T[];
+  nextPageToken: string | null;
+  totalSize: number;
+};
 
-const DEFAULT_LIMIT = 50;
-const MAX_LIMIT = 200;
+const DEFAULT_PAGE_SIZE = 50;
+const MAX_PAGE_SIZE = 200;
 
-/** An offset page of `rows` for list operation `operation` (`?limit=` ≤ 200, opaque `?cursor=`). */
+/**
+ * An offset page of `rows` for list operation `operation` (AIP-158: `?pageSize=` 0 or left out
+ * 50, above 200 counted as 200, an opaque `?pageToken=` and `?skip=`).
+ */
 export function paginate<T>(
   operation: string,
   rows: T[],
   input: PageInput
 ): Page<T> {
-  const limit = input.limit ?? DEFAULT_LIMIT;
-  if (!Number.isInteger(limit) || limit < 1 || limit > MAX_LIMIT) {
-    throw invalid('limit', 'pageLimit', `limit must be 1–${MAX_LIMIT}`, {
-      max: MAX_LIMIT
-    });
-  }
+  const size = Math.min(input.pageSize || DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
   let offset = 0;
-  if (input.cursor !== undefined) {
+  if (input.pageToken !== undefined) {
     try {
-      const decoded = JSON.parse(atob(input.cursor)) as {
+      const decoded = JSON.parse(atob(input.pageToken)) as {
         list?: string;
         offset?: number;
       };
       if (decoded.list !== operation || typeof decoded.offset !== 'number') {
-        throw new Error('foreign cursor');
+        throw new Error('foreign page token');
       }
       offset = decoded.offset;
     } catch {
-      throw invalid('cursor', 'pageCursor', 'cursor is not one of this list');
+      throw invalid(
+        'pageToken',
+        'pageToken',
+        'pageToken is not one of this list'
+      );
     }
   }
-  const end = offset + limit;
+  const start = offset + (input.skip ?? 0);
+  const end = start + size;
   return {
-    items: rows.slice(offset, end),
-    nextCursor:
+    items: rows.slice(start, end),
+    nextPageToken:
       rows.length > end
         ? btoa(JSON.stringify({ list: operation, offset: end }))
-        : null
+        : null,
+    totalSize: rows.length
   };
 }
 

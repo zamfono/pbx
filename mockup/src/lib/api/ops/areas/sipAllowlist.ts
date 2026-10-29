@@ -7,6 +7,7 @@ import { newId } from '../../ids';
 import type { SipAllowlistEntry } from '../../types';
 import { defineOp } from '../core';
 import { isIpOrCidr } from '../validate';
+import { paginate, type Page } from './calls';
 import { isActiveBan } from './sipBans';
 
 export type SipAllowlistEntryWire = Omit<SipAllowlistEntry, 'deletedAt'>;
@@ -54,18 +55,18 @@ function liveEntry(
 }
 
 defineOp<
-  { limit?: number; cursor?: string },
-  { items: SipAllowlistEntryWire[]; nextCursor: null }
+  { pageSize?: number; pageToken?: string; skip?: number },
+  Page<SipAllowlistEntryWire>
 >({
   name: 'sipAllowlist.list',
   minRole: 'admin',
   readOnly: true,
-  run: ctx => ({
-    items: ctx.db.sipAllowlist
-      .filter(row => row.deletedAt === null)
-      .map(toWire),
-    nextCursor: null
-  })
+  run: (ctx, input) =>
+    paginate(
+      ctx.operation,
+      ctx.db.sipAllowlist.filter(row => row.deletedAt === null).map(toWire),
+      input
+    )
 });
 
 defineOp<{ address: string; label?: string | null }, SipAllowlistEntryWire>({

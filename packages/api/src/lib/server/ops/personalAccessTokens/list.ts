@@ -2,12 +2,7 @@ import { z } from 'zod';
 
 import { HTTP_NOT_FOUND } from '@zamfono/shared';
 
-import {
-  decodeIdCursor,
-  keysetPage,
-  pageInput,
-  pageOutput
-} from '#lib/server/pagination.js';
+import { pageInput, pageOutput, sqlPage } from '#lib/server/pagination.js';
 
 import { ownActingUser } from '../gates.js';
 import { defineOperation } from '../types.js';
@@ -37,23 +32,20 @@ export const list = defineOperation({
   readOnly: true,
   run: async (ctx, input) => {
     await liveUser(ctx.db, input.userId);
-    const { limit } = input;
-    let query = ctx.db
+    const query = ctx.db
       .selectFrom('personalAccessTokens')
       .selectAll()
       .where('userId', '=', input.userId);
-    if (input.cursor !== undefined) {
-      query = query.where(
-        'id',
-        '>',
-        decodeIdCursor(ctx.operation, input.cursor)
-      );
-    }
-    const rows = await query
-      .orderBy('id')
-      .limit(limit + 1)
-      .execute();
-    const { page, nextCursor } = keysetPage(ctx.operation, rows, limit);
-    return { items: page.map(toPersonalAccessTokenWire), nextCursor };
+    const { page, nextPageToken, totalSize } = await sqlPage(
+      ctx.operation,
+      input,
+      query,
+      [['id', 'asc']]
+    );
+    return {
+      items: page.map(toPersonalAccessTokenWire),
+      nextPageToken,
+      totalSize
+    };
   }
 });

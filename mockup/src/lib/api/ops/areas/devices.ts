@@ -8,6 +8,7 @@ import { newId } from '../../ids';
 import type { Codec, Db, Device } from '../../types';
 import { defineOp, type Ctx } from '../core';
 import { isIpOrCidr, requireText } from '../validate';
+import { paginate, type Page } from './calls';
 import {
   liveUser,
   ownActingUser,
@@ -137,22 +138,24 @@ function connectionSettings(db: Db, device: Device): ConnectionSettings {
 }
 
 defineOp<
-  { userId: string; limit?: number; cursor?: string },
-  { items: DeviceOut[]; nextCursor: string | null }
+  { userId: string; pageSize?: number; pageToken?: string; skip?: number },
+  Page<DeviceOut>
 >({
   name: 'devices.list',
   minRole: 'user',
   scope: ownActingUser,
   readOnly: true,
-  run: (ctx, input) => ({
-    items: ctx.db.devices
-      .filter(
-        device => device.userId === input.userId && device.deletedAt === null
-      )
-      .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
-      .map(toDeviceOut),
-    nextCursor: null
-  })
+  run: (ctx, input) =>
+    paginate(
+      ctx.operation,
+      ctx.db.devices
+        .filter(
+          device => device.userId === input.userId && device.deletedAt === null
+        )
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+        .map(toDeviceOut),
+      input
+    )
 });
 
 export type DeviceCreateInput = {

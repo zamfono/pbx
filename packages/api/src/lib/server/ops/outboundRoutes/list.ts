@@ -1,14 +1,9 @@
-import {
-  decodeOffsetCursor,
-  offsetPage,
-  pageInput,
-  pageOutput
-} from '#lib/server/pagination.js';
+import { pageInput, pageOutput, sqlPage } from '#lib/server/pagination.js';
 
 import { defineOperation } from '../types.js';
 import { loadRouteChildren, routeToWire, routeWire } from './_shared.js';
 
-/** `GET /outboundRoutes` (§10.3): live routes in evaluation order (§9.4), offset-cursor paginated
+/** `GET /outboundRoutes` (§10.3): live routes in evaluation order (§9.4), paginated
  *  like every list endpoint (§10.3 "Conventions"). */
 export const list = defineOperation({
   name: 'outboundRoutes.list',
@@ -19,21 +14,21 @@ export const list = defineOperation({
   minRole: 'admin',
   readOnly: true,
   run: async (ctx, input) => {
-    const offset = decodeOffsetCursor(ctx.operation, input.cursor);
-    const { limit } = input;
-    const pageRows = await ctx.db
-      .selectFrom('outboundRoutes')
-      .selectAll()
-      .where('deletedAt', 'is', null)
-      .orderBy('priority')
-      .offset(offset)
-      .limit(limit + 1)
-      .execute();
-    const { page: rows, nextCursor } = offsetPage(
+    const {
+      page: rows,
+      nextPageToken,
+      totalSize
+    } = await sqlPage(
       ctx.operation,
-      pageRows,
-      offset,
-      limit
+      input,
+      ctx.db
+        .selectFrom('outboundRoutes')
+        .selectAll()
+        .where('deletedAt', 'is', null),
+      [
+        ['priority', 'asc'],
+        ['id', 'asc']
+      ]
     );
     const children = await loadRouteChildren(
       ctx.db,
@@ -41,7 +36,8 @@ export const list = defineOperation({
     );
     return {
       items: rows.map(row => routeToWire(row, children)),
-      nextCursor
+      nextPageToken,
+      totalSize
     };
   }
 });

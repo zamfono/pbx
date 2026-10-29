@@ -2,16 +2,15 @@
  * `search.query` (any user): type-ahead over users, ring groups and contacts.
  */
 import { defineOp } from '../core';
+import { paginate, type PageInput } from './calls';
 
-type Input = { q: string; limit?: number };
+type Input = { q: string } & PageInput;
 type Hit = {
   kind: 'user' | 'ringGroup' | 'contact';
   id: string;
   name: string;
   detail: string | null;
 };
-
-const DEFAULT_LIMIT = 10;
 
 defineOp<Input, { items: Hit[] }>({
   name: 'search.query',
@@ -60,6 +59,6 @@ defineOp<Input, { items: Hit[] }>({
           detail: contact.phones[0]?.number ?? null
         }))
     ];
-    return { items: items.slice(0, input.limit ?? DEFAULT_LIMIT) };
+    return paginate(ctx.operation, items, input);
   }
 });

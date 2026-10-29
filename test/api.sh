@@ -67,15 +67,15 @@ api_status() {
 }
 
 # `api_all <path>` prints every item of list `<path>` as one `{"items": [...]}`, read page by page
-# at the most a page holds (§10.3: `limit` at most 200, `nextCursor` to the next page).
+# at the most a page holds (§10.3: `pageSize` at most 200, `nextPageToken` to the next page).
 api_all() {
-  local sep='?' cursor='' page pages=()
+  local sep='?' token='' page pages=()
   [[ $1 != *'?'* ]] || sep='&'
   while :; do
-    page=$(api GET "$1${sep}limit=200${cursor:+&cursor=$cursor}") || return 1
+    page=$(api GET "$1${sep}pageSize=200${token:+&pageToken=$token}") || return 1
     pages+=("$page")
-    cursor=$(printf '%s' "$page" | jsonfield nextCursor) || return 1
-    [ "$cursor" != None ] || break
+    token=$(printf '%s' "$page" | jsonfield nextPageToken) || return 1
+    [ "$token" != None ] || break
   done
   printf '%s\n' "${pages[@]}" | python3 -c '
 import json, sys

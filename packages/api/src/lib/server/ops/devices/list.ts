@@ -1,11 +1,6 @@
 import { z } from 'zod';
 
-import {
-  decodeOffsetCursor,
-  offsetPage,
-  pageInput,
-  pageOutput
-} from '#lib/server/pagination.js';
+import { pageInput, pageOutput, sqlPage } from '#lib/server/pagination.js';
 
 import { ownActingUser } from '../gates.js';
 import { defineOperation } from '../types.js';
@@ -26,18 +21,23 @@ export const list = defineOperation({
   scope: ownActingUser,
   readOnly: true,
   run: async (ctx, input) => {
-    const offset = decodeOffsetCursor(ctx.operation, input.cursor);
-    const { limit } = input;
-    const rows = await ctx.db
-      .selectFrom('devices')
-      .selectAll()
-      .where('userId', '=', input.userId)
-      .where('deletedAt', 'is', null)
-      .orderBy('createdAt')
-      .offset(offset)
-      .limit(limit + 1)
-      .execute();
-    const { page, nextCursor } = offsetPage(ctx.operation, rows, offset, limit);
-    return { items: await toDevicesOut(ctx.db, page), nextCursor };
+    const { page, nextPageToken, totalSize } = await sqlPage(
+      ctx.operation,
+      input,
+      ctx.db
+        .selectFrom('devices')
+        .selectAll()
+        .where('userId', '=', input.userId)
+        .where('deletedAt', 'is', null),
+      [
+        ['createdAt', 'asc'],
+        ['id', 'asc']
+      ]
+    );
+    return {
+      items: await toDevicesOut(ctx.db, page),
+      nextPageToken,
+      totalSize
+    };
   }
 });

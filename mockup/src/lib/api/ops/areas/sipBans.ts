@@ -5,6 +5,7 @@
 import { conflict, notFound } from '../../errors';
 import type { SipBan } from '../../types';
 import { defineOp } from '../core';
+import { paginate, type Page } from './calls';
 
 export type SipBanState = 'active' | 'ended' | 'all';
 export type SipBanWire = Omit<SipBan, 'reason'> & { liftedBy: string | null };
@@ -22,16 +23,17 @@ const toWire = ({
 }: StoredBan): SipBanWire => ({ ...ban, liftedBy: liftedBy ?? null });
 
 defineOp<
-  { state?: SipBanState; limit?: number; cursor?: string },
-  { items: SipBanWire[]; nextCursor: null }
+  { state?: SipBanState; pageSize?: number; pageToken?: string; skip?: number },
+  Page<SipBanWire>
 >({
   name: 'sipBans.list',
   minRole: 'admin',
   readOnly: true,
   run: (ctx, input) => {
     const state = input.state ?? 'active';
-    return {
-      items: ctx.db.sipBans
+    return paginate(
+      ctx.operation,
+      ctx.db.sipBans
         .filter(
           ban =>
             state === 'all' ||
@@ -39,8 +41,8 @@ defineOp<
         )
         .toSorted((a, b) => b.createdAt.localeCompare(a.createdAt))
         .map(toWire),
-      nextCursor: null
-    };
+      input
+    );
   }
 });
 

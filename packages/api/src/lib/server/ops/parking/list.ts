@@ -3,12 +3,7 @@ import { z } from 'zod';
 import { HTTP_SERVICE_UNAVAILABLE } from '@zamfono/shared';
 
 import { getCoreClient } from '#lib/server/coreClient.js';
-import {
-  decodeOffsetCursor,
-  offsetPage,
-  pageInput,
-  pageOutput
-} from '#lib/server/pagination.js';
+import { arrayPage, pageInput, pageOutput } from '#lib/server/pagination.js';
 
 import { defineOperation } from '../types.js';
 
@@ -43,14 +38,12 @@ export const list = defineOperation({
   scope: 'any',
   readOnly: true,
   run: async (ctx, input) => {
-    const offset = decodeOffsetCursor(ctx.operation, input.cursor);
     const { parked } = await getCoreClient().parked();
-    const { page, nextCursor } = offsetPage(
+    const { page, nextPageToken, totalSize } = arrayPage(
       ctx.operation,
-      parked.slice(offset, offset + input.limit + 1),
-      offset,
-      input.limit
+      input,
+      parked
     );
-    return { items: page, nextCursor };
+    return { items: page, nextPageToken, totalSize };
   }
 });

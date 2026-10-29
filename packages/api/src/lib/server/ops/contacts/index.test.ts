@@ -118,8 +118,22 @@ describe('contacts', () => {
     ).toEqual(contact);
     expect(await runOperation(db, 'contacts.list', {}, asRun())).toEqual({
       items: [contact],
-      nextCursor: null
+      nextPageToken: null,
+      totalSize: 1
     });
+    const totals = await Promise.all(
+      ['huber', '89 12', 'Maier'].map(async text => {
+        const page = (await runOperation(
+          db,
+          'contacts.list',
+          // eslint-disable-next-line id-length -- 'q' is the wire query-parameter name of `GET /contacts?q=`
+          { q: text },
+          asRun()
+        )) as { totalSize: number };
+        return page.totalSize;
+      })
+    );
+    expect(totals).toEqual([1, 1, 0]);
     expect(
       await runOperation(
         db,

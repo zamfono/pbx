@@ -9,6 +9,7 @@ import { newId } from '../../ids';
 import type { Db, Member, UserGroup } from '../../types';
 import { defineOp } from '../core';
 import { requireText } from '../validate';
+import { paginate, type Page } from './calls';
 import { softDeleteConfirm } from './users';
 
 function liveGroup(db: Db, id: string): UserGroup {
@@ -137,19 +138,21 @@ function replaceMembers(db: Db, group: UserGroup, members: Member[]): Member[] {
 }
 
 defineOp<
-  { limit?: number; cursor?: string },
-  { items: UserGroup[]; nextCursor: string | null }
+  { pageSize?: number; pageToken?: string; skip?: number },
+  Page<UserGroup>
 >({
   name: 'userGroups.list',
   minRole: 'admin',
   readOnly: true,
-  run: ctx => ({
-    items: ctx.db.userGroups
-      .filter(group => group.deletedAt === null)
-      .sort((a, b) => a.name.localeCompare(b.name))
-      .map(group => toOut(ctx.db, group)),
-    nextCursor: null
-  })
+  run: (ctx, input) =>
+    paginate(
+      ctx.operation,
+      ctx.db.userGroups
+        .filter(group => group.deletedAt === null)
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map(group => toOut(ctx.db, group)),
+      input
+    )
 });
 
 defineOp<{ id: string }, UserGroup>({

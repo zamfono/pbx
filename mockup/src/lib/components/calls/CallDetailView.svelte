@@ -57,7 +57,7 @@
     admin
       ? read<{ items: RecordingOut[] }>(
           'recordings.list',
-          { limit: 200 },
+          { pageSize: 200 },
           { items: [] }
         ).items.filter(row => row.callId === call.id)
       : []

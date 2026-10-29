@@ -1,14 +1,9 @@
-import {
-  decodeOffsetCursor,
-  offsetPage,
-  pageInput,
-  pageOutput
-} from '#lib/server/pagination.js';
+import { pageInput, pageOutput, sqlPage } from '#lib/server/pagination.js';
 
 import { defineOperation } from '../types.js';
 import { ringGroupOut, toRingGroupOut } from './_shared.js';
 
-/** `GET /ringGroups` (§10.3 "Ring groups"): live ring groups, alphabetical, offset-cursor paginated. */
+/** `GET /ringGroups` (§10.3 "Ring groups"): live ring groups, alphabetical, paginated. */
 export const listRingGroups = defineOperation({
   name: 'ringGroups.list',
   description: "Lists the tenant's live ring groups.",
@@ -17,20 +12,21 @@ export const listRingGroups = defineOperation({
   minRole: 'admin',
   readOnly: true,
   run: async (ctx, input) => {
-    const offset = decodeOffsetCursor(ctx.operation, input.cursor);
-    const { limit } = input;
-    const rows = await ctx.db
-      .selectFrom('ringGroups')
-      .selectAll()
-      .where('deletedAt', 'is', null)
-      .orderBy('name')
-      .offset(offset)
-      .limit(limit + 1)
-      .execute();
-    const { page, nextCursor } = offsetPage(ctx.operation, rows, offset, limit);
+    const { page, nextPageToken, totalSize } = await sqlPage(
+      ctx.operation,
+      input,
+      ctx.db
+        .selectFrom('ringGroups')
+        .selectAll()
+        .where('deletedAt', 'is', null),
+      [
+        ['name', 'asc'],
+        ['id', 'asc']
+      ]
+    );
     const items = await Promise.all(
       page.map(row => toRingGroupOut(ctx.db, row))
     );
-    return { items, nextCursor };
+    return { items, nextPageToken, totalSize };
   }
 });

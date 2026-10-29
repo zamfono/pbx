@@ -30,15 +30,15 @@
   const live = $derived(
     read<Page<LiveCall>>(
       'calls.list',
-      { live: true, limit: 200 },
-      { items: [], nextCursor: null }
+      { live: true, pageSize: 200 },
+      { items: [], nextPageToken: null, totalSize: 0 }
     ).items
   );
   const parked = $derived(
     read<Page<ParkedOut>>(
       'parking.list',
-      { limit: 200 },
-      { items: [], nextCursor: null }
+      { pageSize: 200 },
+      { items: [], nextPageToken: null, totalSize: 0 }
     ).items
   );
   const parkedIds = $derived(new Set(parked.map(entry => entry.callId)));

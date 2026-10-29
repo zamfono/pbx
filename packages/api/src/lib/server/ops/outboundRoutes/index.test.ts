@@ -294,8 +294,8 @@ describe('outboundRoutes operations', () => {
     ).rejects.toMatchObject({ status: 422 });
   });
 
-  // §10.3 "Conventions": list endpoints paginate with `?limit=` and an opaque `?cursor=`.
-  it('list pages through the routes in evaluation order with limit and cursor', async () => {
+  // §10.3 "Conventions": list endpoints paginate with `?pageSize=` and an opaque `?pageToken=`.
+  it('list pages through the routes in evaluation order with pageSize and pageToken', async () => {
     const db = await makeTestDb();
     const { trunkId, routeId } = await createTrunkAndCatchAll(db);
     await runOperation(
@@ -316,13 +316,13 @@ describe('outboundRoutes operations', () => {
     );
     type Page = {
       items: { id: string; numbers: unknown[] }[];
-      nextCursor: string | null;
+      nextPageToken: string | null;
     };
 
     const one = (await runOperation(
       db,
       'outboundRoutes.list',
-      { limit: 1 },
+      { pageSize: 1 },
       asRun()
     )) as Page;
     expect(one.items).toHaveLength(1);
@@ -331,16 +331,16 @@ describe('outboundRoutes operations', () => {
       throw new Error('outboundRoutes test: expected one item');
     }
     expect(onlyItem.numbers).toHaveLength(1);
-    expect(one.nextCursor).toEqual(expect.any(String));
+    expect(one.nextPageToken).toEqual(expect.any(String));
 
     const two = (await runOperation(
       db,
       'outboundRoutes.list',
-      { limit: 1, cursor: one.nextCursor },
+      { pageSize: 1, pageToken: one.nextPageToken },
       asRun()
     )) as Page;
     expect(two.items.map(item => item.id)).toEqual([routeId]);
-    expect(two.nextCursor).toBeNull();
+    expect(two.nextPageToken).toBeNull();
   });
 
   // Two kept routes move behind three new ones: their final priorities lie past the table's

@@ -8,6 +8,7 @@ import { newId } from '../../ids';
 import type { Db, PersonalAccessToken } from '../../types';
 import { defineOp, type Ctx } from '../core';
 import { requireText } from '../validate';
+import { paginate, type Page } from './calls';
 import { liveUser, namesAnOwner, ownActingUser, randomFrom } from './users';
 
 const NAME_MAX_LENGTH = 100;
@@ -32,8 +33,8 @@ const anOwnersToken = (ctx: Ctx, input: { id: string }): boolean =>
     ?.role === 'owner';
 
 defineOp<
-  { userId: string; limit?: number; cursor?: string },
-  { items: PersonalAccessToken[]; nextCursor: string | null }
+  { userId: string; pageSize?: number; pageToken?: string; skip?: number },
+  Page<PersonalAccessToken>
 >({
   name: 'personalAccessTokens.list',
   minRole: 'user',
@@ -42,12 +43,13 @@ defineOp<
   readOnly: true,
   run: (ctx, input) => {
     liveUser(ctx.db, input.userId);
-    return {
-      items: ctx.db.personalAccessTokens
+    return paginate(
+      ctx.operation,
+      ctx.db.personalAccessTokens
         .filter(row => row.userId === input.userId)
         .sort((a, b) => a.id.localeCompare(b.id)),
-      nextCursor: null
-    };
+      input
+    );
   }
 });
 

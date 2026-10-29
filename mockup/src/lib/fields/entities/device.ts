@@ -12,5 +12,5 @@ defineFields({
     { key: 'allowedIps', tier: 'expert' },
     { key: 'keys', tier: 'advanced', self: true }
   ],
-  notFields: ['id', 'userId', 'limit', 'cursor', 'confirm']
+  notFields: ['id', 'userId', 'pageSize', 'pageToken', 'skip', 'confirm']
 });

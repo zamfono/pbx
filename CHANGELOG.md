@@ -11,8 +11,25 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+### Upgrade notes
+
+- A client of a list endpoint pages with `pageSize`, `pageToken` and `skip` instead of `limit`
+  and `cursor`, and reads the next page's token from `nextPageToken` instead of `nextCursor`;
+  `limit` and `cursor` are refused with 422. MCP clients pick the new names up from the tools.
+
+### Added
+
+- Call history, the audit log, recordings, voicemails and the phone book sort by `orderBy`
+  (`startedAt desc`, `durationS`, …). Recordings filter by `callId`, `userId`, `from` and `to`;
+  voicemails by `userId`, `ringGroupId`, `read`, `from` and `to`; the phone book by `q`, matched
+  as the search bar matches contacts.
+
 ### Changed
 
+- **Breaking:** every list pages with `pageSize`, `pageToken` and `skip` and answers
+  `{ items, nextPageToken, totalSize }`, as Google's AIP-158 has it, where it took `limit` and
+  `cursor` and answered `{ items, nextCursor }`. A page size above 200 now counts as 200 instead
+  of being refused, and a page token only works with the same filters it was handed out with.
 - `setup.sh` asks which of SIP over UDP, SIP over TCP and STUN to keep on with one checklist,
   instead of a `true` or `false` answer for each, and for the RTP range in one field
   (`10000-10200`). Its question whether to change the ports at all now defaults to keeping them.

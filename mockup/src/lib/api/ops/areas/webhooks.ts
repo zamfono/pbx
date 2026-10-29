@@ -12,6 +12,7 @@ import {
   type Webhook
 } from '../../types';
 import { defineOp } from '../core';
+import { paginate, type Page } from './calls';
 
 export type WebhookWire = Omit<Webhook, 'deletedAt'>;
 
@@ -67,16 +68,18 @@ function liveWebhook(webhooks: Webhook[], id: string): Webhook {
 }
 
 defineOp<
-  { limit?: number; cursor?: string },
-  { items: WebhookWire[]; nextCursor: null }
+  { pageSize?: number; pageToken?: string; skip?: number },
+  Page<WebhookWire>
 >({
   name: 'webhooks.list',
   minRole: 'admin',
   readOnly: true,
-  run: ctx => ({
-    items: ctx.db.webhooks.filter(row => row.deletedAt === null).map(toWire),
-    nextCursor: null
-  })
+  run: (ctx, input) =>
+    paginate(
+      ctx.operation,
+      ctx.db.webhooks.filter(row => row.deletedAt === null).map(toWire),
+      input
+    )
 });
 
 defineOp<

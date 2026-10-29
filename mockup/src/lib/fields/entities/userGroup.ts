@@ -7,5 +7,5 @@ defineFields({
     { key: 'name', tier: 'basic' },
     { key: 'members', tier: 'basic' }
   ],
-  notFields: ['id', 'limit', 'cursor', 'confirm']
+  notFields: ['id', 'pageSize', 'pageToken', 'skip', 'confirm']
 });

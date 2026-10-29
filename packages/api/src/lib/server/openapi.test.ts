@@ -96,15 +96,23 @@ function jsonResult(pattern: string, method: string): Schema {
 }
 
 describe('the OpenAPI responses describe what each operation answers (§10.3)', () => {
-  it('documents a list as a page of its items and the next cursor', () => {
+  it('documents a list as a page of its items, the next page token and the total', () => {
     const page = jsonResult('/users', 'get');
-    expect(page.required).toEqual(['items', 'nextCursor']);
-    expect(accepts(page, { items: [], nextCursor: 'abc' })).toBe(true);
-    expect(accepts(page, { items: [], nextCursor: null })).toBe(true);
-    expect(accepts(page, { items: [{ id: 'u1' }], nextCursor: null })).toBe(
-      false
-    );
-    expect(accepts(page, { items: [] })).toBe(false);
+    expect(page.required).toEqual(['items', 'nextPageToken', 'totalSize']);
+    expect(
+      accepts(page, { items: [], nextPageToken: 'abc', totalSize: 60 })
+    ).toBe(true);
+    expect(
+      accepts(page, { items: [], nextPageToken: null, totalSize: 0 })
+    ).toBe(true);
+    expect(
+      accepts(page, {
+        items: [{ id: 'u1' }],
+        nextPageToken: null,
+        totalSize: 1
+      })
+    ).toBe(false);
+    expect(accepts(page, { items: [], nextPageToken: null })).toBe(false);
   });
 
   it('documents a write’s result with the warnings its commit may add', () => {

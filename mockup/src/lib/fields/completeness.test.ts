@@ -23,7 +23,14 @@ type ApiOperation = {
 const api = apiOperations as Record<string, ApiOperation>;
 
 /** Inputs that address or page rather than configure. */
-const NOT_CONFIGURATION_INPUTS = new Set(['id', 'confirm', 'cursor', 'limit']);
+const NOT_CONFIGURATION_INPUTS = new Set([
+  'id',
+  'confirm',
+  'pageSize',
+  'pageToken',
+  'skip',
+  'orderBy'
+]);
 
 /**
  * Writes that act rather than configure: live-call control, runtime data, pure actions, account

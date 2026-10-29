@@ -200,8 +200,8 @@
   const snapshot = $derived(
     read<Page<PresenceLogEntry>>(
       'presenceLog.snapshot',
-      { at, limit: 200 },
-      { items: [], nextCursor: null }
+      { at, pageSize: 200 },
+      { items: [], nextPageToken: null, totalSize: 0 }
     ).items
   );
   const people = $derived(

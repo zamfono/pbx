@@ -46,7 +46,7 @@ describe('menus', () => {
     });
   });
 
-  it('list returns the live menus, a page with no next cursor', async () => {
+  it('list returns the live menus, a page with no next page token', async () => {
     const db = await makeTestDb();
     const audioId = await seedAudio(db);
     await runOperation(
@@ -61,10 +61,10 @@ describe('menus', () => {
     );
     const page = (await runOperation(db, 'menus.list', {}, asRun())) as {
       items: { name: string }[];
-      nextCursor: string | null;
+      nextPageToken: string | null;
     };
     expect(page.items.map(menu => menu.name)).toEqual(['Main menu']);
-    expect(page.nextCursor).toBeNull();
+    expect(page.nextPageToken).toBeNull();
   });
 
   it('refuses to create a menu whose name is already used by another live menu', async () => {

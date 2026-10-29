@@ -199,10 +199,11 @@ describe('a parked call (§10.2 "Call parking")', () => {
     core();
     await expect(run(user('ben'), 'parking.list', {})).resolves.toEqual({
       items: PARKED,
-      nextCursor: null
+      nextPageToken: null,
+      totalSize: PARKED.length
     });
     await expect(
-      run(user('ben'), 'parking.list', { limit: 1 })
+      run(user('ben'), 'parking.list', { pageSize: 1 })
     ).resolves.toMatchObject({ items: PARKED.slice(0, 1) });
   });
 

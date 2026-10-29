@@ -44,8 +44,8 @@
   const live = $derived(
     read<Page<LiveCall>>(
       'calls.list',
-      { live: true, limit: 200 },
-      { items: [], nextCursor: null }
+      { live: true, pageSize: 200 },
+      { items: [], nextPageToken: null, totalSize: 0 }
     ).items.filter(call => call.userIds.includes(actor.id))
   );
   const incoming = $derived(live.filter(call => ringsFor(call, actor.id)));
@@ -60,12 +60,12 @@
       'calls.list',
       {
         userId: actor.id,
-        limit: 200,
+        pageSize: 200,
         ...(direction === 'all' ? {} : { direction }),
         ...(status === 'all' ? {} : { status }),
         ...rangeInput(range)
       },
-      { items: [], nextCursor: null }
+      { items: [], nextPageToken: null, totalSize: 0 }
     ).items
   );
 

@@ -4,14 +4,20 @@
     "path": "/users",
     "summary": "Lists the tenant's live users, paginated.",
     "fields": {
-      "limit": {
+      "pageSize": {
         "type": "integer",
         "required": false,
         "in": "query",
         "description": null
       },
-      "cursor": {
+      "pageToken": {
         "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "skip": {
+        "type": "integer",
         "required": false,
         "in": "query",
         "description": null
@@ -356,14 +362,20 @@
         "in": "path",
         "description": null
       },
-      "limit": {
+      "pageSize": {
         "type": "integer",
         "required": false,
         "in": "query",
         "description": null
       },
-      "cursor": {
+      "pageToken": {
         "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "skip": {
+        "type": "integer",
         "required": false,
         "in": "query",
         "description": null
@@ -519,14 +531,20 @@
         "in": "path",
         "description": null
       },
-      "limit": {
+      "pageSize": {
         "type": "integer",
         "required": false,
         "in": "query",
         "description": null
       },
-      "cursor": {
+      "pageToken": {
         "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "skip": {
+        "type": "integer",
         "required": false,
         "in": "query",
         "description": null
@@ -634,14 +652,20 @@
     "path": "/trunks",
     "summary": "Lists SIP trunks in trunk order, with their live status merged in.",
     "fields": {
-      "limit": {
+      "pageSize": {
         "type": "integer",
         "required": false,
         "in": "query",
         "description": null
       },
-      "cursor": {
+      "pageToken": {
         "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "skip": {
+        "type": "integer",
         "required": false,
         "in": "query",
         "description": null
@@ -973,14 +997,20 @@
     "path": "/outboundRoutes",
     "summary": "Lists outbound routes in evaluation order, each with its callers and numbers.",
     "fields": {
-      "limit": {
+      "pageSize": {
         "type": "integer",
         "required": false,
         "in": "query",
         "description": null
       },
-      "cursor": {
+      "pageToken": {
         "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "skip": {
+        "type": "integer",
         "required": false,
         "in": "query",
         "description": null
@@ -1004,14 +1034,20 @@
     "path": "/dids",
     "summary": "Lists the tenant's DIDs",
     "fields": {
-      "limit": {
+      "pageSize": {
         "type": "integer",
         "required": false,
         "in": "query",
         "description": null
       },
-      "cursor": {
+      "pageToken": {
         "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "skip": {
+        "type": "integer",
         "required": false,
         "in": "query",
         "description": null
@@ -1086,14 +1122,20 @@
     "path": "/didBlocks",
     "summary": "Lists the tenant's number blocks with their digit counts and fallback targets",
     "fields": {
-      "limit": {
+      "pageSize": {
         "type": "integer",
         "required": false,
         "in": "query",
         "description": null
       },
-      "cursor": {
+      "pageToken": {
         "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "skip": {
+        "type": "integer",
         "required": false,
         "in": "query",
         "description": null
@@ -1178,14 +1220,20 @@
     "path": "/ringGroups",
     "summary": "Lists the tenant's live ring groups.",
     "fields": {
-      "limit": {
+      "pageSize": {
         "type": "integer",
         "required": false,
         "in": "query",
         "description": null
       },
-      "cursor": {
+      "pageToken": {
         "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "skip": {
+        "type": "integer",
         "required": false,
         "in": "query",
         "description": null
@@ -1421,14 +1469,20 @@
     "path": "/userGroups",
     "summary": "Lists the tenant's live user groups.",
     "fields": {
-      "limit": {
+      "pageSize": {
         "type": "integer",
         "required": false,
         "in": "query",
         "description": null
       },
-      "cursor": {
+      "pageToken": {
         "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "skip": {
+        "type": "integer",
         "required": false,
         "in": "query",
         "description": null
@@ -1511,14 +1565,20 @@
     "path": "/audio",
     "summary": "Lists the tenant's live audio assets.",
     "fields": {
-      "limit": {
+      "pageSize": {
         "type": "integer",
         "required": false,
         "in": "query",
         "description": null
       },
-      "cursor": {
+      "pageToken": {
         "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "skip": {
+        "type": "integer",
         "required": false,
         "in": "query",
         "description": null
@@ -1589,14 +1649,56 @@
     "path": "/voicemails",
     "summary": "Lists voicemails newest first: a user's own mailbox and their ring groups', every mailbox for an admin.",
     "fields": {
-      "limit": {
+      "userId": {
+        "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "ringGroupId": {
+        "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "read": {
+        "type": "boolean",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "from": {
+        "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "to": {
+        "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "orderBy": {
+        "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "pageSize": {
         "type": "integer",
         "required": false,
         "in": "query",
         "description": null
       },
-      "cursor": {
+      "pageToken": {
         "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "skip": {
+        "type": "integer",
         "required": false,
         "in": "query",
         "description": null
@@ -1664,14 +1766,50 @@
     "path": "/recordings",
     "summary": "Lists call recordings, newest first: one per recorded user and call (see zamfono.help recording-consent).",
     "fields": {
-      "limit": {
+      "callId": {
+        "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "userId": {
+        "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "from": {
+        "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "to": {
+        "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "orderBy": {
+        "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "pageSize": {
         "type": "integer",
         "required": false,
         "in": "query",
         "description": null
       },
-      "cursor": {
+      "pageToken": {
         "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "skip": {
+        "type": "integer",
         "required": false,
         "in": "query",
         "description": null
@@ -1779,14 +1917,26 @@
         "in": "query",
         "description": null
       },
-      "limit": {
+      "orderBy": {
+        "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "pageSize": {
         "type": "integer",
         "required": false,
         "in": "query",
         "description": null
       },
-      "cursor": {
+      "pageToken": {
         "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "skip": {
+        "type": "integer",
         "required": false,
         "in": "query",
         "description": null
@@ -2017,14 +2167,20 @@
         "in": "query",
         "description": null
       },
-      "limit": {
+      "pageSize": {
         "type": "integer",
         "required": false,
         "in": "query",
         "description": null
       },
-      "cursor": {
+      "pageToken": {
         "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "skip": {
+        "type": "integer",
         "required": false,
         "in": "query",
         "description": null
@@ -2075,14 +2231,32 @@
     "path": "/contacts",
     "summary": "Lists the tenant's live phone-book contacts.",
     "fields": {
-      "limit": {
+      "q": {
+        "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "orderBy": {
+        "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "pageSize": {
         "type": "integer",
         "required": false,
         "in": "query",
         "description": null
       },
-      "cursor": {
+      "pageToken": {
         "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "skip": {
+        "type": "integer",
         "required": false,
         "in": "query",
         "description": null
@@ -2185,14 +2359,20 @@
     "path": "/blockedNumbers",
     "summary": "Lists the tenant's inbound blocklist",
     "fields": {
-      "limit": {
+      "pageSize": {
         "type": "integer",
         "required": false,
         "in": "query",
         "description": null
       },
-      "cursor": {
+      "pageToken": {
         "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "skip": {
+        "type": "integer",
         "required": false,
         "in": "query",
         "description": null
@@ -2244,14 +2424,20 @@
     "path": "/sipBans",
     "summary": "Lists the bans of sources of failed SIP attempts, the active ones unless state says otherwise",
     "fields": {
-      "limit": {
+      "pageSize": {
         "type": "integer",
         "required": false,
         "in": "query",
         "description": null
       },
-      "cursor": {
+      "pageToken": {
         "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "skip": {
+        "type": "integer",
         "required": false,
         "in": "query",
         "description": null
@@ -2288,14 +2474,20 @@
     "path": "/sipAllowlist",
     "summary": "Lists the source addresses and ranges never banned for failed SIP attempts",
     "fields": {
-      "limit": {
+      "pageSize": {
         "type": "integer",
         "required": false,
         "in": "query",
         "description": null
       },
-      "cursor": {
+      "pageToken": {
         "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "skip": {
+        "type": "integer",
         "required": false,
         "in": "query",
         "description": null
@@ -2360,14 +2552,20 @@
     "path": "/parking/calls",
     "summary": "Lists the calls parked right now: slot, call, caller (null when withheld), parked since and by whom.",
     "fields": {
-      "limit": {
+      "pageSize": {
         "type": "integer",
         "required": false,
         "in": "query",
         "description": null
       },
-      "cursor": {
+      "pageToken": {
         "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "skip": {
+        "type": "integer",
         "required": false,
         "in": "query",
         "description": null
@@ -2379,14 +2577,20 @@
     "path": "/menus",
     "summary": "Lists the tenant's live menus.",
     "fields": {
-      "limit": {
+      "pageSize": {
         "type": "integer",
         "required": false,
         "in": "query",
         "description": null
       },
-      "cursor": {
+      "pageToken": {
         "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "skip": {
+        "type": "integer",
         "required": false,
         "in": "query",
         "description": null
@@ -2540,14 +2744,20 @@
     "path": "/tenant/ooo",
     "summary": "Lists a scope's out-of-office rules",
     "fields": {
-      "limit": {
+      "pageSize": {
         "type": "integer",
         "required": false,
         "in": "query",
         "description": null
       },
-      "cursor": {
+      "pageToken": {
         "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "skip": {
+        "type": "integer",
         "required": false,
         "in": "query",
         "description": null
@@ -2677,14 +2887,20 @@
     "path": "/webhooks",
     "summary": "Lists the tenant's webhooks with their delivery status, ok or failing",
     "fields": {
-      "limit": {
+      "pageSize": {
         "type": "integer",
         "required": false,
         "in": "query",
         "description": null
       },
-      "cursor": {
+      "pageToken": {
         "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "skip": {
+        "type": "integer",
         "required": false,
         "in": "query",
         "description": null
@@ -2769,14 +2985,20 @@
     "path": "/mailTemplates",
     "summary": "Lists the effective mail templates in the tenant language",
     "fields": {
-      "limit": {
+      "pageSize": {
         "type": "integer",
         "required": false,
         "in": "query",
         "description": null
       },
-      "cursor": {
+      "pageToken": {
         "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "skip": {
+        "type": "integer",
         "required": false,
         "in": "query",
         "description": null
@@ -2917,14 +3139,20 @@
     "path": "/backups/targets",
     "summary": "Lists the tenant's backup targets",
     "fields": {
-      "limit": {
+      "pageSize": {
         "type": "integer",
         "required": false,
         "in": "query",
         "description": null
       },
-      "cursor": {
+      "pageToken": {
         "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "skip": {
+        "type": "integer",
         "required": false,
         "in": "query",
         "description": null
@@ -3022,14 +3250,20 @@
         "in": "query",
         "description": null
       },
-      "limit": {
+      "pageSize": {
         "type": "integer",
         "required": false,
         "in": "query",
         "description": null
       },
-      "cursor": {
+      "pageToken": {
         "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "skip": {
+        "type": "integer",
         "required": false,
         "in": "query",
         "description": null
@@ -3332,14 +3566,20 @@
         "in": "query",
         "description": null
       },
-      "limit": {
+      "pageSize": {
         "type": "integer",
         "required": false,
         "in": "query",
         "description": null
       },
-      "cursor": {
+      "pageToken": {
         "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "skip": {
+        "type": "integer",
         "required": false,
         "in": "query",
         "description": null
@@ -3407,14 +3647,26 @@
         "in": "query",
         "description": null
       },
-      "limit": {
+      "orderBy": {
+        "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "pageSize": {
         "type": "integer",
         "required": false,
         "in": "query",
         "description": null
       },
-      "cursor": {
+      "pageToken": {
         "type": "string",
+        "required": false,
+        "in": "query",
+        "description": null
+      },
+      "skip": {
+        "type": "integer",
         "required": false,
         "in": "query",
         "description": null

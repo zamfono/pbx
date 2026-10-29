@@ -38,7 +38,7 @@ describe('blockedNumbers', () => {
     expect(afterDelete.items).toHaveLength(0);
   });
 
-  it('pages with an opaque cursor, and refuses a bare row id', async () => {
+  it('pages with an opaque page token, and refuses a bare row id', async () => {
     const db = await makeTestDb();
     await runOperation(
       db,
@@ -52,19 +52,19 @@ describe('blockedNumbers', () => {
       { number: '+492222' },
       asRun()
     );
-    type Page = { items: { id: string }[]; nextCursor: string | null };
+    type Page = { items: { id: string }[]; nextPageToken: string | null };
     const first = (await runOperation(
       db,
       'blockedNumbers.list',
-      { limit: 1 },
+      { pageSize: 1 },
       asRun()
     )) as Page;
     const firstId = first.items[0]?.id ?? '';
-    expect(first.nextCursor).not.toBe(firstId);
+    expect(first.nextPageToken).not.toBe(firstId);
     const second = (await runOperation(
       db,
       'blockedNumbers.list',
-      { limit: 1, cursor: first.nextCursor },
+      { pageSize: 1, pageToken: first.nextPageToken },
       asRun()
     )) as Page;
     expect(second.items).toHaveLength(1);
@@ -73,7 +73,7 @@ describe('blockedNumbers', () => {
       runOperation(
         db,
         'blockedNumbers.list',
-        { limit: 1, cursor: firstId },
+        { pageSize: 1, pageToken: firstId },
         asRun()
       )
     ).rejects.toMatchObject({ status: 422 });
@@ -81,7 +81,7 @@ describe('blockedNumbers', () => {
       runOperation(
         db,
         'blockedNumbers.list',
-        { cursor: 'not-a-cursor' },
+        { pageToken: 'not-a-token' },
         asRun()
       )
     ).rejects.toMatchObject({ status: 422 });

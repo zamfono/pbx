@@ -37,16 +37,16 @@
   const rows = $derived(
     read<Page<RecordingOut>>(
       'recordings.list',
-      { limit: 200 },
-      { items: [], nextCursor: null }
+      { pageSize: 200 },
+      { items: [], nextPageToken: null, totalSize: 0 }
     ).items
   );
   const calls = $derived(
     new Map(
       read<Page<CallOut>>(
         'calls.list',
-        { limit: 200 },
-        { items: [], nextCursor: null }
+        { pageSize: 200 },
+        { items: [], nextPageToken: null, totalSize: 0 }
       ).items.map(call => [call.id, call])
     )
   );

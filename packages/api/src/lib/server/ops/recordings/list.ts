@@ -1,14 +1,38 @@
+import { z } from 'zod';
+
 import {
-  decodeIdCursor,
-  keysetPage,
+  orderByInput,
+  orderOf,
   pageInput,
-  pageOutput
+  pageOutput,
+  sqlPage
 } from '#lib/server/pagination.js';
 
+import { instantInput, tenantInstantReader } from '../instantInput.js';
 import { defineOperation } from '../types.js';
 import { recordingOut, toRecordingOut } from './_shared.js';
 
-const inputSchema = pageInput.strict();
+const inputSchema = z
+  .object({
+    callId: z.string().optional().describe("Only this call's recordings."),
+    userId: z
+      .string()
+      .optional()
+      .describe("Only the recordings of this user's side of their calls."),
+    from: instantInput
+      .optional()
+      .describe(
+        "Only recordings made at or after this ISO 8601 time, any offset (none: the tenant's time zone)."
+      ),
+    to: instantInput
+      .optional()
+      .describe(
+        "Only recordings made before this ISO 8601 time, any offset (none: the tenant's time zone), or before the end of this date."
+      ),
+    orderBy: orderByInput(['createdAt', 'durationS'], 'newest first'),
+    ...pageInput.shape
+  })
+  .strict();
 
 /** `GET /recordings` (§5.3): every call recording, newest first; `admin`/`owner` only. */
 export const list = defineOperation({
@@ -20,23 +44,32 @@ export const list = defineOperation({
   minRole: 'admin',
   readOnly: true,
   run: async (ctx, input) => {
-    const { limit } = input;
-    const cursor =
-      input.cursor === undefined
-        ? undefined
-        : decodeIdCursor(ctx.operation, input.cursor);
     let query = ctx.db.selectFrom('recordings').selectAll();
-    if (cursor !== undefined) {
-      query = query.where('id', '<', cursor);
+    if (input.callId !== undefined) {
+      query = query.where('callId', '=', input.callId);
     }
-    const rows = await query
-      .orderBy('id', 'desc')
-      .limit(limit + 1)
-      .execute();
-    const { page, nextCursor } = keysetPage(ctx.operation, rows, limit);
+    if (input.userId !== undefined) {
+      query = query.where('userId', '=', input.userId);
+    }
+    if (input.from !== undefined || input.to !== undefined) {
+      const instants = await tenantInstantReader(ctx.db);
+      if (input.from !== undefined) {
+        query = query.where('createdAt', '>=', instants.start(input.from));
+      }
+      if (input.to !== undefined) {
+        query = query.where('createdAt', '<', instants.end(input.to));
+      }
+    }
+    const { page, nextPageToken, totalSize } = await sqlPage(
+      ctx.operation,
+      input,
+      query,
+      orderOf(input.orderBy, [['id', 'desc']])
+    );
     return {
       items: page.map(toRecordingOut),
-      nextCursor
+      nextPageToken,
+      totalSize
     };
   }
 });

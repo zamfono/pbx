@@ -36,6 +36,7 @@ import {
   requireText,
   requireTimeout
 } from '../validate';
+import { paginate, type Page } from './calls';
 
 /* ---------------- shared helpers (also used by devices and tokens) ---------------- */
 
@@ -356,19 +357,18 @@ function revokeTokens(ctx: Ctx, userId: string): void {
 
 /* ---------------- reads ---------------- */
 
-defineOp<
-  { limit?: number; cursor?: string },
-  { items: User[]; nextCursor: string | null }
->({
+defineOp<{ pageSize?: number; pageToken?: string; skip?: number }, Page<User>>({
   name: 'users.list',
   minRole: 'admin',
   readOnly: true,
-  run: ctx => ({
-    items: ctx.db.users
-      .filter(user => user.deletedAt === null)
-      .sort((a, b) => a.name.localeCompare(b.name)),
-    nextCursor: null
-  })
+  run: (ctx, input) =>
+    paginate(
+      ctx.operation,
+      ctx.db.users
+        .filter(user => user.deletedAt === null)
+        .sort((a, b) => a.name.localeCompare(b.name)),
+      input
+    )
 });
 
 defineOp<{ id: string }, User>({

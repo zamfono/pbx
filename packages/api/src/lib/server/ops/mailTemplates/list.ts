@@ -1,11 +1,6 @@
 import { MAIL_KINDS } from '@zamfono/shared';
 
-import {
-  decodeOffsetCursor,
-  offsetPage,
-  pageInput,
-  pageOutput
-} from '#lib/server/pagination.js';
+import { arrayPage, pageInput, pageOutput } from '#lib/server/pagination.js';
 
 import { defineOperation } from '../types.js';
 import {
@@ -26,17 +21,15 @@ export const list = defineOperation({
   minRole: 'admin',
   readOnly: true,
   run: async (ctx, input) => {
-    const offset = decodeOffsetCursor(ctx.operation, input.cursor);
-    const { page, nextCursor } = offsetPage(
+    const { page, nextPageToken, totalSize } = arrayPage(
       ctx.operation,
-      MAIL_KINDS.slice(offset, offset + input.limit + 1),
-      offset,
-      input.limit
+      input,
+      MAIL_KINDS
     );
     const language = await tenantLanguage(ctx.db);
     const items = await Promise.all(
       page.map(kind => effectiveTemplate(ctx.db, kind, language))
     );
-    return { items, nextCursor };
+    return { items, nextPageToken, totalSize };
   }
 });

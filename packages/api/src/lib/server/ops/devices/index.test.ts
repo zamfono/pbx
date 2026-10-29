@@ -257,9 +257,9 @@ describe('devices', () => {
       'devices.list',
       { userId },
       asRun()
-    )) as { items: { id: string }[]; nextCursor: string | null };
+    )) as { items: { id: string }[]; nextPageToken: string | null };
     expect(page.items.map(item => item.id)).toEqual([device.id]);
-    expect(page.nextCursor).toBeNull();
+    expect(page.nextPageToken).toBeNull();
   });
 
   it('revealCredentials writes an undoable-0 audit row', async () => {

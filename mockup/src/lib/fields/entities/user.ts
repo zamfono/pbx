@@ -33,5 +33,5 @@ defineFields({
     { key: 'dnd', tier: 'basic', self: true },
     { key: 'upload', tier: 'basic', self: true }
   ],
-  notFields: ['id', 'limit', 'cursor', 'confirm']
+  notFields: ['id', 'pageSize', 'pageToken', 'skip', 'confirm']
 });

@@ -1,11 +1,6 @@
 import { z } from 'zod';
 
-import {
-  decodeIdCursor,
-  keysetPage,
-  pageInput,
-  pageOutput
-} from '#lib/server/pagination.js';
+import { pageInput, pageOutput, sqlPage } from '#lib/server/pagination.js';
 import { activeSipBans } from '#lib/server/sipBanList.js';
 
 import { defineOperation } from '../types.js';
@@ -32,25 +27,18 @@ export const list = defineOperation({
   minRole: 'admin',
   readOnly: true,
   run: async (ctx, input) => {
-    const { limit } = input;
     const state = input.state ?? 'active';
     let query = ctx.db.selectFrom('sipBans').selectAll();
     if (state !== 'all') {
       const active = activeSipBans(ctx.db, ctx.now).select('id');
       query = query.where('id', state === 'active' ? 'in' : 'not in', active);
     }
-    if (input.cursor !== undefined) {
-      query = query.where(
-        'id',
-        '>',
-        decodeIdCursor(ctx.operation, input.cursor)
-      );
-    }
-    const rows = await query
-      .orderBy('id')
-      .limit(limit + 1)
-      .execute();
-    const { page, nextCursor } = keysetPage(ctx.operation, rows, limit);
+    const { page, nextPageToken, totalSize } = await sqlPage(
+      ctx.operation,
+      input,
+      query,
+      [['id', 'asc']]
+    );
     return {
       items: page.map(row => ({
         id: row.id,
@@ -62,7 +50,8 @@ export const list = defineOperation({
         liftedAt: row.liftedAt,
         liftedBy: row.liftedBy
       })),
-      nextCursor
+      nextPageToken,
+      totalSize
     };
   }
 });

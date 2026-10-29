@@ -9,12 +9,12 @@ import {
 
 import { getCoreClient } from '#lib/server/coreClient.js';
 import {
-  decodeIdCursor,
-  decodeOffsetCursor,
-  keysetPage,
-  offsetPage,
+  arrayPage,
+  orderByInput,
+  orderOf,
   pageInput,
-  pageOutput
+  pageOutput,
+  sqlPage
 } from '#lib/server/pagination.js';
 
 import { ownActingUser } from '../gates.js';
@@ -64,6 +64,10 @@ const inputSchema = z
       .describe(
         'true returns the calls in progress now, each with userIds, the users it concerns now, and legs, the parties in it, instead of the history of ended calls.'
       ),
+    orderBy: orderByInput(
+      ['startedAt', 'endedAt'],
+      'newest first. History only'
+    ),
     ...pageInput.shape
   })
   .strict();
@@ -157,25 +161,15 @@ export const list = defineOperation({
   readOnly: true,
   run: async (ctx, input) => {
     const ownUserId = ctx.actor.role === 'user' ? ctx.actor.id : null;
-    const { limit } = input;
     if (input.live === true) {
-      const offset = decodeOffsetCursor(ctx.operation, input.cursor);
       const state = await getCoreClient().state();
-      const matching = state.calls.filter(call =>
-        matchesLive(call, input, ownUserId)
-      );
-      const { page, nextCursor } = offsetPage(
+      const { page, nextPageToken, totalSize } = arrayPage(
         ctx.operation,
-        matching.slice(offset, offset + limit + 1),
-        offset,
-        limit
+        input,
+        state.calls.filter(call => matchesLive(call, input, ownUserId))
       );
-      return { items: page.map(listedLiveCall), nextCursor };
+      return { items: page.map(listedLiveCall), nextPageToken, totalSize };
     }
-    const cursor =
-      input.cursor === undefined
-        ? undefined
-        : decodeIdCursor(ctx.operation, input.cursor);
     const instants = await tenantInstantReader(ctx.db);
     const from =
       input.from === undefined ? undefined : instants.start(input.from);
@@ -209,17 +203,16 @@ export const list = defineOperation({
     if (ownUserId !== null) {
       query = query.where(eb => ownCallWhere(eb, ownUserId));
     }
-    if (cursor !== undefined) {
-      query = query.where('id', '<', cursor);
-    }
-    const rows = await query
-      .orderBy('id', 'desc')
-      .limit(limit + 1)
-      .execute();
-    const { page, nextCursor } = keysetPage(ctx.operation, rows, limit);
+    const { page, nextPageToken, totalSize } = await sqlPage(
+      ctx.operation,
+      input,
+      query,
+      orderOf(input.orderBy, [['id', 'desc']])
+    );
     return {
       items: page.map(toCallOut),
-      nextCursor
+      nextPageToken,
+      totalSize
     };
   }
 });

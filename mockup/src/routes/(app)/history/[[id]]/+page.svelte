@@ -71,22 +71,22 @@
     read<Page<CallOut>>(
       'calls.list',
       {
-        limit: 200,
+        pageSize: 200,
         ...(direction === 'all' ? {} : { direction }),
         ...(status === 'all' ? {} : { status }),
         ...(userId === 'all' ? {} : { userId }),
         ...(ringGroupId === 'all' ? {} : { ringGroupId }),
         ...dates
       },
-      { items: [], nextCursor: null }
+      { items: [], nextPageToken: null, totalSize: 0 }
     ).items
   );
   const recorded = $derived(
     new Set(
       read<Page<RecordingOut>>(
         'recordings.list',
-        { limit: 200 },
-        { items: [], nextCursor: null }
+        { pageSize: 200 },
+        { items: [], nextPageToken: null, totalSize: 0 }
       ).items.map(row => row.callId)
     )
   );

@@ -56,7 +56,7 @@ describe('ooo', () => {
     expect(afterDelete.items.map(item => item.id)).not.toContain(created.id);
   });
 
-  it('list pages through a scope with limit and cursor, answering { items, nextCursor }', async () => {
+  it('list pages through a scope with pageSize and pageToken, answering { items, nextPageToken }', async () => {
     const db = await makeTestDb();
     const starts = ['2026-08-01', '2026-08-10', '2026-08-20'];
     const ids = await Promise.all(
@@ -75,23 +75,27 @@ describe('ooo', () => {
         return created.id;
       })
     );
-    type Page = { items: OooOutput[]; nextCursor: string | null };
+    type Page = { items: OooOutput[]; nextPageToken: string | null };
     const first = (await runOperation(
       db,
       'ooo.list',
-      { scope: { kind: 'tenant' }, limit: 2 },
+      { scope: { kind: 'tenant' }, pageSize: 2 },
       asRun()
     )) as Page;
     expect(first.items.map(item => item.id)).toEqual(ids.slice(0, 2));
-    expect(first.nextCursor).not.toBeNull();
+    expect(first.nextPageToken).not.toBeNull();
     const second = (await runOperation(
       db,
       'ooo.list',
-      { scope: { kind: 'tenant' }, limit: 2, cursor: first.nextCursor },
+      {
+        scope: { kind: 'tenant' },
+        pageSize: 2,
+        pageToken: first.nextPageToken
+      },
       asRun()
     )) as Page;
     expect(second.items.map(item => item.id)).toEqual(ids.slice(2));
-    expect(second.nextCursor).toBeNull();
+    expect(second.nextPageToken).toBeNull();
   });
 
   it('refuses an active period overlapping another active rule in the same scope', async () => {

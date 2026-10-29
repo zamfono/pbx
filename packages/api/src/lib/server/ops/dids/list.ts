@@ -1,9 +1,4 @@
-import {
-  decodeIdCursor,
-  keysetPage,
-  pageInput,
-  pageOutput
-} from '#lib/server/pagination.js';
+import { pageInput, pageOutput, sqlPage } from '#lib/server/pagination.js';
 
 import { resolveTarget } from '../forwardTargetSpec.js';
 import { defineOperation } from '../types.js';
@@ -20,23 +15,16 @@ export const list = defineOperation({
   minRole: 'admin',
   readOnly: true,
   run: async (ctx, input) => {
-    const { limit } = input;
-    let query = ctx.db
+    const query = ctx.db
       .selectFrom('dids')
       .selectAll()
       .where('deletedAt', 'is', null);
-    if (input.cursor !== undefined) {
-      query = query.where(
-        'id',
-        '>',
-        decodeIdCursor(ctx.operation, input.cursor)
-      );
-    }
-    const rows = await query
-      .orderBy('id')
-      .limit(limit + 1)
-      .execute();
-    const { page, nextCursor } = keysetPage(ctx.operation, rows, limit);
+    const { page, nextPageToken, totalSize } = await sqlPage(
+      ctx.operation,
+      input,
+      query,
+      [['id', 'asc']]
+    );
     const items = await Promise.all(
       page.map(async row => ({
         id: row.id,
@@ -48,7 +36,8 @@ export const list = defineOperation({
     );
     return {
       items,
-      nextCursor
+      nextPageToken,
+      totalSize
     };
   }
 });

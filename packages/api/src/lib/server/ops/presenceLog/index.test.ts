@@ -150,18 +150,22 @@ describe('presenceLog.snapshot', () => {
         ])
       )
       .execute();
-    type Page = { items: SnapshotItem[]; nextCursor: string | null };
+    type Page = { items: SnapshotItem[]; nextPageToken: string | null };
 
     const first = (await runOperation(
       db,
       'presenceLog.snapshot',
-      { at: '2026-01-01T00:30:00.000Z', limit: 1 },
+      { at: '2026-01-01T00:30:00.000Z', pageSize: 1 },
       asRun()
     )) as Page;
     const second = (await runOperation(
       db,
       'presenceLog.snapshot',
-      { at: '2026-01-01T00:30:00.000Z', limit: 1, cursor: first.nextCursor },
+      {
+        at: '2026-01-01T00:30:00.000Z',
+        pageSize: 1,
+        pageToken: first.nextPageToken
+      },
       asRun()
     )) as Page;
 
@@ -171,7 +175,7 @@ describe('presenceLog.snapshot', () => {
       ['other', 'busy'],
       ['owner', 'busy']
     ]);
-    expect(second.nextCursor).toBeNull();
+    expect(second.nextPageToken).toBeNull();
   });
 
   it.each([

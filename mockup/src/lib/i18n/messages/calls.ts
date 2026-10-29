@@ -490,9 +490,7 @@ export default {
     'field.parking.slots.help':
       'Entfernte Parkplätze verschwinden auch von den Telefontasten (BLF).',
 
-    'errors.pageLimit':
-      'Es lassen sich höchstens {max} Einträge auf einmal anzeigen.',
-    'errors.pageCursor':
+    'errors.pageToken':
       'Diese Liste hat sich inzwischen geändert. Bitte laden Sie sie neu.',
     'errors.instantInvalid': '„{value}“ ist kein gültiger Zeitpunkt.',
     'errors.invalidTarget':
@@ -1012,8 +1010,7 @@ export default {
     'field.parking.slots.help':
       'Removed slots also disappear from the phones’ BLF keys.',
 
-    'errors.pageLimit': 'At most {max} entries can be shown at once.',
-    'errors.pageCursor':
+    'errors.pageToken':
       'This list has changed in the meantime. Please reload it.',
     'errors.instantInvalid': '“{value}” is not a valid time.',
     'errors.invalidTarget':

@@ -55,7 +55,7 @@
       ? []
       : read<{ items: DirectoryHit[] }>(
           'search.query',
-          { q: query.trim(), limit: 5 },
+          { q: query.trim(), pageSize: 5 },
           { items: [] }
         ).items
   );

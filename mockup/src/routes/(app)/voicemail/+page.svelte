@@ -42,8 +42,8 @@
   const items = $derived(
     read<Page<VoicemailOut>>(
       'voicemails.list',
-      { limit: 200 },
-      { items: [], nextCursor: null }
+      { pageSize: 200 },
+      { items: [], nextPageToken: null, totalSize: 0 }
     ).items
   );
 

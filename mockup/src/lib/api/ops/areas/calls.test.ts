@@ -39,7 +39,7 @@ beforeEach(() => {
 
 describe('calls history', () => {
   it('narrows a user to their own calls', () => {
-    const own = run<Page<Call>>(mira, 'calls.list', { limit: 200 }).items;
+    const own = run<Page<Call>>(mira, 'calls.list', { pageSize: 200 }).items;
     expect(own.length).toBeGreaterThan(0);
     expect(
       own.every(row =>
@@ -79,9 +79,11 @@ describe('calls history', () => {
     const rows = run<Page<Call>>(jonas, 'calls.list', {
       from: today,
       to: today,
-      limit: 200
+      pageSize: 200
     }).items;
-    const others = run<Page<Call>>(jonas, 'calls.list', { limit: 200 }).items;
+    const others = run<Page<Call>>(jonas, 'calls.list', {
+      pageSize: 200
+    }).items;
     expect(rows.length).toBeLessThanOrEqual(others.length);
     expect(
       refusal(() => run(jonas, 'calls.list', { from: 'yesterday' })).code
@@ -218,7 +220,7 @@ describe('voicemail and recordings', () => {
   it('shows a user their own and their ring groups’ mailboxes only', () => {
     const items = run<
       Page<{ mailboxUserId: string | null; mailboxRingGroupId: string | null }>
-    >(mira, 'voicemails.list', { limit: 200 }).items;
+    >(mira, 'voicemails.list', { pageSize: 200 }).items;
     expect(items.length).toBeGreaterThan(0);
     expect(
       items.every(
@@ -330,7 +332,7 @@ describe('statistics and presence', () => {
     const { items } = run<Page<{ userId: string; status: string }>>(
       jonas,
       'presenceLog.snapshot',
-      { at: new Date().toISOString(), limit: 200 }
+      { at: new Date().toISOString(), pageSize: 200 }
     );
     expect(items.find(item => item.userId === U.tobias)?.status).toBe('dnd');
     expect(items.find(item => item.userId === U.felix)?.status).toBe('busy');

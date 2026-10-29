@@ -2,12 +2,7 @@ import { z } from 'zod';
 
 import { HTTP_NOT_FOUND } from '@zamfono/shared';
 
-import {
-  decodeOffsetCursor,
-  offsetPage,
-  pageInput,
-  pageOutput
-} from '#lib/server/pagination.js';
+import { arrayPage, pageInput, pageOutput } from '#lib/server/pagination.js';
 
 import { resolveTarget } from '../forwardTargetSpec.js';
 import {
@@ -27,7 +22,7 @@ const inputSchema = z
 
 /**
  * `GET /users/{id}/ooo`, `/ringGroups/{id}/ooo`, `/menus/{id}/ooo`, `/tenant/ooo` (§10.2 "Out of
- * office"): the out-of-office rules of one scope, oldest start first, offset-cursor paginated
+ * office"): the out-of-office rules of one scope, oldest start first, paginated
  * like every list endpoint (§10.3 "Conventions").
  */
 export const list = defineOperation({
@@ -41,16 +36,12 @@ export const list = defineOperation({
   readOnly: true,
   run: async (ctx, input) => {
     await assertScopeExists(ctx.db, input.scope);
-    const offset = decodeOffsetCursor(ctx.operation, input.cursor);
-    const { limit } = input;
     // A scope's rules are few, so the page is cut from the whole ordered set here rather than
     // in SQL, which keeps `liveOooRulesInScope` the one query the overlap checks share.
-    const rows = await liveOooRulesInScope(ctx.db, input.scope);
-    const { page, nextCursor } = offsetPage(
+    const { page, nextPageToken, totalSize } = arrayPage(
       ctx.operation,
-      rows.slice(offset, offset + limit + 1),
-      offset,
-      limit
+      input,
+      await liveOooRulesInScope(ctx.db, input.scope)
     );
     const items = await Promise.all(
       page.map(async row => ({
@@ -63,6 +54,6 @@ export const list = defineOperation({
         createdAt: row.createdAt
       }))
     );
-    return { items, nextCursor };
+    return { items, nextPageToken, totalSize };
   }
 });

@@ -188,19 +188,19 @@ describe('search', () => {
     const db = await makeTestDb();
     await seedSettings(db);
     await seedFixtures(db);
-    type Page = { items: Item[]; nextCursor: string | null };
+    type Page = { items: Item[]; nextPageToken: string | null };
     const first = (await runOperation(
       db,
       'search.query',
       // eslint-disable-next-line id-length -- 'q' is the wire query-parameter name fixed by §10.3's `GET /search?q=`
-      { q: '10', limit: 1 },
+      { q: '10', pageSize: 1 },
       asRun({ actor: user })
     )) as Page;
     const second = (await runOperation(
       db,
       'search.query',
       // eslint-disable-next-line id-length -- 'q' is the wire query-parameter name fixed by §10.3's `GET /search?q=`
-      { q: '10', limit: 1, cursor: first.nextCursor },
+      { q: '10', pageSize: 1, pageToken: first.nextPageToken },
       asRun({ actor: user })
     )) as Page;
     expect([...first.items, ...second.items]).toEqual([
@@ -217,6 +217,6 @@ describe('search', () => {
         matched: 'extension'
       }
     ]);
-    expect(second.nextCursor).toBeNull();
+    expect(second.nextPageToken).toBeNull();
   });
 });

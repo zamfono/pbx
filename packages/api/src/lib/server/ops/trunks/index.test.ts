@@ -796,29 +796,29 @@ describe('trunks operations', () => {
     await expect(attempt).rejects.toMatchObject({ status: 422 });
   });
 
-  // §10.3 "Conventions": list endpoints paginate with `?limit=` and an opaque `?cursor=`.
-  it('list pages through the trunks in trunk order with limit and cursor', async () => {
+  // §10.3 "Conventions": list endpoints paginate with `?pageSize=` and an opaque `?pageToken=`.
+  it('list pages through the trunks in trunk order with pageSize and pageToken', async () => {
     const db = await makeTestDb();
     const first = await createTrunk(db, { name: 'Provider A' });
     const second = await createTrunk(db, { name: 'Provider B' });
-    type Page = { items: { id: string }[]; nextCursor: string | null };
+    type Page = { items: { id: string }[]; nextPageToken: string | null };
 
     const one = (await runOperation(
       db,
       'trunks.list',
-      { limit: 1 },
+      { pageSize: 1 },
       asRun()
     )) as Page;
     expect(one.items.map(item => item.id)).toEqual([first.trunk.id]);
-    expect(one.nextCursor).toEqual(expect.any(String));
+    expect(one.nextPageToken).toEqual(expect.any(String));
 
     const two = (await runOperation(
       db,
       'trunks.list',
-      { limit: 1, cursor: one.nextCursor },
+      { pageSize: 1, pageToken: one.nextPageToken },
       asRun()
     )) as Page;
     expect(two.items.map(item => item.id)).toEqual([second.trunk.id]);
-    expect(two.nextCursor).toBeNull();
+    expect(two.nextPageToken).toBeNull();
   });
 });

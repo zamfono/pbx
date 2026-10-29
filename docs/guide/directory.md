@@ -65,7 +65,8 @@ query, matched case-insensitively as a substring, against
       "matched": "phones"
     }
   ],
-  "nextCursor": null
+  "nextPageToken": null,
+  "totalSize": 2
 }
 ```
 
@@ -74,4 +75,6 @@ the resource that hit, as that resource names it (a user's `name`, `extension` o
 group's `name` or `ext`, a contact's `displayName`, `company` or `phones`), so a client renders one
 mixed list and links each item to its resource. A pasted number finds the contact whatever its
 spelling: `+43 1 987 6543`, `01 987 6543`, `9876543` and `(01) 987` all find the contact above.
-Deleted rows never appear. Like every list, the hits are paged with `limit` and `cursor`.
+Deleted rows never appear. Like every list, the hits are paged with `pageSize`, `pageToken` and
+`skip`. To page through the phone book itself under a search, `contacts.list`
+(`GET /api/v1/contacts?q=`) takes the same text and matches contacts the same way.

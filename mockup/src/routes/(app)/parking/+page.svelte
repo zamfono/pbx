@@ -32,8 +32,8 @@
   const parked = $derived(
     read<Page<ParkedOut>>(
       'parking.list',
-      { limit: 200 },
-      { items: [], nextCursor: null }
+      { pageSize: 200 },
+      { items: [], nextPageToken: null, totalSize: 0 }
     ).items
   );
   const settings = $derived(store.db.settings);

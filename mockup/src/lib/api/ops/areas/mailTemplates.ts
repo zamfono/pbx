@@ -23,6 +23,7 @@ import {
   type MailTemplate
 } from '../../types';
 import { defineOp } from '../core';
+import { paginate, type Page } from './calls';
 import { relayConfigured } from './settings';
 
 /** A template as `GET /mailTemplates` returns it. */
@@ -88,18 +89,20 @@ export function effectiveTemplate(db: Db, key: Key): MailTemplateWire {
 }
 
 defineOp<
-  { limit?: number; cursor?: string },
-  { items: MailTemplateWire[]; nextCursor: null }
+  { pageSize?: number; pageToken?: string; skip?: number },
+  Page<MailTemplateWire>
 >({
   name: 'mailTemplates.list',
   minRole: 'admin',
   readOnly: true,
-  run: ctx => ({
-    items: MAIL_KINDS.map(kind =>
-      effectiveTemplate(ctx.db, { kind, language: ctx.db.settings.language })
-    ),
-    nextCursor: null
-  })
+  run: (ctx, input) =>
+    paginate(
+      ctx.operation,
+      MAIL_KINDS.map(kind =>
+        effectiveTemplate(ctx.db, { kind, language: ctx.db.settings.language })
+      ),
+      input
+    )
 });
 
 defineOp<Key, MailTemplateWire>({

@@ -63,7 +63,7 @@
   import EmptyState from '#lib/ui/EmptyState.svelte';
   import Stat from '#lib/ui/Stat.svelte';
 
-  const EMPTY = { items: [], nextCursor: null };
+  const EMPTY = { items: [], nextPageToken: null, totalSize: 0 };
   const actor = $derived(currentActor());
   const admin = $derived(actor.role !== 'user');
   const me = $derived(userById(actor.id));
@@ -96,7 +96,7 @@
   const todays = $derived(
     read<Page<CallOut>>(
       'calls.list',
-      { userId: actor.id, from: localDate(0), to: localDate(0), limit: 200 },
+      { userId: actor.id, from: localDate(0), to: localDate(0), pageSize: 200 },
       EMPTY
     ).items
   );
@@ -104,7 +104,7 @@
     todays.filter(call => cameIn(call, actor.id) && isMissed(call))
   );
   const recent = $derived(
-    read<Page<CallOut>>('calls.list', { userId: actor.id, limit: 6 }, EMPTY)
+    read<Page<CallOut>>('calls.list', { userId: actor.id, pageSize: 6 }, EMPTY)
       .items
   );
 
@@ -112,7 +112,7 @@
   const voicemails = $derived(
     read<Page<VoicemailOut>>(
       'voicemails.list',
-      { limit: 200 },
+      { pageSize: 200 },
       EMPTY
     ).items.filter(
       vm =>
@@ -123,10 +123,11 @@
   );
   const unread = $derived(voicemails.filter(vm => !vm.read));
   const parked = $derived(
-    read<Page<ParkedOut>>('parking.list', { limit: 200 }, EMPTY).items
+    read<Page<ParkedOut>>('parking.list', { pageSize: 200 }, EMPTY).items
   );
   const live = $derived(
-    read<Page<LiveCall>>('calls.list', { live: true, limit: 200 }, EMPTY).items
+    read<Page<LiveCall>>('calls.list', { live: true, pageSize: 200 }, EMPTY)
+      .items
   );
   const myLive = $derived(live.filter(call => call.userIds.includes(actor.id)));
 

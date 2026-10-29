@@ -21,6 +21,7 @@ import {
   type ChangeEntry
 } from '../../types';
 import { defineOp } from '../core';
+import { paginate, type Page } from './calls';
 
 export type BackupTargetWire = Omit<BackupTarget, 'deletedAt' | 'label'>;
 export type BackupRunWire = Omit<BackupRun, 'trigger'>;
@@ -232,18 +233,20 @@ export function targetLocation(target: {
 /* ---------------- targets ---------------- */
 
 defineOp<
-  { limit?: number; cursor?: string },
-  { items: BackupTargetWire[]; nextCursor: null }
+  { pageSize?: number; pageToken?: string; skip?: number },
+  Page<BackupTargetWire>
 >({
   name: 'backups.targets.list',
   minRole: 'admin',
   readOnly: true,
-  run: ctx => ({
-    items: ctx.db.backupTargets
-      .filter(row => row.deletedAt === null)
-      .map(targetToWire),
-    nextCursor: null
-  })
+  run: (ctx, input) =>
+    paginate(
+      ctx.operation,
+      ctx.db.backupTargets
+        .filter(row => row.deletedAt === null)
+        .map(targetToWire),
+      input
+    )
 });
 
 defineOp<
@@ -382,21 +385,23 @@ defineOp<{ id: string }, { id: string }>({
 /* ---------------- runs ---------------- */
 
 defineOp<
-  { targetId?: string; limit?: number; cursor?: string },
-  { items: BackupRunWire[]; nextCursor: null }
+  { targetId?: string; pageSize?: number; pageToken?: string; skip?: number },
+  Page<BackupRunWire>
 >({
   name: 'backups.runs.list',
   minRole: 'admin',
   readOnly: true,
-  run: (ctx, input) => ({
-    items: ctx.db.backupRuns
-      .filter(
-        row => input.targetId === undefined || row.targetId === input.targetId
-      )
-      .toSorted((a, b) => b.startedAt.localeCompare(a.startedAt))
-      .map(runToWire),
-    nextCursor: null
-  })
+  run: (ctx, input) =>
+    paginate(
+      ctx.operation,
+      ctx.db.backupRuns
+        .filter(
+          row => input.targetId === undefined || row.targetId === input.targetId
+        )
+        .toSorted((a, b) => b.startedAt.localeCompare(a.startedAt))
+        .map(runToWire),
+      input
+    )
 });
 
 defineOp<{ id: string }, BackupRunWire>({

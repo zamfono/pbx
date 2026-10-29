@@ -1,14 +1,9 @@
-import {
-  decodeOffsetCursor,
-  offsetPage,
-  pageInput,
-  pageOutput
-} from '#lib/server/pagination.js';
+import { pageInput, pageOutput, sqlPage } from '#lib/server/pagination.js';
 
 import { defineOperation } from '../types.js';
 import { audioAssetOut, toAudioAssetOut } from './_shared.js';
 
-/** `GET /audio` (§10.3 "Audio"): live audio assets, alphabetical, offset-cursor paginated. */
+/** `GET /audio` (§10.3 "Audio"): live audio assets, alphabetical, paginated. */
 export const listAudioAssets = defineOperation({
   name: 'audio.list',
   description: "Lists the tenant's live audio assets.",
@@ -17,17 +12,18 @@ export const listAudioAssets = defineOperation({
   minRole: 'admin',
   readOnly: true,
   run: async (ctx, input) => {
-    const offset = decodeOffsetCursor(ctx.operation, input.cursor);
-    const { limit } = input;
-    const rows = await ctx.db
-      .selectFrom('audioAssets')
-      .selectAll()
-      .where('deletedAt', 'is', null)
-      .orderBy('label')
-      .offset(offset)
-      .limit(limit + 1)
-      .execute();
-    const { page, nextCursor } = offsetPage(ctx.operation, rows, offset, limit);
-    return { items: page.map(toAudioAssetOut), nextCursor };
+    const { page, nextPageToken, totalSize } = await sqlPage(
+      ctx.operation,
+      input,
+      ctx.db
+        .selectFrom('audioAssets')
+        .selectAll()
+        .where('deletedAt', 'is', null),
+      [
+        ['label', 'asc'],
+        ['id', 'asc']
+      ]
+    );
+    return { items: page.map(toAudioAssetOut), nextPageToken, totalSize };
   }
 });

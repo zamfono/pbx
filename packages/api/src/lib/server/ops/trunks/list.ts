@@ -1,9 +1,4 @@
-import {
-  decodeOffsetCursor,
-  offsetPage,
-  pageInput,
-  pageOutput
-} from '#lib/server/pagination.js';
+import { pageInput, pageOutput, sqlPage } from '#lib/server/pagination.js';
 
 import { defineOperation } from '../types.js';
 import { mapTrunkRow, trunkWire, type TrunkHostRow } from './_shared.js';
@@ -22,7 +17,7 @@ function groupHostsByTrunk(hosts: TrunkHostRow[]): Map<string, TrunkHostRow[]> {
   return byTrunk;
 }
 
-/** `GET /trunks` (§10.3): live trunks in trunk order (§9.4), offset-cursor paginated like every
+/** `GET /trunks` (§10.3): live trunks in trunk order (§9.4), paginated like every
  *  list endpoint (§10.3 "Conventions"). */
 export const list = defineOperation({
   name: 'trunks.list',
@@ -33,21 +28,18 @@ export const list = defineOperation({
   minRole: 'admin',
   readOnly: true,
   run: async (ctx, input) => {
-    const offset = decodeOffsetCursor(ctx.operation, input.cursor);
-    const { limit } = input;
-    const pageRows = await ctx.db
-      .selectFrom('trunks')
-      .selectAll()
-      .where('deletedAt', 'is', null)
-      .orderBy('priority')
-      .offset(offset)
-      .limit(limit + 1)
-      .execute();
-    const { page: rows, nextCursor } = offsetPage(
+    const {
+      page: rows,
+      nextPageToken,
+      totalSize
+    } = await sqlPage(
       ctx.operation,
-      pageRows,
-      offset,
-      limit
+      input,
+      ctx.db.selectFrom('trunks').selectAll().where('deletedAt', 'is', null),
+      [
+        ['priority', 'asc'],
+        ['id', 'asc']
+      ]
     );
     const trunkIds = rows.map(row => row.id);
     const hosts =
@@ -68,7 +60,8 @@ export const list = defineOperation({
           statuses[row.id] ?? UNKNOWN_STATUS
         )
       ),
-      nextCursor
+      nextPageToken,
+      totalSize
     };
   }
 });

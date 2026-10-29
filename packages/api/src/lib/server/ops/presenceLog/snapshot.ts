@@ -2,12 +2,7 @@ import { z } from 'zod';
 
 import { PRESENCE_STATUSES } from '@zamfono/shared';
 
-import {
-  decodeOffsetCursor,
-  offsetPage,
-  pageInput,
-  pageOutput
-} from '#lib/server/pagination.js';
+import { pageInput, pageOutput, sqlPage } from '#lib/server/pagination.js';
 
 import { instantInput, tenantInstantReader } from '../instantInput.js';
 import { defineOperation } from '../types.js';
@@ -46,8 +41,6 @@ export const snapshot = defineOperation({
   minRole: 'admin',
   readOnly: true,
   run: async (ctx, input) => {
-    const offset = decodeOffsetCursor(ctx.operation, input.cursor);
-    const { limit } = input;
     const instants = await tenantInstantReader(ctx.db);
     let ranked = ctx.db
       .selectFrom('presenceLog')
@@ -71,15 +64,15 @@ export const snapshot = defineOperation({
     if (input.userId !== undefined) {
       ranked = ranked.where('userId', '=', input.userId);
     }
-    const rows = await ctx.db
-      .selectFrom(ranked.as('ranked'))
-      .select(['userId', 'status', 'since', 'peer', 'ringGroupId'])
-      .where('rank', '=', 1)
-      .orderBy('userId')
-      .offset(offset)
-      .limit(limit + 1)
-      .execute();
-    const { page, nextCursor } = offsetPage(ctx.operation, rows, offset, limit);
-    return { items: page, nextCursor };
+    const { page, nextPageToken, totalSize } = await sqlPage(
+      ctx.operation,
+      input,
+      ctx.db
+        .selectFrom(ranked.as('ranked'))
+        .select(['userId', 'status', 'since', 'peer', 'ringGroupId'])
+        .where('rank', '=', 1),
+      [['userId', 'asc']]
+    );
+    return { items: page, nextPageToken, totalSize };
   }
 });

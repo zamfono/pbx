@@ -202,21 +202,21 @@ describe('handleRest', () => {
     ]);
   });
 
-  it('paginates with ?limit= and continues from the returned nextCursor', async () => {
+  it('paginates with ?pageSize= and continues from the returned nextPageToken', async () => {
     const deps = await testDeps();
     await seedUsers(deps.db);
     const LIMIT = 2;
-    const first = await rest(deps, `/users?limit=${LIMIT}`);
+    const first = await rest(deps, `/users?pageSize=${LIMIT}`);
     const firstBody = (await first.json()) as {
       items: { id: string }[];
-      nextCursor: string;
+      nextPageToken: string;
     };
     expect(firstBody.items).toHaveLength(LIMIT);
-    expect(typeof firstBody.nextCursor).toBe('string');
+    expect(typeof firstBody.nextPageToken).toBe('string');
 
     const second = await rest(
       deps,
-      `/users?limit=${LIMIT}&cursor=${encodeURIComponent(firstBody.nextCursor)}`
+      `/users?pageSize=${LIMIT}&pageToken=${encodeURIComponent(firstBody.nextPageToken)}`
     );
     const secondBody = (await second.json()) as { items: { id: string }[] };
     expect(secondBody.items).toHaveLength(LIMIT);
@@ -240,7 +240,11 @@ describe('handleRest', () => {
     vi.mocked(getCoreClient).mockReturnValue(stubCoreClient({ state }));
     const response = await rest(deps, '/calls?live=true');
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ items: [], nextCursor: null });
+    expect(await response.json()).toEqual({
+      items: [],
+      nextPageToken: null,
+      totalSize: 0
+    });
     expect(state).toHaveBeenCalledOnce();
   });
 
@@ -319,7 +323,7 @@ describe('buildOpenApiDocument', () => {
     }
     const usersList = operationAt(doc, '/users', 'get');
     const limitParam = usersList.parameters?.find(
-      parameter => parameter.name === 'limit'
+      parameter => parameter.name === 'pageSize'
     );
     expect(limitParam?.schema.type).toBe('integer');
     // `{id}` is the URL's (§10.3); the body carries the confirmation instead.

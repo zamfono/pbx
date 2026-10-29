@@ -90,7 +90,7 @@ export async function liveOooRule(db: Db, id: string): Promise<OooRuleRow> {
 
 /**
  * Every live `ooo_rules` row in `scope`, in `starts_at` order (NULLs, meaning "now", first), ties
- * broken by id so `ooo.list`'s offset cursor resumes on a stable order.
+ * broken by id so `ooo.list`'s page token resumes on a stable order.
  */
 export async function liveOooRulesInScope(
   db: Db,

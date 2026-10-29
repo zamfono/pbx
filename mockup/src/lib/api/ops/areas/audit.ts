@@ -15,6 +15,7 @@ import type {
   RowTable
 } from '../../types';
 import { defineOp, undoEntry, type Ctx } from '../core';
+import { paginate, type Page } from './calls';
 
 export type AuditState = 'live' | 'undone' | 'all';
 export type AuditEntryWire = Omit<AuditEntry, 'revert' | 'pure'>;
@@ -31,8 +32,9 @@ export type AuditListInput = {
   /** ISO instant, or a date meaning before the end of that day. */
   to?: string;
   state?: AuditState;
-  limit?: number;
-  cursor?: string;
+  pageSize?: number;
+  pageToken?: string;
+  skip?: number;
 };
 
 /** The table each entity kind's row lives in (`ENTITY_TABLES`). */
@@ -76,7 +78,7 @@ function endOf(value: string): string {
 const startOf = (value: string): string =>
   DATE_ONLY.test(value) ? new Date(`${value}T00:00:00`).toISOString() : value;
 
-defineOp<AuditListInput, { items: AuditEntryWire[]; nextCursor: null }>({
+defineOp<AuditListInput, Page<AuditEntryWire>>({
   name: 'audit.list',
   minRole: 'admin',
   readOnly: true,
@@ -102,12 +104,13 @@ defineOp<AuditListInput, { items: AuditEntryWire[]; nextCursor: null }>({
             ? entry.undoneAt === null
             : entry.undoneAt !== null))
     );
-    return {
-      items: items
+    return paginate(
+      ctx.operation,
+      items
         .toSorted((a, b) => b.createdAt.localeCompare(a.createdAt))
         .map(toWire),
-      nextCursor: null
-    };
+      input
+    );
   }
 });
 

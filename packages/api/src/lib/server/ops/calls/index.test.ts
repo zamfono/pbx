@@ -191,22 +191,27 @@ describe('calls', () => {
     const firstPage = (await runOperation(
       db,
       'calls.list',
-      { live: true, limit: 1 },
+      { live: true, pageSize: 1 },
       asRun()
-    )) as { items: LiveCall[]; nextCursor: string | null };
+    )) as { items: LiveCall[]; nextPageToken: string | null };
     expect(firstPage.items).toHaveLength(1);
     const secondPage = (await runOperation(
       db,
       'calls.list',
-      { live: true, limit: 1, cursor: firstPage.nextCursor },
+      { live: true, pageSize: 1, pageToken: firstPage.nextPageToken },
       asRun()
-    )) as { items: LiveCall[]; nextCursor: string | null };
+    )) as { items: LiveCall[]; nextPageToken: string | null };
     expect(
       [...firstPage.items, ...secondPage.items].map(item => item.callId).sort()
     ).toEqual(['call-1', 'call-2']);
-    expect(secondPage.nextCursor).toBeNull();
+    expect(secondPage.nextPageToken).toBeNull();
     await expect(
-      runOperation(db, 'calls.list', { live: true, cursor: 'garbage' }, asRun())
+      runOperation(
+        db,
+        'calls.list',
+        { live: true, pageToken: 'garbage' },
+        asRun()
+      )
     ).rejects.toMatchObject({ status: 422 });
   });
 
