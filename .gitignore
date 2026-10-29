@@ -13,6 +13,7 @@ coverage
 
 packages/*/dist
 packages/*/build
+mockup/build
 db/dist
 .svelte-kit/
 *.tsbuildinfo
