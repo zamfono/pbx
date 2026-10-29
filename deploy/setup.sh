@@ -45,10 +45,17 @@ v_mode() { [[ $1 == ports || $1 == macvlan ]]; }
 v_security() { [[ $1 == tls || $1 == starttls ]]; }
 v_bool() { [[ $1 == true || $1 == false ]]; }
 v_rtp_start() { v_port "$1" && (($1 >= 1024)); }
-# Above the start, and clear of the other UDP ports in the stack's namespace: STUN and SIP.
+# Above the start (RTP_PORT_START, or the second argument), and clear of the other UDP ports in
+# the stack's namespace: STUN and SIP.
 v_rtp_end() {
-  v_port "$1" && (($1 > RTP_PORT_START)) &&
-    ((RTP_PORT_START > 3478 || $1 < 3478)) && ((RTP_PORT_START > 5060 || $1 < 5060))
+  local start=${2:-$RTP_PORT_START}
+  v_port "$1" && (($1 > start)) && ((start > 3478 || $1 < 3478)) && ((start > 5060 || $1 < 5060))
+}
+# first-last, both as above.
+v_rtp_range() {
+  [[ $1 =~ ^[[:space:]]*([0-9]+)[[:space:]]*-[[:space:]]*([0-9]+)[[:space:]]*$ ]] || return 1
+  local start=${BASH_REMATCH[1]} end=${BASH_REMATCH[2]}
+  v_rtp_start "$start" && v_rtp_end "$end" "$start"
 }
 # An IANA name, such as Europe/Berlin, that the host's time zone database holds, where it has one;
 # api and core take any other TZ for UTC.
@@ -115,8 +122,31 @@ ask_mail() {
 ask_network() {
   if [[ -z ${SIP_UDP_ENABLED:-}${SIP_TCP_ENABLED:-}${STUN_ENABLED:-}${RTP_PORT_START:-}${RTP_PORT_END:-} ]]; then
     [[ -n $interactive ]] || return 0
-    ui_yesno "Change the ports the stack answers on?\n\nBy default: SIP over UDP and TCP on 5060, SIP over TLS on 5061 (always on), STUN on 3478/udp and RTP on 10000-10200/udp." || return 0
+    ui_yesno "Change the ports the stack answers on?\n\nBy default: SIP over UDP and TCP on 5060, SIP over TLS on 5061 (always on), STUN on 3478/udp and RTP on 10000-10200/udp." Change "Keep defaults" no || return 0
   fi
+  local on tag range=
+  if [[ -n $interactive && -z ${SIP_UDP_ENABLED:-}${SIP_TCP_ENABLED:-}${STUN_ENABLED:-} ]]; then
+    until on=$(ui_checklist Listeners "The listeners to keep on. SIP over TLS on 5061 always is." \
+      udp "SIP over UDP on 5060: trunks, allowlisted desk phones" ON \
+      tcp "SIP over TCP on 5060: trunks, allowlisted desk phones" ON \
+      stun "STUN on 3478/udp: phones asking for their address" ON); do
+      ui_cancel
+    done
+    SIP_UDP_ENABLED=false SIP_TCP_ENABLED=false STUN_ENABLED=false
+    for tag in $on; do
+      case $tag in
+        udp) SIP_UDP_ENABLED=true ;;
+        tcp) SIP_TCP_ENABLED=true ;;
+        stun) STUN_ENABLED=true ;;
+      esac
+    done
+  fi
+  if [[ -n $interactive && -z ${RTP_PORT_START:-}${RTP_PORT_END:-} ]]; then
+    ask range v_rtp_range "RTP range" "The UDP ports for media, as first-last: from 1024 up, leaving out 3478 and 5060." 10000-10200
+    range=${range//[[:space:]]/}
+    RTP_PORT_START=${range%-*} RTP_PORT_END=${range#*-}
+  fi
+  # From the environment, or asked one by one where it holds some of them only or an invalid one.
   ask SIP_UDP_ENABLED v_bool "SIP over UDP" "true or false: SIP on 5060/udp, for trunks and allowlisted desk phones." true
   ask SIP_TCP_ENABLED v_bool "SIP over TCP" "true or false: SIP on 5060/tcp, for the same." true
   ask STUN_ENABLED v_bool "STUN" "true or false: the STUN server on 3478/udp, for phones that ask for their public address." true

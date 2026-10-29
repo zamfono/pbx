@@ -11,6 +11,15 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+### Changed
+
+- `setup.sh` asks which of SIP over UDP, SIP over TCP and STUN to keep on with one checklist,
+  instead of a `true` or `false` answer for each, and for the RTP range in one field
+  (`10000-10200`). Its question whether to change the ports at all now defaults to keeping them.
+- `setup.sh`'s dialogs use no blue, which many terminal themes show so light that the text on it
+  was hard to read: the terminal's own colours around a dialog, black on light grey in it. A
+  `NEWT_COLORS` of your own still applies.
+
 ## [0.7.5] - 2026-10-29
 
 ### Added
