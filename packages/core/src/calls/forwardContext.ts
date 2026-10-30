@@ -200,3 +200,23 @@ export function noteBlindTransfer(
     diversionFor(snapshot, call, { userId: transferrerUserId }, 'deflection')
   );
 }
+
+/** Records a blind transfer by a forward's leg with no user, a voice bot's or a SIP target's, in
+ * its onward call's context: the deflection of the party whose forward reached the leg, `parent`'s
+ * newest hop, else of the DID `parent` came in on, for a leg a menu reached (§9.4 "Forwarded
+ * calls"). */
+export function noteUserlessTransfer(
+  snapshot: Snapshot,
+  call: Call,
+  parent: Call
+): void {
+  const hop = parent.diversions.at(-1);
+  if (hop !== undefined) {
+    noteDiversion(call, { ...hop, reason: 'deflection' });
+  } else if (parent.didId !== null) {
+    noteDiversion(
+      call,
+      diversionFor(snapshot, parent, { didId: parent.didId }, 'deflection')
+    );
+  }
+}

@@ -11,6 +11,15 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+### Fixed
+
+- A voice bot's blind transfer to an external number, with its session token, and any other
+  transfer by a leg with no user, such as a `sip` target's, sends the `Diversion` the trunk's
+  `diversion` asks for, naming whoever forwarded the call to the bot, else the DID the caller
+  dialled, reason `deflection`. A trunk with `forwardedCallerId` `original` or
+  `originalPreferred` now presents the original caller on such a transfer, where it presented the
+  company's number.
+
 ## [0.8.2] - 2026-10-30
 
 ### Changed

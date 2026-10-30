@@ -48,7 +48,8 @@ extension: `off` (the default) sends none, `last` the newest forward, `all` ever
 first. Carriers that show the original caller on a forwarded call recognise the forward by it. A DID
 or a fallback names the called number and the DID's or block's label, reason `unconditional`; a
 blind transfer names the transferring user, reason `deflection`, before any forward its target
-makes.
+makes. A voice bot's transfer, or one by a `sip` target's leg, has no user: it names whoever
+forwarded the call there, else the DID the caller dialled, reason `deflection`.
 
 ## Presenting the original caller: `forwardedCallerId`
 

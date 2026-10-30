@@ -18,7 +18,7 @@ import {
   startRig,
   type Rig
 } from '../testing/pipelineRig.js';
-import { seedUserWithDevice } from '../testing/seedRows.js';
+import { seedForwardTarget, seedUserWithDevice } from '../testing/seedRows.js';
 import { callerChannel, type Call } from './call.js';
 import type { Pipeline } from './pipeline.js';
 import { transferCall } from './transfers.js';
@@ -216,6 +216,70 @@ describe('a blind transfer to an external number (§9.4 "Forwarded calls")', () 
       expect(leg.callerId).toBe(CALLER);
     }
   );
+
+  describe('by a voice bot, whose leg has no user', () => {
+    const DID = '+15551078';
+    const HOTLINE = `"Hotline" <sip:${DID}@pbx.example.com>;reason=deflection`;
+
+    /** The bot's leg answering a call that came in on the `Hotline` DID, transferring the caller
+     * with its session token, which names the caller's leg. */
+    async function botTransfer(
+      adjust: (call: Call, didId: string) => void
+    ): Promise<Originate> {
+      await seedTrunk(db, 'last', 'original');
+      const didId = newId();
+      await db
+        .insertInto('dids')
+        .values({
+          id: didId,
+          number: DID,
+          label: 'Hotline',
+          targetId: await seedForwardTarget(db, { external: TARGET }),
+          createdAt: nowIso()
+        })
+        .execute();
+      const call = await answeredCall(rig, transferrer, { from: CALLER });
+      const bot = call.legs.get(legOf(call));
+      if (bot !== undefined) {
+        call.legs.set(bot.channelId, {
+          ...bot,
+          kind: 'webSocket',
+          userId: null
+        });
+      }
+      call.didId = didId;
+      adjust(call, didId);
+      await transferCall(pipeline, call, {
+        target: TARGET,
+        actorUserId: bot?.id ?? '',
+        legId: call.callerLegId
+      });
+      return trunkLeg();
+    }
+
+    it('deflects from the party whose forward reached the bot', async () => {
+      const leg = await botTransfer(call => {
+        call.diversions.push({
+          number: DID,
+          diversionNumber: DID,
+          name: 'Hotline',
+          reason: 'cfu',
+          party: 'number',
+          extension: null
+        });
+      });
+      expect(leg.variables?.[DIVERSION]).toBe(HOTLINE);
+      expect(leg.variables?.['REDIRECTING(count,i)']).toBe('1');
+      expect(leg.callerId).toBe(CALLER);
+      expect(leg.variables?.[PAI]).toBe(`<sip:${MAIN}@pbx.example.com>`);
+    });
+
+    it('deflects from the DID the call came in on when a menu reached the bot', async () => {
+      const leg = await botTransfer(() => undefined);
+      expect(leg.variables?.[DIVERSION]).toBe(HOTLINE);
+      expect(leg.callerId).toBe(CALLER);
+    });
+  });
 
   it('follows a REFER blind transfer the same way', async () => {
     await seedTrunk(db, 'last', 'original');

@@ -93,7 +93,9 @@ OpenAI's Realtime API, is `forward-to-ai-agent` instead.
    - to hang up: `calls.hangup` (`POST /api/v1/calls/{id}/hangup`) with the call's id
      (`callSid`, or `callId`);
    - to hand the caller to a person: `calls.transfer` (`POST /api/v1/calls/{id}/transfer`) with
-     `"target": "102"` and `"legId": <callerLegId>`; the bot's own leg is released;
+     `"target": "102"` and `"legId": <callerLegId>`; the bot's own leg is released. To an
+     external number the transfer is the DID's forward handed on, so a trunk with "CLIP no
+     screening" shows the caller (`forwardedCallerId`, see `caller-id`);
    - to hold, resume or park the caller: `calls.hold`, `calls.resume` and `calls.park` the same
      way.
 

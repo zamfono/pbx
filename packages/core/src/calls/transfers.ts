@@ -15,6 +15,7 @@ import type { Snapshot } from '../internal/snapshot.js';
 import { ActionError } from './actionError.js';
 import { type Call } from './call.js';
 import { ownerForExt } from './extensionOwner.js';
+import { noteUserlessTransfer } from './forwardContext.js';
 import { endHold } from './hold.js';
 import { closeCall } from './liveCall.js';
 import { actedParty } from './liveLegs.js';
@@ -42,15 +43,18 @@ type Onward =
 
 /**
  * The transferee's own new call, going `onward`: a target is routed as the transferrer's call
- * (§9.4), so an external number leaves under the transferrer's routes and caller-ID.
+ * (§9.4), so an external number leaves under the transferrer's routes and caller-ID. A forward's
+ * leg with no user, a voice bot's or a SIP target's, transfers for the party whose forward reached
+ * it (`noteUserlessTransfer`).
  */
 async function startTransfereeCall(
   pipeline: Pipeline,
   parent: Call,
-  transferee: string,
+  transfer: { transferee: string; transferrer: string },
   onward: Onward,
   transferrerUserId: string | null
 ): Promise<Call> {
+  const { transferee, transferrer } = transfer;
   const snapshot = await pipeline.deps.cache.get();
   const dial = 'resolved' in onward ? onward.resolved : null;
   const entry: OnwardEntry = {
@@ -71,14 +75,22 @@ async function startTransfereeCall(
     parent,
     transferee,
     { snapshot, entry },
-    child =>
-      'mailbox' in onward
-        ? deposit(pipeline, child, onward.mailbox, 'transfer')
-        : dispatchAction(pipeline, child, onward.resolved.action, {
-            snapshot,
-            asUser: transferrerUserId,
-            blindTransfer: true
-          })
+    child => {
+      if ('mailbox' in onward) {
+        return deposit(pipeline, child, onward.mailbox, 'transfer');
+      }
+      if (
+        transferrerUserId === null &&
+        transferrer !== parent.callerChannelId
+      ) {
+        noteUserlessTransfer(snapshot, child, parent);
+      }
+      return dispatchAction(pipeline, child, onward.resolved.action, {
+        snapshot,
+        asUser: transferrerUserId,
+        blindTransfer: true
+      });
+    }
   );
 }
 
@@ -143,7 +155,7 @@ export async function transferCall(
   return startTransfereeCall(
     pipeline,
     call,
-    transferee,
+    { transferee, transferrer },
     onward,
     transferrerUserId
   );

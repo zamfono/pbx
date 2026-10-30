@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-30 · §9.4 Forwarded calls.** A blind transfer by a forward's leg with no user, a voice bot's or a SIP target's, starts its onward call's context with the deflection of the party whose forward reached that leg, the call's newest hop, else of the DID an inbound call came in on.
+*Why:* the context started with the transferring user alone, so a bot's `calls.transfer` with its session token sent no `Diversion`, and a trunk with `forwarded_caller_id` `original` presented the company's number instead of the caller. The product owner: "a blind transfer by a bot with "CLIP no screening" still doesn't forward the initial caller's number".
+
 **2026-10-29 · §6.3 Updates.** `update.sh` refuses an update, before downloading anything, while the stack directory's filesystem has less than 3 GB free, and once the recreated stack is healthy removes the stack's own images no container uses.
 *Why:* every update left the previous release's images behind, a few GB each, until a 19 GB disk filled: the next update's pull succeeded, and `migrate` then failed with `SQLITE_IOERR_SHMSIZE`, leaving the stack without `api` and `core`. The product owner: "should we add a "docker image prune" step to the updater?", then, for the removal after an update and a free-space check before the download, "let's do that".
 
