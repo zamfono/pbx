@@ -11,7 +11,7 @@
   },
   "devDependencies": {
     "@types/better-sqlite3": "^9.6.0",
-    "kysely-ctl": "^0.21.0"
+    "kysely-ctl": "^0.22.0"
   },
   "scripts": {
     "migrate:create": "sh -c \"printf 'Migration name: '; IFS= read -r name; if [ -z \\\"$name\\\" ]; then echo 'Migration name is required.' >&2; exit 1; fi; kysely migrate make \\\"$name\\\" -c config.ts --no-outdated-check --extension ts\"",
