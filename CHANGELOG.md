@@ -11,6 +11,8 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+## [0.8.3] - 2026-10-30
+
 ### Fixed
 
 - A voice bot's blind transfer to an external number, with its session token, and any other
@@ -906,7 +908,8 @@ The first 0.2 release; its `v0.2.0` tag was never published.
 
 The first tagged version, before any deployment.
 
-[Unreleased]: https://github.com/zamfono/pbx/compare/v0.8.2...HEAD
+[Unreleased]: https://github.com/zamfono/pbx/compare/v0.8.3...HEAD
+[0.8.3]: https://github.com/zamfono/pbx/compare/v0.8.2...v0.8.3
 [0.8.2]: https://github.com/zamfono/pbx/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/zamfono/pbx/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/zamfono/pbx/compare/v0.7.5...v0.8.0
