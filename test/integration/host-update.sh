@@ -61,10 +61,24 @@ host_update_images() {
   done
 }
 
+# The build's own images, each held by a stopped container of its own while the update runs: once
+# the stack is healthy on HOST_UPDATE_TO's, `update.sh` prunes the stack's images no container
+# uses, and the step then puts the stack back on these.
+host_update_holders=()
+host_update_hold_images() {
+  local service var
+  for service in "${HOST_UPDATE_SERVICES[@]}"; do
+    var=${service^^}_IMAGE
+    host_update_holders+=("$("$RUNTIME" create "${!var}")") || fail "could not hold ${!var}"
+  done
+}
+
 # HOST_UPDATE_TO's images removed, where no container uses them any more: a failed run's KEEP=1
-# stack keeps them.
+# stack keeps them. The holders of the build's go too.
 host_update_drop_images() {
   local word
+  ((${#host_update_holders[@]} == 0)) || "$RUNTIME" rm "${host_update_holders[@]}" >/dev/null 2>&1 || true
+  host_update_holders=()
   for word in "${host_update_env[@]}"; do
     "$RUNTIME" rmi "${word#*=}" >/dev/null 2>&1 || true
   done
@@ -135,6 +149,7 @@ run_host_update_step() {
   echo "$HOST_UPDATE_FROM" >"$run_dir/VERSION"
   host_update_publish "$HOST_UPDATE_TO"
   host_update_images
+  host_update_hold_images
 
   host_update --check "$HOST_UPDATE_TO" || verdict=$?
   [ "$verdict" = 0 ] \
