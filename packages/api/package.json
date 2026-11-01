@@ -22,7 +22,7 @@
     "jose": "^6.2.12",
     "kysely": "^0.29.6",
     "lean-qr": "^2.7.4",
-    "nodemailer": "^10.0.16",
+    "nodemailer": "^10.1.4",
     "pino": "^10.4.0",
     "sodium-native": "^5.1.0",
     "ws": "^8.22.0",
