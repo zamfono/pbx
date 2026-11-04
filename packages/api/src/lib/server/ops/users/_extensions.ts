@@ -96,7 +96,7 @@ export async function assertExtensionAvailable(
     .where('ext', '=', ext)
     .executeTakeFirst();
   if (existing) {
-    throw new Conflict('users: extension already in use', [
+    throw new Conflict('extension already in use', [
       { ...extensionReference(ext, existing), label: `extension ${ext}` }
     ]);
   }

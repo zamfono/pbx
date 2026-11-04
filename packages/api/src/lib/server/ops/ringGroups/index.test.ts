@@ -45,6 +45,156 @@ describe('ringGroups', () => {
     ]);
   });
 
+  it('create with extension null makes a group with none, which list, get and delete handle', async () => {
+    const db = await makeTestDb();
+    await seedSettings(db);
+    vi.mocked(propagateConfig).mockClear();
+    const created = (await runOperation(
+      db,
+      'ringGroups.create',
+      { name: 'Hotline', strategy: 'simultaneous', extension: null },
+      asRun()
+    )) as { id: string; ext: string | null };
+    expect(created.ext).toBeNull();
+    expect(
+      await db.selectFrom('extensions').selectAll().execute()
+    ).toHaveLength(0);
+    expect(
+      await runOperation(db, 'ringGroups.get', { id: created.id }, asRun())
+    ).toMatchObject({ ext: null });
+    const page = (await runOperation(db, 'ringGroups.list', {}, asRun())) as {
+      items: { name: string; ext: string | null }[];
+    };
+    expect(page.items).toMatchObject([{ name: 'Hotline', ext: null }]);
+    await runOperation(
+      db,
+      'ringGroups.delete',
+      { id: created.id },
+      asRun({ confirm: true })
+    );
+    const audit = await db
+      .selectFrom('auditLog')
+      .select('changesJson')
+      .where('entityId', '=', created.id)
+      .execute();
+    expect(audit.map(row => row.changesJson).join()).not.toContain('"ext"');
+  });
+
+  it('create takes a given extension, refusing a malformed one with 422 and a taken one with 409', async () => {
+    const db = await dbWithOwnerExtension();
+    const created = (await runOperation(
+      db,
+      'ringGroups.create',
+      { name: 'Sales', strategy: 'simultaneous', extension: '600' },
+      asRun()
+    )) as { ext: string };
+    expect(created.ext).toBe('600');
+    await expect(
+      runOperation(
+        db,
+        'ringGroups.create',
+        { name: 'Support', strategy: 'simultaneous', extension: '6a' },
+        asRun()
+      )
+    ).rejects.toMatchObject({ status: 422 });
+    await expect(
+      runOperation(
+        db,
+        'ringGroups.create',
+        { name: 'Support', strategy: 'simultaneous', extension: '100' },
+        asRun()
+      )
+    ).rejects.toMatchObject({ status: 409 });
+  });
+
+  it('update removes the extension with the keys watching it, gives one back and moves it', async () => {
+    const db = await dbWithOwnerExtension();
+    const group = (await runOperation(
+      db,
+      'ringGroups.create',
+      {
+        name: 'Sales',
+        strategy: 'simultaneous',
+        extension: '600',
+        members: [{ kind: 'user', id: 'owner' }]
+      },
+      asRun()
+    )) as { id: string };
+    const deviceId = newId();
+    await db
+      .insertInto('devices')
+      .values({
+        id: deviceId,
+        userId: 'owner',
+        label: 'Desk',
+        kind: 'manual',
+        transport: 'tls',
+        allowedIpsJson: null,
+        sipUsername: 'dev1',
+        sipPasswordEnc: Buffer.from('x'),
+        createdAt: nowIso()
+      })
+      .execute();
+    await db
+      .insertInto('deviceBlfKeys')
+      .values({ deviceId, ext: '600', position: 1 })
+      .execute();
+    const update = async (extension: string | null): Promise<unknown> =>
+      runOperation(
+        db,
+        'ringGroups.update',
+        { id: group.id, extension },
+        asRun()
+      );
+
+    vi.mocked(propagateConfig).mockClear();
+    expect(await update(null)).toMatchObject({ ext: null });
+    expect(await db.selectFrom('extensions').selectAll().execute()).toEqual([
+      expect.objectContaining({ ext: '100' })
+    ]);
+    expect(
+      await db.selectFrom('deviceBlfKeys').selectAll().execute()
+    ).toHaveLength(0);
+    expect(vi.mocked(propagateConfig).mock.calls).toContainEqual([
+      db,
+      ['pjsip', 'dialplan']
+    ]);
+
+    expect(await update('601')).toMatchObject({ ext: '601' });
+    await db
+      .insertInto('deviceBlfKeys')
+      .values({ deviceId, ext: '601', position: 1 })
+      .execute();
+    expect(await update('602')).toMatchObject({ ext: '602' });
+    expect(
+      await db.selectFrom('deviceBlfKeys').select('ext').execute()
+    ).toEqual([{ ext: '602' }]);
+    await expect(update('100')).rejects.toMatchObject({ status: 409 });
+
+    const changes = (
+      await db
+        .selectFrom('auditLog')
+        .select('changesJson')
+        .where('entityId', '=', group.id)
+        .where('operation', '=', 'ringGroups.update')
+        .orderBy('createdAt')
+        .orderBy('id')
+        .execute()
+    ).flatMap(row => JSON.parse(row.changesJson) as { field: string }[]);
+    expect(changes.filter(change => change.field === 'extension')).toEqual([
+      { field: 'extension', from: '600', to: null },
+      { field: 'extension', from: null, to: '601' },
+      { field: 'extension', from: '601', to: '602' }
+    ]);
+    expect(changes).toContainEqual({
+      field: 'droppedBlfKeys',
+      from: [
+        { deviceId, ext: '600', mailboxExt: null, label: null, position: 1 }
+      ],
+      to: []
+    });
+  });
+
   it('list returns the live ring groups with their extensions', async () => {
     const db = await makeTestDb();
     await seedSettings(db);

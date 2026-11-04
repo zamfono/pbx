@@ -6,6 +6,10 @@ import { recordChange } from '../audit.js';
 import { propagate } from '../propagate.js';
 import { pushRoster } from '../roster.js';
 import { defineOperation } from '../types.js';
+import {
+  assertExtensionAvailable,
+  assertValidExtension
+} from '../users/_extensions.js';
 import { ringGroupFields } from './_input.js';
 import { replaceMembers } from './_members.js';
 import {
@@ -22,7 +26,8 @@ export const ringGroupInputSchema = z.object(ringGroupFields).strict();
 
 export const createRingGroup = defineOperation({
   name: 'ringGroups.create',
-  description: 'Creates a ring group and assigns it a tenant extension.',
+  description:
+    'Creates a ring group with the extension given, the next free one when omitted, or none (null).',
   input: ringGroupInputSchema,
   output: ringGroupOut,
   problems: [HTTP_NOT_FOUND, HTTP_CONFLICT],
@@ -32,7 +37,14 @@ export const createRingGroup = defineOperation({
     await assertNameAvailable(ctx.db, input.name);
     await assertGroupAudioFieldsAvailable(ctx.db, input);
     const id = newId();
-    const ext = await nextExtension(ctx.db);
+    const ext =
+      input.extension === undefined
+        ? await nextExtension(ctx.db)
+        : input.extension;
+    if (input.extension) {
+      await assertValidExtension(ctx.db, input.extension);
+      await assertExtensionAvailable(ctx.db, input.extension);
+    }
     await ctx.db
       .insertInto('ringGroups')
       .values({
@@ -52,15 +64,19 @@ export const createRingGroup = defineOperation({
         createdAt: ctx.now
       })
       .execute();
-    await ctx.db
-      .insertInto('extensions')
-      .values({ ext, ringGroupId: id })
-      .execute();
+    if (ext !== null) {
+      await ctx.db
+        .insertInto('extensions')
+        .values({ ext, ringGroupId: id })
+        .execute();
+    }
     if (input.members) {
       await replaceMembers(ctx.db, id, input.members);
     }
     recordChange(ctx, { field: 'name', from: null, to: input.name });
-    recordChange(ctx, { field: 'ext', from: null, to: ext });
+    if (ext !== null) {
+      recordChange(ctx, { field: 'ext', from: null, to: ext });
+    }
     propagate(ctx, ['pjsip', 'dialplan']);
     await pushRoster(ctx);
     const row = await ctx.db

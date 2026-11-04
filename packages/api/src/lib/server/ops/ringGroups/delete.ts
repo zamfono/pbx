@@ -23,7 +23,9 @@ export const deleteRingGroup = defineOperation({
     const ext = await ringGroupExtension(ctx.db, input.id);
     return softDeleteQuestion(
       ctx,
-      `the ring group ${group.name} (extension ${ext})`
+      ext === null
+        ? `the ring group ${group.name}`
+        : `the ring group ${group.name} (extension ${ext})`
     );
   },
   entity: input => ({ kind: 'ringGroup', id: input.id }),
@@ -34,13 +36,16 @@ export const deleteRingGroup = defineOperation({
       throw new Conflict('ring group is still in use', references);
     }
     const ext = await ringGroupExtension(ctx.db, input.id);
-    const droppedBlfKeys = await loadDroppedBlfKeys(ctx, ext);
+    const droppedBlfKeys =
+      ext === null ? [] : await loadDroppedBlfKeys(ctx, ext);
     await softDelete(ctx, 'ringGroups', input.id);
-    await ctx.db
-      .deleteFrom('extensions')
-      .where('ringGroupId', '=', input.id)
-      .execute();
-    recordChange(ctx, { field: 'ext', from: ext, to: null });
+    if (ext !== null) {
+      await ctx.db
+        .deleteFrom('extensions')
+        .where('ringGroupId', '=', input.id)
+        .execute();
+      recordChange(ctx, { field: 'ext', from: ext, to: null });
+    }
     if (droppedBlfKeys.length > 0) {
       recordChange(ctx, {
         field: 'droppedBlfKeys',

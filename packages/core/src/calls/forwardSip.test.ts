@@ -721,6 +721,64 @@ describe('sip forward targets and the forwarding context (§9.4, §10.1 step 7)'
       expect(trunkOriginates(fakeAri)).toEqual([]);
     }
   );
+  it('names a ring group without an extension by its DID, else the main number, and leaves its extension placeholder empty', async () => {
+    const trunkId = await seedSipTrunk(db);
+    const headers = [
+      {
+        name: 'X-Forwarded-By',
+        value:
+          '[{{forwardedByExtension}}] {{forwardedByName}} {{forwardReason}}'
+      }
+    ];
+    /** An extension-less group with no members, whose `unanswered` rule dials the sip target. */
+    async function seedGroup(name: string): Promise<string> {
+      const groupId = newId();
+      await db
+        .insertInto('ringGroups')
+        .values({
+          id: groupId,
+          name,
+          strategy: 'simultaneous',
+          createdAt: nowIso()
+        })
+        .execute();
+      await db
+        .insertInto('ringGroupForwardRules')
+        .values({
+          groupId,
+          condition: 'unanswered',
+          targetId: await sipTargetId(db, trunkId, headers)
+        })
+        .execute();
+      return groupId;
+    }
+    const hotline = await seedGroup('Hotline');
+    await seedDid(
+      db,
+      '+15552000',
+      await seedTarget(db, { ringGroupId: hotline })
+    );
+    const backOffice = await seedGroup('Back office');
+
+    const hops: Record<string, string>[] = [];
+    for (const groupId of [hotline, backOffice]) {
+      // eslint-disable-next-line no-await-in-loop -- one call at a time, each adding one leg
+      const legs = await dialled(
+        ringGroup(pipeline, inboundCall(), groupId),
+        hops.length + 1
+      );
+      const context = forwardContext(legs.at(-1));
+      hops.push({
+        from: context['REDIRECTING(from-num,i)'] ?? '',
+        header: context['PJSIP_HEADER(add,X-Forwarded-By)'] ?? ''
+      });
+    }
+    expect(hops).toEqual([
+      { from: '+15552000', header: '[] Hotline unavailable' },
+      { from: '+15551000', header: '[] Back office unavailable' }
+    ]);
+  });
+
   it("maps an offline rule to unavailable, a closed schedule to time_of_day and a group's fallback to its outcome", async () => {
     const trunkId = await seedSipTrunk(db);
     const offline = await seedUser(db, {

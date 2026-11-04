@@ -85,7 +85,7 @@
 | `recordings.audio` | `GET /api/v1/recordings/{id}/audio` | Returns a recording's mixed audio; over MCP, a download link that opens for five minutes. | admin | no |
 | `recordings.delete` | `DELETE /api/v1/recordings/{id}` | Permanently deletes a call recording and its audio file. | admin | yes |
 | `recordings.list` | `GET /api/v1/recordings` | Lists call recordings, newest first: one per recorded user and call (see zamfono.help recording-consent). | admin | no |
-| `ringGroups.create` | `POST /api/v1/ringGroups` | Creates a ring group and assigns it a tenant extension. | admin | no |
+| `ringGroups.create` | `POST /api/v1/ringGroups` | Creates a ring group with the extension given, the next free one when omitted, or none (null). | admin | no |
 | `ringGroups.delete` | `DELETE /api/v1/ringGroups/{id}` | Soft-deletes a ring group. | admin | yes |
 | `ringGroups.get` | `GET /api/v1/ringGroups/{id}` | Reads one live ring group by id. | admin | no |
 | `ringGroups.getForwarding` | `GET /api/v1/ringGroups/{id}/forwarding` | Reads a ring group's 'unanswered' and 'unavailable' forwarding rules in the shape ringGroups.setForwarding takes. | admin | no |

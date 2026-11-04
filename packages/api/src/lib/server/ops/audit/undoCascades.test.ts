@@ -31,6 +31,39 @@ async function annaWithPanel(db: Db, keys: string[]): Promise<string> {
   return anna;
 }
 
+/** A yealink desk phone of `userId`, the kind that takes mailbox keys; answers its id. */
+async function yealinkDevice(db: Db, userId: string): Promise<string> {
+  const created = await run<{ device: { id: string } }>(db, 'devices.create', {
+    userId,
+    label: 'Desk',
+    kind: 'yealink'
+  });
+  return created.device.id;
+}
+
+/** Sales, with member Anna, whose yealink device has a BLF and a mailbox key on its extension;
+ *  answers the group's id. */
+async function salesWatchedByAnna(db: Db): Promise<string> {
+  const anna = await createUser(db, '101');
+  const group = await run<{ id: string; ext: string }>(
+    db,
+    'ringGroups.create',
+    {
+      name: 'Sales',
+      strategy: 'simultaneous',
+      members: [{ kind: 'user', id: anna }]
+    }
+  );
+  await run(db, 'devices.setBlf', {
+    id: await yealinkDevice(db, anna),
+    keys: [
+      { kind: 'blf', ext: group.ext },
+      { kind: 'mailbox', ext: group.ext, label: 'Sales VM' }
+    ]
+  });
+  return group.id;
+}
+
 // The cascades of a delete (§5.9), an extension rename, the renumbering of a list replace, and
 // what each pushes to Ringotel (§10.4): its users and the branch roster.
 const CASES: UndoCase[] = [
@@ -100,6 +133,30 @@ const CASES: UndoCase[] = [
         })
       ).id,
     act: async (db, id) => run(db, 'ringGroups.update', { id, name: 'Support' })
+  },
+  {
+    name: 'ringGroups.update removing its extension a BLF and a mailbox key watch',
+    arrange: async db => salesWatchedByAnna(db),
+    act: async (db, id) => run(db, 'ringGroups.update', { id, extension: null })
+  },
+  {
+    name: 'ringGroups.update moving its extension a BLF and a mailbox key watch',
+    arrange: async db => salesWatchedByAnna(db),
+    act: async (db, id) =>
+      run(db, 'ringGroups.update', { id, extension: '555' })
+  },
+  {
+    name: 'ringGroups.update giving an extension-less group one',
+    arrange: async db =>
+      (
+        await run(db, 'ringGroups.create', {
+          name: 'Sales',
+          strategy: 'simultaneous',
+          extension: null
+        })
+      ).id,
+    act: async (db, id) =>
+      run(db, 'ringGroups.update', { id, extension: '555' })
   },
   {
     name: 'ringGroups.delete with members and a BLF key',

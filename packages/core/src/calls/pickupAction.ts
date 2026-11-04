@@ -7,7 +7,6 @@
 import { HTTP_CONFLICT, newId, type PickupRequest } from '@zamfono/shared';
 
 import { ignoreGone, logFailure } from '../ari/failures.js';
-import type { Snapshot } from '../internal/snapshot.js';
 import { RelayedCallLog } from '../relayedCallLog.js';
 import { ActionError } from './actionError.js';
 import { newCall, type Call } from './call.js';
@@ -16,16 +15,6 @@ import { ringOwnDevices, ringTimeoutOf } from './ownDevices.js';
 import { pickUp, pickupRingOf } from './pickup.js';
 import type { Pipeline } from './pipeline.js';
 import { registeredDevices } from './userDevices.js';
-
-/** The extension `call` is ringing right now, `null` once it stopped (§10.1 "Pickup"). */
-function ringingExtension(
-  pipeline: Pipeline,
-  snapshot: Snapshot,
-  call: Call
-): string | null {
-  const ringing = pickupRingOf(pipeline, call);
-  return ringing === null ? null : extensionOf(snapshot, ringing.rings);
-}
 
 /** The answered phone takes `target`, if it still rings; else the phone is hung up, and
  * `target`'s trace says the pickup found it no longer ringing. */
@@ -54,10 +43,12 @@ export async function pickupOnRequest(
   req: PickupRequest
 ): Promise<void> {
   const snapshot = await pipeline.deps.cache.get();
-  const ext = ringingExtension(pipeline, snapshot, target);
-  if (ext === null) {
+  const ringing = pickupRingOf(pipeline, target);
+  if (ringing === null) {
     throw new ActionError(HTTP_CONFLICT, 'notRinging', 'call is not ringing');
   }
+  // `null` for a ring group without an extension (§11.2), which is picked up all the same.
+  const ext = extensionOf(snapshot, ringing.rings);
   const userId = req.actorUserId;
   const devices = registeredDevices(pipeline, snapshot, userId);
   if (devices.length === 0) {
@@ -77,7 +68,7 @@ export async function pickupOnRequest(
     direction: 'internal',
     callerChannelId: null,
     from: target.from,
-    to: ext,
+    to: ext ?? target.to,
     startedAt: pipeline.deps.now(),
     logLevel: target.log.level,
     callLogMaxBytes: pipeline.deps.callLogMaxBytes

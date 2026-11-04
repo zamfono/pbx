@@ -108,7 +108,12 @@ export async function assertNameAvailable(
 export const ringGroupOut = z.object({
   id: z.string(),
   name: z.string(),
-  ext: z.string(),
+  ext: z
+    .string()
+    .nullable()
+    .describe(
+      'The extension, null for none (reached only through numbers, forwards and menus).'
+    ),
   strategy: z.enum(RING_STRATEGIES),
   ringTimeoutS: z.number(),
   ringTotalS: z.number().nullable(),
@@ -125,17 +130,17 @@ export const ringGroupOut = z.object({
 });
 export type RingGroupOut = z.infer<typeof ringGroupOut>;
 
-/** The extension a live ring group owns (§11.2 `extensions`); every live group has exactly one. */
+/** The extension a live ring group owns (§11.2 `extensions`): at most one, `null` for none. */
 export async function ringGroupExtension(
   db: Db,
   groupId: string
-): Promise<string> {
+): Promise<string | null> {
   const row = await db
     .selectFrom('extensions')
     .select('ext')
     .where('ringGroupId', '=', groupId)
-    .executeTakeFirstOrThrow();
-  return row.ext;
+    .executeTakeFirst();
+  return row?.ext ?? null;
 }
 
 /** Assembles the wire shape of a ring group from its row, extension and member list (§10.3). */

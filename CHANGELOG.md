@@ -11,6 +11,16 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+### Added
+
+- A ring group's extension is optional. `POST /api/v1/ringGroups` (MCP `ringGroups.create`)
+  takes `extension`: left out, the group gets the next free extension as before; a value gives
+  it that one; `null` gives it none, for a group reached only through numbers, forwards and
+  menus. `PATCH /api/v1/ringGroups/{id}` gives, moves or removes it; removing it removes the BLF
+  and mailbox keys watching it, which undo restores. Reads return `ext` `null` for such a group.
+  It has no BLF lamp or mailbox key, and a forwarded call's `REDIRECTING` names its DID, else
+  the main number.
+
 ## [0.8.3] - 2026-10-30
 
 ### Fixed

@@ -28,12 +28,14 @@ import {
 import {
   seedDevice,
   seedExternalRoute,
-  seedRegisteredDevice
+  seedRegisteredDevice,
+  seedRingGroup
 } from '../testing/seedRows.js';
 import { CallActions } from './actions.js';
 import { callerChannel, newCall, type Call } from './call.js';
 import type { Pipeline } from './pipeline.js';
 import { sipToHangupCause } from './releaseCause.js';
+import { ringGroup } from './ringGroup.js';
 
 const RING_TIMER_MS = 60_000;
 
@@ -859,6 +861,50 @@ describe('CallActions', () => {
     expect(row.log).toContain(
       `"event":"pickup","userId":"${pickerId}","ext":"101"`
     );
+  });
+
+  it('picks up a call ringing a ring group without an extension (§11.2)', async () => {
+    await setUp();
+    const memberId = await seedUser(db, { ext: '101' });
+    const pickerId = await seedUser(db, { ext: '102' });
+    // Seeded before the devices come up, which loads the config snapshot.
+    const groupId = await seedRingGroup(db);
+    await db
+      .insertInto('ringGroupMembers')
+      .values({ groupId, position: 0, userId: memberId })
+      .execute();
+    await seedRegisteredDevice(rig, memberId, 'e101-a');
+    await seedRegisteredDevice(rig, pickerId, 'e102-a');
+    await rig.devicesUp();
+    fakeAri.answerAfterMs = RING_TIMER_MS;
+    const caller = fakeAri.addChannel({
+      name: 'PJSIP/trunk-1-00000001',
+      caller: { number: '+15559999', name: '' }
+    });
+    const call = newCall({
+      id: newId(),
+      direction: 'inbound',
+      callerChannelId: caller.id,
+      from: '+15559999',
+      to: '+15551000',
+      startedAt: nowIso(),
+      logLevel: 'events',
+      callLogMaxBytes: 1_048_576
+    });
+    pipeline.registerCall(call);
+    ringGroup(pipeline, call, groupId).catch(() => undefined);
+    await eventually(() => {
+      expect(originates().map(entry => entry.endpoint)).toEqual([
+        contactEndpoint('e101-a')
+      ]);
+    });
+
+    await actions.pickup(call.id, { actorUserId: pickerId });
+
+    expect(originates().map(entry => entry.endpoint)).toEqual([
+      contactEndpoint('e101-a'),
+      contactEndpoint('e102-a')
+    ]);
   });
 
   it('picks up the call it names while another call rings the same user (call waiting)', async () => {

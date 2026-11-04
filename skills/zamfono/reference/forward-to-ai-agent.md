@@ -87,9 +87,9 @@ outside the stack; this recipe gets the call to OpenAI. OpenAI's guide:
    | `{{callerNumber}}`         | the caller's number (`+43…`), or a colleague's extension; empty when withheld           |
    | `{{callerName}}`           | the caller's name from the phone book, else a colleague's own name, else empty          |
    | `{{did}}`                  | the company number an outside caller dialled; empty for an internal call                |
-   | `{{calledExtension}}`      | the extension of the user or ring group the call was for                                |
+   | `{{calledExtension}}`      | the extension of the user or ring group the call was for, empty when it has none        |
    | `{{calledName}}`           | that user's or ring group's name                                                        |
-   | `{{forwardedByExtension}}` | the extension of the user or ring group that forwarded the call last                    |
+   | `{{forwardedByExtension}}` | the extension of the user or ring group that forwarded the call last, empty without one |
    | `{{forwardedByName}}`      | their name, or the label of the DID or number block whose target the agent is           |
    | `{{forwardReason}}`        | why: `outOfOffice`, `closed`, `unconditional`, `busy`, `noAnswer`, `unavailable`, `dnd` |
    | `{{hopCount}}`             | how many times the call was forwarded                                                   |

@@ -12,6 +12,13 @@ import { timeoutSeconds } from '../timeoutInput.js';
  */
 export const ringGroupFields = {
   name: z.string().min(1),
+  extension: z
+    .string()
+    .min(1)
+    .nullish()
+    .describe(
+      "The internal number colleagues dial, digits of the tenant's fixed extension length; null for none: the group is reached only through numbers, forwards and menus, with no BLF and no mailbox key. Omitted on create: the next free extension."
+    ),
   strategy: z
     .enum(RING_STRATEGIES)
     .describe(

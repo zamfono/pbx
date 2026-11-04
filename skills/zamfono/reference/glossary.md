@@ -1,7 +1,7 @@
 # Glossary
 
-**Extension** — the short internal number dialled between colleagues. A user, a ring group and a
-parking slot each own one extension.
+**Extension** — the short internal number dialled between colleagues. A parking slot is one; a
+user or a ring group owns at most one.
 
 **Parking slot** — an extension that holds a parked call (`*70`) until someone dials it; replaced
 as a set with `parking.set`. See `parking`.

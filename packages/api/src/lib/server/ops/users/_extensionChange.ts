@@ -29,10 +29,36 @@ export type ExtensionChange = {
 };
 
 /**
- * Renames every live device of `userId` from `e<oldExt>-…` to `e<newExt>-…` and moves the BLF
- * keys watching the extension, in one deferred-FK block: `device_blf_keys.ext` references
- * `extensions.ext` (§11.2), so both statements run under `PRAGMA defer_foreign_keys = ON`, which
- * moves the FK check to commit.
+ * Moves the `extensions` row `oldExt` and the BLF and mailbox keys watching it to `newExt`, in one
+ * deferred-FK block: `device_blf_keys.ext` and `mailbox_ext` reference `extensions.ext` (§11.2),
+ * so the statements run under `PRAGMA defer_foreign_keys = ON`, which moves the FK check to commit.
+ */
+export async function moveExtension(
+  ctx: Context,
+  oldExt: string,
+  newExt: string
+): Promise<void> {
+  await sql`PRAGMA defer_foreign_keys = ON`.execute(ctx.db);
+  await ctx.db
+    .updateTable('deviceBlfKeys')
+    .set({ ext: newExt })
+    .where('ext', '=', oldExt)
+    .execute();
+  await ctx.db
+    .updateTable('deviceBlfKeys')
+    .set({ mailboxExt: newExt })
+    .where('mailboxExt', '=', oldExt)
+    .execute();
+  await ctx.db
+    .updateTable('extensions')
+    .set({ ext: newExt })
+    .where('ext', '=', oldExt)
+    .execute();
+}
+
+/**
+ * Renames every live device of `userId` from `e<oldExt>-…` to `e<newExt>-…` and moves the
+ * extension with the keys watching it (`moveExtension`).
  */
 async function renameExtension(
   ctx: Context,
@@ -60,22 +86,7 @@ async function renameExtension(
         : device.sipUsername
     }))
   );
-  await sql`PRAGMA defer_foreign_keys = ON`.execute(ctx.db);
-  await ctx.db
-    .updateTable('deviceBlfKeys')
-    .set({ ext: newExt })
-    .where('ext', '=', oldExt)
-    .execute();
-  await ctx.db
-    .updateTable('deviceBlfKeys')
-    .set({ mailboxExt: newExt })
-    .where('mailboxExt', '=', oldExt)
-    .execute();
-  await ctx.db
-    .updateTable('extensions')
-    .set({ ext: newExt })
-    .where('ext', '=', oldExt)
-    .execute();
+  await moveExtension(ctx, oldExt, newExt);
   await Promise.all(
     renamed.map(device =>
       ctx.db

@@ -81,7 +81,7 @@ type PartyIdentity = Omit<
 };
 
 /** `party`'s number, name and extension: a user's primary number or extension, a ring group's
- * extension, a menu's called number, the one an inbound call dialled, else the tenant's main
+ * extension, else its DID or the main number, a menu's called number, the one an inbound call dialled, else the tenant's main
  * number; `null` for a menu with neither, a main DID since deleted; a DID's own number and label, a
  * fallback's called number and its block's label. */
 function partyIdentity(
@@ -102,7 +102,7 @@ function partyIdentity(
       ringGroupId: party.ringGroupId
     });
     return {
-      number: extension,
+      number: extension ?? diversionNumber(snapshot, call, party),
       name:
         snapshot.ringGroups.find(row => row.id === party.ringGroupId)?.name ??
         null,

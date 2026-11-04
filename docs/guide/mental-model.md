@@ -29,7 +29,11 @@ that single tenant; there is no cross-tenant sharing.
   provider that hands over a whole range instead of individual DIDs. The company's **main
   number** is one of the DIDs, `settings.mainDidId`. See `numbers`.
 - **Ring group** — an ordered or unordered set of users (and nested user groups) rung together
-  under one strategy (`simultaneous`, `sequential` or `random`).
+  under one strategy (`simultaneous`, `sequential` or `random`). A new group gets the next free
+  extension unless `ringGroups.create` names one or passes `extension: null`; a group without
+  one is reached only through DIDs, forwards and menus, has no BLF lamp or mailbox key, and its
+  mailbox is opened on the web or over the API. `ringGroups.update` adds, moves or removes it;
+  removing it drops the BLF and mailbox keys watching it, and undo puts them back.
 - **Menu** — a greeting plus a map of DTMF digits to forward targets, usable anywhere a target is
   usable, including as one option of another menu.
 - **User group** — a named, nestable set of users, used as ring-group membership and as an
