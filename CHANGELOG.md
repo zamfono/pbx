@@ -11,6 +11,8 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+## [0.8.5] - 2026-11-05
+
 ### Added
 
 - A forward target to an external number, a SIP target or a voice bot (`webSocket`) takes a
@@ -941,7 +943,8 @@ The first 0.2 release; its `v0.2.0` tag was never published.
 
 The first tagged version, before any deployment.
 
-[Unreleased]: https://github.com/zamfono/pbx/compare/v0.8.4...HEAD
+[Unreleased]: https://github.com/zamfono/pbx/compare/v0.8.5...HEAD
+[0.8.5]: https://github.com/zamfono/pbx/compare/v0.8.4...v0.8.5
 [0.8.4]: https://github.com/zamfono/pbx/compare/v0.8.3...v0.8.4
 [0.8.3]: https://github.com/zamfono/pbx/compare/v0.8.2...v0.8.3
 [0.8.2]: https://github.com/zamfono/pbx/compare/v0.8.1...v0.8.2
