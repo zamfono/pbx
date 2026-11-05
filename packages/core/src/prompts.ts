@@ -3,7 +3,7 @@
  * §10.2 "Voicemail", "Greetings and audio"). Asterisk resolves a `sound:` name's language variant
  * from the channel's own language, so one name covers every tenant language (§9.1).
  */
-import { PROMPTS_SUBDIR } from '@zamfono/shared';
+import { PROMPTS_SUBDIR, type Language } from '@zamfono/shared';
 
 import { ignoreGone } from './ari/failures.js';
 
@@ -31,15 +31,54 @@ export const PROMPTS = {
 
 type PromptKey = keyof typeof PROMPTS;
 
-/** Tenant languages (§11.4 `language`) whose prompt set actually names {@link PROMPTS.failedCall}
- * (verified against the image, §9.1, `test/integration/prompts.sh`): `en`'s own file and the
- * community `fr` and `it` sets. `de` and `es` ship no file of that name at all, and `ru`'s
- * community set names its own `pls-try-call-later` instead, so all three fall outside this list.
- * `conclude.ts` plays the special information tone (`indications.ts`) for a `language` not here. */
+/** The languages whose prompt set the repository generates itself (§9.1): the image ships each from
+ * `images/asterisk/prompts/<language>/`, which holds every prompt the core can play in it
+ * (`promptSet.ts`), so nothing falls back to another language's file. Polish has no tenant setting
+ * yet; until it does, its set is reachable only through `CHANNEL(language)`. */
+export const GENERATED_LANGUAGES = ['pl'] as const;
+export type GeneratedLanguage = (typeof GENERATED_LANGUAGES)[number];
+/** A language the core can speak: a tenant language or a generated set's. */
+export type PromptLanguage = Language | GeneratedLanguage;
+
+/** Where a generated set keeps the form a number clip takes at the end of a sentence, falling
+ * where the same clip inside a sentence rises: the last clip of a number nothing follows. */
+export const FINAL_DIGITS_DIR = 'digits-final';
+
+export function isGeneratedLanguage(
+  language: string
+): language is GeneratedLanguage {
+  return (GENERATED_LANGUAGES as readonly string[]).includes(language);
+}
+
+/**
+ * A digit string read one digit at a time (§10.2 "Call parking"'s slot): ARI's `digits:` for a
+ * Debian set; a generated set's own clips, the last digit in its end-of-sentence form.
+ */
+export function digitsMedia(
+  language: PromptLanguage,
+  digits: string
+): string[] {
+  if (!isGeneratedLanguage(language)) {
+    return [`digits:${digits}`];
+  }
+  return digits
+    .split('')
+    .map(
+      (digit, index) =>
+        `sound:${index === digits.length - 1 ? FINAL_DIGITS_DIR : 'digits'}/${digit}`
+    );
+}
+
+/** Languages whose prompt set actually names {@link PROMPTS.failedCall} (verified against the
+ * image, §9.1, `test/integration/prompts.sh`): `en`'s own file, the community `fr` and `it` sets,
+ * and every generated set. `de` and `es` ship no file of that name at all, and `ru`'s community set
+ * names its own `pls-try-call-later` instead, so all three fall outside this list. `conclude.ts`
+ * plays the special information tone (`indications.ts`) for a `language` not here. */
 export const LANGUAGES_WITH_FAILED_CALL_PROMPT: readonly string[] = [
   'en',
   'fr',
-  'it'
+  'it',
+  ...GENERATED_LANGUAGES
 ];
 
 /** The `sound:` reference for one of the fixed default prompts above. */

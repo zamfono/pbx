@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { assetMedia, defaultPrompt, PROMPTS } from './prompts.js';
+import { assetMedia, defaultPrompt, digitsMedia, PROMPTS } from './prompts.js';
 
 describe('defaultPrompt', () => {
   it('renders a fixed default prompt as a sound: reference to its core-sounds name', () => {
@@ -17,5 +17,19 @@ describe('assetMedia', () => {
 
   it('throws for an audio asset id missing from the snapshot', () => {
     expect(() => assetMedia([], 'missing')).toThrow();
+  });
+});
+
+describe('digitsMedia (§10.2 "Call parking")', () => {
+  it("leaves a Debian set's digits to ARI", () => {
+    expect(digitsMedia('en', '701')).toEqual(['digits:701']);
+  });
+
+  it("reads a generated set's digits itself, the last one ending the sentence", () => {
+    expect(digitsMedia('pl', '701')).toEqual([
+      'sound:digits/7',
+      'sound:digits/0',
+      'sound:digits-final/1'
+    ]);
   });
 });

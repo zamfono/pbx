@@ -50,6 +50,9 @@ RUN ln -s es_MX_f_Allison /usr/share/asterisk/sounds/es \
     && ln -s fr_CA_f_June /usr/share/asterisk/sounds/fr \
     && ln -s it_IT_m_Carlo /usr/share/asterisk/sounds/it \
     && ln -s ru_RU_f_IvrvoiceRU /usr/share/asterisk/sounds/ru
+# The generated prompt sets (spec §9.1), committed audio that scripts/generate-prompts.mjs made
+# from prompts/<language>.json; each holds every prompt the core can play in its language.
+COPY prompts/pl /usr/share/asterisk/sounds/pl
 
 # The Node images' shared volumes (media, asterisk-config) are written by the `node` user
 # (uid/gid 1000); Asterisk is remapped to the same id so both sides can write them (spec §6.3

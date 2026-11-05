@@ -3,10 +3,10 @@
  * grammar (§9.1): the intro ("you have 2 new messages") follows app_voicemail's `vm_intro_de`,
  * `vm_intro_es`, `vm_intro_fr`, `vm_intro_it` and `vm_intro_multilang` (Russian), and a message's
  * header ("new message 2") takes the same language's singular. English stays the menu's own
- * sentence, which names both folders.
+ * sentence, which names both folders. Polish, a generated set (§9.1), is `mailboxGrammarPl.ts`'s.
  */
-import type { Language } from '@zamfono/shared';
-
+import type { PromptLanguage } from '../prompts.js';
+import { headerPl, introPl } from './mailboxGrammarPl.js';
 import {
   folderWord,
   MAILBOX_PROMPTS,
@@ -216,16 +216,23 @@ function introRu(newCount: number, oldCount: number): string[] {
 
 type Grammar = {
   intro: (newCount: number, oldCount: number) => string[];
-  /** "New message", before the message's place in its folder. */
-  header: (folder: Folder) => string[];
+  /** "New message 2": the message's folder and its place in it. */
+  header: (folder: Folder, position: number) => string[];
 };
 
-const ADJECTIVE_NOUN_HEADER = (folder: Folder): string[] => [
+/** A header whose words come before ARI's `number:` reading of the place. */
+function numbered(
+  words: (folder: Folder) => string[]
+): (folder: Folder, position: number) => string[] {
+  return (folder, position) => [...words(folder), number(position)];
+}
+
+const ADJECTIVE_NOUN_HEADER = numbered(folder => [
   folderWord(folder),
   sound(MAILBOX_PROMPTS.message)
-];
+]);
 
-const GRAMMARS: Record<Language, Grammar> = {
+const GRAMMARS: Record<PromptLanguage, Grammar> = {
   en: { intro: introEn, header: ADJECTIVE_NOUN_HEADER },
   de: {
     intro: introNumberAdjectiveNoun(de.oneFeminine),
@@ -237,24 +244,28 @@ const GRAMMARS: Record<Language, Grammar> = {
       [sound(es.youHaveNo), sound(MAILBOX_PROMPTS.messages)],
       esPart
     ),
-    header: folder => esPart(folder, 1).slice(1)
+    header: numbered(folder => esPart(folder, 1).slice(1))
   },
   it: {
     intro: introParts(
       [sound(MAILBOX_PROMPTS.no), sound(MAILBOX_PROMPTS.message)],
       itPart
     ),
-    header: folder => itPart(folder, 1).slice(1)
+    header: numbered(folder => itPart(folder, 1).slice(1))
   },
   ru: {
     intro: introRu,
-    header: folder => [ruAdjective(folder, 1), sound(MAILBOX_PROMPTS.message)]
-  }
+    header: numbered(folder => [
+      ruAdjective(folder, 1),
+      sound(MAILBOX_PROMPTS.message)
+    ])
+  },
+  pl: { intro: introPl, header: headerPl }
 };
 
 /** "You have 2 new messages and 1 old message", in the channel's language. */
 export function introMedia(
-  language: Language,
+  language: PromptLanguage,
   newCount: number,
   oldCount: number
 ): string[] {
@@ -263,9 +274,9 @@ export function introMedia(
 
 /** "New message 2", before the message itself. */
 export function messageHeaderMedia(
-  language: Language,
+  language: PromptLanguage,
   folder: Folder,
   position: number
 ): string[] {
-  return [...GRAMMARS[language].header(folder), number(position)];
+  return GRAMMARS[language].header(folder, position);
 }

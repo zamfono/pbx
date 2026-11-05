@@ -7,6 +7,7 @@ import { MS_PER_SECOND } from '@zamfono/shared';
 import { ignoreGone, logFailure, logUnlessGone } from '../ari/failures.js';
 import type { Snapshot } from '../internal/snapshot.js';
 import type { Presence } from '../presence.js';
+import { digitsMedia } from '../prompts.js';
 import { SIP_FORBIDDEN, SIP_TEMPORARILY_UNAVAILABLE } from '../sipCodes.js';
 import { callerChannel, type Call } from './call.js';
 import { activeCallOf, bridgedParty, channelOf } from './callLookup.js';
@@ -246,7 +247,13 @@ export async function park(
   const channelId = callerChannel(call);
   const ari = pipeline.deps.ari;
   await ari.channels.answer(channelId).catch(ignoreGone);
-  await playAndWait(ari, channelId, `digits:${ext}`, `${channelId}:park`);
+  const { language } = (await pipeline.deps.cache.get()).settings;
+  await playAndWait(
+    ari,
+    channelId,
+    digitsMedia(language, ext),
+    `${channelId}:park`
+  );
   await concludeFeature(pipeline, call, 'answered');
 }
 

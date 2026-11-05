@@ -40,7 +40,7 @@ function stopPlayback(ari: AriClient, playbackId: string): void {
 export function playAndWait(
   ari: AriClient,
   channelId: string,
-  media: string,
+  media: string | readonly string[],
   playbackId: string
 ): Promise<PlaybackEnd> {
   const wait = waitForEvent<PlaybackEnd>(ari, (ev, waiting) => {

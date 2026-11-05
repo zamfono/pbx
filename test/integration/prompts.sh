@@ -7,7 +7,9 @@
 # `mailboxPrompts.ts`'s `MAILBOX_PROMPTS` (the `*96`/`*95` menu, §10.2) — so a prompt added to
 # the core without shipping it fails here instead of playing silence on a real call. The names only
 # some languages' grammar uses (`mailboxGrammar.ts`'s `MAILBOX_LANGUAGE_PROMPTS`) ship in that
-# language's own set, in any format Asterisk plays.
+# language's own set, in any format Asterisk plays. A generated set (`prompts.ts`'s
+# `GENERATED_LANGUAGES`) holds every prompt the core can play in its language
+# (`promptSet.ts`'s `generatedPromptNames`) in both formats it ships, with no fallback at all.
 #
 #   prompts.sh <compose>
 set -euo pipefail
@@ -41,9 +43,22 @@ missing=$(dc exec -T asterisk sh -c "
   for name in $language_names; do
     ls /usr/share/asterisk/sounds/\$name.* >/dev/null 2>&1 || echo \"\$name\"
   done" | tr -d '\r')
+generated_names=$(dc exec -T core node --input-type=module -e "
+const { GENERATED_LANGUAGES } = await import('/app/packages/core/dist/prompts.js');
+const { generatedPromptNames } = await import('/app/packages/core/dist/calls/promptSet.js');
+console.log(GENERATED_LANGUAGES
+  .flatMap(lang => generatedPromptNames(lang).map(name => lang + '/' + name)).join(' '));
+" | tr -d '\r')
+[ -n "$generated_names" ] || { echo 'the core image named no generated prompts' >&2; exit 1; }
+missing="$missing$(dc exec -T asterisk sh -c "
+  for name in $generated_names; do
+    for format in wav g722; do
+      [ -f /usr/share/asterisk/sounds/\$name.\$format ] || echo \"\$name.\$format\"
+    done
+  done" | tr -d '\r')"
 if [ -n "$missing" ]; then
   echo "prompts the core plays are missing from the image: $missing" >&2
   exit 1
 fi
 # shellcheck disable=SC2086 # one name per word, split by design
-echo "   $(printf '%s\n' $names | wc -l | tr -d ' ') prompts ship for every tenant language, $(printf '%s\n' $language_names | wc -l | tr -d ' ') in their own"
+echo "   $(printf '%s\n' $names | wc -l | tr -d ' ') prompts ship for every tenant language, $(printf '%s\n' $language_names | wc -l | tr -d ' ') in their own, $(printf '%s\n' $generated_names | wc -l | tr -d ' ') in the generated sets"
