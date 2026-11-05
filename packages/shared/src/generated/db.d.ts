@@ -181,12 +181,14 @@ export interface Extensions {
 export interface ForwardTargets {
   announcementAudioId: string | null;
   external: string | null;
+  fallbackOfId: string | null;
   id: string;
   mailboxRingGroupId: string | null;
   mailboxUserId: string | null;
   menuId: string | null;
   recordCalls: Generated<number>;
   ringGroupId: string | null;
+  ringTimeoutS: number | null;
   sipHeadersJson: string | null;
   sipTrunkId: string | null;
   sipUser: string | null;
@@ -383,6 +385,7 @@ export interface Settings {
   language: Generated<Language>;
   mailFrom: string | null;
   mainDidId: string;
+  maxForwardHops: Generated<number>;
   mfaRequiredForAll: Generated<number>;
   parkingTimeoutS: Generated<number>;
   recordingRetentionDays: Generated<number | null>;

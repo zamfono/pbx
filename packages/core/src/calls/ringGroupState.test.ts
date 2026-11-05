@@ -10,10 +10,12 @@ import {
 
 import { ConfigCache } from '../internal/snapshot.js';
 import { ringable } from '../routing/ringGroup.js';
-import { MAX_HOPS } from '../routing/targets.js';
 import { seedForwardTarget } from '../testing/seedRows.js';
 import type { Pipeline } from './pipeline.js';
 import { buildMemberStates } from './ringGroupState.js';
+
+/** `settings.max_forward_hops`' default. */
+const MAX_HOPS = 3;
 
 // `buildMemberStates` reads only presence and the calls in progress from the pipeline.
 const idlePipeline = {

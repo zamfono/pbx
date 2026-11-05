@@ -34,8 +34,16 @@ function external(number: string): {
   kind: 'external';
   external: string;
   record: boolean;
+  ringTimeoutS: null;
+  fallback: null;
 } {
-  return { kind: 'external', external: number, record: false };
+  return {
+    kind: 'external',
+    external: number,
+    record: false,
+    ringTimeoutS: null,
+    fallback: null
+  };
 }
 
 describe('audit.undo of a whole-list replace', () => {

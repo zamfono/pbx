@@ -42,6 +42,11 @@ export async function concludeFinal(
   call: Call,
   failure: AttemptFailure
 ): Promise<void> {
+  if (failure.kind === 'ringTimeout') {
+    // §10.1 step 7: a target that rang out without a fallback ends unanswered.
+    await release(pipeline, call, SIP_TEMPORARILY_UNAVAILABLE, 'missed');
+    return;
+  }
   if (failure.kind !== 'final') {
     return;
   }

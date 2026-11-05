@@ -33,6 +33,36 @@ export type DialResult =
   | { kind: 'exhausted'; lastFailureKind: AttemptFailure['kind'] | null };
 
 const CALLER_GONE: AttemptFailure = { kind: 'callerGone' };
+const RING_TIMEOUT: AttemptFailure = { kind: 'ringTimeout' };
+
+const MS_PER_SECOND = 1000;
+
+/** A forward target's ring timeout (§10.1 step 7), running from the dial's start across every
+ * route and host it tries: `expired` resolves once it ran out, never for a dial without one. */
+type RingTimer = {
+  expired: Promise<void>;
+  isOver: () => boolean;
+  clear: () => void;
+};
+
+function ringTimer(seconds: number | undefined): RingTimer {
+  const { promise, resolve } = Promise.withResolvers<undefined>();
+  if (seconds === undefined) {
+    return { expired: promise, isOver: () => false, clear: () => undefined };
+  }
+  let over = false;
+  const timer = setTimeout(() => {
+    over = true;
+    resolve(undefined);
+  }, seconds * MS_PER_SECOND);
+  return {
+    expired: promise,
+    isOver: () => over,
+    clear: () => {
+      clearTimeout(timer);
+    }
+  };
+}
 
 /** A waiting dial's result as its trace lines name it. */
 export function dialCause(result: DialResult): string | null {
@@ -120,12 +150,27 @@ function placingLeg(
   };
 }
 
+/** Hangs up an attempt the target's ring timeout ended (§10.1 step 7). */
+async function hangUpAttempt(
+  pipeline: Pipeline,
+  call: Call,
+  channelId: string
+): Promise<void> {
+  await pipeline.deps.ari.channels.hangup(channelId).catch(
+    logUnlessGone(pipeline.deps.logger, 'ring timeout hangup', {
+      callId: call.id
+    })
+  );
+}
+
 /** One INVITE to `candidate`: placed and tracked as a `trunk` leg of the call, its outcome awaited
  * (§9.4). A caller who hung up ended the leg (`legsEnded.ts`, `legOriginate.ts`): its end is no
- * failure of the far end's. */
+ * failure of the far end's. One still out when `expired` resolves, the target's ring timeout, is
+ * hung up and fails with `ringTimeout`. */
 async function attemptOnce(
   cursor: RouteCursor,
-  candidate: Candidate
+  candidate: Candidate,
+  expired: Promise<void>
 ): Promise<AttemptOutcome> {
   const { pipeline, call } = cursor;
   let leg: Leg | undefined;
@@ -161,8 +206,15 @@ async function attemptOnce(
     attempt.ended.then(({ failure }): AttemptOutcome => ({
       kind: 'failure',
       failure: call.callerEnded === true ? CALLER_GONE : failure
+    })),
+    expired.then((): AttemptOutcome => ({
+      kind: 'failure',
+      failure: RING_TIMEOUT
     }))
   ]);
+  if (outcome.kind === 'failure' && outcome.failure.kind === 'ringTimeout') {
+    await hangUpAttempt(pipeline, call, attempt.channelId);
+  }
   await earlySetup();
   const tracked = call.legs.get(attempt.channelId);
   if (outcome.kind === 'answered') {
@@ -191,24 +243,33 @@ async function attemptOnce(
 }
 
 /** Dials `cursor`'s attempts in turn (§9.4 "Route fallthrough", "Hosts") until one answers, a
- * failure does not fall through, or none is left; none once the caller has hung up. */
+ * failure does not fall through, none is left, or a forward target's ring timeout runs out
+ * (§10.1 step 7); none once the caller has hung up. */
 export async function dialRoutes(cursor: RouteCursor): Promise<DialResult> {
-  let failure: AttemptFailure | null = null;
-  let candidate = nextRoute(cursor);
-  while (candidate !== null) {
-    if (cursor.call.callerEnded === true) {
-      return { kind: 'final', failure: CALLER_GONE };
+  const timer = ringTimer(cursor.forward?.ringTimeoutS);
+  try {
+    let failure: AttemptFailure | null = null;
+    let candidate = nextRoute(cursor);
+    while (candidate !== null) {
+      if (cursor.call.callerEnded === true) {
+        return { kind: 'final', failure: CALLER_GONE };
+      }
+      if (timer.isOver()) {
+        return { kind: 'final', failure: RING_TIMEOUT };
+      }
+      // eslint-disable-next-line no-await-in-loop -- attempts are dialled one at a time, in fallthrough order, by design
+      const outcome = await attemptOnce(cursor, candidate, timer.expired);
+      if (outcome.kind === 'answered') {
+        return outcome;
+      }
+      ({ failure } = outcome);
+      candidate = nextCandidate(cursor, failure);
     }
-    // eslint-disable-next-line no-await-in-loop -- attempts are dialled one at a time, in fallthrough order, by design
-    const outcome = await attemptOnce(cursor, candidate);
-    if (outcome.kind === 'answered') {
-      return outcome;
+    if (failure !== null && !shouldFallThrough(failure)) {
+      return { kind: 'final', failure };
     }
-    ({ failure } = outcome);
-    candidate = nextCandidate(cursor, failure);
+    return { kind: 'exhausted', lastFailureKind: cursor.lastFailureKind };
+  } finally {
+    timer.clear();
   }
-  if (failure !== null && !shouldFallThrough(failure)) {
-    return { kind: 'final', failure };
-  }
-  return { kind: 'exhausted', lastFailureKind: cursor.lastFailureKind };
 }

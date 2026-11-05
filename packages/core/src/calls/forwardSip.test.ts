@@ -697,6 +697,72 @@ describe('sip forward targets and the forwarding context (§9.4, §10.1 step 7)'
     });
   });
 
+  it("rings a member's followed forward for its ring timeout, never following its fallback (§10.1 steps 5, 7)", async () => {
+    const member = await seedUser(db, {
+      name: 'Bea',
+      ext: '177',
+      mailboxEnabled: 1
+    });
+    const sipId = await sipTargetId(db, await seedSipTrunk(db));
+    await db
+      .updateTable('forwardTargets')
+      .set({ ringTimeoutS: 1 })
+      .where('id', '=', sipId)
+      .execute();
+    await seedTarget(db, { mailboxUserId: member, fallbackOfId: sipId });
+    await seedRule(db, member, 'unconditional', sipId);
+    await db
+      .insertInto('devices')
+      .values({
+        id: newId(),
+        userId: member,
+        label: 'phone',
+        kind: 'manual',
+        sipUsername: 'e177-d1',
+        sipPasswordEnc: Buffer.from('secret'),
+        createdAt: nowIso()
+      })
+      .execute();
+    await registerDevice(fakeAri, pipeline, 'e177-d1');
+    const groupId = newId();
+    await db
+      .insertInto('ringGroups')
+      .values({
+        id: groupId,
+        name: 'Support',
+        strategy: 'simultaneous',
+        ringTimeoutS: 30,
+        createdAt: nowIso()
+      })
+      .execute();
+    await db
+      .insertInto('ringGroupMembers')
+      .values({ groupId, position: 1, userId: member })
+      .execute();
+    const call = inboundCall();
+    call.ringGroupId = groupId;
+
+    ringGroup(pipeline, call, groupId).catch(() => undefined);
+
+    await dialled(Promise.resolve());
+    const placed = fakeAri.calls.find(
+      entry =>
+        isPlacement(entry) &&
+        (entry.body as Originate).endpoint.includes('@trunk-')
+    );
+    const channelId = (placed?.body as { channelId?: string }).channelId ?? '';
+    await eventually(() => {
+      expect(rig.hungUp(channelId)).toBe(true);
+    }, 3000);
+    expect(traceEvents(call)).toContainEqual(
+      expect.objectContaining({ event: 'ringTimeout', channelId })
+    );
+    expect(traceEvents(call)).not.toContainEqual(
+      expect.objectContaining({ event: 'fallback' })
+    );
+    expect(trunkOriginates(fakeAri)).toHaveLength(1);
+  });
+
   it.each(['noOutboundHost', 'trunkMissing'] as const)(
     'releases with 503 and a sipTarget trace line (%s)',
     async cause => {

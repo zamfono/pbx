@@ -70,7 +70,20 @@ describe('field descriptions reach tools/list and the OpenAPI document', () => {
   });
 
   it('describes each forward-target kind inside a target', async () => {
-    const variants = (await toolProperties('dids.create')).target?.oneOf ?? [];
+    // A target nests itself as a fallback, so some kinds are the tool schema's `$defs`.
+    const tool = (await publishedTools()).find(
+      candidate => candidate.name === 'dids.create'
+    );
+    if (tool === undefined) {
+      throw new Error('fieldDescriptions test: no tool dids.create');
+    }
+    const schema = tool.inputSchema as Schema;
+    const defs = (schema.$defs ?? {}) as Record<string, Schema>;
+    const resolve = (variant: Schema): Schema =>
+      typeof variant.$ref === 'string'
+        ? (defs[variant.$ref.replace('#/$defs/', '')] ?? variant)
+        : variant;
+    const variants = (schema.properties?.target?.oneOf ?? []).map(resolve);
     expect(variants).toHaveLength(9);
     for (const variant of variants) {
       expect(variant.properties?.kind?.description).toEqual(DESCRIBED);

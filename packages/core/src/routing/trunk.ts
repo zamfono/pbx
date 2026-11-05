@@ -81,7 +81,10 @@ export type AttemptFailure =
   | { kind: 'final'; code: number; alerted: boolean }
   /** The caller hung up: the attempt ended with no outcome of the far end's, and nothing is
    * dialled after it — no next host, route or emergency trunk. */
-  | { kind: 'callerGone' };
+  | { kind: 'callerGone' }
+  /** A forward target's ring timeout ran out (§10.1 step 7): the attempt is hung up, and nothing
+   * is dialled after it either. */
+  | { kind: 'ringTimeout' };
 
 /** SIP final responses that state the callee's own condition (§9.4 "Route fallthrough"). */
 const CALLEE_CONDITION_CODES = new Set<number>([
@@ -98,7 +101,7 @@ const CALLEE_CONDITION_CODES = new Set<number>([
  * arrived before the far end alerted. A caller who hung up ends the dial.
  */
 export function shouldFallThrough(failure: AttemptFailure): boolean {
-  if (failure.kind === 'callerGone') {
+  if (failure.kind === 'callerGone' || failure.kind === 'ringTimeout') {
     return false;
   }
   if (failure.kind !== 'final') {

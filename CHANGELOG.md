@@ -11,6 +11,27 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+### Added
+
+- A forward target to an external number, a SIP target or a voice bot (`webSocket`) takes a
+  `fallback`: where the call goes when the target does not work, any target, which may have a
+  fallback of its own. Busy, a refusal, no route or trunk, every host failing, a bot that cannot
+  be reached and the ring timeout all count; the caller hanging up does not. Where a call ended
+  with 503 or the far end's refusal, it now goes to the fallback when one is set. Every read
+  returns `fallback`, `null` without one.
+- An external or SIP forward target takes `ringTimeoutS`, 1 to 86400 seconds: how long it rings,
+  across every route and host, before it counts as not working, which beats a mobile's own
+  voicemail answering. `null`, the default, rings until the far end decides as before. A
+  ring-group member's forward rings for it too, but never follows a fallback; nor does a
+  three-way call's added party.
+- A user may set both on their own forward to an external number; a SIP, voice-bot or recording
+  target anywhere in the chain stays admin-only.
+- The hop limit is a setting: `maxForwardHops` in `PATCH /api/v1/settings` (MCP
+  `settings.update`), 3 by default, at least 1.
+- The OpenAPI document names the forward target `ForwardTarget` (`ForwardTargetInput` in a
+  request) under `components/schemas`, and MCP tool inputs carry it under `$defs`, since a
+  fallback nests it.
+
 ## [0.8.4] - 2026-11-04
 
 ### Added

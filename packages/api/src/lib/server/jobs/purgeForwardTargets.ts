@@ -151,12 +151,17 @@ async function referencedForwardTargetIds(
   return ids;
 }
 
-/** Hard-deletes every `forward_targets` row no owner column references any more (§5.9). */
+/** Hard-deletes every `forward_targets` row no owner column references any more (§5.9), with
+ * its fallback chain, whose rows go with it (`fallback_of_id`'s `ON DELETE CASCADE`). */
 export async function purgeOrphanForwardTargets(
   trx: Transaction<DB>
 ): Promise<void> {
   const [all, referenced] = await Promise.all([
-    trx.selectFrom('forwardTargets').select('id').execute(),
+    trx
+      .selectFrom('forwardTargets')
+      .select('id')
+      .where('fallbackOfId', 'is', null)
+      .execute(),
     referencedForwardTargetIds(trx)
   ]);
   const orphanIds = all.map(row => row.id).filter(id => !referenced.has(id));

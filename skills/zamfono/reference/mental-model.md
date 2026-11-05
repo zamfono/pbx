@@ -76,6 +76,26 @@ headers; either leg tells it who forwarded only as far as the trunk's `diversion
 a voice bot that takes calls over a WebSocket, in the Twilio Media Streams or the Vonage protocol
 (`forward-to-voice-bot`); like `external` and `sip` it neither counts a hop nor re-enters.
 
+An `external`, `sip` or `webSocket` target may carry a `fallback`, any target, which may carry a
+fallback of its own: where the call goes when the target does not work, for any reason but the
+caller hanging up. An `external` or `sip` one may also carry `ringTimeoutS`, how many seconds it
+rings before it counts as not working; set it below the carrier's own no-answer time to reach the
+fallback before a mobile's voicemail answers. The fallback applies as if the rule had named it: a
+`user` or `ringGroup` fallback counts a hop, so a loop such as "user → bot → back to the same user"
+ends at the hop limit in the user's mailbox. A ring-group member's forward rings for its ring
+timeout but never follows its fallback, so a group never hands its caller to one member's
+fallback; a party added with `*5` doesn't either.
+
+```json
+{
+  "kind": "sip",
+  "trunkId": "…",
+  "user": "agent",
+  "ringTimeoutS": 15,
+  "fallback": { "kind": "ringGroup", "ringGroupId": "…" }
+}
+```
+
 ## Where to look next
 
 - `routing-order` — the order every call is decided in, inbound and outbound.

@@ -4,7 +4,7 @@ import { recordChange } from '../audit.js';
 import {
   deleteForwardTargets,
   insertForwardTarget,
-  rowToTarget
+  resolveTarget
 } from '../forwardTargetSpec.js';
 import { propagate } from '../propagate.js';
 import { defineOperation, OpError } from '../types.js';
@@ -40,13 +40,7 @@ export const setMenuTargets = defineOperation({
     const existingTargets = await Promise.all(
       existing.map(async row => ({
         digits: row.digits,
-        target: rowToTarget(
-          await ctx.db
-            .selectFrom('forwardTargets')
-            .selectAll()
-            .where('id', '=', row.targetId)
-            .executeTakeFirstOrThrow()
-        )
+        target: await resolveTarget(ctx.db, row.targetId)
       }))
     );
     await ctx.db

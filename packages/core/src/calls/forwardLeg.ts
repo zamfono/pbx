@@ -56,6 +56,9 @@ export type ForwardLeg = {
   standsInFor?: string;
   /** The target the leg dials records its calls (`Leg.targetRecords`). */
   targetRecords?: true;
+  /** Seconds the target may ring, across every route and host it is tried on, before it counts
+   * as not working (§10.1 step 7). */
+  ringTimeoutS?: number;
 };
 
 /** The user whose own rule forwards a call (§10.1 step 7), whose call an external or SIP target is
@@ -75,6 +78,15 @@ export function recordingOf(target: {
   record?: true;
 }): Pick<ForwardLeg, 'targetRecords'> {
   return target.record === true ? { targetRecords: true } : {};
+}
+
+/** The `ForwardLeg.ringTimeoutS` of a leg dialled for `target` (§10.1 step 7). */
+export function ringTimeoutOf(target: {
+  ringTimeoutS?: number;
+}): Pick<ForwardLeg, 'ringTimeoutS'> {
+  return target.ringTimeoutS === undefined
+    ? {}
+    : { ringTimeoutS: target.ringTimeoutS };
 }
 
 /** The forwarding context `forward`'s leg carries over `trunk` (§9.4 "Forwarded calls"): its

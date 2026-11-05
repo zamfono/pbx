@@ -9,20 +9,21 @@ import { ownDid, type ForwardTarget } from '../routing/targets.js';
 import { SIP_SERVICE_UNAVAILABLE } from '../sipCodes.js';
 import { type Call } from './call.js';
 import type { TrunkRow } from './callerIdentity.js';
-import { dialRoutes } from './dialAttempt.js';
+import { dialCause, dialRoutes, type DialResult } from './dialAttempt.js';
 import { openCursor, trunkWay } from './externalLegRoutes.js';
 import {
   recordingOf,
+  ringTimeoutOf,
   standInOf,
   type Forwarder,
   type ForwardLeg
 } from './forwardLeg.js';
 import { sipForwardLeg } from './forwardValues.js';
-import { dialExternal, settleDial } from './outboundExternal.js';
+import { originateExternalLeg, settleDial } from './outboundExternal.js';
 import type { Pipeline } from './pipeline.js';
 import { release } from './release.js';
 import { liveTrunk } from './routeSelection.js';
-import { enterOwnDid } from './runTarget.js';
+import { enterOwnDid, failOver } from './runTarget.js';
 import type { TrunkChannels } from './trunkChannels.js';
 import { dialTargets } from './trunkDial.js';
 
@@ -37,6 +38,35 @@ function unusableCause(
     return 'trunkMissing';
   }
   return dialTargets(trunk, snapshot).length === 0 ? 'noOutboundHost' : null;
+}
+
+/** Settles `call` on the dial of a forward target, `forwarded.target` dialled for
+ * `forwarded.forwarder`: one that did not answer goes to the target's fallback (`failOver`), else
+ * ends as any outbound dial does (`settleDial`). */
+async function settleForward(
+  pipeline: Pipeline,
+  call: Call,
+  forwarded: {
+    target: Extract<ForwardTarget, { kind: 'external' | 'sip' }>;
+    forwarder: Forwarder | null;
+  },
+  result: DialResult
+): Promise<void> {
+  if (
+    result.kind !== 'answered' &&
+    (await failOver(
+      pipeline,
+      call,
+      forwarded.target,
+      forwarded.forwarder,
+      result.kind === 'final' && result.failure.kind === 'final'
+        ? result.failure.code
+        : (dialCause(result) ?? 'noRoute')
+    ))
+  ) {
+    return;
+  }
+  await settleDial(pipeline, call, result);
 }
 
 /**
@@ -62,7 +92,17 @@ export async function dialSipTarget(
       trunkId: target.trunkId,
       cause: unusable
     });
-    await release(pipeline, call, SIP_SERVICE_UNAVAILABLE, 'failed');
+    if (
+      !(await failOver(
+        pipeline,
+        call,
+        target,
+        forwarder,
+        unusable ?? 'trunkMissing'
+      ))
+    ) {
+      await release(pipeline, call, SIP_SERVICE_UNAVAILABLE, 'failed');
+    }
     return;
   }
   const forward: ForwardLeg = {
@@ -74,7 +114,8 @@ export async function dialSipTarget(
       snapshot
     )),
     ...standInOf(forwarder),
-    ...recordingOf(target)
+    ...recordingOf(target),
+    ...ringTimeoutOf(target)
   };
   const cursor = openCursor(
     {
@@ -89,7 +130,12 @@ export async function dialSipTarget(
     },
     [trunkWay(snapshot, trunk.id)]
   );
-  await settleDial(pipeline, call, await dialRoutes(cursor));
+  await settleForward(
+    pipeline,
+    call,
+    { target, forwarder },
+    await dialRoutes(cursor)
+  );
 }
 
 /**
@@ -121,13 +167,19 @@ export async function dialForwardTarget(
     diversions: [...call.diversions],
     headers: [],
     ...standInOf(forwarder),
-    ...recordingOf(target)
+    ...recordingOf(target),
+    ...ringTimeoutOf(target)
   };
-  await dialExternal(
-    { pipeline, trunkChannels, forward },
+  await settleForward(
+    pipeline,
     call,
-    target.number,
-    forwarder?.userId ?? null,
-    null
+    { target, forwarder },
+    await originateExternalLeg(
+      { pipeline, trunkChannels, forward },
+      call,
+      target.number,
+      forwarder?.userId ?? null,
+      null
+    )
   );
 }

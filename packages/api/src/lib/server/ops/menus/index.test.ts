@@ -42,7 +42,9 @@ describe('menus', () => {
     expect(menu.fallbackTarget).toEqual({
       kind: 'external',
       external: '+490000000',
-      record: false
+      record: false,
+      ringTimeoutS: null,
+      fallback: null
     });
   });
 
@@ -245,7 +247,9 @@ describe('menus', () => {
     expect(updated.fallbackTarget).toEqual({
       kind: 'external',
       external: '+491111111',
-      record: false
+      record: false,
+      ringTimeoutS: null,
+      fallback: null
     });
     const targets = await db.selectFrom('forwardTargets').selectAll().execute();
     expect(targets).toHaveLength(1);

@@ -85,6 +85,13 @@ export const settingsInputSchema = z
       .describe(
         'The tenant-wide fallback for a number in a block that no DID holds and for a number outside every DID and block; null: such calls are released with 404 (see zamfono.help numbers).'
       ),
+    maxForwardHops: z
+      .int()
+      .min(1)
+      .optional()
+      .describe(
+        "How many forwards to a user or ring group, an own number counted as one, a call may make before it goes to the last target's mailbox, else ends (480); 3 by default."
+      ),
     codecs: codecsSchema
       .optional()
       .describe(

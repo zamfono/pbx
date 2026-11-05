@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { type DB, type Db } from '@zamfono/shared';
 
 import { targetSpecSchema } from '../forwardTargetSchema.js';
-import { rowToTarget } from '../forwardTargetSpec.js';
+import { resolveTarget } from '../forwardTargetSpec.js';
 import { assertNoLiveHolder } from '../liveHolder.js';
 import { liveRow } from '../rows.js';
 import { timeoutSeconds } from '../timeoutInput.js';
@@ -103,13 +103,7 @@ export async function menuTargetRows(
   return Promise.all(
     rows.map(async row => ({
       digits: row.digits,
-      target: rowToTarget(
-        await db
-          .selectFrom('forwardTargets')
-          .selectAll()
-          .where('id', '=', row.targetId)
-          .executeTakeFirstOrThrow()
-      )
+      target: await resolveTarget(db, row.targetId)
     }))
   );
 }
@@ -130,11 +124,7 @@ export type MenuOut = z.infer<typeof menuOut>;
 /** Assembles the wire shape of a menu from its row, fallback target and DTMF map (§10.3). */
 export async function toMenuOut(db: Db, row: MenuRow): Promise<MenuOut> {
   const [fallback, targets] = await Promise.all([
-    db
-      .selectFrom('forwardTargets')
-      .selectAll()
-      .where('id', '=', row.fallbackTargetId)
-      .executeTakeFirstOrThrow(),
+    resolveTarget(db, row.fallbackTargetId),
     menuTargetRows(db, row.id)
   ]);
   return {
@@ -144,7 +134,7 @@ export async function toMenuOut(db: Db, row: MenuRow): Promise<MenuOut> {
     timeoutS: row.timeoutS,
     maxAttempts: row.maxAttempts,
     allowExtensionDialing: row.allowExtensionDialing === 1,
-    fallbackTarget: rowToTarget(fallback),
+    fallbackTarget: fallback,
     targets
   };
 }

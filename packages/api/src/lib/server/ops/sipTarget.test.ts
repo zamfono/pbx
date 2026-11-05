@@ -68,7 +68,9 @@ describe('sip forward targets', () => {
     const stored = {
       ...sipTarget(trunkId),
       headers: DEFAULT_SIP_HEADERS,
-      record: false
+      record: false,
+      ringTimeoutS: null,
+      fallback: null
     };
     expect(did.target).toEqual(stored);
     const row = await db

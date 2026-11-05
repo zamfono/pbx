@@ -9,13 +9,12 @@ import type { Snapshot } from '../internal/snapshot.js';
 import { resolveDialed } from '../routing/outbound.js';
 import {
   findForwardTarget,
-  MAX_HOPS,
   ownDidTarget,
   type ForwardTarget
 } from '../routing/targets.js';
 import { SIP_NOT_FOUND, SIP_TEMPORARILY_UNAVAILABLE } from '../sipCodes.js';
 import { extensionOf } from './extensionOwner.js';
-import { recordingOf, type ForwardLeg } from './forwardLeg.js';
+import { recordingOf, ringTimeoutOf, type ForwardLeg } from './forwardLeg.js';
 import { resolveDialedContext } from './outboundLookup.js';
 
 /**
@@ -63,7 +62,7 @@ function followOwnDids(
     next = ownDidTarget(snapshot, reached)
   ) {
     hops += 1;
-    if (hops > MAX_HOPS) {
+    if (hops > snapshot.settings.maxForwardHops) {
       return null;
     }
     reached = next;
@@ -105,7 +104,12 @@ function didTarget(
       number: target.number,
       clir: null,
       // A party added with `*5` carries no forwarding context (§9.4 "Forwarded calls").
-      forward: { diversions: [], headers: [], ...recordingOf(target) }
+      forward: {
+        diversions: [],
+        headers: [],
+        ...recordingOf(target),
+        ...ringTimeoutOf(target)
+      }
     };
   }
   if (target.kind === 'sip') {

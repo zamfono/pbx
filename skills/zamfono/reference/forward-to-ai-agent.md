@@ -59,6 +59,10 @@ outside the stack; this recipe gets the call to OpenAI. OpenAI's guide:
    Add `"record": true` to record every call the agent answers, one recording per call, however
    it was forwarded there; a DID answered by the agent alone records each of its concurrent calls.
 
+   Add a `"fallback"` target, such as the reception's ring group, for when the agent cannot take
+   the call: its trunk is down, it answers busy or refuses, or it does not answer within
+   `"ringTimeoutS"` seconds. Without one, such a call ends (`mental-model`).
+
 3. Choose what the call tells your webhook. The target's `headers` lists the SIP headers the
    INVITE carries, each a `name` and a `value`:
 

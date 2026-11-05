@@ -1,3 +1,5 @@
+import { sql } from 'kysely';
+
 import type { Db } from '@zamfono/shared';
 
 import {
@@ -179,20 +181,39 @@ function toReferences(
 }
 
 /**
+ * The first row of the fallback chain each of `ftIds` is in (§10.1 step 7): a fallback has no
+ * owner column of its own, its chain's first row has, so it is referenced through that row.
+ */
+async function chainHeads(db: Db, ftIds: string[]): Promise<string[]> {
+  const ids = sql.join(ftIds.map(id => sql`${id}`));
+  const { rows } = await sql<{ id: string }>`
+    WITH RECURSIVE chain(id, fallback_of_id) AS (
+      SELECT id, fallback_of_id FROM forward_targets WHERE id IN (${ids})
+      UNION
+      SELECT parent.id, parent.fallback_of_id
+        FROM forward_targets parent JOIN chain ON parent.id = chain.fallback_of_id
+    )
+    SELECT id FROM chain WHERE fallback_of_id IS NULL`.execute(db);
+  return rows.map(row => row.id);
+}
+
+/**
  * Every row across all nine `forward_targets` owner columns of §11.2 that still points at one of
  * `ftIds`, outside `exclude`'s own scope: `dids.target_id`, `did_blocks.fallback_target_id`,
  * `menus.fallback_target_id`, `menu_targets.target_id`, `user_forward_rules.target_id`,
  * `ring_group_forward_rules.target_id`, `settings.fallback_target_id`, `ooo_rules.target_id` and
- * `opening_hours.closed_target_id` (§5.9: a soft delete is refused while any of these exist).
+ * `opening_hours.closed_target_id` (§5.9: a soft delete is refused while any of these exist); a
+ * fallback is referenced by the owner of its chain's first row (`chainHeads`).
  */
 export async function findForwardTargetOwners(
   db: Db,
-  ftIds: string[],
+  targetIds: string[],
   exclude: OwnScope = {}
 ): Promise<Reference[]> {
-  if (ftIds.length === 0) {
+  if (targetIds.length === 0) {
     return [];
   }
+  const ftIds = await chainHeads(db, targetIds);
   const [unscoped, menuOwned, groupRules, schedules] = await Promise.all([
     loadUnscopedSources(db, ftIds),
     loadMenuOwnedSources(db, ftIds, exclude.menuId),

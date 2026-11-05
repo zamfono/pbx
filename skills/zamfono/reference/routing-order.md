@@ -32,8 +32,12 @@ Every call — inbound from a trunk, internal between colleagues, or re-entering
    unmatched string replays the greeting up to `maxAttempts`, after which the menu's fallback
    target applies.
 7. **Forward targets.** A `user` or `ringGroup` target re-enters at **Entry** with the hop counter
-   increased; a `menu` target re-enters without counting a hop. After the third hop the call goes
-   to the last target's mailbox, or is released if it has none.
+   increased; a `menu` target re-enters without counting a hop. Past the hop limit,
+   `settings.maxForwardHops` (3 unless set), the call goes to the last target's mailbox, or is
+   released if it has none. An `external`, `sip` or `webSocket` target that does not work — busy,
+   refused, no route or trunk, a bot that cannot be reached, or its `ringTimeoutS` run out — hands
+   the call to its `fallback`, as if the rule had named that target instead; a ring-group member's
+   forward and a `*5` party never fall back (see `mental-model`).
 
 ## Outbound resolution
 

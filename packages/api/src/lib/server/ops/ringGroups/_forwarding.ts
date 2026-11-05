@@ -64,11 +64,12 @@ export async function storedRingGroupForwardRules(
   const byCondition = (rule: {
     condition: RingGroupForwardCondition;
   }): number => RING_GROUP_FORWARD_CONDITIONS.indexOf(rule.condition);
-  return rows
-    .map(row => ({
+  const rules = await Promise.all(
+    rows.map(async row => ({
       condition: row.condition,
-      target: rowToTarget(row),
+      target: await rowToTarget(db, row),
       targetId: row.targetId
     }))
-    .sort((left, right) => byCondition(left) - byCondition(right));
+  );
+  return rules.sort((left, right) => byCondition(left) - byCondition(right));
 }

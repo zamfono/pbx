@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { WebSocketServer, type WebSocket } from 'ws';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
-import { seedDid } from '@zamfono/shared/testDb.js';
+import { seedDid, seedUser } from '@zamfono/shared/testDb.js';
 
 import type { Channel } from '../ari/types.js';
 import type { ForwardTarget } from '../routing/targets.js';
@@ -319,6 +319,32 @@ describe('webSocket targets (§9.4 "WebSocket targets")', () => {
     expect(
       fakeAri.calls.some(entry => entry.path === 'channels/externalMedia')
     ).toBe(false);
+  });
+
+  it('hands the call to its fallback when the socket does not open (§10.1 step 7)', async () => {
+    const url = bot.url;
+    await bot.close();
+    // A user with no device and no mailbox: the fallback rings nobody and releases 480.
+    const anna = await seedUser(db, { mailboxEnabled: 0 });
+    const call = inboundCall();
+    await enterTarget(
+      pipeline,
+      call,
+      target({ url, fallback: { kind: 'user', userId: anna } }),
+      null
+    );
+    expect(traceEvents(call)).toContainEqual(
+      expect.objectContaining({
+        event: 'fallback',
+        from: 'webSocket',
+        cause: 'connectFailed',
+        to: 'user'
+      })
+    );
+    expect(traceEvents(call)).not.toContainEqual(
+      expect.objectContaining({ event: 'release', code: 503 })
+    );
+    expect(call.hops).toBe(1);
   });
 
   it('streams a vonage target as little-endian PCM at its rate', async () => {

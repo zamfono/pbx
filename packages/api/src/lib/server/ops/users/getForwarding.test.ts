@@ -62,7 +62,9 @@ describe('users.getForwarding', () => {
             trunkId,
             user: 'proj_def456',
             headers: [...DEFAULT_SIP_HEADERS],
-            record: false
+            record: false,
+            ringTimeoutS: null,
+            fallback: null
           }
         },
         { condition: 'busy', target: { kind: 'mailboxUser', userId: anna.id } },
@@ -73,7 +75,9 @@ describe('users.getForwarding', () => {
             trunkId,
             user: 'proj_abc123',
             headers,
-            record: false
+            record: false,
+            ringTimeoutS: null,
+            fallback: null
           }
         },
         {
@@ -81,7 +85,9 @@ describe('users.getForwarding', () => {
           target: {
             kind: 'external',
             external: '+4915112345678',
-            record: false
+            record: false,
+            ringTimeoutS: null,
+            fallback: null
           }
         }
       ]

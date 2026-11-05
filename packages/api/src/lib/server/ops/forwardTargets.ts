@@ -19,6 +19,12 @@ export function isAdminTarget(target: TargetSpec): boolean {
   );
 }
 
+/** `target` and each fallback down its chain, in order (§10.1 step 7). */
+export function targetChain(target: TargetSpec): TargetSpec[] {
+  const fallback = ('fallback' in target ? target.fallback : null) ?? null;
+  return fallback === null ? [target] : [target, ...targetChain(fallback)];
+}
+
 /** Why a `user` may not hold the admin target `target` (`assertMayHoldTarget`). */
 function adminTargetRefusal(target: TargetSpec): string {
   if (target.kind === 'sip') {
@@ -31,16 +37,20 @@ function adminTargetRefusal(target: TargetSpec): string {
 }
 
 /**
- * §10.3 "Forward targets": an admin target (`isAdminTarget`) is set or kept by an `admin` or
- * `owner` alone. The one check for every operation a `user` may call, their own forwarding, OOO
+ * §10.3 "Forward targets": an admin target (`isAdminTarget`), anywhere in a target's fallback
+ * chain, is set or kept by an `admin` or `owner` alone. The one check for every operation a `user` may call, their own forwarding, OOO
  * rules and opening hours: each writes its targets through `createTarget`, and `ooo.update` calls
  * this for the target it keeps, while `users.setForwarding` keeps, without writing it, only the
  * very admin target a rule's condition already holds. The admin-only operations need it only
  * through `createTarget`, where it always passes.
  */
 export function assertMayHoldTarget(ctx: Context, target: TargetSpec): void {
-  if (isAdminTarget(target) && ctx.actor.role === 'user') {
-    throw new OpError(HTTP_FORBIDDEN, adminTargetRefusal(target));
+  if (ctx.actor.role !== 'user') {
+    return;
+  }
+  const admin = targetChain(target).find(isAdminTarget);
+  if (admin !== undefined) {
+    throw new OpError(HTTP_FORBIDDEN, adminTargetRefusal(admin));
   }
 }
 

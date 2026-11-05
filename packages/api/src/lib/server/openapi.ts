@@ -152,7 +152,46 @@ function responses(
   };
 }
 
-function operationFor(route: RouteEntry): OpenApiOperation {
+/** The named schemas the operations' JSON Schemas define (`$defs`), lifted into the document's
+ * components as they are published, an input one's name suffixed `Input`, since a field with a
+ * default is optional only there. */
+type LiftedSchemas = Record<string, JsonSchema>;
+
+/** Moves every `$defs` within `node` into `lifted`, already renamed (`liftDefs`). */
+function moveDefs(node: unknown, suffix: string, lifted: LiftedSchemas): void {
+  if (node === null || typeof node !== 'object') {
+    return;
+  }
+  const record = node as Record<string, unknown>;
+  const defs = record.$defs as Record<string, JsonSchema> | undefined;
+  delete record.$defs;
+  for (const [name, def] of Object.entries(defs ?? {})) {
+    moveDefs(def, suffix, lifted);
+    lifted[`${name}${suffix}`] = def;
+  }
+  for (const value of Object.values(record)) {
+    moveDefs(value, suffix, lifted);
+  }
+}
+
+/** `schemas`, an operation's JSON Schemas or what holds them, with their `$defs` lifted into
+ * `lifted` under `<name><suffix>` and their references pointing there: a schema's own `$defs`
+ * resolve against the document's root once embedded in it. */
+function liftDefs<T>(schemas: T, suffix: string, lifted: LiftedSchemas): T {
+  const copy = JSON.parse(
+    JSON.stringify(schemas).replaceAll(
+      /"#\/\$defs\/(?<name>[^"]+)"/gu,
+      `"#/components/schemas/$<name>${suffix}"`
+    )
+  ) as T;
+  moveDefs(copy, suffix, lifted);
+  return copy;
+}
+
+function operationFor(
+  route: RouteEntry,
+  lifted: LiftedSchemas
+): OpenApiOperation {
   const op = routeOperation(route);
   const captures = pathParamNames(route.pattern);
   // The fields the route fills from its path, never the client's: its captures', and a scope
@@ -163,7 +202,7 @@ function operationFor(route: RouteEntry): OpenApiOperation {
   if (route.scope !== undefined) {
     routeFields.add('scope');
   }
-  const inputSchema = inputJsonSchema(op);
+  const inputSchema = liftDefs(inputJsonSchema(op), 'Input', lifted);
   const properties =
     (inputSchema.properties as Record<string, JsonSchema> | undefined) ?? {};
   // OpenAPI 3.1 §4.8.12.1 / Path Templating: a path parameter's `name` is the template expression
@@ -186,7 +225,7 @@ function operationFor(route: RouteEntry): OpenApiOperation {
     summary: op.description,
     'x-operation-name': route.op,
     parameters,
-    responses: responses(route, op)
+    responses: liftDefs(responses(route, op), '', lifted)
   };
   if (route.method === 'GET') {
     return {
@@ -199,7 +238,11 @@ function operationFor(route: RouteEntry): OpenApiOperation {
     : JSON_CONTENT_TYPE;
   // The route fills its own fields after the body is read (`handleRest`), so they are the URL's,
   // never the body's; `confirm` rides in the body (§10.3 "Confirmation").
-  const bodySchema = publishedInputSchema(op, routeFields);
+  const bodySchema = liftDefs(
+    publishedInputSchema(op, routeFields),
+    'Input',
+    lifted
+  );
   return {
     ...base,
     requestBody: { content: { [contentType]: { schema: bodySchema } } }
@@ -212,13 +255,14 @@ function operationFor(route: RouteEntry): OpenApiOperation {
  */
 export function buildOpenApiDocument(): OpenApiDocument {
   const paths: OpenApiDocument['paths'] = {};
+  const lifted: LiftedSchemas = {};
   for (const route of routes) {
     let methods = paths[route.pattern];
     if (methods === undefined) {
       methods = {};
       paths[route.pattern] = methods;
     }
-    methods[route.method.toLowerCase()] = operationFor(route);
+    methods[route.method.toLowerCase()] = operationFor(route, lifted);
   }
   return {
     openapi: OPENAPI_VERSION,
@@ -226,7 +270,7 @@ export function buildOpenApiDocument(): OpenApiDocument {
     servers: [{ url: API_PREFIX }],
     paths,
     components: {
-      schemas: { Problem: PROBLEM_SCHEMA },
+      schemas: { Problem: PROBLEM_SCHEMA, ...lifted },
       securitySchemes: { bearerAuth: BEARER_SECURITY_SCHEME }
     },
     security: [{ bearerAuth: [] }]

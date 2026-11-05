@@ -32,7 +32,9 @@ async function withAdminSipRule(): Promise<Fixture> {
       trunkId,
       user: 'proj_abc123',
       headers: [{ name: 'X-Ext', value: '{{calledExtension}}' }],
-      record: false
+      record: false,
+      ringTimeoutS: null,
+      fallback: null
     }
   };
   await setForwarding(db, anna.id, [
@@ -65,7 +67,13 @@ describe('users.setForwarding, an admin-set sip rule', () => {
       .execute();
     const external: Rule = {
       condition: 'busy',
-      target: { kind: 'external', external: '+4915112345678', record: false }
+      target: {
+        kind: 'external',
+        external: '+4915112345678',
+        record: false,
+        ringTimeoutS: null,
+        fallback: null
+      }
     };
 
     await setForwarding(db, anna.id, [sipRule, external], anna);
@@ -115,7 +123,9 @@ describe('users.setForwarding, an admin-set sip rule', () => {
         target: {
           ...bare.target,
           headers: [...DEFAULT_SIP_HEADERS],
-          record: false
+          record: false,
+          ringTimeoutS: null,
+          fallback: null
         }
       }
     ]);

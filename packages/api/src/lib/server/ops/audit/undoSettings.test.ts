@@ -86,7 +86,9 @@ describe('audit.undo of a settings.update', () => {
     const first: TargetSpec = {
       kind: 'external',
       external: '+491111111',
-      record: false
+      record: false,
+      ringTimeoutS: null,
+      fallback: null
     };
     await updateSettings(db, { fallbackTarget: first });
     await updateSettings(db, {

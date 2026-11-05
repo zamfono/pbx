@@ -3,16 +3,11 @@ import { z } from 'zod';
 import {
   USER_FORWARD_CONDITIONS,
   type Db,
-  type SipHeaderTemplate,
   type UserForwardCondition
 } from '@zamfono/shared';
 
-import { isAdminTarget } from '../forwardTargets.js';
-import {
-  targetSpecSchema,
-  webSocketSampleRate,
-  type TargetSpec
-} from '../forwardTargetSchema.js';
+import { isAdminTarget, targetChain } from '../forwardTargets.js';
+import { targetSpecSchema, type TargetSpec } from '../forwardTargetSchema.js';
 import { rowToTarget } from '../forwardTargetSpec.js';
 
 /** A user's forwarding rules (§10.3 "Users"), as `users.setForwarding` takes them and both
@@ -66,51 +61,41 @@ export async function storedForwardRules(
     .execute();
   const byCondition = (rule: { condition: UserForwardCondition }): number =>
     USER_FORWARD_CONDITIONS.indexOf(rule.condition);
-  return rows
-    .map(row => ({
+  const rules = await Promise.all(
+    rows.map(async row => ({
       condition: row.condition,
-      target: rowToTarget(row),
+      target: await rowToTarget(db, row),
       targetId: row.targetId
     }))
-    .sort((left, right) => byCondition(left) - byCondition(right));
+  );
+  return rules.sort((left, right) => byCondition(left) - byCondition(right));
 }
 
-/** A `sip` target's headers as `[name, value]` pairs in order, compared without key order. */
-function headerPairs(headers: SipHeaderTemplate[]): string {
-  return JSON.stringify(headers.map(header => [header.name, header.value]));
+/** `value` as JSON with every object's keys sorted, so two targets compare without key order. */
+function canonical(value: unknown): string {
+  return JSON.stringify(value, (_key, inner: unknown) =>
+    inner !== null && typeof inner === 'object' && !Array.isArray(inner)
+      ? Object.fromEntries(
+          Object.entries(inner).sort(([left], [right]) =>
+            left.localeCompare(right)
+          )
+        )
+      : inner
+  );
 }
 
 /**
- * §10.3 "Forward targets": whether `input` is the very admin target (`isAdminTarget`) `stored`
- * holds, with the same `record`: the same number; the same trunk, user part and headers, in
- * order, name for name and value for value; or the same protocol, URL and sample rate. `stored`
- * comes through `rowToTarget`, so its headers are the parsed JSON the wire returns.
+ * §10.3 "Forward targets": whether `input` is the very target `stored` holds, field for field down
+ * its whole fallback chain, a `sip` target's headers in order, while that chain holds an admin
+ * target (`isAdminTarget`) anywhere. Both come parsed, `stored` through `rowToTarget`, so every
+ * defaulted field (`sampleRate`, `ringTimeoutS`, `fallback`) is set on either side.
  */
 export function isSameAdminTarget(
   stored: TargetSpec,
   input: TargetSpec
 ): boolean {
-  if (!isAdminTarget(stored)) {
-    return false;
-  }
-  if (stored.kind === 'external' && input.kind === 'external') {
-    return stored.external === input.external && stored.record === input.record;
-  }
-  if (stored.kind === 'webSocket' && input.kind === 'webSocket') {
-    return (
-      stored.protocol === input.protocol &&
-      stored.url === input.url &&
-      webSocketSampleRate(stored) === webSocketSampleRate(input) &&
-      stored.record === input.record
-    );
-  }
-  if (stored.kind !== 'sip' || input.kind !== 'sip') {
-    return false;
-  }
   return (
-    stored.trunkId === input.trunkId &&
-    stored.user === input.user &&
-    headerPairs(stored.headers) === headerPairs(input.headers) &&
-    stored.record === input.record
+    targetChain(stored).some(isAdminTarget) &&
+    canonical(stored) === canonical(input)
   );
 }

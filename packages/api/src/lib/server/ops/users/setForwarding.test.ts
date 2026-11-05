@@ -29,7 +29,9 @@ describe('users.setForwarding, self-service', () => {
         target: {
           kind: 'external',
           external: '+4915112345678',
-          record: false
+          record: false,
+          ringTimeoutS: null,
+          fallback: null
         }
       }
     ];

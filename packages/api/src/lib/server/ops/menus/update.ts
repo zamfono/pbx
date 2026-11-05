@@ -11,7 +11,7 @@ import {
 import {
   deleteForwardTargets,
   insertForwardTarget,
-  rowToTarget
+  resolveTarget
 } from '../forwardTargetSpec.js';
 import { propagate } from '../propagate.js';
 import { defineOperation, type Context } from '../types.js';
@@ -67,13 +67,7 @@ async function resolvedFallbackTargetId(
   if (!fallbackTarget) {
     return before.fallbackTargetId;
   }
-  const previous = rowToTarget(
-    await ctx.db
-      .selectFrom('forwardTargets')
-      .selectAll()
-      .where('id', '=', before.fallbackTargetId)
-      .executeTakeFirstOrThrow()
-  );
+  const previous = await resolveTarget(ctx.db, before.fallbackTargetId);
   const newTargetId = await insertForwardTarget(ctx, fallbackTarget);
   // The diff names this operation's own input field and carries the wire target, so `audit.undo`
   // replays it straight back through `menus.update` (§5.8).

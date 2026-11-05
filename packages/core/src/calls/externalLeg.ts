@@ -188,6 +188,47 @@ async function dialFrom(
   }
 }
 
+const MS_PER_SECOND = 1000;
+
+/**
+ * `owner`, holding the leg for `seconds` at most, a forward target's ring timeout (§10.1 step 7):
+ * once it runs out, the channel ringing then is hung up and the leg ends for the race, and an
+ * attempt placed after it is not taken. Without a timeout, `owner` itself.
+ */
+function timedOwner(
+  pipeline: Pipeline,
+  call: Call,
+  owner: ExternalLegOwner,
+  seconds: number | undefined
+): ExternalLegOwner {
+  if (seconds === undefined) {
+    return owner;
+  }
+  let current: string | null = null;
+  let expired = false;
+  setTimeout(() => {
+    expired = true;
+    if (current === null || !owner.ringing(current)) {
+      return;
+    }
+    call.log.event({ event: 'ringTimeout', channelId: current });
+    owner.end(current, null);
+    pipeline.deps.ari.channels
+      .hangup(current)
+      .catch(logUnlessGone(pipeline.deps.logger, 'ring timeout hangup'));
+  }, seconds * MS_PER_SECOND);
+  return {
+    ...owner,
+    track: channelId => {
+      if (expired || !owner.track(channelId)) {
+        return false;
+      }
+      current = channelId;
+      return true;
+    }
+  };
+}
+
 /**
  * Rings `target.number` as one of the race's legs: dialled as `target.asUser`'s own call (§9.4
  * "Outbound routing": a user's forwards and find-me legs count as that user's calls), which picks
@@ -221,6 +262,7 @@ export async function ringExternalLeg(
     return;
   }
   const leg: ExternalLeg = {
+    owner: timedOwner(pipeline, call, owner, target.forward?.ringTimeoutS),
     ...openCursor(
       {
         pipeline,
@@ -235,8 +277,7 @@ export async function ringExternalLeg(
       target.trunkId === undefined
         ? routeWays(snapshot, target.number, target.asUser)
         : [trunkWay(snapshot, target.trunkId)]
-    ),
-    owner
+    )
   };
   const first = nextRoute(leg);
   if (first === null) {

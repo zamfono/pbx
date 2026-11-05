@@ -12,24 +12,33 @@ import {
 
 import type { Snapshot } from '../internal/snapshot.js';
 
+/** An `external`, `sip` or `webSocket` target's own fallback, where the call goes when it does
+ * not work (§10.1 step 7); set only when it has one. */
+type Fallback = { fallback?: ForwardTarget };
+
+/** An `external` or `sip` target's ring timeout in seconds (§10.1 step 7); set only when it has one. */
+type RingTimeout = { ringTimeoutS?: number };
+
 export type ForwardTarget =
   | { kind: 'user'; userId: string }
   | { kind: 'ringGroup'; ringGroupId: string }
-  | { kind: 'external'; number: string; record?: true }
-  | {
+  | ({ kind: 'external'; number: string; record?: true } & RingTimeout &
+      Fallback)
+  | ({
       kind: 'sip';
       trunkId: string;
       user: string;
       headers: SipHeaderTemplate[];
       record?: true;
-    }
-  | {
+    } & RingTimeout &
+      Fallback)
+  | ({
       kind: 'webSocket';
       protocol: WebSocketProtocol;
       url: string;
       sampleRate: WebSocketSampleRate;
       record?: true;
-    }
+    } & Fallback)
   | { kind: 'mailboxUser'; userId: string }
   | { kind: 'mailboxRingGroup'; ringGroupId: string }
   | { kind: 'announcement'; audioId: string }
@@ -54,6 +63,9 @@ type ForwardTargetsRow = {
   mailboxRingGroupId: string | null;
   announcementAudioId: string | null;
   menuId: string | null;
+  ringTimeoutS: number | null;
+  /** The target this row is the fallback of (§10.1 step 7), `null` for a chain's first row. */
+  fallbackOfId: string | null;
   recordCalls: number;
 };
 
@@ -61,6 +73,11 @@ type ForwardTargetsRow = {
  * when it records. */
 function recordOf(row: ForwardTargetsRow): { record?: true } {
   return row.recordCalls === 1 ? { record: true } : {};
+}
+
+/** An `external` or `sip` target's `ringTimeoutS`: set only when it has one. */
+function ringTimeoutOf(row: ForwardTargetsRow): RingTimeout {
+  return row.ringTimeoutS === null ? {} : { ringTimeoutS: row.ringTimeoutS };
 }
 
 /** A `webSocket` target's sample rate, one of those the table's CHECK allows. */
@@ -74,8 +91,16 @@ function sampleRateOf(row: ForwardTargetsRow): WebSocketSampleRate {
   );
 }
 
-/** Reads the one set column of `row` into the `ForwardTarget` union it represents. */
-export function targetFromRow(row: ForwardTargetsRow): ForwardTarget {
+/** Reads the one set column of `row` into the `ForwardTarget` union it represents, an `external`,
+ * `sip` or `webSocket` one with its fallback chain from `rows` (the snapshot's). */
+export function targetFromRow(
+  row: ForwardTargetsRow,
+  rows: readonly ForwardTargetsRow[] = []
+): ForwardTarget {
+  // The row whose `fallbackOfId` names this one holds its fallback, read down its own chain.
+  const next = rows.find(candidate => candidate.fallbackOfId === row.id);
+  const fallback: Fallback =
+    next === undefined ? {} : { fallback: targetFromRow(next, rows) };
   if (row.userId !== null) {
     return { kind: 'user', userId: row.userId };
   }
@@ -83,7 +108,13 @@ export function targetFromRow(row: ForwardTargetsRow): ForwardTarget {
     return { kind: 'ringGroup', ringGroupId: row.ringGroupId };
   }
   if (row.external !== null) {
-    return { kind: 'external', number: row.external, ...recordOf(row) };
+    return {
+      kind: 'external',
+      number: row.external,
+      ...recordOf(row),
+      ...ringTimeoutOf(row),
+      ...fallback
+    };
   }
   // The table's CHECKs set `sip_user` and `sip_headers_json` exactly when `sip_trunk_id` is set.
   if (
@@ -96,7 +127,9 @@ export function targetFromRow(row: ForwardTargetsRow): ForwardTarget {
       trunkId: row.sipTrunkId,
       user: row.sipUser,
       headers: row.sipHeaders,
-      ...recordOf(row)
+      ...recordOf(row),
+      ...ringTimeoutOf(row),
+      ...fallback
     };
   }
   // The table's CHECKs set the three `web_socket_*` columns together.
@@ -106,7 +139,8 @@ export function targetFromRow(row: ForwardTargetsRow): ForwardTarget {
       protocol: row.webSocketProtocol,
       url: row.webSocketUrl,
       sampleRate: sampleRateOf(row),
-      ...recordOf(row)
+      ...recordOf(row),
+      ...fallback
     };
   }
   if (row.mailboxUserId !== null) {
@@ -138,7 +172,7 @@ export function findForwardTarget(
   if (!row) {
     throw new Error(`forwardTargets: missing row ${targetId}`);
   }
-  return targetFromRow(row);
+  return targetFromRow(row, snapshot.forwardTargets);
 }
 
 /** The tenant's own DID that an `external` target names, by its id, and the DID's target, which
@@ -181,25 +215,21 @@ export function buildUserRules(
 }
 
 /**
- * Hops a forward re-entering the pipeline (§10.1 step 7) may make before the last target's
- * mailbox applies instead.
- */
-export const MAX_HOPS = 3;
-
-/**
  * Counts one more hop for a `user` or `ringGroup` target re-entering at Entry; a `menu` target
  * re-enters without counting, and every other kind, `external`, `sip` and `webSocket` included,
- * neither counts nor re-enters (§10.1 step 7).
+ * neither counts nor re-enters (§10.1 step 7). `maxHops` is the tenant's hop limit
+ * (`settings.max_forward_hops`), past which the last target's mailbox applies instead.
  */
 export function nextHop(
   hops: number,
-  target: ForwardTarget
+  target: ForwardTarget,
+  maxHops: number
 ): { ok: true; hops: number } | { ok: false } {
   if (target.kind !== 'user' && target.kind !== 'ringGroup') {
     return { ok: true, hops };
   }
   const next = hops + 1;
-  if (next > MAX_HOPS) {
+  if (next > maxHops) {
     return { ok: false };
   }
   return { ok: true, hops: next };
@@ -208,7 +238,7 @@ export function nextHop(
 /**
  * `target` followed through the tenant's own DIDs it names (`ownDidTarget`) to the target the
  * chain ends at, each DID one hop on the `hops` already taken, as `enterOwnDid` counts them
- * (§10.1 step 7); `null` for a chain that passes `MAX_HOPS`.
+ * (§10.1 step 7); `null` for a chain that passes the hop limit.
  */
 export function throughOwnDids(
   snapshot: Snapshot,
@@ -223,7 +253,7 @@ export function throughOwnDids(
     next = ownDidTarget(snapshot, current)
   ) {
     taken += 1;
-    if (taken > MAX_HOPS) {
+    if (taken > snapshot.settings.maxForwardHops) {
       return null;
     }
     current = next;

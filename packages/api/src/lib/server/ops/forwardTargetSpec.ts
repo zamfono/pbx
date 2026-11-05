@@ -15,11 +15,11 @@ import { udpHeadersWarning } from './sipHeaders.js';
 import { type Context } from './types.js';
 
 /** The one column `spec` sets on its `forward_targets` row, `sip`'s and `webSocket`'s column sets
- * among them, with an `external`, `sip` or `webSocket` target's `record_calls`; every other column
- * stays `null`. */
+ * among them, with an `external`, `sip` or `webSocket` target's `record_calls` and an `external` or
+ * `sip` one's `ring_timeout_s`; every other column stays `null`. */
 function forwardTargetColumns(
   spec: TargetSpec
-): Record<string, string | number> {
+): Record<string, string | number | null> {
   if (spec.kind === 'user') {
     return { userId: spec.userId };
   }
@@ -27,14 +27,19 @@ function forwardTargetColumns(
     return { ringGroupId: spec.ringGroupId };
   }
   if (spec.kind === 'external') {
-    return { external: spec.external, recordCalls: spec.record ? 1 : 0 };
+    return {
+      external: spec.external,
+      recordCalls: spec.record ? 1 : 0,
+      ringTimeoutS: spec.ringTimeoutS ?? null
+    };
   }
   if (spec.kind === 'sip') {
     return {
       sipTrunkId: spec.trunkId,
       sipUser: spec.user,
       sipHeadersJson: JSON.stringify(spec.headers),
-      recordCalls: spec.record ? 1 : 0
+      recordCalls: spec.record ? 1 : 0,
+      ringTimeoutS: spec.ringTimeoutS ?? null
     };
   }
   if (spec.kind === 'webSocket') {
@@ -58,6 +63,7 @@ function forwardTargetColumns(
 }
 
 type ForwardTargetColumns = {
+  id: string;
   userId: string | null;
   ringGroupId: string | null;
   external: string | null;
@@ -71,6 +77,7 @@ type ForwardTargetColumns = {
   mailboxRingGroupId: string | null;
   announcementAudioId: string | null;
   menuId: string | null;
+  ringTimeoutS: number | null;
   recordCalls: number;
 };
 
@@ -82,8 +89,9 @@ function storedSampleRate(rate: number | null): WebSocketSampleRate {
   throw new Error(`forwardTargets: web socket sample rate ${String(rate)}`);
 }
 
-/** The inverse of `forwardTargetColumns`: the wire target a `forward_targets` row represents. */
-export function rowToTarget(row: ForwardTargetColumns): TargetSpec {
+/** The inverse of `forwardTargetColumns`: the wire target a `forward_targets` row represents,
+ * an `external`, `sip` or `webSocket` one with `fallback` still `null` (`rowToTarget`). */
+function baseTarget(row: ForwardTargetColumns): TargetSpec {
   if (row.userId !== null) {
     return { kind: 'user', userId: row.userId };
   }
@@ -94,7 +102,9 @@ export function rowToTarget(row: ForwardTargetColumns): TargetSpec {
     return {
       kind: 'external',
       external: row.external,
-      record: row.recordCalls === 1
+      ringTimeoutS: row.ringTimeoutS,
+      record: row.recordCalls === 1,
+      fallback: null
     };
   }
   // The table's CHECKs set `sip_user` and `sip_headers_json` exactly when `sip_trunk_id` is set.
@@ -108,7 +118,9 @@ export function rowToTarget(row: ForwardTargetColumns): TargetSpec {
       trunkId: row.sipTrunkId,
       user: row.sipUser,
       headers: sipHeadersColumn.decode(row.sipHeadersJson),
-      record: row.recordCalls === 1
+      ringTimeoutS: row.ringTimeoutS,
+      record: row.recordCalls === 1,
+      fallback: null
     };
   }
   // The table's CHECKs set the three `web_socket_*` columns together, 8000 for `twilio`.
@@ -118,7 +130,8 @@ export function rowToTarget(row: ForwardTargetColumns): TargetSpec {
       protocol: row.webSocketProtocol,
       url: row.webSocketUrl,
       sampleRate: storedSampleRate(row.webSocketSampleRate),
-      record: row.recordCalls === 1
+      record: row.recordCalls === 1,
+      fallback: null
     };
   }
   if (row.mailboxUserId !== null) {
@@ -136,6 +149,30 @@ export function rowToTarget(row: ForwardTargetColumns): TargetSpec {
   throw new Error('forwardTargets: row has no owner column set');
 }
 
+/** The wire target a `forward_targets` row represents, with its fallback chain, the rows whose
+ * `fallback_of_id` names it, each the next one's (§10.1 step 7). */
+export async function rowToTarget(
+  db: Db,
+  row: ForwardTargetColumns
+): Promise<TargetSpec> {
+  const target = baseTarget(row);
+  if (
+    target.kind !== 'external' &&
+    target.kind !== 'sip' &&
+    target.kind !== 'webSocket'
+  ) {
+    return target;
+  }
+  const fallback = await db
+    .selectFrom('forwardTargets')
+    .selectAll()
+    .where('fallbackOfId', '=', row.id)
+    .executeTakeFirst();
+  return fallback === undefined
+    ? target
+    : { ...target, fallback: await rowToTarget(db, fallback) };
+}
+
 /** Loads and converts the `forward_targets` row `targetId` points at; `targetId` is never NULL. */
 export async function resolveTarget(
   db: Db,
@@ -146,7 +183,7 @@ export async function resolveTarget(
     .selectAll()
     .where('id', '=', targetId)
     .executeTakeFirstOrThrow();
-  return rowToTarget(row);
+  return rowToTarget(db, row);
 }
 
 /** `resolveTarget`, but for a nullable FK such as `did_blocks.fallback_target_id`. */
@@ -209,11 +246,13 @@ async function warnForSipHeaders(
   }
 }
 
-/** Inserts one owned `forward_targets` row for `spec`, returning its id (§11.2); a `sip` target's
+/** Inserts one owned `forward_targets` row for `spec`, returning its id (§11.2), and one more for
+ * each fallback down its chain, each naming the one before as `fallback_of_id`; a `sip` target's
  * headers too large for its UDP trunk are a warning of the operation's result (§10.3). */
 export async function insertForwardTarget(
   ctx: Context,
-  spec: TargetSpec
+  spec: TargetSpec,
+  fallbackOfId: string | null = null
 ): Promise<string> {
   const { db } = ctx;
   await assertTargetAvailable(db, spec);
@@ -238,9 +277,14 @@ export async function insertForwardTarget(
       mailboxRingGroupId: null,
       announcementAudioId: null,
       menuId: null,
+      fallbackOfId,
       ...forwardTargetColumns(spec)
     })
     .execute();
+  const fallback = ('fallback' in spec ? spec.fallback : null) ?? null;
+  if (fallback !== null) {
+    await insertForwardTarget(ctx, fallback, id);
+  }
   return id;
 }
 

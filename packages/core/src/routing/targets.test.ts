@@ -13,11 +13,11 @@ const menuTarget: ForwardTarget = {
 
 describe('nextHop', () => {
   it('refuses a user target at the third hop', () => {
-    expect(nextHop(3, userTarget)).toEqual({ ok: false });
+    expect(nextHop(3, userTarget, 3)).toEqual({ ok: false });
   });
 
   it('lets a menu target re-enter at the third hop without counting it', () => {
-    expect(nextHop(3, menuTarget)).toEqual({ ok: true, hops: 3 });
+    expect(nextHop(3, menuTarget, 3)).toEqual({ ok: true, hops: 3 });
   });
 
   // §10.1 step 7: a SIP target, like an external number, neither counts a hop nor re-enters.
@@ -28,7 +28,7 @@ describe('nextHop', () => {
       user: 'proj_1',
       headers: []
     };
-    expect(nextHop(3, sipTarget)).toEqual({ ok: true, hops: 3 });
+    expect(nextHop(3, sipTarget, 3)).toEqual({ ok: true, hops: 3 });
   });
 });
 
@@ -48,6 +48,8 @@ describe('targetFromRow', () => {
     mailboxRingGroupId: null,
     announcementAudioId: null,
     menuId: null,
+    ringTimeoutS: null,
+    fallbackOfId: null,
     recordCalls: 0
   };
 
@@ -75,6 +77,44 @@ describe('targetFromRow', () => {
         recordCalls: 1
       })
     ).toEqual({ kind: 'external', number: '+15557777', record: true });
+  });
+
+  // §10.1 step 7: a target's ring timeout, and its fallback chain from the rows naming it.
+  it('reads a ring timeout and the fallback chain the rows hold', () => {
+    const externalRow = {
+      ...sipRow,
+      id: 'ft-2',
+      external: '+15557777',
+      sipTrunkId: null,
+      sipUser: null,
+      sipHeaders: null,
+      fallbackOfId: 'ft-1'
+    };
+    const mailboxRow = {
+      ...externalRow,
+      id: 'ft-3',
+      external: null,
+      mailboxUserId: 'u1',
+      fallbackOfId: 'ft-2'
+    };
+    expect(
+      targetFromRow({ ...sipRow, ringTimeoutS: 20 }, [
+        mailboxRow,
+        sipRow,
+        externalRow
+      ])
+    ).toEqual({
+      kind: 'sip',
+      trunkId: 'trunk-1',
+      user: 'proj_1',
+      headers: [{ name: 'X-Called', value: '{{calledExtension}}' }],
+      ringTimeoutS: 20,
+      fallback: {
+        kind: 'external',
+        number: '+15557777',
+        fallback: { kind: 'mailboxUser', userId: 'u1' }
+      }
+    });
   });
 
   // §9.4 "WebSocket targets": the three columns read as one target, recording when set.

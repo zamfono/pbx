@@ -163,7 +163,7 @@ async function enterCalled(
   }
   // §10.1 step 7: a DID's or fallback's own target is dialled without a caller, the called number
   // its forward's hop.
-  const target = targetFromRow(targetRow);
+  const target = targetFromRow(targetRow, snapshot.forwardTargets);
   noteNumberForward(
     snapshot,
     call,

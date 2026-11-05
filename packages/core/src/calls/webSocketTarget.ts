@@ -31,6 +31,7 @@ import { recordingOf, standInOf, type Forwarder } from './forwardLeg.js';
 import { callerNameOf, forwardValues } from './forwardValues.js';
 import type { Pipeline } from './pipeline.js';
 import { release } from './release.js';
+import { failOver } from './runTarget.js';
 
 type WebSocketTarget = Extract<ForwardTarget, { kind: 'webSocket' }>;
 
@@ -235,7 +236,10 @@ export async function dialWebSocketTarget(
       cause: socket === null ? 'connectFailed' : 'mediaFailed'
     });
     await abandon(pipeline, call, socket, media);
-    await release(pipeline, call, SIP_SERVICE_UNAVAILABLE, 'failed');
+    const cause = socket === null ? 'connectFailed' : 'mediaFailed';
+    if (!(await failOver(pipeline, call, target, forwarder, cause))) {
+      await release(pipeline, call, SIP_SERVICE_UNAVAILABLE, 'failed');
+    }
     return;
   }
   const leg: Leg = {

@@ -3,12 +3,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { newId, nowIso, type Db } from '@zamfono/shared';
 import { seedUser } from '@zamfono/shared/testDb.js';
 
-import { MAX_HOPS } from '../routing/targets.js';
 import { startRig, type Rig } from '../testing/pipelineRig.js';
 import { seedRingGroup } from '../testing/seedRows.js';
 import { newCall, type Call } from './call.js';
 import { enterTarget } from './inbound.js';
 import { Pipeline } from './pipeline.js';
+
+/** `settings.max_forward_hops`' default. */
+const MAX_HOPS = 3;
 
 // The mailbox a call ends in, recorded instead of deposited: no deposit is made here.
 const { deposit } = vi.hoisted(() => ({

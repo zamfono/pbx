@@ -22,7 +22,13 @@ describe('ringGroups.getForwarding', () => {
       { condition: 'unanswered', target: { kind: 'user', userId: 'owner' } },
       {
         condition: 'unavailable',
-        target: { kind: 'external', external: '+491111111', record: false }
+        target: {
+          kind: 'external',
+          external: '+491111111',
+          record: false,
+          ringTimeoutS: null,
+          fallback: null
+        }
       }
     ];
     await runOperation(

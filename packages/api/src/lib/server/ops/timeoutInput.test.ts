@@ -11,6 +11,8 @@ function secondsFields(schema: JsonSchema, at: string): [string, JsonSchema][] {
   const properties = (schema.properties ?? {}) as Record<string, JsonSchema>;
   const branches = [
     ...((schema.anyOf ?? schema.oneOf ?? []) as JsonSchema[]),
+    // A forward target nests itself as a fallback, so its kinds are named definitions.
+    ...Object.values((schema.$defs ?? {}) as Record<string, JsonSchema>),
     ...(schema.items ? [schema.items as JsonSchema] : [])
   ];
   return [

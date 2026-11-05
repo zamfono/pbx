@@ -3,7 +3,6 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { newId, nowIso, type Db } from '@zamfono/shared';
 import { seedUser } from '@zamfono/shared/testDb.js';
 
-import { MAX_HOPS } from '../routing/targets.js';
 import type { FakeAri } from '../testing/ari/fake.js';
 import { defaultChannel } from '../testing/ari/fakeChannel.js';
 import { eventually } from '../testing/eventually.js';
@@ -17,6 +16,9 @@ import {
 import { newCall, type Call } from './call.js';
 import { playMenu } from './menu.js';
 import type { Pipeline } from './pipeline.js';
+
+/** `settings.max_forward_hops`' default. */
+const MAX_HOPS = 3;
 
 /** A `forward_targets` row that deposits in `userId`'s mailbox: easy to tell apart in assertions. */
 async function seedMailboxTarget(db: Db, userId: string): Promise<string> {

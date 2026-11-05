@@ -9,7 +9,7 @@ import type { ForwardTarget } from '../routing/targets.js';
 import type { Call } from './call.js';
 import { ringExternalLeg } from './externalLeg.js';
 import { CONDITION_REASONS, diversionFor } from './forwardContext.js';
-import { recordingOf, type ForwardLeg } from './forwardLeg.js';
+import { recordingOf, ringTimeoutOf, type ForwardLeg } from './forwardLeg.js';
 import { sipForwardLeg } from './forwardValues.js';
 import type { Pipeline } from './pipeline.js';
 import type { BatchLegs } from './ringGroupOriginate.js';
@@ -42,6 +42,9 @@ export async function originateExternalLeg(
     target.kind === 'sip'
       ? await sipForwardLeg(pipeline, call, target, diversions, member.snapshot)
       : { diversions, headers: [] };
+  // §10.1 step 5: the member's leg rings for the target's own ring timeout at most, and a failure
+  // drops it from the group, the target's fallback not followed.
+  const timed: ForwardLeg = { ...forward, ...ringTimeoutOf(target) };
   await ringExternalLeg(
     pipeline,
     call,
@@ -50,9 +53,9 @@ export async function originateExternalLeg(
           number: target.user,
           asUser: memberKey,
           trunkId: target.trunkId,
-          forward
+          forward: timed
         }
-      : { number: target.number, asUser: memberKey, forward },
+      : { number: target.number, asUser: memberKey, forward: timed },
     {
       place: channelId => {
         tracked.set(channelId, {
