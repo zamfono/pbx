@@ -397,6 +397,33 @@ describe('createRingotelProvider', () => {
     });
   });
 
+  it.each([
+    ['pl', 'pl'],
+    ['ru', 'en']
+  ] as const)(
+    'a %s tenant sends Ringotel lang %s, English where Ringotel has no welcome mail',
+    async (language, lang) => {
+      const db = await makeTestDb();
+      await seed(db);
+      const settings = await db
+        .updateTable('settings')
+        .set({ language })
+        .where('id', '=', 1)
+        .returningAll()
+        .executeTakeFirstOrThrow();
+      const { client, calls } = fakeClient();
+
+      await createRingotelProvider({ client, db }).onTenantProfileChanged?.(
+        settings
+      );
+
+      expect(calls[1]?.params).toEqual({
+        id: 'org-1',
+        params: { hidePassInEmail: true, lang }
+      });
+    }
+  );
+
   it('onPbxRestarted resets the registrations: updateBranch with the profile and rereg', async () => {
     const db = await makeTestDb();
     await seed(db);

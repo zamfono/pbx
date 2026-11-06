@@ -22,6 +22,27 @@ import {
 } from './ringotelRoster.js';
 import type { SettingsRow, UserRow } from './types.js';
 
+/** The languages Ringotel's welcome mails come in, as the Shell lists them (`emailLangs` in
+ *  https://shell.ringotel.co/account/en-US/main-es2015.f1c4c712e802651787aa.js, 2026-11-06).
+ *  Ukrainian is Ringotel's own `ua`. */
+export const RINGOTEL_LANGUAGES: ReadonlySet<string> = new Set(
+  'en ua fi fr sq bg hr cs da nl et de el hu it lt lv mk nb pl pt ro sr sk sl es sv tr'.split(
+    ' '
+  )
+);
+
+/** The organization's `params` object, written whole (§10.4): onboarding mails never carry the
+ *  password, and they speak the tenant's language, English where Ringotel has none (`ru`). */
+export function organizationParams(settings: SettingsRow): {
+  hidePassInEmail: true;
+  lang: string;
+} {
+  const lang = RINGOTEL_LANGUAGES.has(settings.language)
+    ? settings.language
+    : 'en';
+  return { hidePassInEmail: true, lang };
+}
+
 /**
  * A roster user whose live `ringotel` device has no Ringotel user, one removed in the Ringotel
  * Shell (setup provisions the devices created before it, `ringotelUser.ts`), is skipped by the
@@ -221,11 +242,9 @@ export async function ringotelTenantProfileChanged(
       settings.ringotelOrgId
     )
   );
-  // The organization's `params` object is written whole (§10.4), so every push carries
-  // `hidePassInEmail: true` alongside the language.
   await deps.client.call('updateOrganization', {
     id: settings.ringotelOrgId,
-    params: { hidePassInEmail: true, lang: settings.language }
+    params: organizationParams(settings)
   });
 }
 

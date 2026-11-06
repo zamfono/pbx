@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-11-06 · §10.4 Organization.** The Ringotel organization's `lang` is `en` for a tenant language the Shell offers no welcome mail in, today `ru`, where it was `settings.language` whatever its value.
+*Why:* the Shell's e-mail languages lack Russian, so a Russian tenant sent a `lang` Ringotel does not list (TASK-89). The product owner: "unsupported languages – like `ru` – shall receive English communication".
+
 **2026-11-05 · §9.1 Static configuration, §11.4 Settings.** Polish (`pl`) is a seventh tenant language: `settings.language` and `mail_templates.language` take it, the authentication pages and every shipped mail template exist in Polish, its prompts are the generated Polish set, a Yealink phone gets `Polish` for its phone and web interface, and the Ringotel organization gets `lang` `pl`.
 *Why:* the product owner wants Polish as a tenant language (TASK-87); Yealink lists `Polish` among `lang.gui` and `lang.wui`'s values, and the Ringotel Shell offers `pl` among the organization's e-mail languages.
 

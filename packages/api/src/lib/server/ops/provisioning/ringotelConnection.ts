@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { HTTP_CONFLICT, type Db } from '@zamfono/shared';
 
 import { buildBranchProvision } from '#lib/server/provisioning/branchProvision.js';
+import { organizationParams } from '#lib/server/provisioning/ringotelBranchHooks.js';
 import type { RingotelClient } from '#lib/server/provisioning/ringotelClient.js';
 import { branchBlfEntries } from '#lib/server/provisioning/ringotelRoster.js';
 import {
@@ -43,15 +44,6 @@ export function assertNotSetUp(settings: SettingsRow): void {
       `provisioning: Ringotel is already set up (organization ${settings.ringotelOrgId ?? '-'}, connection ${settings.ringotelBranchId ?? '-'})`
     );
   }
-}
-
-/** The organization's `params` object, written whole (§10.4): onboarding mails never carry the
- *  password, and they speak the tenant's language. */
-export function organizationParams(settings: SettingsRow): {
-  hidePassInEmail: true;
-  lang: string;
-} {
-  return { hidePassInEmail: true, lang: settings.language };
 }
 
 // `settings.ringotel_max_regs`'s default (§11.4), the one a stack follows its package from.

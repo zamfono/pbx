@@ -18,6 +18,11 @@ why the specified behaviour changed; the commit history, how.
   welcome mail is sent in Polish. Its voice prompts are a new generated set with whole-sentence
   menus and counts read in correct Polish grammar.
 
+### Fixed
+
+- A Russian-language stack sets its Ringotel welcome mails to English, since Ringotel offers no
+  Russian ones, instead of a language Ringotel does not list.
+
 ## [0.8.5] - 2026-11-05
 
 ### Added
