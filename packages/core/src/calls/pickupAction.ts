@@ -7,6 +7,7 @@
 import { HTTP_CONFLICT, newId, type PickupRequest } from '@zamfono/shared';
 
 import { ignoreGone, logFailure } from '../ari/failures.js';
+import { soundLanguage } from '../prompts.js';
 import { RelayedCallLog } from '../relayedCallLog.js';
 import { ActionError } from './actionError.js';
 import { newCall, type Call } from './call.js';
@@ -88,7 +89,7 @@ export async function pickupOnRequest(
     devices,
     callerId: target.from,
     timeoutS: ringTimeoutOf(snapshot, userId),
-    language: snapshot.settings.language,
+    language: soundLanguage(snapshot.settings),
     peer: target.from,
     // A key of its own: the answered phone sets the picker in `target`'s call itself.
     presenceKey: `pickup:${target.id}`,

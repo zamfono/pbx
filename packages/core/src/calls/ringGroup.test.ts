@@ -1011,7 +1011,7 @@ describe('ringGroup', () => {
     });
     await finished;
 
-    expect(languages).toEqual(['de', 'de']);
+    expect(languages).toEqual(['de_female', 'de_female']);
   });
 
   it('releases immediately with 480 when no member is ringable', async () => {

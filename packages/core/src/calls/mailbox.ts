@@ -96,7 +96,7 @@ async function mainMenu(session: MailboxSession): Promise<MenuEnd> {
     const { newCount, oldCount } = folderCounts(session);
     const media = [
       ...(withIntro ? introMedia(session.language, newCount, oldCount) : []),
-      ...mainMenuMedia(session.language, newCount, oldCount)
+      ...mainMenuMedia(newCount, oldCount)
     ];
     // eslint-disable-next-line no-await-in-loop -- one key at a time, from the same caller
     const input: MenuInput = await sessionInput(

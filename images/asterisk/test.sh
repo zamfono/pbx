@@ -211,9 +211,12 @@ docker exec "$CONTAINER" grep -q '^\[zamfono\]' /etc/asterisk/ari.conf \
 docker exec "$CONTAINER" grep -q '^channelvars = RTPAUDIOQOS$' /etc/asterisk/ari.conf \
   || fail "ari.conf does not send RTPAUDIOQOS with ARI's events (§7 level qos)"
 
-for lang in es fr it ru; do
-  docker exec "$CONTAINER" test -f "/usr/share/asterisk/sounds/$lang/vm-goodbye.wav" \
-    || fail "no vm-goodbye prompt under sounds/$lang; language symlink is missing or broken"
+# §9.1: a prompt set per language and voice, under the channel language the core sets.
+for lang in de en es fr it pl ru; do
+  for voice in female male; do
+    docker exec "$CONTAINER" test -f "/usr/share/asterisk/sounds/${lang}_$voice/vm-goodbye.wav" \
+      || fail "no vm-goodbye prompt under sounds/${lang}_$voice"
+  done
 done
 
 MANAGER_USER=$(docker exec "$CONTAINER" asterisk -rx 'manager show user zamfono')
@@ -260,18 +263,17 @@ MOH_CLASSES=$(docker exec "$CONTAINER" asterisk -rx 'moh show classes')
 echo "$MOH_CLASSES" | grep -q 'Class: default' \
   || fail "asterisk loads no [default] music-on-hold class (§10.2)"
 
-# §9.1 "indications.conf", §9.4 "Cross-trunk failover": indications.conf holds exactly the `itu`
-# zone, and Asterisk must actually have parsed it at startup, with the special information tone's
-# exact playlist (`core`, packages/core/src/indications.ts, plays `tone:info;tonezone=itu` — three
-# rising tones then silence — for every tenant whose language lacks the failed-call announcement).
+# §9.1 "indications.conf": indications.conf holds exactly the `itu` zone, and Asterisk must actually
+# have parsed it at startup, with the congestion tone `core` plays for an empty parking slot
+# (packages/core/src/indications.ts, `tone:congestion;tonezone=itu`, §10.1 Outbound step 3).
 INDICATION_LIST=$(docker exec "$CONTAINER" asterisk -rx 'indication show')
 echo "$INDICATION_LIST" | grep -qE '^itu[[:space:]]' \
   || fail "asterisk did not load the itu indications.conf zone"
 
 INDICATION_ITU=$(docker exec "$CONTAINER" asterisk -rx 'indication show itu')
 echo "$INDICATION_ITU" \
-  | grep -qE '^itu[[:space:]]+info[[:space:]]+950/330,1400/330,1800/330,0/1000$' \
-  || fail "the itu zone's info playlist is not 950/330,1400/330,1800/330,0/1000"
+  | grep -qE '^itu[[:space:]]+congestion[[:space:]]+425/200,0/200$' \
+  || fail "the itu zone's congestion playlist is not 425/200,0/200"
 
 docker exec "$CONTAINER" grep -qx 'enabled = no' /etc/asterisk/hep.conf \
   || fail "hep.conf is not enabled = no while HEP_ENABLED=false"

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { assetMedia, defaultPrompt, digitsMedia, PROMPTS } from './prompts.js';
 
 describe('defaultPrompt', () => {
-  it('renders a fixed default prompt as a sound: reference to its core-sounds name', () => {
+  it('renders a fixed default prompt as a sound: reference to its name', () => {
     expect(defaultPrompt('vmIntro')).toBe(`sound:${PROMPTS.vmIntro}`);
     expect(defaultPrompt('pbxInvalid')).toBe(`sound:${PROMPTS.pbxInvalid}`);
   });
@@ -21,12 +21,8 @@ describe('assetMedia', () => {
 });
 
 describe('digitsMedia (§10.2 "Call parking")', () => {
-  it("leaves a Debian set's digits to ARI", () => {
-    expect(digitsMedia('en', '701')).toEqual(['digits:701']);
-  });
-
-  it("reads a generated set's digits itself, the last one ending the sentence", () => {
-    expect(digitsMedia('pl', '701')).toEqual([
+  it('reads the digits one clip each, the last one ending the sentence', () => {
+    expect(digitsMedia('701')).toEqual([
       'sound:digits/7',
       'sound:digits/0',
       'sound:digits-final/1'

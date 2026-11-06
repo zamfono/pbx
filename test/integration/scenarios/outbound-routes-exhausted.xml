@@ -1,14 +1,13 @@
 <?xml version="1.0" encoding="ISO-8859-1"?>
 <!--
   §9.4 "Cross-trunk failover", placed by the phone: 101's device dials `+15557301`, which only
-  the catch-all route carries, over `ci-trunk` — the tenant's language is `de`
-  (`outbound-routes-exhausted.setup.sh`), whose prompt set has no `please-try-call-later`. The
-  trunk side refuses the call with 403 before any alerting (`uas/refuse-403.xml`), a final
-  response that falls through (§9.4 "Route fallthrough"); with no further matching route the call
-  is exhausted, so the core answers the caller itself and plays ITU-T E.180's special information
-  tone (three cycles, `indications.ts`'s `SIT_DURATION_MS`) rather than the announcement, then
-  releases the call — the `recv request="BYE"` below, not one this scenario sends. The device's
-  SIP username arrives as `-key user`, its credentials through `-au`/`-ap`.
+  the catch-all route carries, over `ci-trunk`, the tenant's language `es`
+  (`outbound-routes-exhausted.setup.sh`). The trunk side refuses the call with 403 before any
+  alerting (`uas/refuse-403.xml`), a final response that falls through (§9.4 "Route
+  fallthrough"); with no further matching route the call is exhausted, so the core answers the
+  caller itself and plays the failed-call announcement, then releases the call — the
+  `recv request="BYE"` below, not one this scenario sends. The device's SIP username arrives as
+  `-key user`, its credentials through `-au`/`-ap`.
 -->
 <scenario name="outbound-routes-exhausted">
   <send retrans="500">
@@ -91,9 +90,8 @@
     ]]>
   </send>
 
-  <!-- The special information tone plays for about 6 s (three cycles of 950/1400/1800 Hz plus
-       silence); the core then releases the call itself, so this waits for its own BYE rather
-       than sending one. -->
+  <!-- The announcement plays for a few seconds; the core then releases the call itself, so this
+       waits for its own BYE rather than sending one. -->
   <recv request="BYE" timeout="20000" />
 
   <send>

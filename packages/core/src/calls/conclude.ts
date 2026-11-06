@@ -1,14 +1,7 @@
 /** Terminal failures of an outbound or emergency dial: the releases of §9.4 "Route fallthrough" /
  * "Outbound routing" once a route (or the trunk list) is done. An answer settles in `answer.ts`. */
 import { ignoreGone } from '../ari/failures.js';
-import {
-  SIT_DURATION_MS,
-  SPECIAL_INFORMATION_TONE_MEDIA
-} from '../indications.js';
-import {
-  defaultPrompt,
-  LANGUAGES_WITH_FAILED_CALL_PROMPT
-} from '../prompts.js';
+import { defaultPrompt } from '../prompts.js';
 import type { AttemptFailure } from '../routing/trunk.js';
 import {
   SIP_BUSY_EVERYWHERE,
@@ -20,7 +13,7 @@ import {
 } from '../sipCodes.js';
 import { type Call } from './call.js';
 import type { Pipeline } from './pipeline.js';
-import { playAndWait, playToneAndWait } from './playback.js';
+import { playAndWait } from './playback.js';
 import { release } from './release.js';
 
 const CALLEE_BUSY_CODES = new Set<number>([
@@ -53,10 +46,10 @@ export async function concludeFinal(
   await release(pipeline, call, failure.code, statusForFinalCode(failure.code));
 }
 
-/** Answers and plays the failed-call announcement, or — where the tenant's `language` (§11.4) has
- * no such prompt — ITU-T E.180's special information tone, to completion (§9.4 "Cross-trunk
- * failover"), the same answer-then-play order `announce.ts` uses, since a playback reaches no
- * unanswered caller. A call with no caller channel (a party `api` adds) has nobody to play to. */
+/** Answers and plays the failed-call announcement to completion (§9.4 "Cross-trunk failover"), in
+ * the channel's language, the same answer-then-play order `announce.ts` uses, since a playback
+ * reaches no unanswered caller. A call with no caller channel (a party `api` adds) has nobody to
+ * play to. */
 async function playFailedCallAnnouncement(
   pipeline: Pipeline,
   call: Call
@@ -66,22 +59,11 @@ async function playFailedCallAnnouncement(
     return;
   }
   await pipeline.deps.ari.channels.answer(channelId).catch(ignoreGone);
-  const snapshot = await pipeline.deps.cache.get();
-  if (LANGUAGES_WITH_FAILED_CALL_PROMPT.includes(snapshot.settings.language)) {
-    await playAndWait(
-      pipeline.deps.ari,
-      channelId,
-      defaultPrompt('failedCall'),
-      `${channelId}:failed`
-    );
-    return;
-  }
-  await playToneAndWait(
+  await playAndWait(
     pipeline.deps.ari,
     channelId,
-    SPECIAL_INFORMATION_TONE_MEDIA,
-    `${channelId}:failed-tone`,
-    SIT_DURATION_MS
+    defaultPrompt('failedCall'),
+    `${channelId}:failed`
   );
 }
 

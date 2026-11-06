@@ -1,77 +1,68 @@
 #!/usr/bin/env node
 // Generates a language's prompt set (spec §9.1) from its manifest with ElevenLabs text-to-speech:
 //
-//   ELEVENLABS_API_KEY=… node scripts/generate-prompts.mjs <language> [prompt ...]
+//   ELEVENLABS_API_KEY=… node scripts/generate-prompts.mjs <language> <voice> [prompt ...]
 //
 // `images/asterisk/prompts/<language>.json` maps each prompt the core can play in that language
-// (packages/core/src/calls/promptSet.ts) to its text, said whole; a [bracketed] part is cut out
-// of the whole, so a piece joined to others keeps its mid-sentence intonation. The API's
-// character timestamps only place a cut roughly; each end moves to the quietest point nearby,
-// which a word starting with a stop (p, t) right after the part makes a clean one. `aliases`
-// respells words the voice says wrong. Each utterance is brought to one loudness, each clip
-// trimmed of silence and written as 8 kHz `.wav` and `.g722` into
-// `images/asterisk/prompts/<language>/`; `beep` is a tone. Named prompts regenerate alone.
-/* eslint-disable camelcase -- the ElevenLabs API's field names */
+// (packages/core/src/calls/promptSet.ts) to its text. Where a [bracketed] part is a piece the core
+// joins to others, only the part is spoken, with the text around it sent as context that shapes
+// its intonation (mid-sentence, or falling at the end) without being spoken, so nothing is cut.
+// Every clip is transcribed and, where it does not read back as its text, spoken again with
+// another seed; the ones that never do are listed at the end for a native speaker's ear. `voices` names the ElevenLabs voice of each of the language's sets
+// (`female`, `male`) and, in `seeds`, the seed a listener picked for a prompt that voice got wrong
+// (spoken with it and kept unchecked), `aliases` respells words they say wrong. Each clip is brought to one
+// loudness, trimmed of silence and written as 8 kHz `.wav` and `.g722` into
+// `images/asterisk/prompts/<language>/<voice>/`; `beep` is a tone. Named prompts regenerate alone.
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import {
-  fade,
-  normalize,
-  quietest,
-  RATE,
-  trim,
-  write
-} from './prompt-audio.mjs';
+import { elevenLabs, parseJson, plain } from './elevenlabs.mjs';
+import { fade, normalize, RATE, trim, wav, write } from './prompt-audio.mjs';
 
-// One voice (Joanna), model and settings for every language, so no set mixes voices.
-const VOICE_ID = 'H3IcxEgdFxIEJAqMc0Bc';
-const MODEL_ID = 'eleven_v4';
-const SEED = 1;
-const VOICE_SETTINGS = { stability: 0.5, similarity_boost: 0.75, speed: 1.0 };
-
-// Where a cut's ends are looked for, around the timestamps: its start from a little before its
-// first character; its end from just before its last character's end until a little past the
-// next word's start, whose stop's closure is the quiet point; timestamps run late as well as
-// early.
-const CUT_START = { beforeS: 0.06, afterS: 0.01 };
-const CUT_END = { beforeS: 0.02, afterS: 0.15 };
+// How many times a prompt is spoken, each with its own seed, for speech-to-text to hear it right.
+const SEEDS = 3;
 const BEEP = { hz: 1000, seconds: 0.25, amplitude: 0.15, fadeS: 0.01 };
+// The silence a clip too short for speech-to-text is heard with.
+const PAD_S = 1;
 const TAU = Math.PI + Math.PI;
 const EXIT_USAGE = 2;
 const FIRST_ARG = 2;
 const INT16_SCALE = 32768;
 const BYTES_PER_SAMPLE = 2;
 
-/** @typedef {{ aliases: Record<string, string>, prompts: Record<string, string> }} Manifest */
-/** @typedef {{ characters: string[], character_start_times_seconds: number[],
- *   character_end_times_seconds: number[] }} Alignment */
+/** @typedef {{ voices: Record<string, { name: string, id: string, seeds?: Record<string, number> }>,
+ *   aliases: Record<string, string>, prompts: Record<string, string> }} Manifest */
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const [language, ...only] = process.argv.slice(FIRST_ARG);
+const [language, voiceName, ...only] = process.argv.slice(FIRST_ARG);
 const apiKey = process.env.ELEVENLABS_API_KEY;
-if (language === undefined || !apiKey) {
+if (language === undefined || voiceName === undefined || !apiKey) {
   console.error(
-    'usage: ELEVENLABS_API_KEY=… generate-prompts.mjs <language> [prompt ...]'
+    'usage: ELEVENLABS_API_KEY=… generate-prompts.mjs <language> <voice> [prompt ...]'
   );
   process.exit(EXIT_USAGE);
 }
-
-// JSON.parse is necessarily `any`; each caller names the shape it reads.
-/* eslint-disable @typescript-eslint/no-unsafe-return */
-/** @template T @param {string} text @returns {T} */
-function parseJson(text) {
-  return JSON.parse(text);
-}
-/* eslint-enable @typescript-eslint/no-unsafe-return */
 
 const promptsDir = join(root, 'images/asterisk/prompts');
 /** @type {Manifest} */
 const manifest = parseJson(
   readFileSync(join(promptsDir, `${language}.json`), 'utf8')
 );
-const outDir = join(promptsDir, language);
+const voice = manifest.voices[voiceName];
+if (voice === undefined) {
+  throw new Error(`no ${voiceName} voice in ${language}.json`);
+}
+const voiceId = voice.id;
+const seeds = voice.seeds ?? {};
+const outDir = join(promptsDir, language, voiceName);
+const api = elevenLabs({
+  apiKey,
+  cacheDir: join(root, '.cache/prompts'),
+  language
+});
+/** @type {string[]} */
+const toHear = [];
 
 /** @param {string} text @returns {string} */
 function applyAliases(text) {
@@ -83,9 +74,10 @@ function applyAliases(text) {
 }
 
 /**
- * The text to send and the character range to keep, `null` for all of it.
+ * What to speak, the context around it, and the words it says. A trailing space lets the voice
+ * finish the last word, which it otherwise breaks off mid-vowel where the next text would join.
  * @param {string} text
- * @returns {{ said: string, cut: { start: number, end: number } | null }}
+ * @returns {{ said: { text: string, previous: string, next: string }, words: string }}
  */
 function parse(text) {
   const match =
@@ -94,99 +86,101 @@ function parse(text) {
     if (/[[\]]/u.test(text)) {
       throw new Error(`unbalanced brackets: ${text}`);
     }
-    return { said: applyAliases(text), cut: null };
+    return {
+      said: { text: `${applyAliases(text)} `, previous: '', next: '' },
+      words: text
+    };
   }
-  const before = applyAliases(match.groups.before ?? '');
-  const part = applyAliases(match.groups.part ?? '');
-  const after = applyAliases(match.groups.after ?? '');
-  const start = before.length + (part.length - part.trimStart().length);
-  const end = before.length + part.trimEnd().length;
-  return { said: before + part + after, cut: { start, end } };
+  const { before = '', part = '', after = '' } = match.groups;
+  return {
+    said: {
+      text: `${applyAliases(part.trim())} `,
+      previous: before.trim() === '' ? '' : `${applyAliases(before.trim())} `,
+      next: applyAliases(after.trim())
+    },
+    words: part.trim()
+  };
 }
 
 /**
- * The utterance as samples in [-1, 1] at `RATE`, and its character timestamps.
- * @param {string} text
- * @returns {Promise<{ samples: Float32Array, alignment: Alignment }>}
+ * Whether speech-to-text heard `words`, or a number prompt's number written as digits.
+ * @param {string} heard @param {string} words @param {string} name
  */
-async function speak(text) {
-  const url = `https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}/with-timestamps?output_format=pcm_${RATE}`;
-  const body = JSON.stringify({
-    text,
-    model_id: MODEL_ID,
-    language_code: language,
-    seed: SEED,
-    voice_settings: VOICE_SETTINGS
-  });
-  const headers = {
-    'xi-api-key': String(apiKey),
-    'content-type': 'application/json'
-  };
-  const response = await fetch(url, { method: 'POST', headers, body });
-  if (!response.ok) {
-    throw new Error(`ElevenLabs ${response.status}: ${await response.text()}`);
-  }
-  /** @type {{ audio_base64: string, alignment: Alignment }} */
-  const json = parseJson(await response.text());
+function heardAs(heard, words, name) {
+  const number = /^digits(?:-final)?\/(?<value>\d+)/u.exec(name)?.groups?.value;
+  return plain(heard) === plain(words) || plain(heard) === number;
+}
+
+/**
+ * The clip the voice speaks for `said` with `seed`, at one loudness and trimmed of silence.
+ * @param {{ text: string, previous: string, next: string }} said @param {number} seed
+ */
+async function speak(said, seed) {
+  const json = await api.speak(voiceId, said, RATE, seed);
   const bytes = Buffer.from(json.audio_base64, 'base64');
   const pcm = new Int16Array(
     bytes.buffer,
     bytes.byteOffset,
     bytes.length / BYTES_PER_SAMPLE
   );
-  return {
-    samples: Float32Array.from(pcm, sample => sample / INT16_SCALE),
-    alignment: json.alignment
-  };
-}
-
-/**
- * Where a cut starting at character `index` begins: the text's start, or the quietest point just
- * before the character.
- * @param {Float32Array} samples @param {Alignment} alignment @param {number} index
- */
-function cutStart(samples, alignment, index) {
-  const start = alignment.character_start_times_seconds[index] ?? 0;
-  if (!/\p{L}/u.test(alignment.characters.slice(0, index).join(''))) {
-    return 0;
-  }
-  return quietest(samples, start - CUT_START.beforeS, start + CUT_START.afterS);
-}
-
-/**
- * Where a cut ending before character `index` ends: the quietest point from its last character's
- * end until a little past the next word's start, or the utterance's end.
- * @param {Float32Array} samples @param {Alignment} alignment @param {number} index
- */
-function cutEnd(samples, alignment, index) {
-  const end = alignment.character_end_times_seconds[index - 1] ?? 0;
-  const next = alignment.characters.findIndex(
-    (character, at) => at >= index && /\p{L}/u.test(character)
+  return trim(
+    normalize(Float32Array.from(pcm, sample => sample / INT16_SCALE))
   );
-  const nextStart =
-    next === -1
-      ? samples.length / RATE
-      : (alignment.character_start_times_seconds[next] ?? end) + CUT_END.afterS;
-  return quietest(samples, end - CUT_END.beforeS, nextStart);
 }
 
-/** @param {string} name @param {string} text */
+/**
+ * What speech-to-text hears in `clip`. A clip too short for it ("de") is heard again with silence
+ * after it, only then, so every other clip's transcript stays the one cached.
+ * @param {Float32Array} clip
+ */
+async function transcribe(clip) {
+  try {
+    return await api.transcribe(wav(clip));
+  } catch (error) {
+    if (!String(error).includes('audio_too_short')) {
+      throw error;
+    }
+    const padded = new Float32Array(clip.length + Math.round(PAD_S * RATE));
+    padded.set(clip);
+    return api.transcribe(wav(padded));
+  }
+}
+
+/**
+ * Speaks a prompt, again with the next seed while speech-to-text does not hear it as its words
+ * (the voice now and then says some of the context too), and keeps the first it hears right, else
+ * the first, listed for a native speaker.
+ * @param {string} name @param {string} text
+ */
 async function generate(name, text) {
-  const { said, cut } = parse(text);
-  const { samples, alignment } = await speak(said);
-  if (alignment.characters.join('') !== said) {
-    throw new Error(`${name}: the timestamps do not follow the text`);
+  const { said, words } = parse(text);
+  const pinned = seeds[name];
+  if (pinned !== undefined) {
+    write(join(outDir, name), await speak(said, pinned));
+    console.log(`${name}: "${words}", seed ${pinned}`);
+    return;
   }
-  let clip = normalize(samples);
-  if (cut !== null) {
-    const from = cutStart(clip, alignment, cut.start);
-    const to = cutEnd(clip, alignment, cut.end);
-    clip = clip.slice(Math.round(from * RATE), Math.round(to * RATE));
+  /** @type {{ clip: Float32Array, heard: string }[]} */
+  const tried = [];
+  for (let seed = 1; seed <= SEEDS; seed += 1) {
+    // eslint-disable-next-line no-await-in-loop -- the next seed is only needed if this one fails
+    const clip = await speak(said, seed);
+    // eslint-disable-next-line no-await-in-loop -- as above
+    const heard = await transcribe(clip);
+    if (heardAs(heard, words, name)) {
+      write(join(outDir, name), clip);
+      console.log(`${name}: "${words}"`);
+      return;
+    }
+    tried.push({ clip, heard });
   }
-  write(join(outDir, name), trim(clip));
-  console.log(
-    `${name}: ${cut === null ? said : said.slice(cut.start, cut.end)}`
-  );
+  const [first] = tried;
+  if (first !== undefined) {
+    write(join(outDir, name), first.clip);
+  }
+  const heard = [...new Set(tried.map(attempt => attempt.heard))];
+  toHear.push(`${name}: "${words}", heard "${heard.join('" / "')}"`);
+  console.log(`${name}: "${words}" not heard`);
 }
 
 function beep() {
@@ -210,4 +204,9 @@ for (const name of names) {
     // eslint-disable-next-line no-await-in-loop -- one request at a time, within the plan's concurrency
     await generate(name, text);
   }
+}
+if (toHear.length > 0) {
+  console.log(
+    `\nNot heard as written, for a native speaker's ear:\n${toHear.join('\n')}`
+  );
 }

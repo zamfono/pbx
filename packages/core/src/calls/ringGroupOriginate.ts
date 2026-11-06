@@ -6,7 +6,11 @@ import { newId } from '@zamfono/shared';
 
 import { logUnlessGone } from '../ari/failures.js';
 import type { Snapshot } from '../internal/snapshot.js';
-import { channelLanguageVariable } from '../prompts.js';
+import {
+  channelLanguageVariable,
+  soundLanguage,
+  type SoundLanguage
+} from '../prompts.js';
 import type { MemberLeg } from '../routing/ringGroup.js';
 import type { Call } from './call.js';
 import { softphoneCallerId } from './contactName.js';
@@ -45,7 +49,7 @@ function hangUpIfAlreadyWon(
 async function originateDevice(
   pipeline: Pipeline,
   call: Call,
-  member: { owner: LegOwner; callerId: string; language: string },
+  member: { owner: LegOwner; callerId: string; language: SoundLanguage },
   { device, endpoint }: ContactLeg,
   tracked: Map<string, GroupLeg>
 ): Promise<void> {
@@ -116,7 +120,11 @@ async function originateDevices(
   if (call.answeredAt !== null) {
     return;
   }
-  const member = { owner, callerId, language: snapshot.settings.language };
+  const member = {
+    owner,
+    callerId,
+    language: soundLanguage(snapshot.settings)
+  };
   await Promise.all(
     legs.map(leg => originateDevice(pipeline, call, member, leg, tracked))
   );

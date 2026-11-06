@@ -29,6 +29,7 @@ const PLAIN_COLUMNS: {
   country: {},
   timezone: {},
   language: {},
+  promptVoice: {},
   smtpHost: {},
   smtpPort: {},
   smtpSecurity: {},

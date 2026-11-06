@@ -3,11 +3,16 @@
  * §10.2 "Voicemail", "Greetings and audio"). Asterisk resolves a `sound:` name's language variant
  * from the channel's own language, so one name covers every tenant language (§9.1).
  */
-import { PROMPTS_SUBDIR, type Language } from '@zamfono/shared';
+import {
+  PROMPTS_SUBDIR,
+  type Language,
+  type PromptVoice
+} from '@zamfono/shared';
 
 import { ignoreGone } from './ari/failures.js';
 
-/** Asterisk core-sounds names played where no tenant audio applies. */
+/** The fixed prompts played where no tenant audio applies, named as Asterisk's core sounds name
+ * them; every language's generated set holds them (§9.1, `calls/promptSet.ts`). */
 export const PROMPTS = {
   /** Before recording, when the mailbox has no greeting of its own (§10.2 "Voicemail"). */
   vmIntro: 'vm-intro',
@@ -17,46 +22,23 @@ export const PROMPTS = {
   vmMailboxFull: 'vm-mailboxfull',
   /** Before a menu replays its greeting on silence or an unmatched string (§10.1 step 6). */
   pbxInvalid: 'pbx-invalid',
-  /** Find-me's accept prompt (§10.1 step 4), core sounds' "press 1 to accept this call, or 2 to
-   * reject it". The German set has no `followme/` prompts, so a `de` tenant hears the English
-   * file, as §9.1 has a prompt missing from a community set fall back. */
+  /** Find-me's accept prompt (§10.1 step 4): "press 1 to accept this call, or 2 to reject it". */
   findMeAccept: 'followme/options',
-  /** The failed-call announcement (§9.4 "Cross-trunk failover"), core sounds' "Please try your call
-   * again later". The `en`, `fr` and `it` sets have it; the German, Spanish and Russian sets do
-   * not — Russian names its own `pls-try-call-later` — so `conclude.ts` plays the special
-   * information tone instead for those three (`indications.ts`), rather than falling back to the
-   * English file as an ordinary missing prompt would (§9.1's general fallback rule). */
+  /** The failed-call announcement (§9.4 "Cross-trunk failover"): "please try again later". */
   failedCall: 'please-try-call-later'
 } as const;
 
 type PromptKey = keyof typeof PROMPTS;
 
-/** The tenant languages whose prompt set the repository generates itself (§9.1): the image ships
- * each from `images/asterisk/prompts/<language>/`, which holds every prompt the core can play in it
- * (`promptSet.ts`), so nothing falls back to another language's file. */
-export const GENERATED_LANGUAGES = [
-  'pl'
-] as const satisfies readonly Language[];
-export type GeneratedLanguage = (typeof GENERATED_LANGUAGES)[number];
-
 /** Where a generated set keeps the form a number clip takes at the end of a sentence, falling
  * where the same clip inside a sentence rises: the last clip of a number nothing follows. */
 export const FINAL_DIGITS_DIR = 'digits-final';
 
-export function isGeneratedLanguage(
-  language: string
-): language is GeneratedLanguage {
-  return (GENERATED_LANGUAGES as readonly string[]).includes(language);
-}
-
 /**
- * A digit string read one digit at a time (§10.2 "Call parking"'s slot): ARI's `digits:` for a
- * Debian set; a generated set's own clips, the last digit in its end-of-sentence form.
+ * A digit string read one digit at a time (§10.2 "Call parking"'s slot), the last digit in its
+ * end-of-sentence form.
  */
-export function digitsMedia(language: Language, digits: string): string[] {
-  if (!isGeneratedLanguage(language)) {
-    return [`digits:${digits}`];
-  }
+export function digitsMedia(digits: string): string[] {
   return digits
     .split('')
     .map(
@@ -64,18 +46,6 @@ export function digitsMedia(language: Language, digits: string): string[] {
         `sound:${index === digits.length - 1 ? FINAL_DIGITS_DIR : 'digits'}/${digit}`
     );
 }
-
-/** Languages whose prompt set actually names {@link PROMPTS.failedCall} (verified against the
- * image, §9.1, `test/integration/prompts.sh`): `en`'s own file, the community `fr` and `it` sets,
- * and every generated set. `de` and `es` ship no file of that name at all, and `ru`'s community set
- * names its own `pls-try-call-later` instead, so all three fall outside this list. `conclude.ts`
- * plays the special information tone (`indications.ts`) for a `language` not here. */
-export const LANGUAGES_WITH_FAILED_CALL_PROMPT: readonly string[] = [
-  'en',
-  'fr',
-  'it',
-  ...GENERATED_LANGUAGES
-];
 
 /** The `sound:` reference for one of the fixed default prompts above. */
 export function defaultPrompt(key: PromptKey): string {
@@ -103,6 +73,18 @@ export function assetMedia(
   return `sound:${PROMPTS_DIR}/${asset.filename.replace(/\.[^./]+$/u, '')}`;
 }
 
+/** A channel's language as Asterisk resolves sounds in it: the tenant language and its voice,
+ * `<language>_<voice>`, the name each generated set ships under (§9.1). Branded, so a bare
+ * `settings.language` cannot reach a channel. */
+export type SoundLanguage = string & { readonly soundLanguage: unique symbol };
+
+export function soundLanguage(settings: {
+  language: Language;
+  promptVoice: PromptVoice;
+}): SoundLanguage {
+  return `${settings.language}_${settings.promptVoice}` as SoundLanguage;
+}
+
 /**
  * Sets the channel's language, which is what Asterisk resolves a `sound:` name's language variant
  * from (§9.1's tenant languages). Every prompt this module names is played on a channel that
@@ -115,7 +97,7 @@ export async function setChannelLanguage(
     };
   },
   channelId: string,
-  language: string
+  language: SoundLanguage
 ): Promise<void> {
   await ari.channels
     .setVar(channelId, 'CHANNEL(language)', language)
@@ -126,7 +108,7 @@ export async function setChannelLanguage(
  * its creation (§9.1 "every channel's language"), so a prompt played the moment it answers —
  * find-me's accept prompt — already follows it, before the leg has been through any entry. */
 export function channelLanguageVariable(
-  language: string
+  language: SoundLanguage
 ): Record<string, string> {
   return { 'CHANNEL(language)': language };
 }

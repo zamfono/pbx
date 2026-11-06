@@ -562,7 +562,7 @@ describe('parking', () => {
           entry.qs === `reason_code=${sipToHangupCause(404)}`
       );
       expect(fallbackReleased).toBe(true);
-      expect(languageSet(fakeAri, customerChannel.id, 'de')).toBe(true);
+      expect(languageSet(fakeAri, customerChannel.id, 'de_female')).toBe(true);
       const ringbackRows = await db
         .selectFrom('calls')
         .select('status')

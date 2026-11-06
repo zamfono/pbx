@@ -9,6 +9,8 @@ node_modules
 # the updater's state and log in a stack directory (deploy/ under the integration harness)
 .update/
 .eslintcache
+# scripts/generate-prompts.mjs's ElevenLabs answers
+/.cache/
 coverage
 
 packages/*/dist

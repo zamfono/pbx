@@ -9,7 +9,7 @@ import { newId } from '@zamfono/shared';
 import type { AriEventOf } from '../ari/events.js';
 import { ignoreGone } from '../ari/failures.js';
 import { userById } from '../internal/snapshot.js';
-import { setChannelLanguage } from '../prompts.js';
+import { setChannelLanguage, soundLanguage } from '../prompts.js';
 import type { DialAction } from '../routing/outbound.js';
 import { newCall, type Call } from './call.js';
 import { raiseLogLevel } from './callLogLevel.js';
@@ -105,7 +105,7 @@ export async function handleOutbound(
   await setChannelLanguage(
     pipeline.deps.ari,
     channel.id,
-    snapshot.settings.language
+    soundLanguage(snapshot.settings)
   );
   if (transfer !== null) {
     call.log.event({

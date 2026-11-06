@@ -9,7 +9,7 @@ import { newId, type CallLogLevel } from '@zamfono/shared';
 
 import { logFailure } from '../ari/failures.js';
 import { userById, type Snapshot } from '../internal/snapshot.js';
-import { setChannelLanguage } from '../prompts.js';
+import { setChannelLanguage, soundLanguage } from '../prompts.js';
 import { linkParent, newCall, type Call, type Transferee } from './call.js';
 import { raiseLogLevel } from './callLogLevel.js';
 import { presentCallerUserId } from './callLookup.js';
@@ -123,7 +123,7 @@ export async function startOnwardCall(
   await setChannelLanguage(
     pipeline.deps.ari,
     transferee,
-    snapshot.settings.language
+    soundLanguage(snapshot.settings)
   );
   child.log.event({ event: 'entry', ...entry.trace, parentCallId: parent.id });
   pipeline.deps.cdr.sampleMedia([child], 'onward');

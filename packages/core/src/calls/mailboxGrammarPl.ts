@@ -1,9 +1,8 @@
 /**
  * The mailbox menu's counted phrases in Polish (§10.2 "Mailbox access"), from the generated Polish
  * set (§9.1). "Wiadomość" is feminine and the intro takes the accusative: "Masz jedną nową
- * wiadomość", "dwie nowe wiadomości", "pięć nowych wiadomości". An adjective and its noun are
- * always said together, so each form is one clip, the new-message one also with the "i" (and)
- * that follows it before the old messages, cut from a sentence that goes on.
+ * wiadomość", "dwie nowe wiadomości", "pięć nowych wiadomości", each form one clip
+ * (`mailboxGrammarGenerated.ts`).
  *
  * The core reads the numbers itself rather than through ARI's `number:`, which has no gender,
  * joins every number below 100 from its tens and its unit, and whose Polish reading takes 112 for
@@ -13,39 +12,23 @@
  * clips as well, and the feminine of a number ending in 2 ("dwadzieścia dwie") adds a `z`, as
  * `say.c`'s own "dwie" (`2z`) does.
  */
-import { FINAL_DIGITS_DIR } from '../prompts.js';
-import { sound, type Folder } from './mailboxPrompts.js';
-
-export const POLISH_MAILBOX_PROMPTS = {
-  /** "Masz", before the counts. */
-  youHave: 'mailbox/you-have',
-  /** "Nie masz żadnych wiadomości." */
-  none: 'mailbox/none',
-  /** The new messages' count noun phrase ending the sentence: "jedną nową wiadomość", "nowe
-   * wiadomości", "nowych wiadomości". */
-  newLast: {
-    one: 'mailbox/new-one',
-    few: 'mailbox/new-few',
-    many: 'mailbox/new-many'
-  },
-  /** The same, followed by "i" before the old messages. */
-  newAnd: {
-    one: 'mailbox/new-one-and',
-    few: 'mailbox/new-few-and',
-    many: 'mailbox/new-many-and'
-  },
-  /** The old messages', always last: "jedną zapisaną wiadomość", "zapisane wiadomości",
-   * "zapisanych wiadomości". */
-  oldLast: {
-    one: 'mailbox/old-one',
-    few: 'mailbox/old-few',
-    many: 'mailbox/old-many'
-  },
-  /** "Nowa wiadomość numer", "Zapisana wiadomość numer", before a message's place in its folder. */
-  header: { new: 'mailbox/header-new', old: 'mailbox/header-old' }
-} as const;
+import {
+  atSentenceEnd,
+  countedGrammar,
+  countedPrompts,
+  finalForm
+} from './mailboxGrammarGenerated.js';
 
 type Category = 'one' | 'few' | 'many';
+
+/** "Masz", "Nie masz żadnych wiadomości", and the folders' noun phrases: "jedną nową wiadomość",
+ * "nowe wiadomości", "nowych wiadomości", and the same with "i"; "jedną zapisaną wiadomość",
+ * "zapisane wiadomości", "zapisanych wiadomości"; "Nowa wiadomość numer". */
+export const POLISH_MAILBOX_PROMPTS = countedPrompts<Category>([
+  'one',
+  'few',
+  'many'
+]);
 
 const TEN = 10;
 const HUNDRED = 100;
@@ -123,17 +106,9 @@ export function polishNumber(value: number, feminine: boolean): string[] {
   return belowThousand(value, feminine);
 }
 
-function atEnd(name: string): string {
-  return name.replace(/^digits\//u, `${FINAL_DIGITS_DIR}/`);
-}
-
-/** The same number ending a sentence, in the masculine: its last clip in the falling form that
- * ends one (`FINAL_DIGITS_DIR`), where a count's rises into the noun after it. */
+/** The same number ending a sentence, in the masculine (`atSentenceEnd`). */
 export function polishNumberAtEnd(value: number): string[] {
-  const names = polishNumber(value, false);
-  return names.map((name, index) =>
-    index === names.length - 1 ? atEnd(name) : name
-  );
+  return atSentenceEnd(polishNumber(value, false));
 }
 
 const BELOW_HUNDRED = Array.from(
@@ -162,43 +137,14 @@ export const POLISH_NUMBER_PROMPTS: readonly string[] = [
     ...MASCULINE,
     ...BELOW_HUNDRED.map(value => belowHundred(value, true))
   ]),
-  ...MASCULINE.map(atEnd)
+  ...MASCULINE.map(finalForm)
 ];
 
-const PROMPTS_PL = POLISH_MAILBOX_PROMPTS;
-
-/** One folder's count: "jedną nową wiadomość", or the number and the noun phrase. */
-function folderPart(
-  folder: Folder,
-  count: number,
-  beforeAnd: boolean
-): string[] {
-  const newForms = beforeAnd ? PROMPTS_PL.newAnd : PROMPTS_PL.newLast;
-  const forms = folder === 'old' ? PROMPTS_PL.oldLast : newForms;
-  const phrase = sound(forms[category(count)]);
-  if (count === 1) {
-    return [phrase];
-  }
-  return [...polishNumber(count, true).map(sound), phrase];
-}
-
-/** "Masz dwie nowe wiadomości i pięć zapisanych wiadomości": the folders that hold messages, or
- * "Nie masz żadnych wiadomości". */
-export function introPl(newCount: number, oldCount: number): string[] {
-  if (newCount === 0 && oldCount === 0) {
-    return [sound(PROMPTS_PL.none)];
-  }
-  return [
-    sound(PROMPTS_PL.youHave),
-    ...(newCount > 0 ? folderPart('new', newCount, oldCount > 0) : []),
-    ...(oldCount > 0 ? folderPart('old', oldCount, false) : [])
-  ];
-}
-
-/** "Nowa wiadomość numer dwa", the number ending the sentence before the message plays. */
-export function headerPl(folder: Folder, position: number): string[] {
-  return [
-    sound(PROMPTS_PL.header[folder]),
-    ...polishNumberAtEnd(position).map(sound)
-  ];
-}
+/** "Masz dwie nowe wiadomości i pięć zapisanych wiadomości", or "Nie masz żadnych wiadomości";
+ * "Nowa wiadomość numer dwa", the number ending the sentence before the message plays. */
+export const polishGrammar = countedGrammar({
+  prompts: POLISH_MAILBOX_PROMPTS,
+  category,
+  count: value => (value === 1 ? [] : polishNumber(value, true)),
+  position: polishNumberAtEnd
+});

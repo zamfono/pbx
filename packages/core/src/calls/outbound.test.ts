@@ -339,7 +339,7 @@ describe('outbound dialing', () => {
 
     const call = await dial('+498912345');
 
-    expect(languageSet(fakeAri, callerChannel(call), 'de')).toBe(true);
+    expect(languageSet(fakeAri, callerChannel(call), 'de_female')).toBe(true);
   });
 
   it('stores the resolved E.164 form in calls.to, the dialled digits only in the trace', async () => {
@@ -764,7 +764,7 @@ describe('outbound dialing', () => {
       'POST',
       'DELETE'
     ]);
-    // A core-sounds prompt the image ships (§9.1), which the harness's prompt check covers.
+    // A fixed prompt every set in the image ships (§9.1), which the harness's prompt check covers.
     expect(relevant[1]?.body).toMatchObject({
       media: `sound:${PROMPTS.failedCall}`
     });

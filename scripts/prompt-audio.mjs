@@ -1,6 +1,6 @@
 // The audio side of scripts/generate-prompts.mjs (spec §9.1): mono samples in [-1, 1] at `RATE`,
-// brought to one loudness, cut at quiet points, trimmed of silence and written in the formats
-// Asterisk picks from by codec.
+// brought to one loudness, trimmed of silence and written in the formats Asterisk picks from by
+// codec.
 import { spawnSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
@@ -61,9 +61,16 @@ function level(samples, from) {
  * @param {Float32Array} samples
  */
 export function normalize(samples) {
+  // Integrated loudness needs 400 ms blocks, so a short word measures as nothing (and its gain
+  // as no number) unless looped to a second or more.
+  const copies = Math.ceil(RATE / Math.max(1, samples.length));
+  const measured = new Float32Array(samples.length * copies);
+  for (let copy = 0; copy < copies; copy += 1) {
+    measured.set(samples, copy * samples.length);
+  }
   const log = ffmpeg(
     [...RAW_IN, '-af', 'loudnorm=print_format=json', '-f', 'null', '-'],
-    toPcm(samples)
+    toPcm(measured)
   );
   const report = log.match(/\{[^{}]*\}/gu)?.at(-1);
   if (report === undefined) {
@@ -75,23 +82,10 @@ export function normalize(samples) {
   const gain = linear(
     Math.min(LOUDNESS_LUFS - Number(loudness), TRUE_PEAK_DB - Number(peak))
   );
-  return samples.map(sample => sample * gain);
-}
-
-/**
- * The time of the quietest frame between two times, where a word can be cut without cutting a
- * sound: a stop's closure, the pause between words.
- * @param {Float32Array} samples @param {number} fromS @param {number} toS
- */
-export function quietest(samples, fromS, toS) {
-  const last = Math.min(samples.length - FRAME, Math.round(toS * RATE));
-  let best = Math.max(0, Math.round(fromS * RATE));
-  for (let from = best; from <= last; from += FRAME) {
-    if (level(samples, from) < level(samples, best)) {
-      best = from;
-    }
+  if (!Number.isFinite(gain)) {
+    throw new Error(`loudnorm measured no loudness: ${report}`);
   }
-  return best / RATE;
+  return samples.map(sample => sample * gain);
 }
 
 /** Both ends faded over `seconds`. @param {Float32Array} samples @param {number} seconds */
@@ -124,6 +118,19 @@ export function trim(samples) {
     Math.min(samples.length, last + FRAME + keep)
   );
   return fade(kept, FADE_S);
+}
+
+/** The samples as a 16-bit WAV file. @param {Float32Array} samples @returns {Buffer} */
+export function wav(samples) {
+  const run = spawnSync(
+    'ffmpeg',
+    ['-hide_banner', '-nostdin', ...RAW_IN, '-f', 'wav', 'pipe:1'],
+    { input: toPcm(samples), maxBuffer: Infinity }
+  );
+  if (run.status !== 0) {
+    throw new Error(`ffmpeg wav: ${run.stderr.toString()}`);
+  }
+  return run.stdout;
 }
 
 /** Writes `<base>.wav` and `<base>.g722`. @param {string} base @param {Float32Array} samples */

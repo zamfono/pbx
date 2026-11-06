@@ -17,6 +17,15 @@ why the specified behaviour changed; the commit history, how.
   sign-in pages and the shipped mails are in Polish, Yealink phones show Polish, and the Ringotel
   welcome mail is sent in Polish. Its voice prompts are a new generated set with whole-sentence
   menus and counts read in correct Polish grammar.
+- The voice prompts can be female or male in every language: `settings.promptVoice`, female
+  unless set.
+
+### Changed
+
+- Every language's voice prompts are new: one voice per language and gender instead of a mix of
+  recordings, mailbox menus that say each option as a whole sentence, and message counts read in
+  each language's own grammar. A caller whose call fails on every route now hears "please try
+  again later" in every language; Spanish and Russian callers heard a tone instead.
 
 ### Fixed
 

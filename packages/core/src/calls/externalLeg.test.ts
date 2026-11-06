@@ -542,7 +542,7 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
       emit('ChannelDestroyed', callerChannel.id, { cause: 16 });
       await finished;
 
-      expect(leg?.variables?.['CHANNEL(language)']).toBe('de');
+      expect(leg?.variables?.['CHANNEL(language)']).toBe('de_female');
     });
 
     /** The find-me leg of a user with one delay-0 entry, answered by the far end: it now awaits

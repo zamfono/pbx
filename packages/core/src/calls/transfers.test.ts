@@ -655,7 +655,7 @@ describe('transfers', () => {
     });
 
     await eventually(() => {
-      expect(languageSet(fakeAri, callerId, 'de')).toBe(true);
+      expect(languageSet(fakeAri, callerId, 'de_female')).toBe(true);
     });
   });
 

@@ -7,7 +7,7 @@ import { sipHostUri, trunkSectionName } from '@zamfono/shared';
 
 import type { AriEventOf } from '../ari/events.js';
 import type { Snapshot } from '../internal/snapshot.js';
-import { channelLanguageVariable } from '../prompts.js';
+import { channelLanguageVariable, soundLanguage } from '../prompts.js';
 import type { AttemptFailure } from '../routing/trunk.js';
 import { SIP_SERVER_ERROR } from '../sipCodes.js';
 import { type Call } from './call.js';
@@ -209,7 +209,7 @@ export async function originateTrunkLeg(
         appArgs: `leg,${call.id}`,
         callerId,
         variables: {
-          ...channelLanguageVariable(snapshot.settings.language),
+          ...channelLanguageVariable(soundLanguage(snapshot.settings)),
           ...variables
         }
       },

@@ -6,7 +6,7 @@ import { newId } from '@zamfono/shared';
 
 import { ignoreGone } from '../ari/failures.js';
 import type { Snapshot } from '../internal/snapshot.js';
-import { setChannelLanguage } from '../prompts.js';
+import { setChannelLanguage, soundLanguage } from '../prompts.js';
 import { findForwardTarget } from '../routing/targets.js';
 import { SIP_NOT_FOUND } from '../sipCodes.js';
 import { newCall, type Call } from './call.js';
@@ -184,7 +184,7 @@ export async function ringParkerBack(
   await setChannelLanguage(
     pipeline.deps.ari,
     partyChannelId,
-    snapshot.settings.language
+    soundLanguage(snapshot.settings)
   );
   const parkerExt = extensionOf(snapshot, { userId: parkerUserId });
   if (parkerExt === null || parked.bridgeId === null) {

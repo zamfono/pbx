@@ -327,7 +327,7 @@ describe('user step against registration', () => {
             'CHANNEL(language)'
           ]
       );
-    expect(languages).toEqual(['de', 'de']);
+    expect(languages).toEqual(['de_female', 'de_female']);
   });
 
   // §7: the target user's diagnostics override counts toward the call's level.

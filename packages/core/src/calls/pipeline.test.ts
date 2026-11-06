@@ -310,13 +310,16 @@ describe('Pipeline', () => {
     started.catch(() => undefined);
   });
 
-  it("sets the caller channel's language from the tenant setting (§9.1)", async () => {
+  it("sets the caller channel's language from the tenant's language and voice (§9.1)", async () => {
     const userId = await seedUser(db, { ringTimeoutS: RING_TIMEOUT_S });
     await seedDevice(db, userId, 'e101-d1');
     const targetId = await seedForwardTarget(db, { userId });
     await seedDid(db, '+15551000', targetId);
     await registerDevice(fakeAri, pipeline, 'e101-d1');
-    await db.updateTable('settings').set({ language: 'de' }).execute();
+    await db
+      .updateTable('settings')
+      .set({ language: 'de', promptVoice: 'male' })
+      .execute();
 
     const callerChannel = fakeAri.addChannel({
       caller: { number: '+15559999', name: '' }
@@ -332,7 +335,7 @@ describe('Pipeline', () => {
     );
     expect(setVars.map(entry => entry.body)).toContainEqual({
       variable: 'CHANNEL(language)',
-      value: 'de'
+      value: 'de_male'
     });
   });
 

@@ -8,7 +8,7 @@ import { newId, type OriginateRequest } from '@zamfono/shared';
 
 import type { Channel } from '../ari/types.js';
 import { userById, type Snapshot } from '../internal/snapshot.js';
-import { setChannelLanguage } from '../prompts.js';
+import { setChannelLanguage, soundLanguage } from '../prompts.js';
 import { withClir, type DialAction } from '../routing/outbound.js';
 import { newCall, type Call } from './call.js';
 import { raiseLogLevel } from './callLogLevel.js';
@@ -89,7 +89,7 @@ export async function beginOriginatedCall(
   await setChannelLanguage(
     pipeline.deps.ari,
     channel.id,
-    snapshot.settings.language
+    soundLanguage(snapshot.settings)
   );
   const isCallOfUser = action.kind !== 'feature' && action.kind !== 'refuse';
   if (call.callerUserId !== null && isCallOfUser) {

@@ -3,7 +3,7 @@
  * Please do not edit it manually.
  */
 
-import type { AudioKind, AuditChannel, BackupRunStatus, BackupTargetKind, CallDirection, CallerIdHeader, CallLogLevel, CallStatus, DeviceKind, DeviceTransport, DiversionPolicy, ForwardedCallerId, HostDirection, Language, LogLevelOverride, MailKind, MaintenanceWork, NumberFormat, OAuthClientKind, PresenceStatus, QosRole, RingGroupForwardCondition, RingStrategy, SmtpSecurity, SsoProvider, TokenKind, TrunkAuthMode, TrunkTransport, UserForwardCondition, UserRole, WebhookStatus, WebSocketProtocol } from "../columnValues.js";
+import type { AudioKind, AuditChannel, BackupRunStatus, BackupTargetKind, CallDirection, CallerIdHeader, CallLogLevel, CallStatus, DeviceKind, DeviceTransport, DiversionPolicy, ForwardedCallerId, HostDirection, Language, LogLevelOverride, MailKind, MaintenanceWork, NumberFormat, OAuthClientKind, PresenceStatus, PromptVoice, QosRole, RingGroupForwardCondition, RingStrategy, SmtpSecurity, SsoProvider, TokenKind, TrunkAuthMode, TrunkTransport, UserForwardCondition, UserRole, WebhookStatus, WebSocketProtocol } from "../columnValues.js";
 import type { ColumnType } from "kysely";
 import type { CountryCode } from "libphonenumber-js";
 
@@ -388,6 +388,7 @@ export interface Settings {
   maxForwardHops: Generated<number>;
   mfaRequiredForAll: Generated<number>;
   parkingTimeoutS: Generated<number>;
+  promptVoice: Generated<PromptVoice>;
   recordingRetentionDays: Generated<number | null>;
   rejectAnonymous: Generated<number>;
   ringotelApiTokenEnc: Buffer | null;

@@ -110,6 +110,10 @@ export type RingGroupForwardCondition =
 export const LANGUAGES = ['de', 'en', 'es', 'fr', 'it', 'pl', 'ru'] as const;
 export type Language = (typeof LANGUAGES)[number];
 
+/** `settings.prompt_voice`: the two voices of each generated prompt set (§9.1). */
+export const PROMPT_VOICES = ['female', 'male'] as const;
+export type PromptVoice = (typeof PROMPT_VOICES)[number];
+
 /** `settings.smtp_security`. */
 export const SMTP_SECURITIES = ['tls', 'starttls'] as const;
 export type SmtpSecurity = (typeof SMTP_SECURITIES)[number];

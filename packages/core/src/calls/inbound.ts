@@ -6,7 +6,7 @@ import { newId } from '@zamfono/shared';
 import type { AriEventOf } from '../ari/events.js';
 import { ignoreGone } from '../ari/failures.js';
 import { userById, type Snapshot } from '../internal/snapshot.js';
-import { setChannelLanguage } from '../prompts.js';
+import { setChannelLanguage, soundLanguage } from '../prompts.js';
 import {
   isBlocked,
   rejectAnonymous,
@@ -241,7 +241,7 @@ export async function handleInboundStart(
   await setChannelLanguage(
     pipeline.deps.ari,
     channel.id,
-    snapshot.settings.language
+    soundLanguage(snapshot.settings)
   );
 
   const blocklist = snapshot.blockedNumbers.map(row => ({

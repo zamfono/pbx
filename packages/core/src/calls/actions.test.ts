@@ -489,7 +489,9 @@ describe('CallActions', () => {
       const rung = originates().find(
         entry => entry.endpoint?.startsWith('PJSIP/e101-') === true
       );
-      expect(languageSet(fakeAri, rung?.channelId ?? '', 'de')).toBe(true);
+      expect(languageSet(fakeAri, rung?.channelId ?? '', 'de_female')).toBe(
+        true
+      );
     });
   });
 
@@ -514,7 +516,7 @@ describe('CallActions', () => {
     );
     expect(rung).toHaveLength(2);
     for (const entry of rung) {
-      expect(entry.variables?.['CHANNEL(language)']).toBe('de');
+      expect(entry.variables?.['CHANNEL(language)']).toBe('de_female');
     }
   });
 

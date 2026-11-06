@@ -125,6 +125,30 @@ describe('settings', () => {
     expect(vi.mocked(propagateConfig).mock.calls).toEqual([[db, []]]);
   });
 
+  it('stores and returns the prompt voice, female unless set, and propagates it to core (§9.1)', async () => {
+    const db = await makeTestDb();
+    await seedSettings(db);
+    vi.mocked(propagateConfig).mockClear();
+
+    type Voiced = { promptVoice: string };
+    expect(
+      ((await runOperation(db, 'settings.get', {}, asRun())) as Voiced)
+        .promptVoice
+    ).toBe('female');
+    const updated = (await runOperation(
+      db,
+      'settings.update',
+      { promptVoice: 'male' },
+      asRun()
+    )) as Voiced;
+
+    expect(updated.promptVoice).toBe('male');
+    expect(vi.mocked(propagateConfig).mock.calls).toEqual([[db, []]]);
+    await expect(
+      runOperation(db, 'settings.update', { promptVoice: 'robot' }, asRun())
+    ).rejects.toMatchObject({ status: 422 });
+  });
+
   it('propagates nothing for a settings.update that changed no column', async () => {
     const db = await makeTestDb();
     await seedSettings(db);

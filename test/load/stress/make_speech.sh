@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # test/load: builds the speech-like source audio the stress profile's media generators encode:
-# Asterisk's own English G.722 (wideband) prompts, pulled from the asterisk image, concatenated
+# the English G.722 (wideband) prompts of the asterisk image's female set, concatenated
 # into one continuous talker. Writes two files into <out_dir>:
 #   speech16k.wav  16 kHz mono s16 -- make_amrwb_pcap.py's input (trunk side, AMR-WB)
 #   speech48k.wav  48 kHz mono s16, looped to <seconds> -- baresip's aufile source (devices,
@@ -18,7 +18,7 @@ trap 'rm -rf "$work"' EXIT
 
 # tar -h follows the sounds directory's symlinks on both runtimes (`podman cp` has no -L).
 mkdir "$work/en"
-"$runtime" run --rm --entrypoint tar "$image" -chf - -C /usr/share/asterisk/sounds/en . \
+"$runtime" run --rm --entrypoint tar "$image" -chf - -C /usr/share/asterisk/sounds/en_female . \
   | tar -xf - -C "$work/en"
 
 list="$work/list.txt"

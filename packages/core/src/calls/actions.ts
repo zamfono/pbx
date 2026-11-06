@@ -24,6 +24,7 @@ import {
 } from '@zamfono/shared';
 
 import { ignoreGone, logFailure } from '../ari/failures.js';
+import { soundLanguage } from '../prompts.js';
 import { ActionError } from './actionError.js';
 import { addPartyOnRequest } from './addedParty.js';
 import type { Call } from './call.js';
@@ -90,7 +91,7 @@ export class CallActions {
       devices,
       callerId: resolved.to,
       timeoutS: ringTimeoutOf(snapshot, req.userId),
-      language: snapshot.settings.language,
+      language: soundLanguage(snapshot.settings),
       peer: resolved.to,
       // Keyed by the call, so a REST hangup's `closeCall` clears it with the rest of the call.
       presenceKey: call.id,

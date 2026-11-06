@@ -1,4 +1,17 @@
 {
+  "voices": {
+    "female": {
+      "name": "Joanna",
+      "id": "H3IcxEgdFxIEJAqMc0Bc",
+      "seeds": {
+        "digits/100": 1
+      }
+    },
+    "male": {
+      "name": "Jacek",
+      "id": "rZNiz8awpFSQAW1GCVS0"
+    }
+  },
   "aliases": {},
   "prompts": {
     "vm-intro": "Proszę zostawić wiadomość. Aby zakończyć, proszę nacisnąć krzyżyk lub odłożyć słuchawkę.",
@@ -20,7 +33,7 @@
     "vm-msgsaved": "Powitanie zostało zapisane.",
     "vm-deleted": "Wiadomość została usunięta.",
     "vm-nomore": "Nie ma więcej wiadomości.",
-    "vm-sorry": "Przepraszamy, nie rozpoznano odpowiedzi.",
+    "vm-sorry": "Przepraszamy, nie udało się. Spróbuj ponownie.",
     "mailbox/none": "Nie masz żadnych wiadomości.",
     "mailbox/you-have": "[Masz] dwie nowe wiadomości.",
     "mailbox/new-one": "Masz [jedną nową wiadomość].",

@@ -12,7 +12,7 @@ import { MS_PER_SECOND, newId } from '@zamfono/shared';
 
 import type { Channel } from '../ari/types.js';
 import { userById, type Snapshot } from '../internal/snapshot.js';
-import { channelLanguageVariable } from '../prompts.js';
+import { channelLanguageVariable, type SoundLanguage } from '../prompts.js';
 import type { Call, Leg } from './call.js';
 import { callPartiesChanged } from './callState.js';
 import { originateLeg } from './legOriginate.js';
@@ -49,7 +49,7 @@ type OwnRingParams = {
   callerId: string;
   timeoutS: number;
   // §9.1 "every channel's language", set from the leg's creation.
-  language: string;
+  language: SoundLanguage;
   /** §9.3 "a user: RINGING while any of their devices rings": whom the user's phones show, under
    * which per-call presence key, until the ring settles. */
   peer: string;

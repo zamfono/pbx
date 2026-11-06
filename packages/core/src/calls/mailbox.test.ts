@@ -119,9 +119,8 @@ describe('mailbox menu (§10.2 "Mailbox access")', () => {
 
   function messageMedia(folder: 'new' | 'old', position: number, id: string) {
     return [
-      folder === 'new' ? 'sound:vm-INBOX' : 'sound:vm-Old',
-      'sound:vm-message',
-      `number:${position}`,
+      `sound:mailbox/header-${folder}`,
+      `sound:digits-final/${position}`,
       `sound:/media/voicemail/${id}`
     ];
   }
@@ -140,20 +139,16 @@ describe('mailbox menu (§10.2 "Mailbox access")', () => {
     const old = await seedMessage(db, ownerId, 60, 1);
     const done = ownVoicemail(pipeline, call);
 
-    // "You have 2 new messages and 1 old message", then the main menu.
+    // "You have 2 new messages and 1 saved message", then the main menu.
     expect((await nextPlay()).media).toEqual([
       ...introMedia('en', 2, 1),
-      ...mainMenuMedia('en', 2, 1)
+      ...mainMenuMedia(2, 1)
     ]);
     expect(introMedia('en', 2, 1)).toEqual([
-      'sound:vm-youhave',
-      'number:2',
-      'sound:vm-INBOX',
-      'sound:vm-messages',
-      'sound:vm-and',
-      'number:1',
-      'sound:vm-Old',
-      'sound:vm-message'
+      'sound:mailbox/you-have',
+      'sound:digits/2',
+      'sound:mailbox/new-other-and',
+      'sound:mailbox/old-one'
     ]);
     press('1');
     // A key barges in on the playing menu: it stops at once.
@@ -184,7 +179,7 @@ describe('mailbox menu (§10.2 "Mailbox access")', () => {
     // Back in the main menu, which repeats the counts on `*`.
     expect((await nextPlay()).media).toEqual([
       ...introMedia('en', 1, 1),
-      ...mainMenuMedia('en', 1, 1)
+      ...mainMenuMedia(1, 1)
     ]);
     press('#');
     const goodbye = await nextPlay();
@@ -220,7 +215,7 @@ describe('mailbox menu (§10.2 "Mailbox access")', () => {
     const done = ownVoicemail(pipeline, call);
     expect((await nextPlay()).media).toEqual([
       ...introMedia('en', 1, 0),
-      ...mainMenuMedia('en', 1, 0)
+      ...mainMenuMedia(1, 0)
     ]);
     press('1');
     const message = await nextPlay();
@@ -254,15 +249,11 @@ describe('mailbox menu (§10.2 "Mailbox access")', () => {
     const menu = await nextPlay();
     expect(menu.media).toEqual([
       ...introMedia('en', 1, 0),
-      ...mainMenuMedia('en', 1, 0)
+      ...mainMenuMedia(1, 0)
     ]);
-    expect(mainMenuMedia('en', 1, 0)).toEqual([
-      'sound:vm-onefor',
-      'sound:vm-INBOX',
-      'sound:vm-messages',
-      'sound:vm-press',
-      'sound:digits/0',
-      'sound:vm-rec-unv',
+    expect(mainMenuMedia(1, 0)).toEqual([
+      'sound:mailbox/menu-new',
+      'sound:mailbox/menu-greeting',
       'sound:vm-helpexit'
     ]);
     press('2');
@@ -270,12 +261,12 @@ describe('mailbox menu (§10.2 "Mailbox access")', () => {
     expect(noMore.media).toBe('sound:vm-nomore');
     finish(noMore);
     // The main menu again, without the counts.
-    expect((await nextPlay()).media).toEqual(mainMenuMedia('en', 1, 0));
+    expect((await nextPlay()).media).toEqual(mainMenuMedia(1, 0));
     press('9');
     const sorry = await nextPlay();
     expect(sorry.media).toBe('sound:vm-sorry');
     finish(sorry);
-    expect((await nextPlay()).media).toEqual(mainMenuMedia('en', 1, 0));
+    expect((await nextPlay()).media).toEqual(mainMenuMedia(1, 0));
     press('#');
     finish(await nextPlay());
     await done;
@@ -285,19 +276,16 @@ describe('mailbox menu (§10.2 "Mailbox access")', () => {
     await db.updateTable('settings').set({ language: 'es' }).execute();
     const id = await seedMessage(db, ownerId, 10, 0);
     const done = ownVoicemail(pipeline, call);
-    // "Tiene un mensaje nuevo": noun before adjective, the singular adjective.
+    // "Tienes un mensaje nuevo", then "Mensaje nuevo número uno" before the message.
     expect((await nextPlay()).media).toEqual([
-      'sound:vm-youhave',
-      'sound:digits/1M',
-      'sound:vm-message',
-      'sound:vm-INBOXs',
-      ...mainMenuMedia('es', 1, 0)
+      'sound:mailbox/you-have',
+      'sound:mailbox/new-one',
+      ...mainMenuMedia(1, 0)
     ]);
     press('1');
     expect((await nextPlay()).media).toEqual([
-      'sound:vm-message',
-      'sound:vm-INBOXs',
-      'number:1',
+      'sound:mailbox/header-new',
+      'sound:digits-final/1',
       `sound:/media/voicemail/${id}`
     ]);
     press('#');
@@ -395,9 +383,9 @@ describe('mailbox menu (§10.2 "Mailbox access")', () => {
       )
       .map(entry => (entry.body as Play).media);
     expect(media).toEqual([
-      [...introMedia('en', 0, 0), ...mainMenuMedia('en', 0, 0)],
-      mainMenuMedia('en', 0, 0),
-      mainMenuMedia('en', 0, 0),
+      [...introMedia('en', 0, 0), ...mainMenuMedia(0, 0)],
+      mainMenuMedia(0, 0),
+      mainMenuMedia(0, 0),
       'sound:vm-goodbye'
     ]);
     // Real 5 s key waits, three of them.

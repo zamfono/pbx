@@ -7,9 +7,10 @@ LABEL org.opencontainers.image.source=https://github.com/zamfono/pbx
 
 # Zamfono APT repository (spec §4):
 # fetch its archive keyring package, register the source, install Asterisk 22 plus the module
-# and sound packages the stack needs (spec §9.1, §9.3, §9.4), nftables and inotify-tools for
+# and music-on-hold packages the stack needs (spec §9.1, §9.3, §9.4), nftables and inotify-tools for
 # the ban helper (§5.6), and coturn for the STUN server the `stun` service runs from this image
-# (§6.1). ca-certificates stays installed:
+# (§6.1). The `asterisk` package pulls in Debian's English sounds, kept as the safety net for a
+# prompt not yet generated (§9.1). ca-certificates stays installed:
 # transport-tls checks a trunk provider's certificate against its bundle (§9.4 "Signaling").
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates curl \
@@ -27,11 +28,6 @@ RUN apt-get update \
        asterisk-modules-hep \
        asterisk-modules-opus \
        asterisk-modules-amr \
-       asterisk-core-sounds-en-wav asterisk-core-sounds-es-wav asterisk-core-sounds-fr-wav \
-       asterisk-core-sounds-it-wav asterisk-core-sounds-ru-wav \
-       asterisk-core-sounds-en-g722 asterisk-core-sounds-es-g722 asterisk-core-sounds-fr-g722 \
-       asterisk-core-sounds-it-g722 asterisk-core-sounds-ru-g722 \
-       asterisk-prompt-de \
        asterisk-moh-opsound-wav \
        asterisk-moh-opsound-g722 \
        coturn \
@@ -41,18 +37,23 @@ RUN apt-get update \
        openssl \
     && rm -rf /var/lib/apt/lists/*
 
-# The community sound packages install into locale+voice directories (`es_MX_f_Allison`,
-# `fr_CA_f_June`, `it_IT_m_Carlo`, `ru_RU_f_IvrvoiceRU`); Asterisk resolves a channel's prompts
-# at `sounds/<language>`, so each tenant language needs a directory of that exact name. `en` and
-# `de` get theirs from `asterisk-core-sounds-en`/`asterisk-prompt-de`'s own alternatives; there is
-# no equivalent alternative package for the other four (spec §9.1).
-RUN ln -s es_MX_f_Allison /usr/share/asterisk/sounds/es \
-    && ln -s fr_CA_f_June /usr/share/asterisk/sounds/fr \
-    && ln -s it_IT_m_Carlo /usr/share/asterisk/sounds/it \
-    && ln -s ru_RU_f_IvrvoiceRU /usr/share/asterisk/sounds/ru
-# The generated prompt sets (spec §9.1), committed audio that scripts/generate-prompts.mjs made
-# from prompts/<language>.json; each holds every prompt the core can play in its language.
-COPY prompts/pl /usr/share/asterisk/sounds/pl
+# The prompt sets (spec §9.1), committed audio that scripts/generate-prompts.mjs made from
+# prompts/<language>.json, one per voice; each holds every prompt the core can play in its
+# language, under the channel language the core sets, `<language>_<voice>`.
+COPY prompts/de/female /usr/share/asterisk/sounds/de_female
+COPY prompts/de/male /usr/share/asterisk/sounds/de_male
+COPY prompts/en/female /usr/share/asterisk/sounds/en_female
+COPY prompts/en/male /usr/share/asterisk/sounds/en_male
+COPY prompts/es/female /usr/share/asterisk/sounds/es_female
+COPY prompts/es/male /usr/share/asterisk/sounds/es_male
+COPY prompts/fr/female /usr/share/asterisk/sounds/fr_female
+COPY prompts/fr/male /usr/share/asterisk/sounds/fr_male
+COPY prompts/it/female /usr/share/asterisk/sounds/it_female
+COPY prompts/it/male /usr/share/asterisk/sounds/it_male
+COPY prompts/pl/female /usr/share/asterisk/sounds/pl_female
+COPY prompts/pl/male /usr/share/asterisk/sounds/pl_male
+COPY prompts/ru/female /usr/share/asterisk/sounds/ru_female
+COPY prompts/ru/male /usr/share/asterisk/sounds/ru_male
 
 # The Node images' shared volumes (media, asterisk-config) are written by the `node` user
 # (uid/gid 1000); Asterisk is remapped to the same id so both sides can write them (spec §6.3
@@ -76,11 +77,10 @@ RUN rm -f /etc/asterisk/*.conf /etc/asterisk/*.ael
 
 COPY conf/pjsip.conf.tmpl conf/ari.conf.tmpl conf/http.conf.tmpl conf/manager.conf.tmpl \
      conf/hep.conf.tmpl conf/rtp.conf.tmpl conf/modules.conf.tmpl /etc/asterisk/templates/
-# indications.conf ships as the image's own static file (spec §9.1, §9.4 "Cross-trunk failover"):
-# the single `itu` zone for ITU-T E.180's special information tone, no environment variable feeds
-# it, so it is copied here rather than templated at start like hep.conf/rtp.conf. res_indications
-# is not a loadable module (main/indications.c is linked into the core binary), so there is
-# nothing to keep out of modules.conf's noload list for it.
+# indications.conf ships as the image's own static file (spec §9.1): the single `itu` zone, no
+# environment variable feeds it, so it is copied here rather than templated at start like
+# hep.conf/rtp.conf. res_indications is not a loadable module (main/indications.c is linked into
+# the core binary), so there is nothing to keep out of modules.conf's noload list for it.
 COPY conf/asterisk.conf conf/extensions.conf conf/logger.conf conf/sorcery.conf \
      conf/indications.conf conf/pjsip_wizard.conf /etc/asterisk/
 COPY conf/musiconhold.conf.static /etc/asterisk/musiconhold.conf

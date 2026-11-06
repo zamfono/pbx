@@ -61,9 +61,8 @@ export function playAndWait(
 
 /**
  * Plays `media` on `channelId` for exactly `durationMs`, then stops it itself, rather than waiting
- * for its own `PlaybackFinished` (§9.4 "Cross-trunk failover"'s special information tone,
- * `indications.ts`: none of its `indications.conf` elements starts with `!`, so it repeats
- * forever once started and never ends on its own). Still resolves early on the channel hanging up
+ * for its own `PlaybackFinished` (a tone of `indications.ts`: none of its `indications.conf`
+ * elements starts with `!`, so it repeats forever once started and never ends on its own). Still resolves early on the channel hanging up
  * mid-tone; the stop request that follows is expected to fail for a channel already gone, so it is
  * not treated as this wait's own failure.
  */

@@ -9,6 +9,7 @@ import {
   isSupportedCountry,
   LANGUAGES,
   MAX_SIP_BAN_PERIOD_S,
+  PROMPT_VOICES,
   sipBanStepsSchema
 } from '@zamfono/shared';
 
@@ -68,6 +69,10 @@ export const settingsInputSchema = z
       .describe(
         'The language of the prompts callers hear, the mails and the sign-in pages.'
       ),
+    promptVoice: z
+      .enum(PROMPT_VOICES)
+      .optional()
+      .describe('The voice of the prompts callers hear: female or male.'),
     ...mailInputFields,
     emergencyNumbers: emergencyNumbersSchema
       .optional()

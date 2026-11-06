@@ -6,7 +6,11 @@ import { MS_PER_SECOND, newId } from '@zamfono/shared';
 
 import { ignoreGone } from '../ari/failures.js';
 import { userById, type Snapshot } from '../internal/snapshot.js';
-import { channelLanguageVariable } from '../prompts.js';
+import {
+  channelLanguageVariable,
+  soundLanguage,
+  type SoundLanguage
+} from '../prompts.js';
 import { SIP_TEMPORARILY_UNAVAILABLE } from '../sipCodes.js';
 import { takeJoinBridge, type Call, type Leg } from './call.js';
 import { callPartiesChanged, callRinging } from './callState.js';
@@ -35,7 +39,7 @@ import { applyRingOutcome, type UnappliedDecision } from './userStep.js';
 type DeviceRing = {
   userId: string;
   callerId: string;
-  language: string;
+  language: SoundLanguage;
 };
 
 /** Originates one leg for a contact of `device`'s, tracked on `call` as a device leg: placing,
@@ -110,7 +114,7 @@ async function ringDevices(
   call: Call,
   userId: string,
   devices: Snapshot['devices'],
-  language: string
+  language: SoundLanguage
 ): Promise<void> {
   // §10.2 "Phone book": the contact's display name is the caller-ID name on the device legs.
   const callerId = await softphoneCallerId(pipeline, call);
@@ -179,7 +183,7 @@ export async function ringUser(
     call,
     userId,
     devices,
-    snapshot.settings.language
+    soundLanguage(snapshot.settings)
   );
   // The race can be over before every device is dialled: the caller hung up, or a phone answered.
   if (pipeline.pendingRing.get(call.id) === ring && ring.won !== true) {

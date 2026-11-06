@@ -12,9 +12,6 @@ compose=$3
 previous=$(cat "$(state_file routes-exhausted-language)")
 api PATCH "/settings" "{\"language\":\"$previous\"}" >/dev/null
 
-dc exec -T asterisk sh -c "
-  asterisk -rx 'logger remove channel ci-tone' >/dev/null
-  rm -f /var/log/asterisk/ci-tone
-  asterisk -rx 'core set debug 0 res_stasis_playback' >/dev/null
-"
+asterisk_cli 'logger remove channel ci-announce' >/dev/null
+dc exec -T asterisk rm -f /var/log/asterisk/ci-announce
 rm -f "$(state_file routes-exhausted-language)"

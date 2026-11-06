@@ -247,13 +247,7 @@ export async function park(
   const channelId = callerChannel(call);
   const ari = pipeline.deps.ari;
   await ari.channels.answer(channelId).catch(ignoreGone);
-  const { language } = (await pipeline.deps.cache.get()).settings;
-  await playAndWait(
-    ari,
-    channelId,
-    digitsMedia(language, ext),
-    `${channelId}:park`
-  );
+  await playAndWait(ari, channelId, digitsMedia(ext), `${channelId}:park`);
   await concludeFeature(pipeline, call, 'answered');
 }
 
