@@ -1,0 +1,5 @@
+{
+  "subject": "Nowa wiadomość głosowa: {{#if callerName}}{{callerName}}{{else if callerNumber}}{{callerNumber}}{{else}}numer zastrzeżony{{/if}}",
+  "bodyText": "Dzień dobry,\n\nNowa wiadomość głosowa w skrzynce: {{mailboxName}}. Dzwoniący: {{#if callerName}}{{callerName}} ({{callerNumber}}){{else if callerNumber}}{{callerNumber}}{{else}}numer zastrzeżony{{/if}}. Nagrano: {{date receivedAt}}. Długość: {{durationS}} s.\n\nNagranie znajduje się w załączniku tego e-maila.\n\n{{companyName}} · {{fqdn}}",
+  "bodyHtml": "<p>Dzień dobry,</p><p>Nowa wiadomość głosowa w skrzynce: {{mailboxName}}. Dzwoniący: {{#if callerName}}{{callerName}} ({{callerNumber}}){{else if callerNumber}}{{callerNumber}}{{else}}numer zastrzeżony{{/if}}. Nagrano: {{date receivedAt}}. Długość: {{durationS}} s.</p><p>Nagranie znajduje się w załączniku tego e-maila.</p><p>{{companyName}} · {{fqdn}}</p>"
+}

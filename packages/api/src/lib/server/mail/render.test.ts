@@ -14,7 +14,15 @@ const BUILTIN_KINDS: MailKind[] = [
   'updateFailed',
   'breakingUpdate'
 ];
-const BUILTIN_LANGUAGES: Language[] = ['de', 'en', 'es', 'fr', 'it', 'ru'];
+const BUILTIN_LANGUAGES: Language[] = [
+  'de',
+  'en',
+  'es',
+  'fr',
+  'it',
+  'pl',
+  'ru'
+];
 
 describe('compileTemplate', () => {
   it('rejects a placeholder the kind does not offer', () => {
@@ -161,6 +169,7 @@ describe('a withheld caller', () => {
     es: 'un número oculto',
     fr: 'un numéro masqué',
     it: 'un numero privato',
+    pl: 'numer zastrzeżony',
     ru: 'скрытого номера'
   };
 
@@ -202,6 +211,7 @@ describe('the voicemail length', () => {
     es: '1 s.',
     fr: '1 s.',
     it: '1 s.',
+    pl: '1 s.',
     ru: '1 сек.'
   };
 

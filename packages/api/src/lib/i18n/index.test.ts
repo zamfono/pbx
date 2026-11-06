@@ -26,7 +26,7 @@ function placeholders(text: string): string[] {
   return [...text.matchAll(/\{\w+\}/gu)].map(match => match[0]).sort();
 }
 
-describe('the six dictionaries', () => {
+describe('the dictionaries', () => {
   const english = entries(dictionaryFor('en'));
 
   for (const language of LANGUAGES) {

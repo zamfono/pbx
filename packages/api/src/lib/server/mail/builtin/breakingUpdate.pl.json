@@ -1,0 +1,5 @@
+{
+  "subject": "Zamfono {{version}} wymaga ręcznej aktualizacji",
+  "bodyText": "Dzień dobry,\n\nZamfono {{version}} jest dostępne{{#if publishedAt}} od {{date publishedAt}}{{/if}}. To wydanie wprowadza zmiany niezgodne wstecz, więc {{fqdn}} w wersji {{currentVersion}} nie zainstaluje go samodzielnie.\n\nPrzeczytaj informacje o wydaniu{{#if releaseUrl}} ({{releaseUrl}}){{/if}}, a następnie zaktualizuj system przez system.update z breaking: true lub skryptem update.sh na hoście.\n\n{{companyName}} · {{fqdn}}",
+  "bodyHtml": "<p>Dzień dobry,</p><p>Zamfono {{version}} jest dostępne{{#if publishedAt}} od {{date publishedAt}}{{/if}}. To wydanie wprowadza zmiany niezgodne wstecz, więc {{fqdn}} w wersji {{currentVersion}} nie zainstaluje go samodzielnie.</p><p>Przeczytaj informacje o wydaniu{{#if releaseUrl}} ({{releaseUrl}}){{/if}}, a następnie zaktualizuj system przez system.update z breaking: true lub skryptem update.sh na hoście.</p><p>{{companyName}} · {{fqdn}}</p>"
+}

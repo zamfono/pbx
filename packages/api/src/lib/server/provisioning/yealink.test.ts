@@ -166,6 +166,14 @@ describe('renderYealink (§10.4 "Provisioning link")', () => {
     expect(file.get('linekey.3.value')).toBe('207');
   });
 
+  it('shows a Polish tenant Polish on the phone and the web interface', () => {
+    const file = parse(renderYealink(input({ language: 'pl' })));
+    expect([file.get('lang.gui'), file.get('lang.wui')]).toEqual([
+      'Polish',
+      'Polish'
+    ]);
+  });
+
   it('sets the admin password on both web accounts, admin and user', () => {
     const file = renderYealink(input());
     expect(file).toMatch(/^static\.security\.user_password = admin:adminpw$/mu);

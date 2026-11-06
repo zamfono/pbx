@@ -1,0 +1,5 @@
+{
+  "subject": "Ustaw hasło do systemu telefonicznego {{companyName}}",
+  "bodyText": "Dzień dobry,\n\n{{#if invitedBy}}{{invitedBy}} zaprasza Cię do systemu telefonicznego {{companyName}}. Twoje konto jest już gotowe.{{else}}System telefoniczny {{companyName}} jest gotowy.{{/if}} Ustaw hasło, korzystając z poniższego linku:\n\n{{link}}\n\nLink jest ważny do {{date linkExpiresAt}}.\n{{#unless invitedBy}}\nPo zalogowaniu połącz swojego asystenta AI z {{fqdn}} przez MCP, aby zarządzać systemem telefonicznym na czacie.\n{{/unless}}\n{{companyName}} · {{fqdn}}",
+  "bodyHtml": "<p>Dzień dobry,</p><p>{{#if invitedBy}}{{invitedBy}} zaprasza Cię do systemu telefonicznego {{companyName}}. Twoje konto jest już gotowe.{{else}}System telefoniczny {{companyName}} jest gotowy.{{/if}} Ustaw hasło, korzystając z poniższego linku:</p><p><a href=\"{{link}}\">{{link}}</a></p><p>Link jest ważny do {{date linkExpiresAt}}.</p>{{#unless invitedBy}}<p>Po zalogowaniu połącz swojego asystenta AI z {{fqdn}} przez MCP, aby zarządzać systemem telefonicznym na czacie.</p>{{/unless}}<p>{{companyName}} · {{fqdn}}</p>"
+}

@@ -11,6 +11,13 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+### Added
+
+- Polish (`pl`) is a tenant language: `settings.language` and the mail templates take it, the
+  sign-in pages and the shipped mails are in Polish, Yealink phones show Polish, and the Ringotel
+  welcome mail is sent in Polish. Its voice prompts are a new generated set with whole-sentence
+  menus and counts read in correct Polish grammar.
+
 ## [0.8.5] - 2026-11-05
 
 ### Added

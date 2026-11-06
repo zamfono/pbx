@@ -5,6 +5,7 @@ import en from './en.json' with { type: 'json' };
 import es from './es.json' with { type: 'json' };
 import fr from './fr.json' with { type: 'json' };
 import it from './it.json' with { type: 'json' };
+import pl from './pl.json' with { type: 'json' };
 import ru from './ru.json' with { type: 'json' };
 
 /** One dictionary section per page `api` serves: the authentication pages (§5.2 "Authentication
@@ -121,9 +122,17 @@ export type Dictionary = {
   };
 };
 
-const DICTIONARIES: Record<Language, Dictionary> = { de, en, es, fr, it, ru };
+const DICTIONARIES: Record<Language, Dictionary> = {
+  de,
+  en,
+  es,
+  fr,
+  it,
+  pl,
+  ru
+};
 
-/** `true` for one of the six tenant languages a `settings.language` column may hold. */
+/** `true` for one of the tenant languages a `settings.language` column may hold. */
 export function isLanguage(value: string): value is Language {
   return value in DICTIONARIES;
 }
@@ -134,7 +143,7 @@ export function dictionaryFor(language: string): Dictionary {
 }
 
 /** Substitutes `{name}` placeholders in `template` from `params` (no template engine on the
- *  client, §5.2: the six shipped dictionaries use this instead of Handlebars). */
+ *  client, §5.2: the shipped dictionaries use this instead of Handlebars). */
 export function format(
   template: string,
   params: Record<string, string>

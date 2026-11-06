@@ -31,14 +31,13 @@ export const PROMPTS = {
 
 type PromptKey = keyof typeof PROMPTS;
 
-/** The languages whose prompt set the repository generates itself (§9.1): the image ships each from
- * `images/asterisk/prompts/<language>/`, which holds every prompt the core can play in it
- * (`promptSet.ts`), so nothing falls back to another language's file. Polish has no tenant setting
- * yet; until it does, its set is reachable only through `CHANNEL(language)`. */
-export const GENERATED_LANGUAGES = ['pl'] as const;
+/** The tenant languages whose prompt set the repository generates itself (§9.1): the image ships
+ * each from `images/asterisk/prompts/<language>/`, which holds every prompt the core can play in it
+ * (`promptSet.ts`), so nothing falls back to another language's file. */
+export const GENERATED_LANGUAGES = [
+  'pl'
+] as const satisfies readonly Language[];
 export type GeneratedLanguage = (typeof GENERATED_LANGUAGES)[number];
-/** A language the core can speak: a tenant language or a generated set's. */
-export type PromptLanguage = Language | GeneratedLanguage;
 
 /** Where a generated set keeps the form a number clip takes at the end of a sentence, falling
  * where the same clip inside a sentence rises: the last clip of a number nothing follows. */
@@ -54,10 +53,7 @@ export function isGeneratedLanguage(
  * A digit string read one digit at a time (§10.2 "Call parking"'s slot): ARI's `digits:` for a
  * Debian set; a generated set's own clips, the last digit in its end-of-sentence form.
  */
-export function digitsMedia(
-  language: PromptLanguage,
-  digits: string
-): string[] {
+export function digitsMedia(language: Language, digits: string): string[] {
   if (!isGeneratedLanguage(language)) {
     return [`digits:${digits}`];
   }
@@ -109,7 +105,7 @@ export function assetMedia(
 
 /**
  * Sets the channel's language, which is what Asterisk resolves a `sound:` name's language variant
- * from (§9.1's six tenant languages). Every prompt this module names is played on a channel that
+ * from (§9.1's tenant languages). Every prompt this module names is played on a channel that
  * has been through here, so one prompt name serves every tenant.
  */
 export async function setChannelLanguage(

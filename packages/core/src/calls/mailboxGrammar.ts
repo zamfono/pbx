@@ -5,7 +5,8 @@
  * header ("new message 2") takes the same language's singular. English stays the menu's own
  * sentence, which names both folders. Polish, a generated set (§9.1), is `mailboxGrammarPl.ts`'s.
  */
-import type { PromptLanguage } from '../prompts.js';
+import type { Language } from '@zamfono/shared';
+
 import { headerPl, introPl } from './mailboxGrammarPl.js';
 import {
   folderWord,
@@ -232,7 +233,7 @@ const ADJECTIVE_NOUN_HEADER = numbered(folder => [
   sound(MAILBOX_PROMPTS.message)
 ]);
 
-const GRAMMARS: Record<PromptLanguage, Grammar> = {
+const GRAMMARS: Record<Language, Grammar> = {
   en: { intro: introEn, header: ADJECTIVE_NOUN_HEADER },
   de: {
     intro: introNumberAdjectiveNoun(de.oneFeminine),
@@ -265,7 +266,7 @@ const GRAMMARS: Record<PromptLanguage, Grammar> = {
 
 /** "You have 2 new messages and 1 old message", in the channel's language. */
 export function introMedia(
-  language: PromptLanguage,
+  language: Language,
   newCount: number,
   oldCount: number
 ): string[] {
@@ -274,7 +275,7 @@ export function introMedia(
 
 /** "New message 2", before the message itself. */
 export function messageHeaderMedia(
-  language: PromptLanguage,
+  language: Language,
   folder: Folder,
   position: number
 ): string[] {

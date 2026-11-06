@@ -8,7 +8,9 @@
  * phrases, whose grammar differs by language, are `mailboxGrammar.ts`'s. Pure functions:
  * `mailbox.ts` and `mailboxMessages.ts` play the lists they return.
  */
-import { isGeneratedLanguage, type PromptLanguage } from '../prompts.js';
+import type { Language } from '@zamfono/shared';
+
+import { isGeneratedLanguage } from '../prompts.js';
 
 /** The core-sounds names the menu composes its prompts from; the image test checks each ships. */
 export const MAILBOX_PROMPTS = {
@@ -88,7 +90,7 @@ export function folderWord(folder: Folder): string {
  * press the pound key"), then "press star for help or pound to exit".
  */
 export function mainMenuMedia(
-  language: PromptLanguage,
+  language: Language,
   newCount: number,
   oldCount: number
 ): string[] {

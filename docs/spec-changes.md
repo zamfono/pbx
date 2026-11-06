@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-11-05 · §9.1 Static configuration, §11.4 Settings.** Polish (`pl`) is a seventh tenant language: `settings.language` and `mail_templates.language` take it, the authentication pages and every shipped mail template exist in Polish, its prompts are the generated Polish set, a Yealink phone gets `Polish` for its phone and web interface, and the Ringotel organization gets `lang` `pl`.
+*Why:* the product owner wants Polish as a tenant language (TASK-87); Yealink lists `Polish` among `lang.gui` and `lang.wui`'s values, and the Ringotel Shell offers `pl` among the organization's e-mail languages.
+
 **2026-11-05 · §9.1 Static configuration, §9.4 Cross-trunk failover, §10.2 Mailbox access.** The image ships generated prompt sets next to Debian's, Polish first: text-to-speech audio committed to the repository from a per-language manifest by `scripts/generate-prompts.mjs`, holding every prompt the core can play in that language and nothing that falls back to another. A generated set's mailbox menu says each option as one sentence, its counts and numbers are cut from whole sentences, and the core reads Polish counts itself; a Polish caller hears `please-try-call-later` where every route fails. Polish is not yet a tenant language.
 *Why:* the Debian sets join single words into the mailbox menu, which sounds poor, three of them lack the failed-call announcement, and no Polish set exists. The product owner decided on 2026-11-05 to generate the sets with ElevenLabs once at authoring time, Polish first, and chose the voice (Joanna) and the model (`eleven_v4`).
 

@@ -9,7 +9,7 @@ template has a `subject`, a plain-text `bodyText` and an optional `bodyHtml`.
 ## Kinds, languages and which template applies
 
 There are seven kinds, `voicemail`, `missedCall`, `setup`, `reset`, `updateFailed`,
-`breakingUpdate` and `mfaChanged`, and six languages, `de`, `en`, `es`, `fr`, `it` and `ru`. The stack ships a
+`breakingUpdate` and `mfaChanged`, and seven languages, `de`, `en`, `es`, `fr`, `it`, `pl` and `ru`. The stack ships a
 **builtin** template for every kind and language; a **tenant** template overrides one of them. A mail uses the tenant's template for its
 kind in `settings.language`, else the builtin one for that language. An override in another
 language is kept but used only once `settings.language` is switched to it.

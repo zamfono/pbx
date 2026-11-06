@@ -1,8 +1,7 @@
 /**
  * The Yealink configuration file a provisioning link serves (§10.4 "Provisioning link"), for the
  * T7x/T8x firmware line (tested on the T87W). Every key and value follows Yealink's own admin
- * guide for that line; the file is written from Zamfono's data alone, never from a vendor
- * template.
+ * guide for that line; the file is written from Zamfono's data alone, never from a template.
  */
 import * as env from '$app/env/private';
 
@@ -79,6 +78,7 @@ const LANGUAGE_NAMES: Record<Language, string> = {
   es: 'Spanish',
   fr: 'French',
   it: 'Italian',
+  pl: 'Polish',
   ru: 'Russian'
 };
 

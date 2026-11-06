@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # §9.1: every fixed prompt the core plays ships in the asterisk image, for every tenant language
-# (§11.4 `settings.language`), in the language's own set or as the English file a prompt missing
-# from a community set falls back to. The names come from the running core image itself —
+# (§11.4 `settings.language`): for a Debian set's language in its own set or as the English file a
+# prompt missing from a community set falls back to. The names come from the running core image itself —
 # `prompts.ts`'s `PROMPTS` (menus, voicemail, find-me's accept prompt, §10.1 step 4, the failed-call
 # announcement, §9.4) and
 # `mailboxPrompts.ts`'s `MAILBOX_PROMPTS` (the `*96`/`*95` menu, §10.2) — so a prompt added to
@@ -15,6 +15,7 @@
 set -euo pipefail
 
 compose=$1
+# The Debian sets' languages; the generated ones (pl) are checked below, without a fallback.
 LANGUAGES='de en es fr it ru'
 # shellcheck source=../api.sh
 . "$(dirname "$0")/../api.sh"

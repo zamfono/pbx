@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { Language } from '@zamfono/shared';
 
+import type { GeneratedLanguage } from '../prompts.js';
 import { introMedia, messageHeaderMedia } from './mailboxGrammar.js';
 
 const snd = (name: string): string => `sound:${name}`;
@@ -17,7 +18,10 @@ const MESSAGES = snd('vm-messages');
 /** [new, old] counts and what the intro says for them. */
 type IntroCase = [number, number, string[]];
 
-const INTROS: Record<Language, IntroCase[]> = {
+/** The Debian sets' languages; a generated set's grammar has its own tests. */
+type DebianLanguage = Exclude<Language, GeneratedLanguage>;
+
+const INTROS: Record<DebianLanguage, IntroCase[]> = {
   en: [
     [
       0,
@@ -124,7 +128,7 @@ const INTROS: Record<Language, IntroCase[]> = {
 };
 
 /** What a message's header says before its place in the folder, new and old. */
-const HEADERS: Record<Language, [string[], string[]]> = {
+const HEADERS: Record<DebianLanguage, [string[], string[]]> = {
   en: [
     [NEW, MESSAGE],
     [OLD, MESSAGE]

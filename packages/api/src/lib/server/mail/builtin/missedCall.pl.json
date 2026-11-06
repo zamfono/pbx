@@ -1,0 +1,5 @@
+{
+  "subject": "Nieodebrane połączenie na numer {{didLabel}}",
+  "bodyText": "Dzień dobry,\n\nNieodebrane połączenie na numer {{didLabel}} ({{date receivedAt}}). Dzwoniący: {{#if callerName}}{{callerName}} ({{callerNumber}}){{else if callerNumber}}{{callerNumber}}{{else}}numer zastrzeżony{{/if}}.\n\n{{companyName}} · {{fqdn}}",
+  "bodyHtml": "<p>Dzień dobry,</p><p>Nieodebrane połączenie na numer {{didLabel}} ({{date receivedAt}}). Dzwoniący: {{#if callerName}}{{callerName}} ({{callerNumber}}){{else if callerNumber}}{{callerNumber}}{{else}}numer zastrzeżony{{/if}}.</p><p>{{companyName}} · {{fqdn}}</p>"
+}

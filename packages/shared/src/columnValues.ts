@@ -106,8 +106,8 @@ export const RING_GROUP_FORWARD_CONDITIONS = [
 export type RingGroupForwardCondition =
   (typeof RING_GROUP_FORWARD_CONDITIONS)[number];
 
-/** `settings.language` and `mail_templates.language`: the six tenant languages (§9.1, §10.2). */
-export const LANGUAGES = ['de', 'en', 'es', 'fr', 'it', 'ru'] as const;
+/** `settings.language` and `mail_templates.language`: the tenant languages (§9.1, §10.2). */
+export const LANGUAGES = ['de', 'en', 'es', 'fr', 'it', 'pl', 'ru'] as const;
 export type Language = (typeof LANGUAGES)[number];
 
 /** `settings.smtp_security`. */
