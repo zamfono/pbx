@@ -66,10 +66,10 @@ describe('handleMcpRequest, 2026-07-28', () => {
     expect(tools.find(tool => tool.name === 'zamfono.help')).toMatchObject({
       annotations: { readOnlyHint: true, destructiveHint: false }
     });
-    // MCP fixes an output schema to an object, so a tool answering with a list has none.
-    expect(tools.find(tool => tool.name === 'test.names')).not.toHaveProperty(
-      'outputSchema'
-    );
+    // 2026-07-28 takes any output schema root, so a tool answering with a list has one too.
+    expect(tools.find(tool => tool.name === 'test.names')).toMatchObject({
+      outputSchema: { type: 'array' }
+    });
     const names = tools.map(tool => tool.name as string);
     // Code-point order, not `localeCompare`: it must not depend on the container's ICU locale.
     expect(names).toEqual([...names].sort());

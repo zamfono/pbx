@@ -22,15 +22,24 @@ const WARNINGS = z
     'What did not complete once the write was stored, such as its propagation to Asterisk; the write stands.'
   );
 
+function withWarningsField(output: z.ZodType): z.ZodType {
+  if (output instanceof z.ZodObject) {
+    return output.extend({ warnings: WARNINGS });
+  }
+  if (output instanceof z.ZodUnion) {
+    return z.union(
+      output.options.map(option => withWarningsField(option as z.ZodType))
+    );
+  }
+  return output;
+}
+
 /**
- * `op`'s `output` as it reaches the wire: a write's object result also carries the `warnings` the
- * runner appends once the write committed (`withWarnings`).
+ * `op`'s `output` as it reaches the wire: a write's object result, or each object of a union,
+ * also carries the `warnings` the runner appends once the write committed (`withWarnings`).
  */
 export function publishedOutput(op: ErasedOperation): z.ZodType {
-  if (op.readOnly || !(op.output instanceof z.ZodObject)) {
-    return op.output;
-  }
-  return op.output.extend({ warnings: WARNINGS });
+  return op.readOnly ? op.output : withWarningsField(op.output);
 }
 
 /** The media types of `op`'s file, or `undefined` when it answers with JSON (`binaryOutput`). */

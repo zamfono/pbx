@@ -11,6 +11,12 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+### Changed
+
+- Every MCP tool now publishes an output schema, `system.update`, `system.checkUpdate` and
+  `devices.revealCredentials` included, so an MCP client can check every answer; the OpenAPI
+  document describes each shape of a write's result with its `warnings`.
+
 ## [0.8.6] - 2026-11-09
 
 ### Added

@@ -49,6 +49,22 @@ describe('tools/list', () => {
     }
   });
 
+  it('publishes a union of objects as one object schema, each member with the warnings of a write (§10.5)', async () => {
+    const tools = await publishedTools();
+    const update = tools.find(tool => tool.name === 'system.update');
+    expect(update?.outputSchema).toMatchObject({ type: 'object' });
+    const members = (update?.outputSchema as { anyOf: object[] }).anyOf;
+    expect(members.length).toBeGreaterThan(1);
+    for (const member of members) {
+      expect(member).toMatchObject({
+        properties: { warnings: { type: 'array' } }
+      });
+    }
+    expect(
+      tools.find(tool => tool.name === 'system.checkUpdate')?.outputSchema
+    ).toMatchObject({ type: 'object', anyOf: expect.any(Array) as unknown[] });
+  });
+
   it("publishes the help tool's two answers, the topic list and one topic, as one output schema", async () => {
     const help = (await publishedTools()).find(
       tool => tool.name === 'zamfono.help'

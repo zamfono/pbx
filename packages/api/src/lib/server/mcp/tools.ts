@@ -4,11 +4,7 @@ import '../ops/index.js';
 import type { ToolAnnotations } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 
-import {
-  outputJsonSchema,
-  outputMediaTypes,
-  publishedOutput
-} from '../ops/publishedOutput.js';
+import { outputMediaTypes, publishedOutput } from '../ops/publishedOutput.js';
 import { CONFIRM_DESCRIPTION } from '../ops/publishedSchema.js';
 import { registry, type ErasedOperation } from '../ops/registry.js';
 import { UPLOAD_FIELD, uploadRoute } from '../restRoutes.js';
@@ -22,7 +18,7 @@ export type ToolDefinition = {
   name: string;
   description: string;
   inputSchema: z.ZodObject;
-  outputSchema?: z.ZodType;
+  outputSchema: z.ZodType;
   annotations: ToolAnnotations;
 };
 
@@ -46,16 +42,14 @@ function inputSchema(op: ErasedOperation): z.ZodObject {
 
 /**
  * The schema of `op`'s `structuredContent`: a file or an upload answers with its link (§10.5),
- * anything else with the operation's own result. MCP fixes an output schema to an object, so an
- * operation answering with any other value has none.
+ * anything else with the operation's own result. 2026-07-28 takes any root; the SDK stamps
+ * `type: 'object'` on a union of objects and wraps any other root as `{ result }` for a 2025-era
+ * client, as it wraps the value.
  */
-function outputSchema(op: ErasedOperation): z.ZodType | undefined {
-  if (uploadRoute(op.name) || outputMediaTypes(op)) {
-    return operationLink;
-  }
-  return outputJsonSchema(op).type === 'object'
-    ? publishedOutput(op)
-    : undefined;
+function outputSchema(op: ErasedOperation): z.ZodType {
+  return uploadRoute(op.name) || outputMediaTypes(op)
+    ? operationLink
+    : publishedOutput(op);
 }
 
 /** Every registered operation plus the always-present help tool, sorted by name (§10.5). */
