@@ -83,8 +83,10 @@ services:
     pull_policy: missing
     # The run's stack directory belongs to whoever runs the suite, CI's runner user among them,
     # where an operator's belongs to root (deploy/README.md, step 8), so .update is that user's
-    # group's, not root's: api reads it in that group.
-    group_add: ['${STACK_GID:?set by run.sh}']
+    # group's, not root's: api reads it in that group instead of compose.yaml's root group. A
+    # merged list would name 0 twice under rootful Podman, whose run is root's, and compose
+    # refuses that.
+    group_add: !override ['${STACK_GID:?set by run.sh}']
     # The scenarios drive the REST surface directly rather than through Caddy, so a failure is the
     # stack's own and not TLS or the proxy's. The host port is the harness's own (`API_PORT`), not
     # a fixed 3000: a developer machine usually has something on 3000 already, and Docker reports
