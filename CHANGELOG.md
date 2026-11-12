@@ -35,6 +35,12 @@ why the specified behaviour changed; the commit history, how.
   value is no longer a secret anything checks. Host control needs `HOST_CONTROL=true` alone.
 - `update.sh` removes the containers of a service the stack's files no longer name.
 
+### Fixed
+
+- With `HOST_CONTROL=true`, `/api/v1/openapi.json` now lists `system.reboot` and
+  `system.checkHost`: the build writes the document with and without them, and `api` serves the
+  one its `.env` calls for.
+
 ## [0.9.0] - 2026-11-12
 
 ### Upgrade notes

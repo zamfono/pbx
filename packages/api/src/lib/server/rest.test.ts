@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import SwaggerParser from '@apidevtools/swagger-parser';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { newId, nowIso, type Db, type StateResponse } from '@zamfono/shared';
 import { seedSettings } from '@zamfono/shared/testDb.js';
@@ -312,22 +312,17 @@ function operationAt(
 }
 
 describe('buildOpenApiDocument', () => {
-  // Every route, the host control ones among them (§6.3 "Host control").
-  beforeEach(() => {
-    vi.stubEnv('HOST_CONTROL', 'true');
-    vi.stubEnv('UPDATER_TOKEN', 'token');
-  });
-  afterEach(() => {
-    vi.unstubAllEnvs();
-  });
-
-  it('leaves out an operation the stack does not offer', () => {
-    vi.stubEnv('HOST_CONTROL', '');
-    expect(buildOpenApiDocument().paths['/system/reboot']).toBeUndefined();
+  it('leaves out an operation the stack does not offer, which the host control variant lists', () => {
+    expect(
+      buildOpenApiDocument({ hostControl: false }).paths['/system/reboot']
+    ).toBeUndefined();
+    expect(
+      buildOpenApiDocument({ hostControl: true }).paths['/system/reboot']
+    ).toBeDefined();
   });
 
   it("lists every route of the table, with its operation's zod-derived schema", () => {
-    const doc = buildOpenApiDocument();
+    const doc = buildOpenApiDocument({ hostControl: true });
     expect(doc.openapi).toBe('3.1.0');
     for (const route of routes) {
       const entry = operationAt(doc, route.pattern, route.method.toLowerCase());
@@ -351,8 +346,8 @@ describe('buildOpenApiDocument', () => {
   it('does not throw building the document once an area with an unrepresentable input type (a Buffer) is registered', () => {
     // `audio.create` carries `z.instanceof(Buffer)`; without
     // `unrepresentable: 'any'`, z.toJSONSchema throws for it.
-    expect(() => buildOpenApiDocument()).not.toThrow();
-    const doc = buildOpenApiDocument();
+    expect(() => buildOpenApiDocument({ hostControl: true })).not.toThrow();
+    const doc = buildOpenApiDocument({ hostControl: true });
     expect(
       operationAt(doc, '/audio', 'post').requestBody?.content[
         'multipart/form-data'
@@ -361,7 +356,7 @@ describe('buildOpenApiDocument', () => {
   });
 
   it('gives every route a unique operationId', () => {
-    const doc = buildOpenApiDocument();
+    const doc = buildOpenApiDocument({ hostControl: true });
     const ids = Object.values(doc.paths).flatMap(methods =>
       Object.values(methods).map(operation => operation.operationId)
     );
@@ -369,7 +364,7 @@ describe('buildOpenApiDocument', () => {
   });
 
   it('names every path parameter after its own template expression (OpenAPI 3.1 §4.8.12.1)', () => {
-    const doc = buildOpenApiDocument();
+    const doc = buildOpenApiDocument({ hostControl: true });
     for (const route of routes) {
       const templateNames = [
         ...route.pattern.matchAll(/\{(?<name>[^}]+)\}/gu)
@@ -387,7 +382,7 @@ describe('buildOpenApiDocument', () => {
   });
 
   it('records the operation field a renamed path parameter fills, as x-operation-field', () => {
-    const doc = buildOpenApiDocument();
+    const doc = buildOpenApiDocument({ hostControl: true });
     // `/users/{id}/devices` maps its `{id}` capture to the operation's own `userId` field
     // (`WITH_USER_ID`); the parameter is still named `id` (the template expression), with
     // `userId` carried alongside it.
@@ -399,14 +394,14 @@ describe('buildOpenApiDocument', () => {
   });
 
   it('routes GET /menus/{id}/targets to menus.getTargets, the shape PUT takes', () => {
-    const doc = buildOpenApiDocument();
+    const doc = buildOpenApiDocument({ hostControl: true });
     expect(
       operationAt(doc, '/menus/{id}/targets', 'get')['x-operation-name']
     ).toBe('menus.getTargets');
   });
 
   it("excludes a scope route's own `scope` field from its query parameters and request body", () => {
-    const doc = buildOpenApiDocument();
+    const doc = buildOpenApiDocument({ hostControl: true });
     const oooList = operationAt(doc, '/users/{id}/ooo', 'get');
     expect(
       oooList.parameters?.some(parameter => parameter.name === 'scope')
@@ -418,12 +413,12 @@ describe('buildOpenApiDocument', () => {
   });
 
   it('declares the API base path as a server entry', () => {
-    const doc = buildOpenApiDocument();
+    const doc = buildOpenApiDocument({ hostControl: true });
     expect(doc.servers).toEqual([{ url: '/api/v1' }]);
   });
 
   it('declares a bearer JWT security scheme, required document-wide', () => {
-    const doc = buildOpenApiDocument();
+    const doc = buildOpenApiDocument({ hostControl: true });
     expect(doc.components.securitySchemes.bearerAuth).toMatchObject({
       type: 'http',
       scheme: 'bearer'
@@ -432,23 +427,22 @@ describe('buildOpenApiDocument', () => {
   });
 
   it('validates against the OpenAPI 3.1 meta-schema', async () => {
-    const doc = buildOpenApiDocument();
+    const doc = buildOpenApiDocument({ hostControl: true });
     await expect(
       SwaggerParser.validate(structuredClone(doc) as never)
     ).resolves.toBeTruthy();
   });
 
   it('fails that same validation for a document missing a required field', async () => {
-    const broken = structuredClone(buildOpenApiDocument()) as Record<
-      string,
-      unknown
-    >;
+    const broken = structuredClone(
+      buildOpenApiDocument({ hostControl: true })
+    ) as Record<string, unknown>;
     delete (broken.info as Record<string, unknown>).version;
     await expect(SwaggerParser.validate(broken as never)).rejects.toThrow();
   });
 
   it('produces a document whose fragments are well-formed JSON Schema', () => {
-    const doc = buildOpenApiDocument();
+    const doc = buildOpenApiDocument({ hostControl: true });
     expect(typeof doc.info.title).toBe('string');
     expect(typeof doc.info.version).toBe('string');
     for (const methods of Object.values(doc.paths)) {

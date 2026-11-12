@@ -30,6 +30,10 @@ import { getDb } from '#lib/server/db.js';
 import { startBackgroundJobs } from '#lib/server/jobs/background.js';
 import { limiter, type LimitKind } from '#lib/server/limiter.js';
 import { recordApiRequestSeconds } from '#lib/server/metricsCounters.js';
+import {
+  OPENAPI_HOST_CONTROL_PATH,
+  OPENAPI_PATH
+} from '#lib/server/openApiUrl.js';
 import { problem } from '#lib/server/problem.js';
 import { API_PREFIX } from '#lib/server/restRoutes.js';
 import { keyringFromEnv } from '#lib/server/secretbox.js';
@@ -71,8 +75,9 @@ export const init: ServerInit = async () => {
   });
 };
 
-// The one `/api/v1/*` route served without a bearer token (§10.3).
-const OPENAPI_ROUTE = `${API_PREFIX}/openapi.json`;
+// The `/api/v1/*` routes served without a bearer token (§10.3): the OpenAPI document and its
+// variant with host control, both written by the build (`openApiUrl`).
+const OPENAPI_ROUTES = new Set([OPENAPI_PATH, OPENAPI_HOST_CONTROL_PATH]);
 
 // §5.5's per-address limit for the endpoints it can be applied to by route alone. The
 // login and forgot-password limits key on the account the request body names, and the login's
@@ -148,7 +153,7 @@ const handleRequest: Handle = async ({ event, resolve }) => {
   }
   if (
     routeId?.startsWith(`${API_PREFIX}/`) !== true ||
-    routeId === OPENAPI_ROUTE
+    OPENAPI_ROUTES.has(routeId)
   ) {
     event.locals.auth = null;
     return resolve(event, { transformPageChunk: fillLanguage });

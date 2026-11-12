@@ -52,15 +52,18 @@ export type OwnScope<In> =
  * OpenAPI document are all generated from the registry these fill. An operation a `user` may
  * call declares its `scope`; above that role every caller acts on anything (§5.3).
  */
+/** What a stack's `.env` decides of the operations it offers: `HOST_CONTROL` (§6.3 "Host control"). */
+export type StackOffer = { hostControl: boolean };
+
 export type Operation<In, Out, Prepared = void> = {
   name: string;
   description: string;
   /**
-   * Whether the stack offers the operation, checked on every call: one it does not is unknown
-   * (404), left out of `tools/list` and the OpenAPI document, as `system.reboot` without
-   * `HOST_CONTROL` (§6.3 "Host control"). Unset, it always is.
+   * Whether a stack set up as `stack` says offers the operation, checked on every call: one it
+   * does not is unknown (404), left out of `tools/list` and the OpenAPI document, as
+   * `system.reboot` without `HOST_CONTROL` (§6.3 "Host control"). Unset, it always is.
    */
-  available?: () => boolean;
+  available?: (stack: StackOffer) => boolean;
   input: z.ZodType<In>;
   /**
    * What `run` returns, as it reaches the wire: the OpenAPI response and the MCP tool's

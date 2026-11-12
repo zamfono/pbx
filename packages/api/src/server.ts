@@ -13,12 +13,18 @@ import http from 'node:http';
 import process from 'node:process';
 import pino from 'pino';
 
-import { dbFileFrom, openDb, resolveVersion } from '@zamfono/shared';
+import {
+  dbFileFrom,
+  HTTP_NOT_FOUND,
+  openDb,
+  resolveVersion
+} from '@zamfono/shared';
 
 import { answerCors } from '#lib/server/cors.js';
 import { EventHub } from '#lib/server/events.js';
 import { provideEventSink } from '#lib/server/eventSink.js';
 import { attachEventsServer } from '#lib/server/eventsServer.js';
+import { openApiUrl } from '#lib/server/openApiUrl.js';
 
 // A fixed internal port, never configurable per stack (§6.3 "Compose stack").
 const API_INTERNAL_PORT = 3000;
@@ -83,10 +89,19 @@ async function main(): Promise<void> {
   const handler = await loadHandler();
   // After the handler, whose load validates `src/env.ts` and names every required variable missing.
   const jwtSecret = requireEnv('JWT_SECRET');
+  // §6.3 "Host control": which of the build's two OpenAPI documents this stack serves.
+  const hostControl = process.env.HOST_CONTROL === 'true';
   const server = http.createServer((req, res) => {
-    if (!answerCors(req, res)) {
-      handler(req, res);
+    if (answerCors(req, res)) {
+      return;
     }
+    const url = openApiUrl(req.url ?? '/', hostControl);
+    if (url === undefined) {
+      res.writeHead(HTTP_NOT_FOUND).end();
+      return;
+    }
+    req.url = url;
+    handler(req, res);
   });
   attachEventsServer(server, { hub, db, jwtSecret });
   exitOnSignal(server);

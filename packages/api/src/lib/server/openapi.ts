@@ -5,6 +5,7 @@ import {
 } from '@zamfono/shared';
 
 import { operationIds, pathParamNames } from './openapiRouteFields.js';
+import { offered } from './ops/gates.js';
 import {
   outputJsonSchema,
   outputMediaTypes,
@@ -16,7 +17,7 @@ import {
   type JsonSchema
 } from './ops/publishedSchema.js';
 import type { ErasedOperation } from './ops/registry.js';
-import type { ProblemStatus } from './ops/types.js';
+import type { ProblemStatus, StackOffer } from './ops/types.js';
 import {
   API_PREFIX,
   captureField,
@@ -250,14 +251,16 @@ function operationFor(
 }
 
 /**
- * The OpenAPI 3.1 document served at `/api/v1/openapi.json` (§10.3): every route of the table
- * appears, with its operation's zod-derived JSON Schemas of input and output.
+ * The OpenAPI 3.1 document served at `/api/v1/openapi.json` (§10.3) for a stack set up as `stack`
+ * says: every route of the table whose operation it offers appears, with that operation's
+ * zod-derived JSON Schemas of input and output. The build writes one for each setup, and `api`
+ * serves its own (`openApiPath`).
  */
-export function buildOpenApiDocument(): OpenApiDocument {
+export function buildOpenApiDocument(stack: StackOffer): OpenApiDocument {
   const paths: OpenApiDocument['paths'] = {};
   const lifted: LiftedSchemas = {};
   for (const route of routes) {
-    if (routeOperation(route).available?.() === false) {
+    if (!offered(routeOperation(route), stack)) {
       continue;
     }
     let methods = paths[route.pattern];

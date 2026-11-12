@@ -4,6 +4,7 @@ import '../ops/index.js';
 import type { ToolAnnotations } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 
+import { offered } from '../ops/gates.js';
 import { outputMediaTypes, publishedOutput } from '../ops/publishedOutput.js';
 import { CONFIRM_DESCRIPTION } from '../ops/publishedSchema.js';
 import { registry, type ErasedOperation } from '../ops/registry.js';
@@ -55,7 +56,7 @@ function outputSchema(op: ErasedOperation): z.ZodType {
 /** Every registered operation plus the always-present help tool, sorted by name (§10.5). */
 export function listTools(): ToolDefinition[] {
   const tools = [...registry.values()]
-    .filter(op => op.available?.() !== false)
+    .filter(op => offered(op))
     .map((op: ErasedOperation): ToolDefinition => ({
       name: op.name,
       description: op.description,

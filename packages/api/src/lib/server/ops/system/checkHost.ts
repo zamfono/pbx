@@ -1,4 +1,3 @@
-import * as env from '$app/env/private';
 import { z } from 'zod';
 
 import { HTTP_NOT_FOUND } from '@zamfono/shared';
@@ -18,7 +17,7 @@ export const checkHost = defineOperation({
   name: 'system.checkHost',
   description:
     "Has the host agent read the host now, whether it waits for a reboot among it, and answers with the host block system.info carries; Zamfono's own reading, which /metrics and an automatic reboot follow, is refreshed with it.",
-  available: () => env.HOST_CONTROL,
+  available: stack => stack.hostControl,
   input: z.object({}).strict(),
   output: hostOut,
   // Unknown without HOST_CONTROL.

@@ -17,7 +17,9 @@ type Schema = Record<string, unknown> & {
 };
 
 function bodySchema(pattern: string, method: string): Schema {
-  const operation = buildOpenApiDocument().paths[pattern]?.[method];
+  const operation = buildOpenApiDocument({ hostControl: true }).paths[
+    pattern
+  ]?.[method];
   if (operation === undefined) {
     throw new Error(`openapi test: no operation for ${method} ${pattern}`);
   }
@@ -78,7 +80,9 @@ function responsesOf(
   pattern: string,
   method: string
 ): Record<string, { content?: Record<string, { schema?: Schema }> }> {
-  const operation = buildOpenApiDocument().paths[pattern]?.[method];
+  const operation = buildOpenApiDocument({ hostControl: true }).paths[
+    pattern
+  ]?.[method];
   if (operation === undefined) {
     throw new Error(`openapi test: no operation for ${method} ${pattern}`);
   }
@@ -188,7 +192,9 @@ describe('the OpenAPI descriptions list every placeholder a template may name', 
   });
 
   it('names every SIP header placeholder in each header value of a forward target', () => {
-    const headers = schemasWithProperties(buildOpenApiDocument()).filter(
+    const headers = schemasWithProperties(
+      buildOpenApiDocument({ hostControl: true })
+    ).filter(
       schema =>
         (schema.properties?.name as { pattern?: string } | undefined)
           ?.pattern === SIP_HEADER_NAME_PATTERN.source

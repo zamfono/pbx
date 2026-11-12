@@ -1,3 +1,5 @@
+import * as env from '$app/env/private';
+
 import {
   HTTP_FORBIDDEN,
   HTTP_NOT_FOUND,
@@ -11,15 +13,24 @@ import {
   ConfirmationRequired,
   OpError,
   type Actor,
-  type Context
+  type Context,
+  type StackOffer
 } from './types.js';
 
 /** Owner outranks admin outranks user (§5.3); a lower number is more privileged. */
 const ROLE_RANK: Record<UserRole, number> = { owner: 0, admin: 1, user: 2 };
 
+/** Whether `stack`, this one's `.env` unless given, offers `op` (`Operation.available`). */
+export function offered(
+  op: ErasedOperation,
+  stack: StackOffer = { hostControl: env.HOST_CONTROL }
+): boolean {
+  return op.available?.(stack) !== false;
+}
+
 export function findOperation(name: string): ErasedOperation {
   const op = registry.get(name);
-  if (!op || op.available?.() === false) {
+  if (!op || !offered(op)) {
     throw new OpError(HTTP_NOT_FOUND, `unknown operation '${name}'`);
   }
   return op;

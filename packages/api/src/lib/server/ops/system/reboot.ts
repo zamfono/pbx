@@ -1,4 +1,3 @@
-import * as env from '$app/env/private';
 import { z } from 'zod';
 
 import {
@@ -50,7 +49,7 @@ export const reboot = defineOperation({
   name: 'system.reboot',
   description:
     "Reboots the host the stack runs on: now, dropping every call, or at the next maintenance moment once no call is in progress; system.info's host.rebootRequired says when the host waits for one.",
-  available: () => env.HOST_CONTROL,
+  available: stack => stack.hostControl,
   input: z
     .object({
       when: z

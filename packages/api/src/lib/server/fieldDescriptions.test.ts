@@ -31,7 +31,9 @@ function bodyProperties(
   pattern: string,
   method: string
 ): Record<string, Schema> {
-  const operation = buildOpenApiDocument().paths[pattern]?.[method];
+  const operation = buildOpenApiDocument({ hostControl: true }).paths[
+    pattern
+  ]?.[method];
   const schema = operation?.requestBody?.content['application/json']?.schema;
   if (schema === undefined) {
     throw new Error(`fieldDescriptions test: no body for ${method} ${pattern}`);
