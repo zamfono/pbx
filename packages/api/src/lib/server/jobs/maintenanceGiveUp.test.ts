@@ -95,12 +95,28 @@ describe('describeBusy', () => {
   });
 });
 
+describe('the reboot as maintenance work (§6.3 "Host control")', () => {
+  it('records a give-up on it, which the widened CHECK admits', async () => {
+    const db = await makeTestDb();
+    await recordGiveUp(db, {
+      work: 'reboot',
+      moment: new Date('2026-11-13T03:00:00Z'),
+      busy: { liveCalls: 1, asteriskChannels: 2, recordingsInProgress: 0 },
+      at: new Date('2026-11-13T05:00:00Z')
+    });
+    await expect(lastGiveUps(db)).resolves.toMatchObject({
+      reboot: { at: '2026-11-13T05:00:00.000Z' }
+    });
+  });
+});
+
 describe('lastGiveUps', () => {
   it('is the last give-up per work, kept after its run in a row ends', async () => {
     const db = await makeTestDb();
     await expect(lastGiveUps(db)).resolves.toEqual({
       certSync: null,
-      autoUpdate: null
+      autoUpdate: null,
+      reboot: null
     });
 
     await recordGiveUp(db, {
@@ -116,7 +132,8 @@ describe('lastGiveUps', () => {
       autoUpdate: {
         at: '2026-10-01T05:00:00.000Z',
         reason: 'core did not answer: fetch failed'
-      }
+      },
+      reboot: null
     });
   });
 });

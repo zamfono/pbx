@@ -30,12 +30,16 @@ mkdir -p "$stage/zamfono/setup"
 for f in "${files[@]}"; do cp "$root/deploy/$f" "$stage/zamfono/$f"; done
 # The release notes, with every upgrade's own steps, next to the files they are about.
 cp "$root/CHANGELOG.md" "$stage/zamfono/CHANGELOG.md"
+# The directory the updater leaves its requests to the host agent in, which compose.yaml mounts:
+# Podman refuses a bind mount whose source is missing, and an update unpacks only files.
+mkdir -p "$stage/zamfono/.update/requests"
+: >"$stage/zamfono/.update/requests/.keep"
 # The release this bundle is, as data.
 echo "$version" >"$stage/zamfono/VERSION"
 # Every file 644 but the ones the operator runs, whatever the checkout's modes were.
 chmod 644 "$stage"/zamfono/{.env.example,*,setup/*} 2>/dev/null || true
 chmod 755 "$stage/zamfono/setup" "$stage/zamfono/setup.sh" "$stage/zamfono/update.sh" \
-  "$stage/zamfono/setup/compose.sh"
+  "$stage/zamfono/setup/compose.sh" "$stage/zamfono/setup/agent.sh"
 
 sed -i "s/\${ZAMFONO_VERSION:-latest}/\${ZAMFONO_VERSION:-$version}/g" "$stage/zamfono/compose.yaml"
 if grep -q ':-latest}' "$stage/zamfono/compose.yaml"; then

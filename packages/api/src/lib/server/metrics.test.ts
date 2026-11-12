@@ -9,6 +9,7 @@ import { makeTestDb } from '#testing/testDb.js';
 
 import { renderMetrics } from './metrics.js';
 import { recordApiRequestSeconds } from './metricsCounters.js';
+import { setRebootRequiredSince } from './ops/system/_host.js';
 import { updaterClient, type UpdaterClient } from './ops/system/_updater.js';
 
 vi.mock('./ops/system/_updater.js', async importOriginal => ({
@@ -408,6 +409,28 @@ describe('renderMetrics', () => {
       expect(metrics.get('zamfono_auto_update_failed')).toBe(failed);
       expect(metrics.get('zamfono_auto_update_failed_attempts')).toBe(attempts);
       expect(metrics.get('zamfono_breaking_update_available')).toBe(breaking);
+    }
+  });
+
+  it('reports zamfono_host_reboot_required only with host control (§6.3 "Host control")', async () => {
+    const db = await makeTestDb();
+    await seedSettings(db);
+    await setRebootRequiredSince(db, '2026-11-12T04:10:00.000Z');
+    expect(
+      parseMetrics(await renderMetrics(stubDeps({ db }))).has(
+        'zamfono_host_reboot_required'
+      )
+    ).toBe(false);
+    vi.stubEnv('HOST_CONTROL', 'true');
+    vi.stubEnv('UPDATER_TOKEN', 'token');
+    try {
+      const waiting = parseMetrics(await renderMetrics(stubDeps({ db })));
+      await setRebootRequiredSince(db, null);
+      const rebooted = parseMetrics(await renderMetrics(stubDeps({ db })));
+      expect(waiting.get('zamfono_host_reboot_required')).toBe('1');
+      expect(rebooted.get('zamfono_host_reboot_required')).toBe('0');
+    } finally {
+      vi.unstubAllEnvs();
     }
   });
 

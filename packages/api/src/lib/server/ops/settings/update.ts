@@ -6,8 +6,13 @@ import {
   type UserRole
 } from '@zamfono/shared';
 
+import { errorMessage } from '#lib/server/errors.js';
+import { runHostPassNow } from '#lib/server/jobs/host.js';
+
+import { afterCommit } from '../afterCommit.js';
 import { propagate } from '../propagate.js';
-import { defineOperation, OpError } from '../types.js';
+import { hostClient } from '../system/_updater.js';
+import { defineOperation, OpError, type Context } from '../types.js';
 import { settingsInputSchema, type SettingsInput } from './_input.js';
 import {
   checkFieldRole,
@@ -78,6 +83,47 @@ function assertRetentionWindows(
   }
 }
 
+/** Refuses the host fields where they are not offered: without `HOST_CONTROL` (§6.3). */
+function assertHostFields(input: SettingsInput): void {
+  if (
+    (input.hostUpdates !== undefined || input.autoReboot !== undefined) &&
+    hostClient() === undefined
+  ) {
+    throw new OpError(
+      HTTP_UNPROCESSABLE_CONTENT,
+      'settings: hostUpdates and autoReboot need HOST_CONTROL=true and an UPDATER_TOKEN in .env'
+    );
+  }
+}
+
+/**
+ * Once the write committed, applies `hostUpdates` to the host through the updater, which may
+ * install a package meanwhile, or runs the host job for an `autoReboot` change (§6.3 "Host
+ * control"). A host that does not take it is a warning: the setting stands, and the host job
+ * applies it at its next pass.
+ */
+function applyHostFields(ctx: Context, columns: SettingsColumns): void {
+  const { hostUpdates } = columns;
+  if (hostUpdates === undefined && columns.autoReboot === undefined) {
+    return;
+  }
+  afterCommit(ctx, async () => {
+    const host = hostClient();
+    if (hostUpdates === undefined || hostUpdates === null || !host) {
+      runHostPassNow();
+      return null;
+    }
+    try {
+      // No host pass after it: the agent reports the switched upgrades only once apt is through,
+      // and a pass reading the report from before would ask again.
+      await host.setUpdates(hostUpdates === 1);
+      return null;
+    } catch (error) {
+      return `the host did not take hostUpdates yet (${errorMessage(error)}); Zamfono applies it again within the hour`;
+    }
+  });
+}
+
 /**
  * `PATCH /settings` (§10.3, §11.4): a partial update of the tenant settings row. Owner-only fields
  * are enforced by `checkFieldRole`; the three read-only columns (`extLength`, `ringotelOrgId`,
@@ -98,6 +144,7 @@ export const update = defineOperation({
     const before = await loadSettings(ctx.db);
     await assertNoExtensionCollision(ctx, input.emergencyNumbers);
     assertCallLogLevel(input.callLogLevel);
+    assertHostFields(input);
     assertSsoInvariants(before, input);
     assertRetentionWindows(before, input);
     const columns: SettingsColumns = {};
@@ -124,6 +171,7 @@ export const update = defineOperation({
     await maybePushTenantProfile(ctx, columns);
     maybeRenderSipBanList(ctx, columns);
     maybeCheckRelay(ctx, before, columns);
+    applyHostFields(ctx, columns);
     return rowToWire(ctx.db, await loadSettings(ctx.db));
   }
 });

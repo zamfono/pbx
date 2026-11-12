@@ -52,6 +52,11 @@ const onUnlessFalse = {
   schema: (value: string | undefined): boolean => value !== 'false'
 };
 
+/** A switch that is off unless the value is the literal `true` (§6.3 "Host control"). */
+const offUnlessTrue = {
+  schema: (value: string | undefined): boolean => value === 'true'
+};
+
 /** `TLS_RELOAD_HOUR` (§6.4 "Reload timing"): an hour 0-23, `undefined` while unset or not one. */
 const reloadHour = {
   schema: (value: string | undefined): number | undefined => {
@@ -80,6 +85,7 @@ export const variables = defineEnvVars({
   EXTERNAL_IPV4: optional,
   FQDN: requiredHost,
   HEP_ENABLED: onUnlessFalse,
+  HOST_CONTROL: offUnlessTrue,
   JWT_SECRET: required,
   MAIL_FROM: optional,
   MAIN_DID: optional,

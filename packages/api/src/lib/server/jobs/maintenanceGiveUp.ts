@@ -21,7 +21,8 @@ const logger = pino({ name: 'maintenanceGate' });
 
 const WORK_LABELS: Record<MaintenanceWork, string> = {
   certSync: 'the certificate swap',
-  autoUpdate: 'the automatic update'
+  autoUpdate: 'the automatic update',
+  reboot: "the host's reboot"
 };
 
 /** What `core`'s live state counted in progress, or why it told nothing. */
@@ -153,5 +154,9 @@ export async function lastGiveUps(
     const row = rows.find(candidate => candidate.work === work);
     return row === undefined ? null : { at: row.gaveUpAt, reason: row.reason };
   };
-  return { certSync: of('certSync'), autoUpdate: of('autoUpdate') };
+  return {
+    certSync: of('certSync'),
+    autoUpdate: of('autoUpdate'),
+    reboot: of('reboot')
+  };
 }

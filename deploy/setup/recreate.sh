@@ -1,7 +1,7 @@
 # shellcheck shell=bash
-# shellcheck disable=SC2154 # runtime, compose, services, unit and updater are update.sh's
+# shellcheck disable=SC2154 # runtime, compose and unit are update.sh's
 # How update.sh recreates the stack on its new images, waits for it to report healthy and then
-# removes the images an earlier release left (§6.3 "Updates"). Uses update.sh's runtime, compose, services, unit and WAIT_SECONDS.
+# removes the images an earlier release left (§6.3 "Updates"). Uses update.sh's runtime, compose, unit and WAIT_SECONDS.
 
 # Whether this Compose can `up --wait`: docker-compose can, Docker's own and the one `podman
 # compose` hands the files to as deploy/README.md step 2 installs it; podman-compose cannot.
@@ -41,8 +41,7 @@ await_healthy() {
 # `stun` and `proxy` share its network namespace (§6.3), so on Podman the old containers go first: the boot
 # unit's restart does that with `down`, and its `up -d` does not wait, so an `up` that recreates
 # nothing waits for it; without the unit, `down` here, which podman-compose has where it has no
-# `rm`. The updater's run, whose `docker compose` has `rm`, must not take itself down, so it removes
-# asterisk, stun and proxy.
+# `rm`. Every run is on the host, the host agent's too, so the updater is recreated with the rest.
 recreate_stack() {
   local -a wait_args=()
   if compose_waits; then
@@ -58,16 +57,14 @@ recreate_stack() {
       "${compose[@]}" up -d --no-recreate "${wait_args[@]}" || unhealthy
     fi
   else
-    if [[ -n $updater ]]; then
-      "${compose[@]}" rm -sf asterisk stun proxy
-    elif [[ $runtime == podman ]]; then
+    if [[ $runtime == podman ]]; then
       "${compose[@]}" down
     fi
-    "${compose[@]}" up -d "${wait_args[@]}" "${services[@]}" || unhealthy
+    "${compose[@]}" up -d "${wait_args[@]}" || unhealthy
   fi
   ((${#wait_args[@]} > 0)) || await_healthy
   # Only the stack's own images, which carry its source label, so other projects' stay; an image a
-  # container still uses, the updater's during its own run, stays too.
+  # container still uses stays too.
   "$runtime" image prune -a -f --filter label=org.opencontainers.image.source=https://github.com/zamfono/pbx \
     >/dev/null || warn "could not remove the images of earlier releases"
 }

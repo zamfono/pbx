@@ -153,16 +153,18 @@ backup_run_ended() {
   status=$(api GET "/backups/runs/$1" | jsonfield status) && [ "$status" != running ]
 }
 
-# §6.3 "Updates": the updater found its own Compose project and the runtime's socket, so
-# system.info carries its status rather than why it has none, and system.update reaches it with
-# the token api holds: from this checkout, which has no VERSION file, the updater refuses with 409 for
-# that reason. api asks it only once a backup has finished ok, so the step backs up first where
+# §6.3 "Updates": once the host agent has run for the stack directory, which systemd would run
+# and this step runs itself (setup/agent.sh), system.info carries the updater's status rather than
+# why it has none, and system.update reaches it with the token api holds: from this checkout,
+# which has no VERSION file, the updater refuses with 409 for that reason, before it asks the
+# agent for anything. api asks it only once a backup has finished ok, so the step backs up first where
 # this run has not (`step_backups`). Selectable as `updater`; after `backups`, on every shard,
 # since it asks for the runtime of this run.
 step_updater() {
   [ "${backed_up:-false}" = true ] || step_backups
   echo '== reaching the updater through system.info and system.update =='
   local info refusal
+  ZAMFONO_AGENT_TEST_TREE=1 ZAMFONO_RUNTIME=$RUNTIME bash "$run_dir/setup/agent.sh" || fail "the host agent's report failed"
   info=$(api GET /system/info) || fail "GET /system/info did not answer"
   printf '%s' "$info" | python3 -c '
 import json, sys

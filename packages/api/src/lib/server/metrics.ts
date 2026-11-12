@@ -19,7 +19,9 @@ import {
   apiRequestHistogramLines,
   configPropagationFailureLines
 } from './metricsCounters.js';
+import { rebootRequiredSince } from './ops/system/_host.js';
 import { updateNews } from './ops/system/_state.js';
+import { hostClient } from './ops/system/_updater.js';
 import { isPropagationPending } from './propagationPending.js';
 import { countSipBansInForce, sipBanHelperState } from './sipBanList.js';
 
@@ -197,7 +199,14 @@ async function updateLines(db: Db): Promise<string[]> {
     ...gaugeLines(
       'zamfono_breaking_update_available',
       news.breakingUpdateAvailable ? 1 : 0
-    )
+    ),
+    // §6.3 "Host control": as the host job last read it, only with HOST_CONTROL.
+    ...(hostClient() === undefined
+      ? []
+      : gaugeLines(
+          'zamfono_host_reboot_required',
+          (await rebootRequiredSince(db)) === null ? 0 : 1
+        ))
   ];
 }
 

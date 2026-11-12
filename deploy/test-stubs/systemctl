@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # update-test.sh's stub systemctl, for the boot unit's path, over the units in $STUB_UNIT_DIR: it
-# lists them and shows one's WorkingDirectory; the rest is recorded.
+# lists them and shows one's WorkingDirectory, and says every unit is enabled and active; the rest
+# is recorded.
 case $1 in
+  is-enabled | is-active) exit 0 ;;
   list-unit-files)
     for unit in "$STUB_UNIT_DIR"/*.service; do
       [[ ! -e $unit ]] || echo "$(basename "$unit") enabled enabled"

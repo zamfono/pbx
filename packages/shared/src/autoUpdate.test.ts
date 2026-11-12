@@ -22,7 +22,10 @@ test('admits the update mail kinds and starts update_state with its one row', as
       autoFailedAt: null,
       autoFailedAttempts: 0,
       breakingVersion: null,
-      breakingAnnounced: null
+      breakingAnnounced: null,
+      rebootRequestedAt: null,
+      rebootRequestedBy: null,
+      rebootRequiredSince: null
     }
   ]);
   // A failure is recorded whole: version, reason, time and at least one attempt together.

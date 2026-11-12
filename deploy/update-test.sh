@@ -57,18 +57,21 @@ fresh_stack() {
   rm -f "$work/runtime.log.state"
 }
 
-# record_is FILE STATE FROM TO [ERROR] — FILE holds the updater's record of a run in STATE from
-# FROM to TO, with exactly the fields runner.ts writes for it, its times ISO 8601 UTC with
-# milliseconds and, for a failed run, an error containing ERROR.
+# record_is FILE STATE FROM TO [ERROR] — FILE holds the record of a run in STATE from FROM to TO,
+# with exactly the fields setup/outcome.sh writes for it, its times ISO 8601 UTC with
+# milliseconds and, for a failed run, an error containing ERROR; its trigger is RECORD_TRIGGER,
+# host unless set, with RECORD_BY as `by` where set.
 record_is() {
   python3 - "$@" <<'PY' || fail "$1 is not the record of a $2 run $3 -> $4: $(cat "$1" 2>&1)"
-import json, re, sys
+import json, os, re, sys
 path, state, frm, to = sys.argv[1:5]
+trigger = os.environ.get('RECORD_TRIGGER', 'host')
+by = os.environ.get('RECORD_BY')
 error = sys.argv[5] if len(sys.argv) > 5 else None
 with open(path) as f:
     text = f.read()
 record = json.loads(text)
-keys = ['state', 'from', 'to', 'trigger', 'startedAt']
+keys = ['state', 'from', 'to', 'trigger'] + (['by'] if by else []) + ['startedAt']
 if state != 'running':
     keys.append('finishedAt')
 if state == 'failed':
@@ -76,9 +79,9 @@ if state == 'failed':
 if frm == '':
     keys.remove('from')
 assert list(record) == keys, list(record)
-assert text == json.dumps(record, indent=2) + '\n', 'not in the updater layout'
+assert text == json.dumps(record, indent=2) + '\n', 'not two-space JSON'
 assert record['state'] == state and record.get('from', '') == frm and record['to'] == to
-assert record['trigger'] == 'host', record['trigger']
+assert record['trigger'] == trigger and record.get('by') == by, (record['trigger'], record.get('by'))
 for key in ('startedAt', 'finishedAt'):
     if key in record:
         assert re.fullmatch(r'\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z', record[key]), record[key]
@@ -86,13 +89,15 @@ assert error is None or error in record['error'], record['error']
 PY
 }
 
+# Never with the host agent's units, which would be this host's: agent-test.sh tests them in a
+# directory of its own.
 update() {
-  (cd "$work/stack" && PATH="$work/bin:$PATH" STUB_LOG="$work/runtime.log" ZAMFONO_RUNTIME=docker \
+  (cd "$work/stack" && PATH="$work/bin:$PATH" STUB_LOG="$work/runtime.log" ZAMFONO_RUNTIME=docker ZAMFONO_AGENT=false \
     STUB_UNIT_DIR="$work/units" ZAMFONO_REPO_URL="http://127.0.0.1:$port" ./update.sh "$@" </dev/null)
 }
 
 podman_update() {
-  (cd "$work/stack" && PATH="$work/bin:$PATH" STUB_LOG="$work/runtime.log" ZAMFONO_RUNTIME=podman \
+  (cd "$work/stack" && PATH="$work/bin:$PATH" STUB_LOG="$work/runtime.log" ZAMFONO_RUNTIME=podman ZAMFONO_AGENT=false \
     STUB_UNIT_DIR="$work/units" ZAMFONO_REPO_URL="http://127.0.0.1:$port" ./update.sh "$@" </dev/null)
 }
 
@@ -173,6 +178,12 @@ update 1.2.4 | grep -q 'Already on 1.2.4' || fail "a second run did not say it i
 echo "  - an older release"
 update 1.2.3 >/dev/null 2>&1 && fail "an update to an older release ran"
 
+echo "  - nothing of the bundle goes into .update, where a container may have made a directory"
+fresh_stack
+rm -f "$work/stack/.update/requests/.keep" && mkdir "$work/stack/.update/requests/.keep"
+update 1.2.4 >"$work/out" 2>&1 || { cat "$work/out"; fail "a directory in .update/requests broke the update"; }
+[[ $(pin) == '1.2.4 ZAMFONO_VERSION:-1.2.4' ]] || fail "the update stopped at the planted directory: $(pin)"
+
 echo "  - a bundle that does not match SHA256SUMS"
 fresh_stack
 update 1.2.5 >"$work/out" 2>&1 && fail "a mismatching bundle was installed"
@@ -188,6 +199,41 @@ grep -q 'needs --yes' "$work/out" || fail "no word of --yes: $(cat "$work/out")"
 update --yes 2.0.0 >/dev/null 2>&1 || fail "the breaking update with --yes failed"
 [[ $(pin) == '2.0.0 ZAMFONO_VERSION:-2.0.0' ]] || fail "the stack pins $(pin), not 2.0.0"
 
+echo "  - run by an updater from before the host agent: refused, but for --check and --current"
+fresh_stack
+(cd "$work/stack" && ZAMFONO_UPDATER=1 PATH="$work/bin:$PATH" STUB_LOG="$work/runtime.log" \
+  ZAMFONO_REPO_URL="http://127.0.0.1:$port" ./update.sh 1.2.4 </dev/null >"$work/out" 2>&1) &&
+  fail "an old updater's run went ahead"
+grep -q 'install this release with update.sh on the host' "$work/out" || fail "no word why: $(cat "$work/out")"
+[[ ! -s $work/runtime.log && $(pin) == '1.2.3 ZAMFONO_VERSION:-1.2.3' ]] || fail "an old updater's run changed the stack"
+(cd "$work/stack" && ZAMFONO_UPDATER=1 ZAMFONO_REPO_URL="http://127.0.0.1:$port" ./update.sh --check 1.2.4 \
+  </dev/null >/dev/null 2>&1) || fail "an old updater's --check was refused"
+
+echo "  - in a terminal, HOST_CONTROL is offered once, by mode, and taken in by an up -d"
+fresh_stack
+sed -i '/^HOST_CONTROL=/d' "$work/stack/.env"
+# in_terminal ANSWER — update.sh of the release the stack runs, in a terminal, answering ANSWER.
+in_terminal() {
+  : >"$work/runtime.log"
+  printf '%s\n' "$1" | (cd "$work/stack" && PATH="$work/bin:$PATH" STUB_LOG="$work/runtime.log" \
+    ZAMFONO_RUNTIME=docker ZAMFONO_AGENT=false ZAMFONO_REPO_URL="http://127.0.0.1:$port" \
+    script -qec './update.sh 1.2.3' /dev/null) >"$work/out" 2>&1 || fail "update.sh in a terminal failed: $(cat "$work/out")"
+}
+in_terminal n
+grep -q 'reboot it through the API? Only where the stack has the host to itself. \[Y/n\]' "$work/out" ||
+  fail "HOST_CONTROL was not offered with mode A's default: $(cat "$work/out")"
+grep -qx 'HOST_CONTROL=false' "$work/stack/.env" || fail "a no was not written as false"
+in_terminal y
+grep -q 'reboot it through the API' "$work/out" && fail "HOST_CONTROL was offered again after a no"
+sed -i 's/^HOST_CONTROL=.*/HOST_CONTROL=/' "$work/stack/.env"
+in_terminal ''
+grep -qx "HOST_CONTROL='true'" "$work/stack/.env" || fail "Enter did not take mode A's yes: $(grep HOST_CONTROL "$work/stack/.env")"
+# A plain up -d recreates what changed: api and updater for HOST_CONTROL, or an old updater.
+grep -qx 'compose up -d' "$work/runtime.log" ||
+  fail "the stack was not brought up to date for HOST_CONTROL: $(cat "$work/runtime.log")"
+
 # shellcheck source=update-runtime-test.sh
 . "$repo_root/deploy/update-runtime-test.sh"
+# shellcheck source=agent-test.sh
+. "$repo_root/deploy/agent-test.sh"
 echo "  update.sh OK"

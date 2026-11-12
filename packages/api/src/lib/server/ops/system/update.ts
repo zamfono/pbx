@@ -9,6 +9,7 @@ import {
 import { setUndoable } from '../audit.js';
 import { defineOperation } from '../types.js';
 import { requestUpdate } from './_request.js';
+import { ownerName } from './_updater.js';
 import { updateStateOut } from './_wire.js';
 
 const inputSchema = z
@@ -58,7 +59,7 @@ export const update = defineOperation({
       input.version,
       {
         trigger: 'manual',
-        by: ctx.actor.name,
+        by: ownerName(ctx.actor.name),
         breaking: input.breaking === true
       },
       null

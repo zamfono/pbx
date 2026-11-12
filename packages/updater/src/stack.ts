@@ -20,16 +20,9 @@ const VERDICTS = new Map<number, UpdateVerdict>([
 
 type ScriptResult = { status: number; stdout: string; stderr: string };
 
-/** The environment `update.sh` runs in as the updater's run (`ZAMFONO_UPDATER=1`), plus `extra`. */
-export function scriptEnv(
-  extra: Record<string, string> = {}
-): NodeJS.ProcessEnv {
-  return {
-    PATH: process.env.PATH,
-    HOME: process.env.HOME,
-    ZAMFONO_UPDATER: '1',
-    ...extra
-  };
+/** The environment `update.sh --check` and `--current` run in: no more than they need. */
+function scriptEnv(): NodeJS.ProcessEnv {
+  return { PATH: process.env.PATH, HOME: process.env.HOME };
 }
 
 /** `update.sh <args>` in the stack directory, as the updater's run. */

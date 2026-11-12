@@ -12,14 +12,15 @@ const EDGE_BUILD = {
   publishedAt: '2026-10-04T00:00:00Z'
 };
 
-/** An edge stack whose running `api` was built from `running`, with every check recorded. */
-function edgeDeps(running: string | undefined): ServerDeps & {
+/** An edge stack, with every check recorded. */
+function edgeDeps(): ServerDeps & {
   checked: string[];
 } {
   const checked: string[] = [];
   return {
     checked,
     token: 'token',
+    hostControl: false,
     releases: {
       latest: () =>
         Promise.reject(new Error('an edge stack asks for no release')),
@@ -31,19 +32,19 @@ function edgeDeps(running: string | undefined): ServerDeps & {
       checked.push(version);
       return Promise.resolve<UpdateVerdict>('update');
     },
-    runningRevision: () => Promise.resolve(running),
-    runner: {
-      current: () => ({ state: 'idle' }),
-      start: () => Promise.reject(new Error()),
-      idle: () => Promise.resolve()
+    agent: {
+      present: () => Promise.resolve(true),
+      state: () => ({ state: 'idle' }),
+      host: () => Promise.resolve(undefined),
+      send: () => Promise.reject(new Error('unused'))
     }
   };
 }
 
 describe('describeStatus on an edge stack', () => {
   it('offers main newest build while the stack runs another commit', async () => {
-    const deps = edgeDeps(RUNNING_COMMIT);
-    expect(await describeStatus(deps)).toMatchObject({
+    const deps = edgeDeps();
+    expect(await describeStatus(deps, false, RUNNING_COMMIT)).toMatchObject({
       current: 'edge',
       latest: {
         version: 'edge',
@@ -58,8 +59,8 @@ describe('describeStatus on an edge stack', () => {
   });
 
   it('offers nothing once the stack runs that build', async () => {
-    const deps = edgeDeps(EDGE_BUILD.commit);
-    expect(await describeStatus(deps)).toMatchObject({
+    const deps = edgeDeps();
+    expect(await describeStatus(deps, false, EDGE_BUILD.commit)).toMatchObject({
       latest: { version: 'edge' },
       updatable: false
     });
@@ -72,7 +73,7 @@ describe('describeStatus asked to look afresh', () => {
     const fresh: (boolean | undefined)[] = [];
     const limited = new GitHubRateLimited('GitHub answered 403', 0);
     const deps: ServerDeps = {
-      ...edgeDeps(RUNNING_COMMIT),
+      ...edgeDeps(),
       currentVersion: () => Promise.resolve([0, 0, 6]),
       releases: {
         latest: asked => {

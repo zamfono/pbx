@@ -19,7 +19,7 @@ const ROLE_RANK: Record<UserRole, number> = { owner: 0, admin: 1, user: 2 };
 
 export function findOperation(name: string): ErasedOperation {
   const op = registry.get(name);
-  if (!op) {
+  if (!op || op.available?.() === false) {
     throw new OpError(HTTP_NOT_FOUND, `unknown operation '${name}'`);
   }
   return op;

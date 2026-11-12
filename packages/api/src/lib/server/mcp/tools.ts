@@ -54,8 +54,9 @@ function outputSchema(op: ErasedOperation): z.ZodType {
 
 /** Every registered operation plus the always-present help tool, sorted by name (§10.5). */
 export function listTools(): ToolDefinition[] {
-  const tools = [...registry.values()].map(
-    (op: ErasedOperation): ToolDefinition => ({
+  const tools = [...registry.values()]
+    .filter(op => op.available?.() !== false)
+    .map((op: ErasedOperation): ToolDefinition => ({
       name: op.name,
       description: op.description,
       inputSchema: inputSchema(op),
@@ -64,8 +65,7 @@ export function listTools(): ToolDefinition[] {
         readOnlyHint: Boolean(op.readOnly),
         destructiveHint: Boolean(op.confirm)
       }
-    })
-  );
+    }));
   tools.push(HELP_TOOL);
   // Code-point order, not `localeCompare`: collation is locale-dependent, and clients rely on a
   // stable order to hit their prompt cache across deployments (§10.5). `McpServer` lists tools in

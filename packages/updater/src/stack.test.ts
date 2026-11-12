@@ -19,7 +19,7 @@ async function stackDir(files: Record<string, string>): Promise<string> {
 /** A stand-in for update.sh that, asked as --current by the updater, runs `body`. */
 async function currentScript(body: string): Promise<string> {
   return stackDir({
-    'update.sh': `[ "$1 $ZAMFONO_UPDATER" = '--current 1' ] || exit 99\n${body}\n`
+    'update.sh': `[ "$1" = --current ] || exit 99\n${body}\n`
   });
 }
 
@@ -48,7 +48,7 @@ describe('stackVersion', () => {
 /** A stand-in for update.sh that exits with `code`, after a word on stderr, when asked as --check by the updater. */
 async function scriptExiting(code: number): Promise<string> {
   return stackDir({
-    'update.sh': `[ "$1 $ZAMFONO_UPDATER" = '--check 1' ] || exit 99\necho 'said so' >&2\nexit ${String(code)}\n`
+    'update.sh': `[ "$1" = --check ] || exit 99\necho 'said so' >&2\nexit ${String(code)}\n`
   });
 }
 

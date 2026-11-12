@@ -50,3 +50,8 @@ write_env() {
   done
   mv "$tmp" "$target"
 }
+
+# env_value NAME — NAME as .env sets it, without its quotes; empty where .env sets none.
+env_value() {
+  sed -nE "s/^$1=[\"']?([^\"']*)[\"']?\$/\\1/p" .env | tail -n1
+}

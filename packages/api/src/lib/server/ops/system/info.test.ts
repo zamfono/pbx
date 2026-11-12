@@ -13,11 +13,14 @@ import { runOperation, type RunInput } from '../runner.js';
 
 import '../index.js';
 
-import { updaterClient } from './_updater.js';
+import { setRebootRequest } from './_host.js';
+import { hostClient, updaterClient } from './_updater.js';
 
+// Without host control unless a case says otherwise: `hostClient` answers `undefined`.
 vi.mock('./_updater.js', async importOriginal => ({
   ...(await importOriginal<typeof import('./_updater.js')>()),
-  updaterClient: vi.fn()
+  updaterClient: vi.fn(),
+  hostClient: vi.fn()
 }));
 
 // The lowest role: every signed-in user may read what the stack runs.
@@ -43,6 +46,7 @@ const NO_UPDATER = {
 afterEach(() => {
   vi.mocked(getCoreClient).mockReset();
   vi.mocked(updaterClient).mockReset();
+  vi.mocked(hostClient).mockReset();
   vi.unstubAllEnvs();
   recordSkippedConfigRows([]);
 });
@@ -207,6 +211,50 @@ describe('system.info', () => {
         autoUpdate: null
       }
     });
+  });
+
+  it('reports the host only with host control: a reboot it waits for and one scheduled (§6.3 "Host control")', async () => {
+    const db = await tenantDb();
+    const rebootRequired = {
+      since: '2026-11-12T04:10:00.000Z',
+      packages: ['linux-image-amd64']
+    };
+    vi.mocked(hostClient).mockReturnValue({
+      read: () =>
+        Promise.resolve({
+          rebootRequired,
+          updates: true,
+          rebootRefused: 'no unit'
+        }),
+      check: () => Promise.reject(new Error('unused')),
+      setUpdates: () => Promise.reject(new Error('unused')),
+      reboot: () => Promise.reject(new Error('unused'))
+    });
+    await setRebootRequest(db, { at: '2026-11-12T09:00:00.000Z', by: 'Olga' });
+    const out = (await runOperation(db, 'system.info', {}, asUser)) as Record<
+      string,
+      unknown
+    >;
+    expect(out.host).toEqual({
+      rebootRequired,
+      rebootScheduled: { at: '2026-11-12T09:00:00.000Z', by: 'Olga' },
+      rebootRefused: 'no unit'
+    });
+    expect(out.maintenanceGate).toEqual({
+      certSync: null,
+      autoUpdate: null,
+      reboot: null
+    });
+
+    vi.mocked(hostClient).mockReturnValue({
+      read: () => Promise.reject(new Error('fetch failed')),
+      check: () => Promise.reject(new Error('unused')),
+      setUpdates: () => Promise.reject(new Error('unused')),
+      reboot: () => Promise.reject(new Error('unused'))
+    });
+    await expect(
+      runOperation(db, 'system.info', {}, asUser)
+    ).resolves.toMatchObject({ host: { unavailable: 'fetch failed' } });
   });
 
   it('reports a tenant profile change that has not reached Ringotel yet (§10.4)', async () => {

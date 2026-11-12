@@ -3,10 +3,11 @@
 # downloads that release's bundle, checks it against the release's SHA256SUMS, pulls the images,
 # unpacks the bundle over this directory, moves .env's ZAMFONO_VERSION along by its form and lists
 # the settings a newer .env.example introduced, recreates the stack and, once it is healthy,
-# removes the stack's images no container uses. The `updater` service runs this same script for
-# `system.update` (§6.3 "Updates"). Compose reads compose.yaml and compose.override.yaml, the
-# link to the mode's overlay setup.sh makes, and compose.dr.yaml where the stack directory holds
-# one (§6.5).
+# removes the stack's images no container uses. The host agent runs this same script for the
+# updater's `system.update` and automatic updates (setup/agent.sh, §6.3 "Updates"), and the
+# updater runs --check and --current, which need no container runtime. Compose reads
+# compose.yaml and compose.override.yaml, the link to the mode's overlay setup.sh makes, and
+# compose.dr.yaml where the stack directory holds one (§6.5).
 #
 #   ./update.sh [--yes] [--check] [VERSION]
 #   ./update.sh --current
@@ -25,8 +26,10 @@
 #   ZAMFONO_RUNTIME         docker | podman, when both are installed
 #   ZAMFONO_REPO_URL        where releases are downloaded from, for a mirror of
 #                           https://github.com/zamfono/pbx
-#   ZAMFONO_UPDATER=1       the updater service's run: breaking only with --yes, never itself,
-#                           no systemctl
+#   ZAMFONO_AGENT=false     leaves the host agent's units alone, which a run as root on a systemd
+#                           host otherwise refreshes, or offers to install in a terminal
+#   ZAMFONO_TRIGGER         who asked, for the run's record: manual (with ZAMFONO_BY, the
+#                           owner) or automatic, as the host agent passes them on; host otherwise
 set -euo pipefail
 
 cd "$(dirname "$0")"
@@ -40,11 +43,10 @@ cd "$(dirname "$0")"
 . setup/recreate.sh
 # shellcheck source=setup/outcome.sh
 . setup/outcome.sh
+# shellcheck source=setup/boot-unit.sh
+. setup/boot-unit.sh
 
 REPO=${ZAMFONO_REPO_URL:-https://github.com/zamfono/pbx}
-# The services a release replaces; the updater's run leaves out the updater itself, which the
-# next update from the host, or any `up -d`, brings to its new image.
-STACK_SERVICES=(netns asterisk stun migrate core api proxy)
 # How long `up` waits for the recreated services to report healthy.
 WAIT_SECONDS=180
 # The free space an update needs for its release's images, about 2.5 GB, with room to spare.
@@ -68,14 +70,13 @@ for arg in "$@"; do
     --check) check_only=1 ;;
     --current) current_only=1 ;;
     -h | --help)
-      sed -n '2,29p' "$(basename "$0")" | sed 's/^# \{0,1\}//'
+      sed -n '2,32p' "$(basename "$0")" | sed 's/^# \{0,1\}//'
       exit 0
       ;;
     -*) fail "unknown option $arg" ;;
     *) target=${arg#v} ;;
   esac
 done
-updater=${ZAMFONO_UPDATER:-}
 # The bundle's download directory, once main has made it.
 work=
 on_exit() {
@@ -85,9 +86,8 @@ on_exit() {
 }
 trap on_exit EXIT
 
-# ZAMFONO_VERSION as .env sets it, without its quotes; empty where .env sets none.
 env_tag() {
-  sed -nE 's/^ZAMFONO_VERSION=["'\'']?([^"'\'']*)["'\'']?$/\1/p' .env | tail -n1
+  env_value ZAMFONO_VERSION
 }
 
 # The release this directory runs, by ZAMFONO_VERSION's form (tag_kind): a pinned release itself,
@@ -117,8 +117,8 @@ current_version() {
 
 # Fails, before anything is downloaded, unless the stack directory's filesystem has MIN_FREE_GB
 # free: a pull that fills the disk leaves the migrations failing with a disk I/O error.
-# ponytail: the stack directory's filesystem stands in for the runtime's image store, which the
-# updater's container cannot see; a host with /var/lib on a disk of its own is not checked.
+# ponytail: the stack directory's filesystem stands in for the runtime's image store; a host with
+# /var/lib on a disk of its own is not checked.
 check_free_space() {
   local free_kb
   free_kb=$(df -Pk . | awk 'NR == 2 { print $4 }')
@@ -139,17 +139,6 @@ latest_version() {
   echo "$url"
 }
 
-# The boot unit (README.md, step 7) whose WorkingDirectory is this directory, if any.
-find_unit() {
-  local name
-  [[ -z $updater ]] && command -v systemctl >/dev/null 2>&1 || return 0
-  for name in $(systemctl list-unit-files --type=service --no-legend 'zamfono*.service' | awk '{print $1}'); do
-    if [[ $(systemctl show -p WorkingDirectory --value "$name") == "$PWD" ]]; then
-      echo "$name"
-      return 0
-    fi
-  done
-}
 
 # ZAMFONO_VERSION follows the update by its form (tag_kind): a pinned release becomes the new one,
 # a line the new release's line, X.Y or X as before; empty and latest stay. The settings a newer
@@ -175,9 +164,11 @@ update_env() {
 # script included) keeps its old contents until it is closed.
 install_bundle() {
   local file
-  (cd "$work/x" && find . -type f) | while read -r file; do
+  # Not into .update, whose request directory a container may write.
+  (cd "$work/x" && find . -type f ! -path './.update/*') | while read -r file; do
     mkdir -p "$(dirname "$file")"
-    mv -f "$work/x/$file" "$file"
+    # -T: a link a container left where a file goes is replaced, never followed.
+    mv -fT "$work/x/$file" "$file"
   done
 }
 
@@ -197,16 +188,90 @@ update_edge() {
     fail "this stack follows edge; set ZAMFONO_VERSION to a release, or empty, to update to $target"
   echo "edge -> edge (update)"
   [[ -z $check_only ]] || exit "$CHECK_UPDATE"
+  prepare_run
   outcome_start edge edge
   check_free_space
   echo "Pulling the newest edge images ..."
-  "${compose[@]}" pull "${services[@]}" || fail "pulling the edge images failed; nothing was changed"
+  "${compose[@]}" pull || fail "pulling the edge images failed; nothing was changed"
+  offer_host_control || true
+  # Before the stack: the request directory's tmpfs must be there before the updater binds it.
+  agent_upkeep
   recreate_stack
   echo "Updated to the newest edge build."
   exit 0
 }
 
+# What a run needs beyond --check: the runtime and the stack's Compose files, the boot unit, the
+# one lock on the directory, so an update from the host and one through the host agent never run
+# at once, and the directory the updater leaves its requests in, which compose.yaml mounts.
+prepare_run() {
+  detect_runtime
+  add_stack_files
+  unit=$(find_boot_unit)
+  mkdir -p .update/requests
+  chmod 700 .update
+  exec 9>.update/lock
+  if ! flock -n 9; then
+    echo "error: another update runs in this directory" >&2
+    # Its own status, so the host agent leaves the other run's record alone (setup/agent.sh).
+    exit 75
+  fi
+}
+
+# ask_yes QUESTION y|n — the answer, Enter taking the default.
+ask_yes() {
+  local answer prompt='[y/N]'
+  [[ $2 != y ]] || prompt='[Y/n]'
+  read -rp "$1 $prompt " answer || return 1
+  [[ $answer == [yY]* || (-z $answer && $2 == y) ]]
+}
+
+# The host agent (setup/agent.sh), once a run is through: its units rewritten where this release
+# changed them, else, missing, offered in a terminal or said how to install. Run as root on a
+# systemd host only, and never with ZAMFONO_AGENT=false.
+agent_upkeep() {
+  local base
+  [[ ${ZAMFONO_AGENT:-} != false ]] && command -v systemctl >/dev/null 2>&1 || return 0
+  base=$(stack_unit_base)-agent
+  if systemctl is-enabled --quiet "$base.path" 2>/dev/null; then
+    (($(id -u) != 0)) || setup/agent.sh refresh "$runtime" ||
+      warn "could not refresh the host agent's units"
+  elif [[ -t 0 ]] && (($(id -u) == 0)) &&
+    ask_yes "Install the host agent, which carries out updates through the API (README.md, step 8)?" y; then
+    setup/agent.sh install "$runtime" || warn "the host agent was not installed"
+  else
+    warn "the host agent $base.path is not installed, so the stack cannot be updated through its" \
+      "API: run \`setup/agent.sh install $runtime\` as root (README.md, step 8)"
+  fi
+}
+
+# Asks in a terminal whether the stack's owners may control the host (§6.3 "Host control") while
+# .env leaves HOST_CONTROL empty, defaulting as setup.sh does by mode; the answer is written, a no
+# as false, so it is asked once. Never through the host agent, which has no terminal: an owner
+# must not grant it themselves. Returns 0 when the answer is true.
+offer_host_control() {
+  [[ -t 0 && -z $(env_value HOST_CONTROL) ]] || return 1
+  local default=n answer=false
+  [[ $(readlink compose.override.yaml 2>/dev/null) != compose.ports.yaml ]] || default=y
+  ! ask_yes "Let this stack's owners switch the host's upgrades and reboot it through the API? Only where the stack has the host to itself." "$default" ||
+    answer=true
+  if grep -q '^HOST_CONTROL=' .env; then
+    set_env_line .env HOST_CONTROL "$answer"
+  else
+    # On a line of its own, whether or not .env ends in one.
+    [[ -z $(tail -c 1 .env) ]] || echo >>.env
+    echo "HOST_CONTROL=$answer" >>.env
+  fi
+  echo "  .env: HOST_CONTROL=$answer"
+  [[ $answer == true ]]
+}
+
 main() {
+  # The updater of a release before the host agent runs update.sh in its own container, which
+  # recreating the stack would now take down with it: such a run must not start.
+  [[ -z ${ZAMFONO_UPDATER:-} || -n $check_only || -n $current_only ]] ||
+    fail "the updater no longer runs update.sh; install this release with update.sh on the host" \
+      "(CHANGELOG.md, upgrade notes)"
   [[ -f .env ]] || fail "there is no .env here; install with setup.sh first (README.md, step 5)"
   local from status=0
   from=$(current_version) || status=$?
@@ -218,17 +283,6 @@ main() {
     echo "$from"
     exit 0
   fi
-  if [[ -n $updater ]]; then
-    runtime=docker
-    compose=(docker compose)
-  else
-    detect_runtime
-  fi
-  add_stack_files
-  unit=$(find_unit)
-  # The services `pull` and `up` name: all of them, but for the updater's run.
-  services=()
-  [[ -z $updater ]] || services=("${STACK_SERVICES[@]}")
   [[ $from != edge ]] || update_edge
   [[ -n $target ]] || target=$(latest_version)
   v_version "$target" || fail "$target is not a release version (X.Y.Z)"
@@ -238,11 +292,20 @@ main() {
       if [[ $(cat "$PENDING" 2>/dev/null) != "$from" ]]; then
         echo "Already on $from."
         [[ -z $check_only ]] || exit "$CHECK_NOT_NEWER"
+        prepare_run
+        offer_host_control || true
+        agent_upkeep
+        # What changed without a new release: HOST_CONTROL's answer, or an updater a release before
+        # the host agent left running, which it never recreated itself.
+        "${compose[@]}" up -d || warn "the stack did not take the changes; run up -d"
         exit 0
       fi
       echo "The update to $from stopped before its stack reported healthy; finishing it."
       [[ -z $check_only ]] || exit "$CHECK_UPDATE"
+      prepare_run
       outcome_start '' "$from"
+      offer_host_control || true
+      agent_upkeep
       recreate_stack
       rm -f "$PENDING"
       echo "Updated to $from. What changed: CHANGELOG.md, or $REPO/releases/tag/v$from"
@@ -264,8 +327,10 @@ main() {
   fi
   echo "$from -> $target ($kind)"
   [[ -z $check_only ]] || exit "$verdict"
-  [[ $kind == update || -z $updater || -n $assume_yes ]] ||
-    fail "$from to $target is a breaking update; run update.sh on the host"
+  [[ $kind == update || -n $assume_yes || -t 0 ]] ||
+    fail "$from to $target is a breaking update, which needs --yes without a terminal; read its" \
+      "notes first"
+  prepare_run
   outcome_start "$from" "$target"
   check_free_space
 
@@ -297,12 +362,15 @@ main() {
   # so a failed pull leaves the stack as it was and a rerun retries it. A service the new release
   # adds is pulled by `up -d` below.
   echo "Pulling the $target images ..."
-  ZAMFONO_VERSION=$target "${compose[@]}" pull "${services[@]}" ||
+  ZAMFONO_VERSION=$target "${compose[@]}" pull ||
     fail "pulling the $target images failed; nothing was changed, and a rerun retries"
 
   echo "$target" >"$PENDING"
   install_bundle
   update_env
+  offer_host_control || true
+  # Before the stack: the request directory's tmpfs must be there before the updater binds it.
+  agent_upkeep
   recreate_stack
   rm -f "$PENDING"
   echo "Updated $from -> $target. What changed: CHANGELOG.md, or $REPO/releases/tag/v$target"

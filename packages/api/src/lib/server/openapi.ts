@@ -257,6 +257,9 @@ export function buildOpenApiDocument(): OpenApiDocument {
   const paths: OpenApiDocument['paths'] = {};
   const lifted: LiftedSchemas = {};
   for (const route of routes) {
+    if (routeOperation(route).available?.() === false) {
+      continue;
+    }
     let methods = paths[route.pattern];
     if (methods === undefined) {
       methods = {};

@@ -44,15 +44,50 @@ WantedBy=multi-user.target
 EOF
 }
 
-# Installs and enables the unit, named after the stack directory, if the user agrees; a unit
-# already there is kept as it is.
-offer_boot_unit() {
-  local name unit
+# The name the stack directory's systemd units share: the directory's own, with `zamfono-` in
+# front unless it starts with `zamfono`. The boot unit is <name>.service, the host agent's
+# <name>-agent.* (setup/agent.sh).
+stack_unit_base() {
+  local name
   name=$(basename "$PWD")
   [[ $name == zamfono* ]] || name=zamfono-$name
+  echo "$name"
+}
+
+# The boot unit whose WorkingDirectory is this directory, if any: by that, not by name, which a
+# stack directory of the same name elsewhere shares. The host agent's units serve the directory
+# too, and are none.
+find_boot_unit() {
+  local name
+  command -v systemctl >/dev/null 2>&1 || return 0
+  for name in $(systemctl list-unit-files --type=service --no-legend 'zamfono*.service' | awk '{print $1}'); do
+    [[ $name != *-agent.service ]] || continue
+    if [[ $(systemctl show -p WorkingDirectory --value "$name") == "$PWD" ]]; then
+      echo "$name"
+      return 0
+    fi
+  done
+}
+
+# Installs and enables the unit, named after the stack directory, if the user agrees; this
+# directory's unit already there is kept as it is. A unit of that name serving another directory,
+# a stack directory of the same name elsewhere, is left alone, and none is installed.
+offer_boot_unit() {
+  local name unit owner
+  name=$(stack_unit_base)
   unit=/etc/systemd/system/$name.service
   if [[ -e $unit ]]; then
-    boot_unit=$name.service
+    owner=$(sed -n 's/^WorkingDirectory=//p' "$unit")
+    if [[ $owner == "$PWD" ]]; then
+      boot_unit=$name.service
+    else
+      warn "$unit already starts the stack in $owner; rename this stack directory and run setup.sh" \
+        "again for a boot unit of its own"
+    fi
+    return 0
+  fi
+  if [[ ! $PWD =~ ^/[A-Za-z0-9._/-]+$ ]]; then
+    warn "a boot unit cannot name $PWD; move the stack to a path of letters, digits, . _ - and /"
     return 0
   fi
   ui_yesno "Podman does not start the stack after a reboot on its own.\n\nInstall $unit to do that?" || return 0

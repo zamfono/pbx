@@ -31,9 +31,10 @@ stack_port_free() {
 
 # The .env setup.sh writes in stack directory `$1` from the answers an operator gives it, for
 # company `$2` at public address `$3` in mode `$4` (ports, the default, or macvlan, where `$3` is
-# the stack's own STACK_IPV4), its output kept in `$1/setup.log`.
+# the stack's own STACK_IPV4), its output kept in `$1/setup.log`. Never with the host agent's
+# units, which would be the test host's own; a step that needs the agent runs it (steps.sh).
 stack_write_env() {
-  ZAMFONO_MODE=${4:-ports} ZAMFONO_RUNTIME=$RUNTIME ZAMFONO_API_IMAGE=$API_IMAGE EXTERNAL_IPV4=$3 \
+  ZAMFONO_AGENT=false ZAMFONO_MODE=${4:-ports} ZAMFONO_RUNTIME=$RUNTIME ZAMFONO_API_IMAGE=$API_IMAGE EXTERNAL_IPV4=$3 \
     STACK_IPV4=$3 \
     FQDN=$FQDN COMPANY_NAME=$2 MAIN_DID=$MAIN_DID COUNTRY=DE EXT_LENGTH=3 TZ=UTC \
     BOOTSTRAP_OWNER_NAME="$2 Owner" BOOTSTRAP_OWNER_EMAIL=$OWNER_EMAIL \
@@ -46,8 +47,8 @@ stack_write_env() {
 # recreate.sh's `compose` is the whole command, this stack's project and files included.
 # shellcheck disable=SC2153 # RUNTIME is the caller's, runtime and compose recreate.sh's
 stack_recreate() {
-  local runtime=$RUNTIME unit='' updater='' WAIT_SECONDS=180 whole=$compose
-  local -a compose services=()
+  local runtime=$RUNTIME unit='' WAIT_SECONDS=180 whole=$compose
+  local -a compose
   read -ra compose <<<"$whole"
   recreate_stack
 }

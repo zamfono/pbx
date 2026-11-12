@@ -79,7 +79,8 @@ echo "==> setup.sh (non-interactive, in the unpacked bundle)"
 (cd "$bundle_dir/x" && bash -c '. setup/checks.sh && api_image') | grep -qx 'ghcr.io/zamfono/api:1.2.3'
 # run_setup [NAME=VALUE...] — setup.sh with every answer from the environment, plus these.
 run_setup() {
-  (cd "$bundle_dir/x" && env SETUP_NONINTERACTIVE=1 ZAMFONO_API_IMAGE="$API_IMAGE" \
+  # Never the host agent: its units would be this host's, started on a directory this test removes.
+  (cd "$bundle_dir/x" && env SETUP_NONINTERACTIVE=1 ZAMFONO_AGENT=false ZAMFONO_API_IMAGE="$API_IMAGE" \
     ZAMFONO_MODE=ports EXTERNAL_IPV4=198.51.100.7 \
     FQDN=pbx.example.com COMPANY_NAME="O'Brien & \$ons" MAIN_DID=+4930123456 COUNTRY=de \
     BOOTSTRAP_OWNER_NAME=Owner BOOTSTRAP_OWNER_EMAIL=owner@example.com \
@@ -119,6 +120,19 @@ if run_setup BOOTSTRAP_OWNER_PASSWORD_HASH= OWNER_PASSWORD=short || [ -e "$bundl
   echo "setup.sh took an OWNER_PASSWORD under 8 characters" >&2
   exit 1
 fi
+# An UNATTENDED_UPGRADES or HOST_CONTROL that is neither true nor false is refused; the apt file
+# the first writes parses.
+for answer in UNATTENDED_UPGRADES=yes HOST_CONTROL=yes; do
+  if run_setup "$answer" || [ -e "$bundle_dir/x/.env" ]; then
+    echo "setup.sh took $answer" >&2
+    exit 1
+  fi
+done
+if command -v apt-config >/dev/null; then
+  (cd "$bundle_dir/x" && bash -c '. setup/host-updates.sh && host_updates_text') >"$env_file.apt"
+  apt-config -c "$env_file.apt" dump | grep -qF 'Origins-Pattern:: "origin=Docker,label=Docker CE'
+  rm "$env_file.apt"
+fi
 # While the stack's database volume from an earlier start exists, a new .env is refused.
 docker volume create x_db >/dev/null
 if run_setup || [ -e "$bundle_dir/x/.env" ]; then
@@ -155,6 +169,8 @@ echo "$setup_config" | grep -qF "COMPANY_NAME: O'Brien & \$\$ons"
 echo "$setup_config" | grep -qF 'BOOTSTRAP_OWNER_PASSWORD_HASH: $$argon2id$$v=19$$m=65536,p=4,t=3$$c2FsdA$$aGFzaA'
 echo "$setup_config" | grep -qF 'COUNTRY: DE'
 echo "$setup_config" | grep -qF 'TZ: Europe/Vienna'
+# Without a terminal, nobody was asked: the owners do not control the host unless told so.
+[ "$(echo "$setup_config" | grep -cF 'HOST_CONTROL: "false"')" = 2 ]   # api and updater
 echo "$setup_config" | grep -qE 'SECRETBOX_KEY: "?1:'
 echo "$setup_config" | grep -qE 'BACKUP_PASSWORD: "?[0-9a-f]{48}'
 echo "$setup_config" | grep -qF 'source: backups'

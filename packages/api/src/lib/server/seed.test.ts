@@ -109,6 +109,7 @@ describe('seedIfEmpty', () => {
     expect(settings.companyName).toBe('Acme GmbH');
     expect(settings.country).toBe('DE');
     expect(settings.extLength).toBe(3);
+    expect(settings.autoUpdate).toBe(1);
 
     const did = await db
       .selectFrom('dids')

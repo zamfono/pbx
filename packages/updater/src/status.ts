@@ -18,13 +18,23 @@ import {
  */
 type Latest = NonNullable<UpdaterStatus['latest']>;
 
+/** Why the updater cannot update at all, `undefined` while it can: without the host agent. */
+export async function unavailable(
+  deps: Pick<ServerDeps, 'agent'>
+): Promise<string | undefined> {
+  return (await deps.agent.present())
+    ? undefined
+    : 'no host agent has run for the stack directory: install it with setup/agent.sh install on the host (deploy/README.md, step 5)';
+}
+
 /** The newest version GitHub names for a stack running `current`, `fresh` asking GitHub now;
- * `newer` is `false` for an `edge` build the stack already runs, which only the running commit
- * tells. */
+ * `newer` is `false` for an `edge` build the stack already runs, the commit `revision` names
+ * that `api` was built from. */
 async function lookUpLatest(
   deps: ServerDeps,
   current: StackVersion | undefined,
-  fresh: boolean
+  fresh: boolean,
+  revision: string | undefined
 ): Promise<{ latest: Latest; newer: boolean } | undefined> {
   if (current === EDGE) {
     const build = await deps.releases.latestEdge(fresh);
@@ -34,7 +44,7 @@ async function lookUpLatest(
     const { commit, url, publishedAt } = build;
     return {
       latest: { version: EDGE, commit, url, publishedAt },
-      newer: build.commit !== (await deps.runningRevision())
+      newer: build.commit !== revision
     };
   }
   const release = await deps.releases.latest(fresh);
@@ -47,20 +57,23 @@ async function lookUpLatest(
 }
 
 /** `fresh` (`POST /check`) asks GitHub now, at most once a minute, and fails on a spent GitHub
- * rate limit, which `GET /status` reports in `latestError` like any other failure. */
+ * rate limit, which `GET /status` reports in `latestError` like any other failure. `revision` is
+ * the commit `api` was built from, which `api` names. */
 export async function describeStatus(
   deps: ServerDeps,
-  fresh = false
+  fresh = false,
+  revision?: string
 ): Promise<UpdaterStatus> {
   const current = await deps.currentVersion();
+  const reason = await unavailable(deps);
   const base = {
     current: current === undefined ? null : formatStackVersion(current),
-    last: deps.runner?.current() ?? { state: 'idle' as const },
-    ...(deps.unavailable === undefined ? {} : { unavailable: deps.unavailable })
+    last: deps.agent.state(),
+    ...(reason === undefined ? {} : { unavailable: reason })
   };
   let found: Awaited<ReturnType<typeof lookUpLatest>>;
   try {
-    found = await lookUpLatest(deps, current, fresh);
+    found = await lookUpLatest(deps, current, fresh, revision);
   } catch (error) {
     if (fresh && error instanceof GitHubRateLimited) {
       throw error;
@@ -82,7 +95,7 @@ export async function describeStatus(
   return {
     ...base,
     latest: found?.latest ?? null,
-    updatable: verdict === 'update' && deps.runner !== undefined,
+    updatable: verdict === 'update' && reason === undefined,
     breaking: verdict === 'breaking'
   };
 }

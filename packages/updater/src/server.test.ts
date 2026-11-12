@@ -1,10 +1,10 @@
 import type { AddressInfo } from 'node:net';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import type { UpdateState } from '@zamfono/shared';
+import type { HostStatus, UpdateState } from '@zamfono/shared';
 
+import { AgentRefusal, type Agent, type AgentRequest } from './agent.js';
 import { GitHubRateLimited, type Release, type Releases } from './releases.js';
-import type { Runner } from './runner.js';
 import { createServer, type ServerDeps } from './server.js';
 import type { UpdateVerdict } from './stack.js';
 import type { Version } from './version.js';
@@ -45,18 +45,33 @@ function fakeReleases(latest: Version, known: Version[] = [latest]): Releases {
   };
 }
 
-function fakeRunner(): Runner & { started: string[][] } {
+/** An agent that takes every request and, for an update, records its run as begun. */
+function fakeAgent(
+  options: { from?: string; present?: boolean; host?: HostStatus } = {}
+): Agent & { sent: AgentRequest[]; running: () => void } {
   let state: UpdateState = { state: 'idle' };
-  const started: string[][] = [];
+  const sent: AgentRequest[] = [];
   return {
-    started,
-    current: () => state,
-    start: (from, to, requester, breaking) => {
-      started.push(breaking === true ? [from, to, 'breaking'] : [from, to]);
-      state = { state: 'running', from, to, ...requester };
-      return Promise.resolve({ finished: Promise.resolve() });
+    sent,
+    running: () => {
+      state = { state: 'running', startedAt: new Date().toISOString() };
     },
-    idle: () => Promise.resolve()
+    present: () => Promise.resolve(options.present ?? true),
+    state: () => state,
+    host: () => Promise.resolve(options.host),
+    send: request => {
+      sent.push(request);
+      if (request.action === 'update') {
+        state = {
+          state: 'running',
+          from: options.from ?? '0.0.6',
+          to: request.version,
+          ...request.requester,
+          startedAt: new Date(Date.now() + 1000).toISOString()
+        };
+      }
+      return Promise.resolve();
+    }
   };
 }
 
@@ -110,11 +125,148 @@ function deps(overrides: Partial<ServerDeps> = {}): ServerDeps {
     releases: fakeReleases([0, 0, 7]),
     currentVersion: () => Promise.resolve([0, 0, 6]),
     checkUpdate: version => Promise.resolve(VERDICTS[version] ?? 'update'),
-    runningRevision: () => Promise.resolve(RUNNING_COMMIT),
-    runner: fakeRunner(),
+    agent: fakeAgent(),
+    hostControl: false,
     ...overrides
   };
 }
+
+const NO_REBOOT: HostStatus = { rebootRequired: null, updates: false };
+
+describe('the host API', () => {
+  it('offers nothing while HOST_CONTROL is not true', async () => {
+    const base = await serve(deps({ agent: fakeAgent({ host: NO_REBOOT }) }));
+    const answers = await Promise.all([
+      call(base, 'GET', '/host'),
+      call(base, 'POST', '/host/updates'),
+      call(base, 'POST', '/host/reboot')
+    ]);
+    expect(answers.map(answer => answer.status)).toEqual([
+      HTTP_NOT_FOUND,
+      HTTP_NOT_FOUND,
+      HTTP_NOT_FOUND
+    ]);
+  });
+
+  it("reports what the agent saw of the host, and hands it the upgrades' switch", async () => {
+    const agent = fakeAgent({ host: NO_REBOOT });
+    const base = await serve(deps({ agent, hostControl: true }));
+    expect((await call(base, 'GET', '/host')).body).toEqual(NO_REBOOT);
+    expect(
+      (await call(base, 'POST', '/host/updates', { enabled: 'yes' })).status
+    ).toBe(HTTP_BAD_REQUEST);
+    expect(
+      (await call(base, 'POST', '/host/updates', { enabled: true })).status
+    ).toBe(HTTP_ACCEPTED);
+    expect(agent.sent).toEqual([{ action: 'updates', enabled: true }]);
+  });
+
+  it('says so before the agent reported the host, and refuses upgrades without apt', async () => {
+    const silent = await serve(deps({ agent: fakeAgent(), hostControl: true }));
+    expect((await call(silent, 'GET', '/host')).status).toBe(
+      HTTP_SERVICE_UNAVAILABLE
+    );
+    const agent = fakeAgent({ host: { rebootRequired: null, updates: null } });
+    const noApt = await serve(deps({ agent, hostControl: true }));
+    expect(
+      (await call(noApt, 'POST', '/host/updates', { enabled: true })).status
+    ).toBe(HTTP_CONFLICT);
+    expect(agent.sent).toEqual([]);
+  });
+
+  it('asks for a reboot, unless an update runs or the stack would not come back', async () => {
+    const agent = fakeAgent({ host: NO_REBOOT });
+    const base = await serve(deps({ agent, hostControl: true }));
+    expect((await call(base, 'POST', '/host/reboot')).status).toBe(
+      HTTP_ACCEPTED
+    );
+    expect(agent.sent).toEqual([{ action: 'reboot' }]);
+
+    const busy = fakeAgent({ host: NO_REBOOT });
+    busy.running();
+    expect(
+      (
+        await call(
+          await serve(deps({ agent: busy, hostControl: true })),
+          'POST',
+          '/host/reboot'
+        )
+      ).status
+    ).toBe(HTTP_CONFLICT);
+
+    const podman = fakeAgent({
+      host: { ...NO_REBOOT, rebootRefused: 'no boot unit' }
+    });
+    const refused = await call(
+      await serve(deps({ agent: podman, hostControl: true })),
+      'POST',
+      '/host/reboot'
+    );
+    expect(refused).toMatchObject({
+      status: HTTP_CONFLICT,
+      body: { error: 'no boot unit' }
+    });
+    expect(podman.sent).toEqual([]);
+  });
+
+  it('has the agent read the host now, and answers with its report', async () => {
+    const agent = fakeAgent({ host: NO_REBOOT });
+    const base = await serve(deps({ agent, hostControl: true }));
+    expect(await call(base, 'POST', '/host/check')).toEqual({
+      status: HTTP_OK,
+      body: NO_REBOOT
+    });
+    expect(agent.sent).toEqual([{ action: 'report' }]);
+  });
+
+  it("shares one check among those asked at once, and passes the agent's refusal on as 409", async () => {
+    const agent = fakeAgent({ host: NO_REBOOT });
+    const base = await serve(deps({ agent, hostControl: true }));
+    const answers = await Promise.all([
+      call(base, 'POST', '/host/check'),
+      call(base, 'POST', '/host/check')
+    ]);
+    expect(answers.map(answer => answer.status)).toEqual([HTTP_OK, HTTP_OK]);
+    expect(agent.sent.length).toBeLessThanOrEqual(2);
+    const refusing: Agent = {
+      ...fakeAgent({ host: NO_REBOOT }),
+      send: () =>
+        Promise.reject(
+          new AgentRefusal(
+            'refused',
+            'the host agent refused: an update is running'
+          )
+        )
+    };
+    expect(
+      await call(
+        await serve(deps({ agent: refusing, hostControl: true })),
+        'POST',
+        '/host/reboot'
+      )
+    ).toMatchObject({
+      status: HTTP_CONFLICT,
+      body: { error: 'the host agent refused: an update is running' }
+    });
+  });
+
+  it('passes on an agent that does not take the request', async () => {
+    const agent: Agent = {
+      ...fakeAgent({ host: NO_REBOOT }),
+      send: () =>
+        Promise.reject(new AgentRefusal('notTaken', 'did not take it'))
+    };
+    const answer = await call(
+      await serve(deps({ agent, hostControl: true })),
+      'POST',
+      '/host/reboot'
+    );
+    expect(answer).toMatchObject({
+      status: HTTP_SERVICE_UNAVAILABLE,
+      body: { error: 'did not take it' }
+    });
+  });
+});
 
 describe('the updater API', () => {
   it('refuses a request without the token, and every request without a token set', async () => {
@@ -149,13 +301,20 @@ describe('the updater API', () => {
     });
   });
 
-  it('starts an update to the latest release and answers at once', async () => {
-    const runner = fakeRunner();
-    const base = await serve(deps({ runner }));
+  it("hands an update to the latest release to the host agent, and answers with the run's record", async () => {
+    const agent = fakeAgent();
+    const base = await serve(deps({ agent }));
     const { status, body } = await call(base, 'POST', '/update', MANUAL);
     expect(status).toBe(HTTP_ACCEPTED);
     expect(body).toMatchObject({ state: 'running', to: '0.0.7' });
-    expect(runner.started).toEqual([['0.0.6', '0.0.7']]);
+    expect(agent.sent).toEqual([
+      {
+        action: 'update',
+        version: '0.0.7',
+        breaking: false,
+        requester: MANUAL
+      }
+    ]);
     expect((await call(base, 'POST', '/update', MANUAL)).status).toBe(
       HTTP_CONFLICT
     );
@@ -202,10 +361,10 @@ describe('the updater API', () => {
     ).toBe(HTTP_BAD_REQUEST);
   });
 
-  it('takes a breaking release when the owner sets breaking, with update.sh --yes', async () => {
-    const runner = fakeRunner();
+  it('takes a breaking release when the owner sets breaking, which the agent passes on as --yes', async () => {
+    const agent = fakeAgent();
     const base = await serve(
-      deps({ releases: fakeReleases([0, 1, 0]), runner })
+      deps({ releases: fakeReleases([0, 1, 0]), agent })
     );
     const { status, body } = await call(base, 'POST', '/update', {
       ...MANUAL,
@@ -213,7 +372,7 @@ describe('the updater API', () => {
     });
     expect(status).toBe(HTTP_ACCEPTED);
     expect(body).toMatchObject({ state: 'running', to: '0.1.0' });
-    expect(runner.started).toEqual([['0.0.6', '0.1.0', 'breaking']]);
+    expect(agent.sent).toMatchObject([{ version: '0.1.0', breaking: true }]);
   });
 
   it.each([
@@ -221,19 +380,22 @@ describe('the updater API', () => {
     { trigger: 'host' },
     { trigger: 'manual' },
     { trigger: 'manual', by: 7 },
-    { trigger: 'automatic', by: 'Zamfono' }
+    { trigger: 'automatic', by: 'Zamfono' },
+    { trigger: 'manual', by: '' },
+    { trigger: 'manual', by: 'Olga\nversion=9.9.9' },
+    // 101 characters, 201 bytes: the host agent counts bytes.
+    { trigger: 'manual', by: `${'Ł'.repeat(100)}x` }
   ])('refuses the requester %j', async requester => {
-    const runner = fakeRunner();
-    const base = await serve(deps({ runner }));
+    const agent = fakeAgent();
+    const base = await serve(deps({ agent }));
     expect((await call(base, 'POST', '/update', requester)).status).toBe(
       HTTP_BAD_REQUEST
     );
-    expect(runner.started).toEqual([]);
+    expect(agent.sent).toEqual([]);
   });
 
   it('records who asked for the run', async () => {
-    const runner = fakeRunner();
-    const base = await serve(deps({ runner }));
+    const base = await serve(deps());
     const { status, body } = await call(base, 'POST', '/update', {
       trigger: 'manual',
       by: 'Olga Owner'
@@ -242,23 +404,44 @@ describe('the updater API', () => {
     expect(body).toMatchObject({ trigger: 'manual', by: 'Olga Owner' });
   });
 
-  it('refuses updates while it cannot run them, and says why', async () => {
-    const base = await serve(
-      deps({ runner: undefined, unavailable: 'no labels' })
-    );
-    const { status, body } = await call(base, 'POST', '/update', {});
+  it('refuses updates while no host agent has run, and says why', async () => {
+    const base = await serve(deps({ agent: fakeAgent({ present: false }) }));
+    const { status, body } = await call(base, 'POST', '/update', MANUAL);
     expect(status).toBe(HTTP_SERVICE_UNAVAILABLE);
-    expect(body.error).toBe('no labels');
+    expect(String(body.error)).toContain('setup/agent.sh install');
     expect((await call(base, 'GET', '/status')).body).toMatchObject({
       updatable: false,
-      unavailable: 'no labels'
+      unavailable: body.error
     });
   });
 
-  it('updates an edge stack to edge alone', async () => {
-    const runner = fakeRunner();
+  it('refuses an update while a request still waits for the agent', async () => {
+    const agent: Agent = {
+      ...fakeAgent(),
+      send: () => Promise.reject(new AgentRefusal('pending', 'still waits'))
+    };
+    expect(
+      (await call(await serve(deps({ agent })), 'POST', '/update', MANUAL))
+        .status
+    ).toBe(HTTP_CONFLICT);
+  });
+
+  it("compares an edge stack's newest build with the commit api names", async () => {
     const base = await serve(
-      deps({ runner, currentVersion: () => Promise.resolve('edge') })
+      deps({ currentVersion: () => Promise.resolve('edge') })
+    );
+    expect(
+      (await call(base, 'GET', `/status?revision=${RUNNING_COMMIT}`)).body
+    ).toMatchObject({ updatable: true });
+    expect(
+      (await call(base, 'GET', `/status?revision=${EDGE_BUILD.commit}`)).body
+    ).toMatchObject({ updatable: false });
+  });
+
+  it('updates an edge stack to edge alone', async () => {
+    const agent = fakeAgent({ from: 'edge' });
+    const base = await serve(
+      deps({ agent, currentVersion: () => Promise.resolve('edge') })
     );
     const refused = await call(base, 'POST', '/update', {
       ...MANUAL,
@@ -266,7 +449,7 @@ describe('the updater API', () => {
     });
     expect(refused.status).toBe(HTTP_CONFLICT);
     expect(refused.body.error).toContain('follows edge');
-    expect(runner.started).toEqual([]);
+    expect(agent.sent).toEqual([]);
     const { status, body } = await call(base, 'POST', '/update', {
       trigger: 'automatic',
       version: 'edge'

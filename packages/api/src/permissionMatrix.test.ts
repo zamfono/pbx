@@ -25,6 +25,9 @@ import * as catchAll from './routes/api/v1/[...path]/+server.js';
 
 process.env.DB_FILE = ':memory:';
 process.env.JWT_SECRET = JWT_SECRET;
+// The host control operations (§6.3 "Host control") are offered only with both.
+process.env.HOST_CONTROL = 'true';
+process.env.UPDATER_TOKEN = 'token';
 
 // Who may call what (§5.2, §5.3, §10.3): every route and every MCP tool against every principal,
 // on what the spec declares, through the hook that authenticates and the gates every call passes.
@@ -33,6 +36,7 @@ const OWNER_OPS = new Set([
   'provisioning.ringotelAdopt',
   'provisioning.ringotelOptions',
   'provisioning.ringotelSetup',
+  'system.reboot',
   'system.update',
   'users.erase'
 ]);

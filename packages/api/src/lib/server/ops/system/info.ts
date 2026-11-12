@@ -17,6 +17,7 @@ import { stackIpv4 } from '#lib/server/stackAddress.js';
 
 import { isRosterPending } from '../roster.js';
 import { defineOperation } from '../types.js';
+import { hostOut, hostStatus } from './_host.js';
 import {
   autoUpdateEnabled,
   autoUpdateFailure,
@@ -53,10 +54,17 @@ const outputSchema = z.object({
       'settings.autoUpdate, and why the last automatic update failed and after how many attempts on its release, until an update succeeds.'
     ),
   maintenanceGate: z
-    .object({ certSync: lastGiveUpOut, autoUpdate: lastGiveUpOut })
+    .object({
+      certSync: lastGiveUpOut,
+      autoUpdate: lastGiveUpOut,
+      reboot: lastGiveUpOut
+        .optional()
+        .describe('Present only where .env sets HOST_CONTROL=true.')
+    })
     .describe(
       'When the maintenance gate last gave up on each work it holds back, and what kept the system busy; null for one it never gave up on.'
     ),
+  host: hostOut,
   ringotel: z
     .object({ profilePending: z.boolean(), rosterPending: z.boolean() })
     .describe(
@@ -111,7 +119,7 @@ async function autoUpdateStatus(db: Db): Promise<Output['autoUpdate']> {
 export const info = defineOperation({
   name: 'system.info',
   description:
-    'Reads the version, commit and start time of api and core separately, when Asterisk started, the latest release and last update with who asked for it, whether automatic updates are on and why and how often the last one failed, when and why the maintenance gate last gave up, whether a tenant profile or roster change still waits for Ringotel, how the last check or send of the mail relay went, which rows the latest config render left out, and the domain of the stack and the public IPv4 address its SIP and media use.',
+    'Reads the version, commit and start time of api and core separately, when Asterisk started, the latest release and last update with who asked for it, whether automatic updates are on and why and how often the last one failed, when and why the maintenance gate last gave up, whether the host waits for a reboot and one is scheduled (only with HOST_CONTROL), whether a tenant profile or roster change still waits for Ringotel, how the last check or send of the mail relay went, which rows the latest config render left out, and the domain of the stack and the public IPv4 address its SIP and media use.',
   input: z.object({}).strict(),
   output: outputSchema,
   minRole: 'user',
@@ -125,7 +133,8 @@ export const info = defineOperation({
       maintenanceGate,
       profilePending,
       rosterPending,
-      relayConfigured
+      relayConfigured,
+      host
     ] = await Promise.all([
       getCoreClient()
         .version()
@@ -135,14 +144,20 @@ export const info = defineOperation({
       lastGiveUps(ctx.db),
       isProfilePending(ctx.db),
       isRosterPending(ctx.db),
-      isRelayConfigured(ctx.db)
+      isRelayConfigured(ctx.db),
+      hostStatus(ctx.db, async client => client.read())
     ]);
     return {
       api: { ...resolveVersion(env), startedAt: apiStartedAt },
       core,
       update,
       autoUpdate,
-      maintenanceGate,
+      maintenanceGate: {
+        certSync: maintenanceGate.certSync,
+        autoUpdate: maintenanceGate.autoUpdate,
+        ...(host === undefined ? {} : { reboot: maintenanceGate.reboot })
+      },
+      ...(host === undefined ? {} : { host }),
       ringotel: { profilePending, rosterPending },
       mail: relayConfigured ? relayState() : null,
       skippedConfigRows: [...skippedConfigRows()],

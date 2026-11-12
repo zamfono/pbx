@@ -1,25 +1,31 @@
 import { timingSafeEqual } from 'node:crypto';
 import http from 'node:http';
 
-import type { RunRequester, UpdateState } from '@zamfono/shared';
+import type { UpdateState } from '@zamfono/shared';
 
-import { errorMessage } from './errors.js';
+import { AgentRefusal, REQUEST_BUDGET_MS, type Agent } from './agent.js';
+import { errorMessage, HttpError } from './errors.js';
+import { hostRoute } from './hostRoutes.js';
+import { recordSince } from './record.js';
 import { GitHubRateLimited, type Releases } from './releases.js';
-import type { Runner } from './runner.js';
 import type { UpdateVerdict } from './stack.js';
-import { describeStatus } from './status.js';
+import { describeStatus, unavailable } from './status.js';
 import {
-  EDGE,
-  formatStackVersion,
-  formatVersion,
-  parseVersion,
-  type StackVersion
-} from './version.js';
+  breakingOf,
+  edgeTarget,
+  PINS_NO_RELEASE,
+  refusal,
+  releaseTarget,
+  requesterOf
+} from './updateRequest.js';
+import { EDGE, formatStackVersion, type StackVersion } from './version.js';
 
 /**
  * The updater's HTTP API on the stack's internal network (§6.3 "Updates"), no port published:
- * `GET /status`, `POST /check` and `POST /update`, each only with `UPDATER_TOKEN`, which `api`
- * alone holds.
+ * `GET /status` and `POST /check`, each with `api`'s own commit as `?revision=`, and
+ * `POST /update`, which the host agent carries out (`agent.ts`), and while `HOST_CONTROL` is `true` `GET /host`,
+ * `POST /host/updates` and `POST /host/reboot` (§6.3 "Host control"), each only with
+ * `UPDATER_TOKEN`, which `api` alone holds.
  */
 const HTTP_OK = 200;
 const HTTP_ACCEPTED = 202;
@@ -29,10 +35,10 @@ const HTTP_NOT_FOUND = 404;
 const HTTP_CONFLICT = 409;
 const HTTP_SERVICE_UNAVAILABLE = 503;
 const MAX_BODY_BYTES = 4096;
-const MAX_BY_LENGTH = 200;
 const MS_PER_SECOND = 1000;
-const PINS_NO_RELEASE =
-  'the stack directory runs no release to update from: .env sets ZAMFONO_VERSION to an immutable sha- build, or the directory has no VERSION file; update.sh --current says which';
+/** How long after its call `POST /update` answers at the latest, the run's record included:
+ * inside api's 10 s wait for the updater. */
+const RESPONSE_BUDGET_MS = 9000;
 
 export type ServerDeps = {
   /** `undefined` while `UPDATER_TOKEN` is not set, which refuses every request. */
@@ -42,21 +48,20 @@ export type ServerDeps = {
   currentVersion: () => Promise<StackVersion | undefined>;
   /** `update.sh --check`'s verdict on an update to a release (stack.ts), the one judge of it. */
   checkUpdate: (version: string) => Promise<UpdateVerdict>;
-  /** The commit the stack's running `api` was built from, which an `edge` stack's newest build
-   * is newer than when they differ; `undefined` while it does not run. */
-  runningRevision: () => Promise<string | undefined>;
-  /** `undefined` when the updater could not learn its Compose project, with `unavailable` why. */
-  runner: Runner | undefined;
-  unavailable?: string;
+  agent: Agent;
+  /** `HOST_CONTROL` is `true` in the updater's own environment. */
+  hostControl: boolean;
 };
 
-class HttpError extends Error {
-  constructor(
-    readonly status: number,
-    message: string
-  ) {
-    super(message);
+/** The agent's refusal to take a request as the updater answers it. */
+export function passOnRefusal(error: unknown): never {
+  if (error instanceof AgentRefusal) {
+    throw new HttpError(
+      error.reason === 'notTaken' ? HTTP_SERVICE_UNAVAILABLE : HTTP_CONFLICT,
+      error.message
+    );
   }
+  throw error;
 }
 
 function authorized(header: string | undefined, token: string): boolean {
@@ -87,100 +92,16 @@ async function readBody(request: http.IncomingMessage): Promise<unknown> {
   }
 }
 
-/** Why the updater does not take the stack from `current` to `to`, by `update.sh --check`'s verdict. */
-function refusal(
-  verdict: Exclude<UpdateVerdict, 'update'>,
-  current: string,
-  to: string
-): string {
-  return {
-    breaking: `${current} to ${to} is a breaking update: read its upgrade notes, then ask again with breaking set, or run update.sh on the host`,
-    notNewer: `${to} is not newer than ${current}, which the stack runs`,
-    noRelease: PINS_NO_RELEASE
-  }[verdict];
-}
-
-/** Who `body` says asks for the run, recorded with it: `manual` with the owner in `by`, or
- * `automatic` without. */
-function requesterOf(body: unknown): RunRequester {
-  const { trigger, by } = body as { trigger?: unknown; by?: unknown };
-  if (trigger === 'automatic' && by === undefined) {
-    return { trigger };
-  }
-  if (trigger !== 'manual') {
-    throw new HttpError(
-      HTTP_BAD_REQUEST,
-      'trigger must be manual, with by, or automatic, without'
-    );
-  }
-  if (typeof by !== 'string' || by.length > MAX_BY_LENGTH) {
-    throw new HttpError(
-      HTTP_BAD_REQUEST,
-      `by must be a string of at most ${String(MAX_BY_LENGTH)} characters`
-    );
-  }
-  return { trigger, by };
-}
-
-/** The release `asked` names, `X.Y.Z`, or the latest one without it. */
-async function releaseTarget(
+async function update(
   deps: ServerDeps,
-  asked: unknown
-): Promise<string> {
-  const askedVersion =
-    typeof asked === 'string' ? parseVersion(asked) : undefined;
-  if (asked !== undefined && askedVersion === undefined) {
-    throw new HttpError(HTTP_BAD_REQUEST, 'version must be X.Y.Z');
+  body: unknown,
+  started: number
+): Promise<UpdateState> {
+  const reason = await unavailable(deps);
+  if (reason !== undefined) {
+    throw new HttpError(HTTP_SERVICE_UNAVAILABLE, reason);
   }
-  const release =
-    askedVersion === undefined
-      ? await deps.releases.latest()
-      : await deps.releases.byVersion(formatVersion(askedVersion));
-  if (release === undefined) {
-    throw new HttpError(
-      HTTP_NOT_FOUND,
-      askedVersion === undefined
-        ? 'GitHub lists no release'
-        : `there is no published release ${formatVersion(askedVersion)}`
-    );
-  }
-  return formatVersion(release.version);
-}
-
-/** A stack on `edge` takes main's newest build alone, `edge` or no version at all. */
-function edgeTarget(asked: unknown): string {
-  if (asked !== undefined && asked !== EDGE) {
-    throw new HttpError(
-      HTTP_CONFLICT,
-      'the stack follows edge: it takes no release until .env sets ZAMFONO_VERSION to one, which update.sh on the host installs'
-    );
-  }
-  return EDGE;
-}
-
-/** Whether `body` takes a breaking release, which only an owner's run does. */
-function breakingOf(body: unknown, requester: RunRequester): boolean {
-  const { breaking } = body as { breaking?: unknown };
-  if (breaking === undefined) {
-    return false;
-  }
-  if (typeof breaking !== 'boolean' || requester.trigger !== 'manual') {
-    throw new HttpError(
-      HTTP_BAD_REQUEST,
-      'breaking must be a boolean, and only with trigger manual'
-    );
-  }
-  return breaking;
-}
-
-async function update(deps: ServerDeps, body: unknown): Promise<UpdateState> {
-  if (deps.runner === undefined) {
-    throw new HttpError(
-      HTTP_SERVICE_UNAVAILABLE,
-      deps.unavailable ?? 'no runner'
-    );
-  }
-  if (deps.runner.current().state === 'running') {
+  if (deps.agent.state().state === 'running') {
     throw new HttpError(HTTP_CONFLICT, 'an update is already running');
   }
   const current = await deps.currentVersion();
@@ -199,13 +120,24 @@ async function update(deps: ServerDeps, body: unknown): Promise<UpdateState> {
       refusal(verdict, formatStackVersion(current), to)
     );
   }
-  await deps.runner.start(
-    formatStackVersion(current),
-    to,
-    requester,
-    verdict === 'breaking'
+  // The record's startedAt has whole milliseconds; the agent's run starts after this anyway.
+  const sentAt = Math.floor(Date.now() / MS_PER_SECOND) * MS_PER_SECOND;
+  await deps.agent
+    .send(
+      {
+        action: 'update',
+        version: to,
+        breaking: verdict === 'breaking',
+        requester
+      },
+      started + REQUEST_BUDGET_MS
+    )
+    .catch(passOnRefusal);
+  return recordSince(
+    deps.agent,
+    sentAt,
+    Math.max(0, started + RESPONSE_BUDGET_MS - Date.now())
   );
-  return deps.runner.current();
 }
 
 function send(
@@ -228,15 +160,24 @@ async function route(
   if (!authorized(request.headers.authorization, deps.token)) {
     throw new HttpError(HTTP_UNAUTHORIZED, 'missing or wrong token');
   }
-  const key = `${request.method ?? ''} ${request.url ?? ''}`;
+  const started = Date.now();
+  const url = new URL(request.url ?? '/', 'http://updater');
+  const revision = url.searchParams.get('revision') ?? undefined;
+  const key = `${request.method ?? ''} ${url.pathname}`;
   if (key === 'GET /status') {
-    return [HTTP_OK, await describeStatus(deps)];
+    return [HTTP_OK, await describeStatus(deps, false, revision)];
   }
   if (key === 'POST /check') {
-    return [HTTP_OK, await describeStatus(deps, true)];
+    return [HTTP_OK, await describeStatus(deps, true, revision)];
   }
   if (key === 'POST /update') {
-    return [HTTP_ACCEPTED, await update(deps, await readBody(request))];
+    return [
+      HTTP_ACCEPTED,
+      await update(deps, await readBody(request), started)
+    ];
+  }
+  if (url.pathname.startsWith('/host')) {
+    return hostRoute(deps, key, async () => readBody(request), started);
   }
   throw new HttpError(HTTP_NOT_FOUND, `no route ${key}`);
 }

@@ -52,3 +52,19 @@ export type UpdaterStatus = {
   /** Why the updater cannot update at all, such as a container without Compose labels. */
   unavailable?: string;
 };
+
+/**
+ * `GET /host`, `POST /host/updates` and `POST /host/reboot` (§6.3 "Host control"), only while
+ * `HOST_CONTROL` is `true`: what the updater sees of the host the stack runs on.
+ */
+export type HostStatus = {
+  /** Since when the host waits for a reboot, by `/run/reboot-required`, and the packages
+   * `reboot-required.pkgs` names; `null` while it waits for none. */
+  rebootRequired: { since: string; packages: string[] } | null;
+  /** Whether the host's unattended upgrades are Zamfono's (`setup/host-updates.sh`'s apt file);
+   * `null` on a host without apt. */
+  updates: boolean | null;
+  /** Why the host may not be rebooted from the stack: a Podman stack without its boot unit would
+   * not come back. */
+  rebootRefused?: string;
+};

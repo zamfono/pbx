@@ -233,12 +233,24 @@ busy ports, Docker's userland proxy or a missing `public` network:
 ```
 
 Asked whether to change the ports, it also takes SIP over UDP and TCP, STUN and the RTP range;
-otherwise each keeps its default. It uses dialogs where `whiptail` is installed (as on every Debian and Ubuntu) and plain prompts
+otherwise each keeps its default. Run as root on a host with apt, it offers a checkbox, ticked, to
+keep the host up to date on its own: it installs `unattended-upgrades` for the distribution's
+packages, Podman among them, and Docker's repository, every night at 04:00 host time after the
+stack's 03:00 backup, since Docker's upgrade restarts every container. It never reboots; a kernel
+update waits until you do (`/run/reboot-required`). The stack's images, Asterisk among them, are
+not host packages: its automatic update (step 8) takes those. A second checkbox writes
+`HOST_CONTROL` to `.env`: with it, the stack's owners switch those upgrades and reboot the host
+through the API, now or at a quiet moment, and a new stack reboots a host that waits for it on
+its own (`zamfono.help update-stack`). It is ticked in mode A and unticked in mode B, and false without a terminal unless set: leave it
+off wherever stacks of others share the host, whose calls a reboot would drop too. As root on a
+systemd host it also installs the host agent, which carries out updates through the API (step 8);
+the stack directory and its files must then belong to root, as they do unpacked by root, and
+`ZAMFONO_AGENT=false` leaves the agent out. It uses dialogs where `whiptail` is installed (as on every Debian and Ubuntu) and plain prompts
 elsewhere, or with `SETUP_PLAIN=1`. It never overwrites an `.env` that holds values, and refuses
 while the stack's `db` volume from an earlier start exists: for a fresh start, run
 `docker compose down -v` with the old `.env` first. For automation,
 every answer can come from the environment under its `.env` name, plus `ZAMFONO_MODE`
-(`ports`/`macvlan`) and `OWNER_PASSWORD`; `SETUP_NONINTERACTIVE=1` makes a missing one an error
+(`ports`/`macvlan`), `OWNER_PASSWORD`, `UNATTENDED_UPGRADES` and `HOST_CONTROL` (`true`/`false`, false unless set); `SETUP_NONINTERACTIVE=1` makes a missing one an error
 instead of a question. The header of `setup.sh` lists them.
 
 ### Or by hand
@@ -284,9 +296,8 @@ retained: restoring one needs it as `SECRETBOX_KEY_PREVIOUS`.
 `api` refuses to start while both keys carry the same generation.
 
 Fill in `FQDN`, `COMPANY_NAME`, `MAIN_DID`, `COUNTRY`, `BOOTSTRAP_OWNER_EMAIL`,
-`BOOTSTRAP_OWNER_NAME`, `CONTAINER_SOCKET` (`/var/run/docker.sock`, or `/run/podman/podman.sock`
-on Podman) and, if you have one, the mail relay (`SMTP_*`, `MAIL_FROM`). The comments in
-`.env.example` explain each value.
+`BOOTSTRAP_OWNER_NAME` and, if you have one, the mail relay (`SMTP_*`, `MAIL_FROM`). The comments
+in `.env.example` explain each value. For updates through the API, install the host agent (step 8) with `setup/agent.sh install docker`, or `podman`, as root.
 
 The owner's password hash comes from the `api` image itself, so you never type a password into a
 file:
@@ -378,11 +389,41 @@ notes in between and asks first; `--yes` answers for a run without a terminal.
 
 **From an MCP client or the API**, the owner updates without a shell: `system.info` shows the
 latest release, whether it can be installed this way, and how the last update went, run either
-way, and `system.update` installs it. It runs the same `update.sh` in the `updater` service, only to a newer
-release, a breaking one only when the owner sets `breaking: true` after reading its upgrade notes,
-and only once a backup run finished `ok` within the last hour. Notes that ask for work on the host,
-such as a new `.env` setting, still need `update.sh` there. The
-updater needs `UPDATER_TOKEN` and `CONTAINER_SOCKET` in `.env`, which `setup.sh` writes. With the owner's setting `autoUpdate` on (off by default), the stack installs such a
+way, and `system.update` installs it, only to a newer release, a breaking one only when the
+owner sets `breaking: true` after reading its upgrade notes, and only once a backup run finished
+`ok` within the last hour. Notes that ask for work on the host, such as a new `.env` setting,
+still need `update.sh` there. The `updater` service needs `UPDATER_TOKEN` in `.env`, which
+`setup.sh` writes, and the host agent.
+
+**The host agent** runs `update.sh` on the host for the updater, as root, so no container holds
+the runtime's socket. `setup.sh` installs it as root on a systemd host: three units named after
+the stack directory, `<name>-agent.path`, which starts `<name>-agent.service` when the updater
+leaves a request in `.update/requests`, and `<name>-agent.timer`, which runs it every ten
+minutes, and a mount unit that makes `.update/requests` a 1 MB tmpfs of its own, `nosuid`,
+`nodev` and `noexec`. The updater, without capabilities and with a read-only root filesystem, may write there
+and nowhere else; the agent takes nothing but a known request, checks every value, answers it,
+and reports in `.update/`, which only root may enter and only it writes. It runs scripts of the
+stack directory as root, so it runs nothing while the directory, anything in it or a directory
+above it could be written by anyone but root. `update.sh`, run as root, keeps its units up to date with
+each release, and where it is missing offers to install it; in a terminal it also asks once
+whether the stack's owners may control the host while `.env` leaves `HOST_CONTROL` empty. By
+hand, and to remove it:
+
+````bash
+setup/agent.sh install docker   # or podman: the runtime the stack runs on
+setup/agent.sh uninstall
+journalctl -u zamfono-agent.service   # what it did; the update's own output is in .update/update.log
+```
+
+It needs Docker or rootful Podman as this README installs them, with root in a container being
+root on the host: with Docker's `userns-remap` or rootless Podman, the updater cannot reach its
+request directory, and updates through the API are refused. The stack directory must be on a
+local disk, not a network filesystem, since its request directory is mounted at boot before the
+network is up. systemd runs the agent through `/usr/local/libexec/zamfono-agent`, which checks
+the directory before anything in it runs as root. Should that mount ever fail, systemd stops
+starting the agent and, after many tries, its path unit: once the cause is fixed, run
+`systemctl reset-failed zamfono-agent.path && systemctl start zamfono-agent.path` (the units are
+named after the stack directory). With the owner's setting `autoUpdate` on (as it is on a new stack), the stack installs such a
 release on its own, after a backup, at a quiet moment with no call in progress, and mails the
 owners when that fails or when a breaking release waits for them, which it never installs on its own (`zamfono.help update-stack`).
 
@@ -394,7 +435,7 @@ curl -fsSL https://github.com/zamfono/pbx/releases/latest/download/zamfono-deplo
   | tar xz --strip-components=1
 docker compose pull
 docker compose up -d
-```
+````
 
 **Podman** refuses to replace `netns` while `asterisk`, `stun` and `proxy` still share its network
 namespace, so `up -d` after a pull fails with "has dependent containers which must be removed

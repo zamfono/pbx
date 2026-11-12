@@ -1,29 +1,22 @@
 import { once } from 'node:events';
 import http from 'node:http';
-import { setImmediate } from 'node:timers/promises';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import type { Runner } from './runner.js';
-import { STOP_WAIT_MS, stopOnSignal } from './stop.js';
+import { stopOnSignal } from './stop.js';
 
 const logged: string[] = [];
 let listenersBefore = new Set<unknown>();
 
-/** A listening server and a runner whose own run ends when `idle` resolves. */
-async function boot(idle: Promise<void>): Promise<http.Server> {
+/** A listening server. */
+async function boot(): Promise<http.Server> {
   const server = http.createServer();
   server.listen(0);
   await once(server, 'listening');
-  const runner: Runner = {
-    current: () => ({ state: 'idle' }),
-    start: () => Promise.reject(new Error()),
-    idle: () => idle
-  };
   listenersBefore = new Set([
     ...process.listeners('SIGTERM'),
     ...process.listeners('SIGINT')
   ]);
-  stopOnSignal(server, runner, message => {
+  stopOnSignal(server, message => {
     logged.push(message);
   });
   return server;
@@ -48,14 +41,13 @@ afterEach(() => {
       process.off(name, listener);
     }
   }
-  vi.useRealTimers();
   vi.restoreAllMocks();
   logged.length = 0;
 });
 
 describe('stopOnSignal', () => {
-  it('closes the server and exits 0 on SIGTERM while no update runs', async () => {
-    const server = await boot(Promise.resolve());
+  it('closes the server and exits 0 on SIGTERM', async () => {
+    const server = await boot();
     const exit = vi.spyOn(process, 'exit').mockReturnValue(undefined as never);
 
     signal('SIGTERM');
@@ -68,7 +60,7 @@ describe('stopOnSignal', () => {
   });
 
   it('exits on SIGINT, once only on a second signal', async () => {
-    await boot(Promise.resolve());
+    await boot();
     const exit = vi.spyOn(process, 'exit').mockReturnValue(undefined as never);
 
     signal('SIGINT');
@@ -78,32 +70,5 @@ describe('stopOnSignal', () => {
       expect(exit).toHaveBeenCalledWith(0);
     });
     expect(exit).toHaveBeenCalledTimes(1);
-  });
-
-  it('waits for its own update to end before it exits', async () => {
-    const run = Promise.withResolvers<undefined>();
-    await boot(run.promise);
-    const exit = vi.spyOn(process, 'exit').mockReturnValue(undefined as never);
-
-    signal('SIGTERM');
-    await setImmediate();
-    expect(exit).not.toHaveBeenCalled();
-
-    run.resolve(undefined);
-    await vi.waitFor(() => {
-      expect(exit).toHaveBeenCalledWith(0);
-    });
-  });
-
-  it('exits after STOP_WAIT_MS with its update still running, and says so', async () => {
-    await boot(Promise.withResolvers<undefined>().promise);
-    const exit = vi.spyOn(process, 'exit').mockReturnValue(undefined as never);
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
-
-    signal('SIGTERM');
-    await vi.advanceTimersByTimeAsync(STOP_WAIT_MS);
-
-    expect(exit).toHaveBeenCalledWith(0);
-    expect(logged).toContain('updater stopping before its update ended');
   });
 });

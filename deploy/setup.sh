@@ -9,6 +9,10 @@
 #   ZAMFONO_MODE           ports | macvlan (README.md, step 1)
 #   ZAMFONO_RUNTIME        docker | podman, when both are installed
 #   OWNER_PASSWORD         hashed into BOOTSTRAP_OWNER_PASSWORD_HASH, at least 8 characters
+#   UNATTENDED_UPGRADES    true | false: the host's packages update on their own; false unless set
+#                          or ticked (setup/host-updates.sh, which also explains HOST_CONTROL)
+#   ZAMFONO_AGENT=false    installs no host agent (setup/agent.sh), which it otherwise does as root on
+#                          a systemd host
 #   SETUP_PLAIN=1          plain prompts even where whiptail is installed
 #   ZAMFONO_API_IMAGE      the image that checks COUNTRY and hashes the password, instead of
 #                          compose.yaml's
@@ -24,6 +28,8 @@ umask 077
 . setup/envfile.sh
 # shellcheck source=setup/boot-unit.sh
 . setup/boot-unit.sh
+# shellcheck source=setup/host-updates.sh
+. setup/host-updates.sh
 
 if [[ -n ${SETUP_NONINTERACTIVE:-} || ! -t 0 ]]; then
   interactive=
@@ -185,6 +191,20 @@ ask_password() {
   unset OWNER_PASSWORD
 }
 
+# The host agent, which carries out updates and host control for the updater (setup/agent.sh):
+# installed where setup.sh runs as root on a systemd host, else said how.
+install_agent() {
+  if [[ ${ZAMFONO_AGENT:-} != false ]] && (($(id -u) == 0)) && command -v systemctl >/dev/null 2>&1; then
+    setup/agent.sh install "$runtime" || warn "the host agent was not installed; updates through" \
+      "the API need it: fix the above, then run \`setup/agent.sh install $runtime\` as root"
+  else
+    mkdir -p .update/requests
+    chmod 700 .update
+    warn "updates through the API need the host agent: run \`setup/agent.sh install $runtime\` as" \
+      "root on a systemd host (README.md, step 5)"
+  fi
+}
+
 main() {
   [[ -f compose.yaml && -f .env.example ]] || fail "run setup.sh from the stack directory it came in"
   if [[ -e .env ]] && ! cmp -s .env .env.example; then
@@ -231,6 +251,7 @@ main() {
   ask_mail
   ask_network
   ask_password
+  ask_host
 
   : "${JWT_SECRET:=$(random_base64)}"
   : "${SECRETBOX_KEY:=1:$(random_base64)}"
@@ -238,24 +259,17 @@ main() {
   : "${AMI_PASSWORD:=$(random_hex)}"
   : "${BACKUP_PASSWORD:=$(random_hex)}"
   : "${UPDATER_TOKEN:=$(random_hex)}"
-  if [[ -z ${CONTAINER_SOCKET:-} ]]; then
-    if [[ $runtime == podman ]]; then
-      CONTAINER_SOCKET=/run/podman/podman.sock
-    else
-      CONTAINER_SOCKET=/var/run/docker.sock
-    fi
-  fi
 
   if [[ -n $interactive ]]; then
-    ui_yesno "Write .env with these values?\n\nMode: $ZAMFONO_MODE ($address)\nHost name: $FQDN\nCompany: $COMPANY_NAME\nMain number: $MAIN_DID ($COUNTRY)\nOwner: $BOOTSTRAP_OWNER_NAME <$BOOTSTRAP_OWNER_EMAIL>\nMail relay: ${SMTP_HOST:-none}\nSIP over UDP: ${SIP_UDP_ENABLED:-true}, over TCP: ${SIP_TCP_ENABLED:-true}, STUN: ${STUN_ENABLED:-true}\nRTP: ${RTP_PORT_START:-10000}-${RTP_PORT_END:-10200}/udp" Write Abort ||
+    ui_yesno "Write .env with these values?\n\nMode: $ZAMFONO_MODE ($address)\nHost name: $FQDN\nCompany: $COMPANY_NAME\nMain number: $MAIN_DID ($COUNTRY)\nOwner: $BOOTSTRAP_OWNER_NAME <$BOOTSTRAP_OWNER_EMAIL>\nMail relay: ${SMTP_HOST:-none}\nSIP over UDP: ${SIP_UDP_ENABLED:-true}, over TCP: ${SIP_TCP_ENABLED:-true}, STUN: ${STUN_ENABLED:-true}\nRTP: ${RTP_PORT_START:-10000}-${RTP_PORT_END:-10200}/udp\nHost upgrades: $UNATTENDED_UPGRADES, owners control the host: $HOST_CONTROL" Write Abort ||
       { echo "Setup aborted; nothing was written." >&2; exit 1; }
   fi
 
   write_env .env FQDN STACK_IPV4 EXTERNAL_IPV4 ARI_PASSWORD AMI_PASSWORD JWT_SECRET SECRETBOX_KEY \
-    BACKUP_PASSWORD UPDATER_TOKEN CONTAINER_SOCKET SMTP_HOST SMTP_PORT SMTP_SECURITY SMTP_USER \
+    BACKUP_PASSWORD UPDATER_TOKEN SMTP_HOST SMTP_PORT SMTP_SECURITY SMTP_USER \
     SMTP_PASSWORD MAIL_FROM BOOTSTRAP_OWNER_EMAIL BOOTSTRAP_OWNER_NAME BOOTSTRAP_OWNER_PASSWORD_HASH \
     COMPANY_NAME MAIN_DID COUNTRY EXT_LENGTH TZ SIP_UDP_ENABLED SIP_TCP_ENABLED STUN_ENABLED \
-    RTP_PORT_START RTP_PORT_END
+    RTP_PORT_START RTP_PORT_END HOST_CONTROL
   ln -sfn "$overlay" compose.override.yaml
 
   echo "Wrote $PWD/.env (readable by root only), and linked compose.override.yaml to $overlay."
@@ -268,6 +282,8 @@ main() {
   else
     check_public_network
   fi
+  [[ $UNATTENDED_UPGRADES != true ]] || setup_host_updates || true
+  install_agent
   boot_unit=
   [[ $runtime != podman || -z $interactive ]] || offer_boot_unit
   echo

@@ -211,7 +211,19 @@ export const settingsInputSchema = z
       .boolean()
       .optional()
       .describe(
-        'Install newer non-breaking releases automatically, after a backup, at a maintenance moment when no call is in progress; off by default. Owner-only.'
+        'Install newer non-breaking releases automatically, after a backup, at a maintenance moment when no call is in progress; on for a new stack. Owner-only.'
+      ),
+    hostUpdates: z
+      .boolean()
+      .optional()
+      .describe(
+        "Unattended upgrades of the host's packages, the system's and Docker's, every night at 04:00 host time, never rebooting; applied to the host at once. Only where .env sets HOST_CONTROL=true. Owner-only."
+      ),
+    autoReboot: z
+      .boolean()
+      .optional()
+      .describe(
+        'Reboot the host at a maintenance moment, once no call is in progress, when an upgrade left it waiting for a reboot; on for a new stack. Only where .env sets HOST_CONTROL=true. Owner-only.'
       ),
     mfaRequiredForAll: z
       .boolean()

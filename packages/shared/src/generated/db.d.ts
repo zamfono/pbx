@@ -368,6 +368,7 @@ export interface RingGroups {
 
 export interface Settings {
   auditRetentionDays: number | null;
+  autoReboot: Generated<number>;
   autoUpdate: Generated<number>;
   backupCron: Generated<string>;
   callLogLevel: Generated<CallLogLevel>;
@@ -381,6 +382,7 @@ export interface Settings {
   fallbackTargetId: string | null;
   featureCodesJson: Generated<string>;
   holdMohAudioId: string | null;
+  hostUpdates: number | null;
   id: Generated<number | null>;
   language: Generated<Language>;
   mailFrom: string | null;
@@ -507,6 +509,9 @@ export interface UpdateState {
   breakingAnnounced: string | null;
   breakingVersion: string | null;
   id: Generated<number | null>;
+  rebootRequestedAt: string | null;
+  rebootRequestedBy: string | null;
+  rebootRequiredSince: string | null;
   runRelease: string | null;
   runStartedAt: string | null;
 }

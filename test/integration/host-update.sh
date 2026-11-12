@@ -132,7 +132,7 @@ host_update_serve() {
 
 # `update.sh` in the stack directory, its output kept in the step's own `update.log`.
 host_update() {
-  ZAMFONO_REPO_URL=$host_update_repo ZAMFONO_RUNTIME=$RUNTIME \
+  ZAMFONO_AGENT=false ZAMFONO_REPO_URL=$host_update_repo ZAMFONO_RUNTIME=$RUNTIME \
     COMPOSE_PROJECT_NAME=$(stack_project "$run_dir") \
     COMPOSE_FILE="$run_dir/compose.yaml:$run_dir/compose.override.yaml:$here/compose.test.yaml" \
     bash "$run_dir/update.sh" "$@" >>"$host_update_work/update.log" 2>&1

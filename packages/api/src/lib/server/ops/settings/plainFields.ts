@@ -59,6 +59,11 @@ const PLAIN_COLUMNS: {
   clir: { encode: toBit, decode: fromFlag },
   rejectAnonymous: { encode: toBit, decode: fromFlag },
   autoUpdate: { encode: toBit, decode: fromFlag },
+  hostUpdates: {
+    encode: toBit,
+    decode: stored => (stored === null ? null : fromFlag(stored))
+  },
+  autoReboot: { encode: toBit, decode: fromFlag },
   mfaRequiredForAll: { encode: toBit, decode: fromFlag },
   emergencyNumbersJson: {
     field: 'emergencyNumbers',

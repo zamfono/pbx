@@ -1,7 +1,8 @@
 /**
  * Every background job `api` runs, started once from `hooks.server.ts`'s `init`: the first-boot
  * seed and the boot render (§6.3 "First boot", §3.1, §9.1), the key-rotation sweep (§5.4), the
- * certificate sync (§6.4), backups (§6.5), the automatic update (§6.3 "Updates"), the daily purge
+ * certificate sync (§6.4), backups (§6.5), the automatic update (§6.3 "Updates"), the host's
+ * upkeep (§6.3 "Host control"), the daily purge
  * (§5.9), the mail relay check (§10.2 "Relay check"), webhook delivery and the relay of `core`'s
  * event stream (§3.1 "Events", §10.6), and the Ringotel re-registration after an Asterisk restart
  * (§10.4).
@@ -29,7 +30,7 @@ import { onceConfigPropagated } from '../ops/afterCommit.js';
 import { oweDevicePushesAtStart } from '../ops/devices/_restartPush.js';
 import { retryPendingRoster } from '../ops/roster.js';
 import { retryPendingProfile } from '../ops/settings/profilePush.js';
-import { updaterClient } from '../ops/system/_updater.js';
+import { hostClient, updaterClient } from '../ops/system/_updater.js';
 import { propagateAtBoot } from '../propagation.js';
 import type { Keyring } from '../secretbox.js';
 import { seedIfEmpty } from '../seed.js';
@@ -41,6 +42,7 @@ import type { ExecFn } from './backupBackends.js';
 import { backupEnabledTargets } from './backupTurns.js';
 import { startCertSync, type CertSyncScheduler } from './certSync.js';
 import { scheduleBackups } from './cron.js';
+import { scheduleHost } from './host.js';
 import { reencryptSweep } from './keyRotation.js';
 import { coreBusy } from './maintenanceGiveUp.js';
 import { createMaintenanceGate } from './maintenanceWindow.js';
@@ -109,6 +111,25 @@ function startAutoUpdate(
       { err: error },
       'boot: automatic-update scheduler failed to start'
     );
+    return null;
+  }
+}
+
+/** The host's upkeep (§6.3 "Host control"); a failed start costs only it. */
+function startHost(db: Db, log: Logger): { stop: () => void } | null {
+  try {
+    const core = getCoreClient();
+    return scheduleHost({
+      db,
+      gate: createMaintenanceGate({
+        db,
+        work: 'reboot',
+        busy: async () => coreBusy(core)
+      }),
+      host: hostClient
+    });
+  } catch (error) {
+    log.error({ err: error }, 'boot: host scheduler failed to start');
     return null;
   }
 }
@@ -213,6 +234,7 @@ export async function startBackgroundJobs(
   };
   const backups = scheduleBackups(db, kr, backupDeps);
   const autoUpdate = startAutoUpdate(db, kr, backupDeps, log);
+  const host = startHost(db, log);
   const retention = scheduleRetention(db);
   const relayCheck = startRelayCheck({ db, kr });
   const coreEvents = relayCoreEvents(db, dispatcher, log);
@@ -222,6 +244,7 @@ export async function startBackgroundJobs(
       retention.stop();
       relayCheck.stop();
       autoUpdate?.stop();
+      host?.stop();
       backups.stop();
       certSync?.stop();
     }

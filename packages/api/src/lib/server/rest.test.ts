@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import SwaggerParser from '@apidevtools/swagger-parser';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { newId, nowIso, type Db, type StateResponse } from '@zamfono/shared';
 import { seedSettings } from '@zamfono/shared/testDb.js';
@@ -312,6 +312,20 @@ function operationAt(
 }
 
 describe('buildOpenApiDocument', () => {
+  // Every route, the host control ones among them (§6.3 "Host control").
+  beforeEach(() => {
+    vi.stubEnv('HOST_CONTROL', 'true');
+    vi.stubEnv('UPDATER_TOKEN', 'token');
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('leaves out an operation the stack does not offer', () => {
+    vi.stubEnv('HOST_CONTROL', '');
+    expect(buildOpenApiDocument().paths['/system/reboot']).toBeUndefined();
+  });
+
   it("lists every route of the table, with its operation's zod-derived schema", () => {
     const doc = buildOpenApiDocument();
     expect(doc.openapi).toBe('3.1.0');

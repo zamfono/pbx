@@ -23,6 +23,7 @@ import {
 
 import { targetSpecSchema } from '../forwardTargetSchema.js';
 import { resolveOptionalTarget } from '../forwardTargetSpec.js';
+import { hostClient } from '../system/_updater.js';
 import { OpError } from '../types.js';
 import type { SettingsInput } from './_input.js';
 
@@ -72,6 +73,17 @@ export const settingsWire = z.object({
   backupCron: z.string(),
   tlsReloadHour: z.number().nullable(),
   autoUpdate: z.boolean(),
+  hostUpdates: z
+    .boolean()
+    .nullable()
+    .optional()
+    .describe(
+      "Present only where .env sets HOST_CONTROL=true; null until the host's state was first read."
+    ),
+  autoReboot: z
+    .boolean()
+    .optional()
+    .describe('Present only where .env sets HOST_CONTROL=true.'),
   mfaRequiredForAll: z.boolean(),
   ssoProvider: z.enum(SSO_PROVIDERS).nullable(),
   ssoLabel: z.string().nullable(),
@@ -99,6 +111,8 @@ export const OWNER_FIELDS: ReadonlySet<keyof SettingsInput> = new Set([
   'emergencyNumbers',
   'auditRetentionDays',
   'autoUpdate',
+  'hostUpdates',
+  'autoReboot',
   'mfaRequiredForAll',
   'ssoProvider',
   'ssoLabel',
@@ -172,6 +186,12 @@ export async function rowToWire(
     backupCron: row.backupCron,
     tlsReloadHour: row.tlsReloadHour,
     autoUpdate: row.autoUpdate === 1,
+    ...(hostClient() === undefined
+      ? {}
+      : {
+          hostUpdates: row.hostUpdates === null ? null : row.hostUpdates === 1,
+          autoReboot: row.autoReboot === 1
+        }),
     mfaRequiredForAll: row.mfaRequiredForAll === 1,
     ssoProvider: row.ssoProvider,
     ssoLabel: row.ssoLabel,

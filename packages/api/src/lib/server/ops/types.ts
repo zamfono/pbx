@@ -55,6 +55,12 @@ export type OwnScope<In> =
 export type Operation<In, Out, Prepared = void> = {
   name: string;
   description: string;
+  /**
+   * Whether the stack offers the operation, checked on every call: one it does not is unknown
+   * (404), left out of `tools/list` and the OpenAPI document, as `system.reboot` without
+   * `HOST_CONTROL` (§6.3 "Host control"). Unset, it always is.
+   */
+  available?: () => boolean;
   input: z.ZodType<In>;
   /**
    * What `run` returns, as it reaches the wire: the OpenAPI response and the MCP tool's

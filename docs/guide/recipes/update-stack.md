@@ -8,15 +8,17 @@ arguments:
 
 # Update the stack
 
-The owner installs a newer release without a shell on the host. The stack's `updater` service does
-the work; it takes only a published release that is newer than the running one, a breaking one
-only when asked to (see Breaking releases).
+The owner installs a newer release without a shell on the host. The stack's `updater` service
+judges the update and hands it to the host agent, which runs it on the host; it takes only a
+published release that is newer than the running one, a breaking one only when asked to (see
+Breaking releases).
 
 1. Check what is available: `system.info` (`GET /api/v1/system/info`). Its `update` field names the
    `current` and the `latest` release. `updatable: true` means `system.update` can install it.
    `breaking: true` means the release needs the operator to read its upgrade notes first (see
    Breaking releases). `unavailable` says why the updater cannot run at
-   all, usually a missing `UPDATER_TOKEN` or `CONTAINER_SOCKET` in `.env`. On a test stack whose
+   all: a missing `UPDATER_TOKEN` in `.env`, or no host agent, which the operator installs on the
+   host with `setup/agent.sh install`. On a test stack whose
    `ZAMFONO_VERSION` is `edge`, `current` and `latest` both say `edge`, `latest` naming main's
    newest build; `updatable: true` means the stack runs an older one, and the update pulls it.
    The updater asks GitHub once an hour; `system.checkUpdate` (`POST /api/v1/system/updateCheck`)
@@ -27,7 +29,8 @@ only when asked to (see Breaking releases).
    backup finished `ok` within the last hour, since migrations only go forward and the backup is the
    way back.
 3. Update: `system.update` (`POST /api/v1/system/update`), optionally with `version`, and with
-   `breaking: true` for a breaking release. It asks for confirmation and answers as soon as the updater has begun.
+   `breaking: true` for a breaking release. It asks for confirmation and answers as soon as the host agent has taken
+   the update, with its record once the run began.
 4. Follow it with `system.info`: `update.last.state` goes from `running` to `succeeded` or `failed`,
    with the end of the updater's log in `error`, and `update.last.trigger` says who asked:
    `manual` (with the owner in `by`), `automatic` or `host` (`update.sh` on the host).
@@ -39,8 +42,9 @@ only when asked to (see Breaking releases).
 
 ## Automatic updates
 
-An owner can let the stack take newer non-breaking releases on its own: `settings.update`
-(`PATCH /api/v1/settings`) with `{ "autoUpdate": true }`; it is off by default. The stack then asks
+The stack takes newer non-breaking releases on its own while `autoUpdate` is on, as it is on a new
+stack; an owner turns it off or on with `settings.update` (`PATCH /api/v1/settings`) and
+`{ "autoUpdate": false }`. The stack then asks
 the updater every hour. When a release is available, it waits for the next maintenance moment, the
 same quiet time a renewed TLS certificate is swapped in at: the middle of a tenant-wide
 out-of-office period, else of the longest closed period of the opening hours, else
@@ -90,6 +94,27 @@ nothing: `/healthz` passes `update:automatic`, the `/metrics` update gauges are
 0, and `system.info` has no `autoUpdate.failed`. Read its upgrade notes, at `update.latest.url`, then install it with `system.update` and
 `breaking: true`, or on the host with `update.sh`. Notes that ask for work on the host, such as a
 new `.env` setting, need `update.sh` there.
+
+## The host
+
+Only where `.env` sets `HOST_CONTROL=true`, which the host operator does for a stack that has
+the host to itself, do owners also look after the host the stack runs on. Without it none of
+this is shown or offered.
+
+- **Upgrades.** `settings.update` with `{ "hostUpdates": true }` turns on the host's unattended
+  upgrades, the system's packages and Docker's, every night at 04:00 host time; `false` turns
+  them off. A host without apt takes none. `settings.get` shows the state, `null` until the
+  stack first read it from the host.
+- **Reboot needed.** A kernel upgrade leaves the host waiting for a reboot: `system.info` shows
+  it in `host.rebootRequired`, with the packages that asked for it, and `/metrics` has
+  `zamfono_host_reboot_required 1`. The host is read every ten minutes; `system.checkHost`
+  (`POST /api/v1/system/hostCheck`) reads it now and answers with the same `host` field.
+- **Rebooting.** `system.reboot` with `when: "maintenance"` reboots at the next maintenance
+  moment, once nothing is in progress, and shows in `host.rebootScheduled` until then;
+  `when: "now"` reboots at once, dropping every call. With `autoReboot` on, as on a new stack,
+  the stack reboots a waiting host at a maintenance moment on its own. Every reboot the gate let
+  through is a `system.hostReboot` entry in `audit.list`. A Podman stack without its boot unit is
+  never rebooted, since it would not start again: `host.rebootRefused` says so.
 
 ## Undoing an update
 

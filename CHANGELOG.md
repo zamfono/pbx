@@ -11,8 +11,49 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+### Upgrade notes
+
+- This release is breaking: install it with `update.sh` on the host, as root, then run
+  `./update.sh` once more in a terminal. That second run offers to install the host agent, through
+  which updates from the API now go instead of the container runtime's socket, and asks whether to
+  set `HOST_CONTROL` (below); `setup/agent.sh install docker` (or `podman`) installs the agent
+  without asking. Until it is installed, `system.info` says the updater is unavailable; from then
+  on `update.sh` keeps it up to date. Should an owner have installed this release through the API
+  anyway, the updater of the release before keeps running, with the runtime's socket, until that
+  second run on the host replaces it.
+- The stack directory and its scripts must belong to root and be writable by no one else
+  (`chown -R root: /srv/zamfono && chmod -R go-w /srv/zamfono`). `CONTAINER_SOCKET` is gone;
+  remove it from `.env`.
+- `HOST_CONTROL` is new: `update.sh` asks once in a terminal, defaulting to yes for one stack per
+  host (mode A) and no where stacks share one (mode B). Answer no wherever stacks of others share
+  the host.
+
+### Added
+
+- `setup.sh` offers to keep the host up to date on its own: a ticked checkbox, or
+  `UNATTENDED_UPGRADES=true`, installs `unattended-upgrades` for the system's packages and Docker's
+  repository, every night at 04:00 host time, never rebooting.
+- Owners can look after the host the stack runs on where the host operator allows it with
+  `HOST_CONTROL=true` in `.env` (`setup.sh` asks; ticked for one stack per host, unticked where
+  stacks share one): `settings.hostUpdates` switches the host's unattended upgrades,
+  `system.info` shows when the host waits for a reboot, as does `/metrics`'
+  `zamfono_host_reboot_required`, `system.checkHost` reads the host now instead of within ten
+  minutes, and `system.reboot` reboots it now or at the next quiet moment. With `settings.autoReboot`, on for a new stack, the stack reboots a waiting host at a
+  quiet moment on its own. Without `HOST_CONTROL` nothing of this is shown or offered.
+
+### Security
+
+- No container holds the container runtime's socket any more, which made the `updater` service root
+  on the host. It now only leaves requests for a host agent, `setup/agent.sh`, which systemd runs
+  as root and which takes nothing but a known request with every value checked: an update to a
+  published release, and with `HOST_CONTROL` a reboot or the host's upgrades switched. The
+  `updater` runs without capabilities and mounts the stack directory read-only, but for its request
+  directory, a 1 MB tmpfs of its own on which nothing runs.
+
 ### Changed
 
+- A new stack installs newer non-breaking releases on its own: its first boot turns `autoUpdate`
+  on. An existing stack keeps its setting.
 - Every MCP tool now publishes an output schema, `system.update`, `system.checkUpdate` and
   `devices.revealCredentials` included, so an MCP client can check every answer; the OpenAPI
   document describes each shape of a write's result with its `warnings`.

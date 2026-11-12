@@ -1,8 +1,8 @@
 # The updater service (docs/spec.md §6.3 "Updates"): a small HTTP API on the stack's internal
-# network that runs the stack directory's own update.sh for `system.update`, driving the runtime
-# through its socket with the Docker CLI and Compose, which speak Docker's API and Podman's
-# Docker-compatible one alike. Build from the repository root: `docker build -f
-# images/updater/Dockerfile .`.
+# network that asks GitHub for releases, judges an update with the stack directory's own
+# `update.sh --check`, and hands it, a reboot or the host's upgrades to the host agent by a request
+# file (deploy/setup/agent.sh). It holds no container runtime socket. Build from the repository
+# root: `docker build -f images/updater/Dockerfile .`.
 FROM node:26-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json tsconfig.base.json tsconfig.json ./
@@ -19,14 +19,14 @@ RUN npx tsc -b packages/updater
 FROM node:26-alpine
 # Links the published package to its repository (§6.3 "Images").
 LABEL org.opencontainers.image.source=https://github.com/zamfono/pbx
-# update.sh's own needs: bash, curl, GNU tar and coreutils' `sha256sum -c`, and the Docker CLI
-# with its Compose plugin for the runtime behind the mounted socket.
-RUN apk add --no-cache bash curl tar coreutils docker-cli docker-cli-compose
+# What `update.sh --check` and `--current` need: bash, curl for the latest release, coreutils.
+RUN apk add --no-cache bash curl coreutils
 WORKDIR /app
 COPY packages/updater/package.json package.json
 COPY --from=build /app/packages/updater/dist dist
-# Root, deliberately: the socket it drives belongs to root, and it links the host's stack path
-# inside its own filesystem at start (main.ts).
+# Root inside the container, deliberately: .env, which `update.sh --check` reads, belongs to root,
+# as does the request directory. With no socket and no host mount beyond the stack directory,
+# read-only but for that directory, it is no root of the host.
 
 ARG ZAMFONO_REVISION
 LABEL org.opencontainers.image.revision=$ZAMFONO_REVISION

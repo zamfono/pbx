@@ -219,5 +219,5 @@ export const PRESENCE_STATUSES = [
 ] as const;
 export type PresenceStatus = (typeof PRESENCE_STATUSES)[number];
 
-/** `maintenance_gate.work`: the certificate swap or the automatic update. */
-export type MaintenanceWork = 'certSync' | 'autoUpdate';
+/** `maintenance_gate.work`: the certificate swap, the automatic update or the host's reboot. */
+export type MaintenanceWork = 'certSync' | 'autoUpdate' | 'reboot';

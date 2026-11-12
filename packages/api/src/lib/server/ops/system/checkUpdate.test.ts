@@ -44,11 +44,15 @@ describe('system.checkUpdate', () => {
     const asked = updaterAnswering(() =>
       Response.json(STATUS, { status: HTTP_OK })
     );
+    vi.stubEnv('ZAMFONO_REVISION', '79c1041aaaaaaa');
     const db = await makeTestDb();
     expect(await runOperation(db, 'system.checkUpdate', {}, asAdmin)).toEqual(
       STATUS
     );
-    expect(asked).toEqual(['POST http://updater.test/check']);
+    // With the commit api was built from, which an edge stack's newest build is compared with.
+    expect(asked).toEqual([
+      'POST http://updater.test/check?revision=79c1041aaaaaaa'
+    ]);
   });
 
   it('says why there is no update block without UPDATER_TOKEN', async () => {

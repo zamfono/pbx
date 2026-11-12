@@ -207,6 +207,64 @@ describe('settings', () => {
     ).resolves.toMatchObject({ autoUpdate: true });
   });
 
+  it('offers hostUpdates and autoReboot only with host control, to an owner, applying hostUpdates to the host (§6.3 "Host control")', async () => {
+    const db = await makeTestDb();
+    await seedSettings(db);
+    await expect(
+      runOperation(
+        db,
+        'settings.update',
+        { autoReboot: true },
+        asRun({ actor: owner })
+      )
+    ).rejects.toMatchObject({ status: 422 });
+    const plain = await runOperation(
+      db,
+      'settings.get',
+      {},
+      asRun({ actor: owner })
+    );
+    expect(plain).not.toHaveProperty('hostUpdates');
+    expect(plain).not.toHaveProperty('autoReboot');
+
+    vi.stubEnv('HOST_CONTROL', 'true');
+    vi.stubEnv('UPDATER_TOKEN', 'token');
+    const asked: unknown[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string, init?: RequestInit) => {
+        asked.push([url, init?.body]);
+        return Promise.resolve(
+          Response.json({ rebootRequired: null, updates: true })
+        );
+      })
+    );
+    try {
+      await expect(
+        runOperation(
+          db,
+          'settings.update',
+          { hostUpdates: true },
+          asRun({ actor: admin })
+        )
+      ).rejects.toMatchObject({ status: 403 });
+      await expect(
+        runOperation(
+          db,
+          'settings.update',
+          { hostUpdates: true, autoReboot: false },
+          asRun({ actor: owner })
+        )
+      ).resolves.toMatchObject({ hostUpdates: true, autoReboot: false });
+      expect(asked).toEqual([
+        ['http://updater:8080/host/updates', JSON.stringify({ enabled: true })]
+      ]);
+    } finally {
+      vi.unstubAllGlobals();
+      vi.unstubAllEnvs();
+    }
+  });
+
   it('refuses feature codes where one is a prefix of another, with 422', async () => {
     const db = await makeTestDb();
     await seedSettings(db);

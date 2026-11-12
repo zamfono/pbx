@@ -112,7 +112,11 @@ async function createSettings(
         env.SMTP_PASSWORD === undefined
           ? null
           : encrypt(kr, 'settings.smtpPasswordEnc', env.SMTP_PASSWORD),
-      mailFrom: smtpHost === null ? null : requiredEnv(env, 'MAIL_FROM')
+      mailFrom: smtpHost === null ? null : requiredEnv(env, 'MAIL_FROM'),
+      // A new stack updates itself and reboots its host when that waits for one (with
+      // HOST_CONTROL); the columns' default, 0, is what stacks seeded earlier kept.
+      autoUpdate: 1,
+      autoReboot: 1
     })
     .execute();
 }
