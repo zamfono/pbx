@@ -300,6 +300,9 @@ main() {
         # What changed without a new release: HOST_CONTROL's answer, or the updater of a release
         # before 0.9.1, which that release left running.
         "${compose[@]}" up -d --remove-orphans || warn "the stack did not take the changes; run up -d"
+        # For api at once, rather than at the agent's next run, which this run may just have
+        # installed.
+        report_stack || warn "could not report what the stack directory runs"
         exit 0
       fi
       echo "The update to $from stopped before its stack reported healthy; finishing it."

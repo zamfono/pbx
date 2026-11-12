@@ -179,7 +179,7 @@ async function deliver(
 ): Promise<void> {
   const { requestFile, resultFile, now } = files;
   const notTaken =
-    'the host agent did not take the request in time: it may be busy with an update or the upgrades switch, not installed (setup/agent.sh install, deploy/README.md step 5), or its path unit failed (journalctl -u <name>-agent.service, then systemctl reset-failed <name>-agent.path and start it)';
+    'the host agent did not take the request in time: it may be busy with an update or the upgrades switch, not installed (setup/agent.sh install, deploy/README.md step 8), or its path unit failed (journalctl -u <name>-agent.service, then systemctl reset-failed <name>-agent.path and start it)';
   const takeUntil = deadline - ANSWER_RESERVE_MS;
   if (now() >= takeUntil) {
     // Its turn came too late: an earlier request kept the agent busy.

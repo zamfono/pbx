@@ -177,8 +177,11 @@ fresh_stack
 update 1.2.4 >/dev/null 2>&1 || fail "the update to 1.2.4 failed"
 echo "  - the same release again"
 record=$(cat "$work/stack/.update/state.json")
+rm "$work/stack/.update/stack.json"
 update 1.2.4 | grep -q 'Already on 1.2.4' || fail "a second run did not say it is already on 1.2.4"
 [[ $(cat "$work/stack/.update/state.json") == "$record" ]] || fail "a run that did nothing was recorded"
+grep -qx '  "current": "1.2.4",' "$work/stack/.update/stack.json" ||
+  fail "the second run did not report what the directory runs"
 
 echo "  - an older release"
 update 1.2.3 >/dev/null 2>&1 && fail "an update to an older release ran"

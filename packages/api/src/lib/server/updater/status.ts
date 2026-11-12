@@ -25,7 +25,7 @@ export async function unavailable(
 ): Promise<string | undefined> {
   return (await deps.agent.present())
     ? undefined
-    : 'no host agent has reported the stack directory yet: it does within ten minutes of an update, or install it with setup/agent.sh install on the host (deploy/README.md, step 5)';
+    : 'no host agent has reported the stack directory yet: it does within ten minutes of an update, or install it with setup/agent.sh install on the host (deploy/README.md, step 8)';
 }
 
 /** The newest version GitHub names for a stack running `current`, `fresh` asking GitHub now;
