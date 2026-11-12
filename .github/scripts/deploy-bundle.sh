@@ -6,7 +6,7 @@
 # unpacks a first install and an upgrade alike; .env is never in the bundle, so an upgrade keeps it.
 # In the bundle, compose.yaml's `${ZAMFONO_VERSION:-latest}` defaults name the release itself,
 # so the files and the images they pull come from the same commit until .env says otherwise; a
-# VERSION file names it as data, for update.sh, setup.sh and the updater to read; and the README's
+# VERSION file names it as data, for update.sh and setup.sh to read; and the README's
 # links to docs/ point at the release tag rather than main. The asset names carry no
 # version, so releases/latest/download/<name> is a stable URL for the newest release.
 set -euo pipefail
@@ -30,7 +30,7 @@ mkdir -p "$stage/zamfono/setup"
 for f in "${files[@]}"; do cp "$root/deploy/$f" "$stage/zamfono/$f"; done
 # The release notes, with every upgrade's own steps, next to the files they are about.
 cp "$root/CHANGELOG.md" "$stage/zamfono/CHANGELOG.md"
-# The directory the updater leaves its requests to the host agent in, which compose.yaml mounts:
+# The directory api reads the host agent's reports in and leaves its requests, which compose.yaml mounts:
 # Podman refuses a bind mount whose source is missing, and an update unpacks only files.
 mkdir -p "$stage/zamfono/.update/requests"
 : >"$stage/zamfono/.update/requests/.keep"

@@ -31,16 +31,16 @@ function passOn(error: unknown): never {
   }
   throw new OpError(
     HTTP_SERVICE_UNAVAILABLE,
-    `system.update: the updater did not answer: ${errorMessage(error)}`
+    `system.update: ${errorMessage(error)}`
   );
 }
 
 /**
- * Hands an update to the updater (§6.3 "Updates"), the one path `system.update` and the
+ * Hands an update to the host agent (§6.3 "Updates"), the one path `system.update` and the
  * automatic update (`jobs/autoUpdate.ts`) share: the latest release, or `version`, a breaking
  * one only with an owner's `breaking`, which the automatic update's requester cannot carry. Refused
  * unless `.env` sets `UPDATER_TOKEN` and a backup run finished `ok` within the last hour, so the
- * update begins from a restorable point. The updater records who asked with the run;
+ * update begins from a restorable point. The run's record names who asked;
  * `update_state` keeps when it began and, for an automatic run, the `release` its failure counts
  * on (`attemptedRelease`), so the automatic update can follow its own run up.
  */

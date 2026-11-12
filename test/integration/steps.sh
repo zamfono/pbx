@@ -20,7 +20,7 @@ bring_up_stack() {
   assert_public_network_address
 
   # A throwaway tenant, its .env written by setup.sh from the answers an operator gives it; the
-  # owner's password is hashed by the api image under test, and the updater drives the runtime
+  # owner's password is hashed by the api image under test, and the host agent drives the runtime
   # this run brings the stack up on (§6.3 "Updates"). The defaults compose.yaml gives everything
   # else hold for the scenarios: HEP_ENABLED is on (§7), as the `*-sip-log-*` scenarios need.
   # EXTERNAL_IPV4 is `netns`'s fixed address on `internal` (compose.test.yaml), Asterisk's, where the
@@ -154,15 +154,15 @@ backup_run_ended() {
 }
 
 # §6.3 "Updates": once the host agent has run for the stack directory, which systemd would run
-# and this step runs itself (setup/agent.sh), system.info carries the updater's status rather than
-# why it has none, and system.update reaches it with the token api holds: from this checkout,
-# which has no VERSION file, the updater refuses with 409 for that reason, before it asks the
-# agent for anything. api asks it only once a backup has finished ok, so the step backs up first where
+# and this step runs itself (setup/agent.sh), system.info carries the update status rather than
+# why it has none, read by api from the agent's reports in .update, and system.update is judged
+# there: from this checkout, which has no VERSION file, the agent reports no release and api
+# refuses with 409 for that reason, before it asks the agent for anything. api asks it only once a backup has finished ok, so the step backs up first where
 # this run has not (`step_backups`). Selectable as `updater`; after `backups`, on every shard,
 # since it asks for the runtime of this run.
 step_updater() {
   [ "${backed_up:-false}" = true ] || step_backups
-  echo '== reaching the updater through system.info and system.update =='
+  echo '== reaching the host agent through system.info and system.update =='
   local info refusal
   ZAMFONO_AGENT_TEST_TREE=1 ZAMFONO_RUNTIME=$RUNTIME bash "$run_dir/setup/agent.sh" || fail "the host agent's report failed"
   info=$(api GET /system/info) || fail "GET /system/info did not answer"
@@ -171,15 +171,18 @@ import json, sys
 info = json.load(sys.stdin)
 update = info["update"]
 if "unavailable" in update or "last" not in update:
-    sys.exit("the updater is not usable: %s" % json.dumps(update))
+    sys.exit("api cannot update the stack: %s" % json.dumps(update))
 # §10.3 System, §10.4 "After a restart": core dates itself and the Asterisk it is connected to.
 core = info["core"] or {}
 if not core.get("startedAt") or not core.get("asteriskStartedAt"):
     sys.exit("system.info carries no core start times: %s" % json.dumps(core))
-' || fail "system.info reports no usable updater, or no core start times"
+' || fail "system.info reports no usable update status, or no core start times"
   refusal=$(api_status POST /system/update '{"confirm":true}')
   case $refusal in
-    409$'\n'*'runs no release to update from'*) echo "   refused as expected: ${refusal#*$'\n'}" ;;
+    # A checkout runs no release; a stack upgraded from one (UPGRADE_FROM) runs the build as the
+    # next patch release, which GitHub's latest is not newer than.
+    409$'\n'*'runs no release to update from'* | 409$'\n'*'is not newer than'*)
+      echo "   refused as expected: ${refusal#*$'\n'}" ;;
     *) fail "system.update did not answer as expected: $refusal" ;;
   esac
 }

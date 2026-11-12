@@ -68,15 +68,27 @@ upgrade_start_previous() {
     || fail "could not download v$version's test/integration/compose.test.yaml"
   compose=${compose/"$here/compose.test.yaml"/"$overlay"}
   echo "== §6.3 Upgrades: starting v$version from its own bundle and images =="
-  ASTERISK_IMAGE=$UPGRADE_REGISTRY/asterisk:$version MIGRATE_IMAGE=$UPGRADE_REGISTRY/migrate:$version \
+  # With the release's own recreate.sh, as its update.sh would: the build's removes an updater the
+  # files no longer name, which must be left for the upgrade to remove.
+  # shellcheck source=/dev/null
+  (. "$run_dir/setup/recreate.sh" &&
+    ASTERISK_IMAGE=$UPGRADE_REGISTRY/asterisk:$version MIGRATE_IMAGE=$UPGRADE_REGISTRY/migrate:$version \
     CORE_IMAGE=$UPGRADE_REGISTRY/core:$version API_IMAGE=$UPGRADE_REGISTRY/api:$version \
     PROXY_IMAGE=$UPGRADE_REGISTRY/proxy:$version UPDATER_IMAGE=$UPGRADE_REGISTRY/updater:$version \
-    stack_recreate
+    stack_recreate) || fail "v$version did not come up"
+  ! grep -q '^  updater:' "$run_dir/compose.yaml" \
+    || [ -n "$("$RUNTIME" ps -aq --filter label=com.docker.compose.service=updater \
+    --filter "label=com.docker.compose.project=$(stack_project "$run_dir")")" ] \
+    || fail "v$version runs no updater for the upgrade to remove"
 }
 
-# `$1`'s stack up and ready on its own overlay, and its data read into UPGRADE_BEFORE.
+# `$1`'s stack up and ready on its own overlay, and its data read into UPGRADE_BEFORE. The
+# build's images, which no container uses while the release runs, are held by stopped containers
+# of their own until the upgrade: starting the stack prunes the stack's unused images
+# (deploy/setup/recreate.sh), as an update does.
 upgrade_previous() {
   local compose=$compose
+  host_update_hold_images
   upgrade_start_previous "$1"
   stack_assert_migrated
   upgrade_snapshot "$UPGRADE_BEFORE"
@@ -96,17 +108,25 @@ upgrade_to_build() {
   host_update "$target" \
     || fail "update.sh $target failed: $(tail -n 40 "$host_update_work/update.log")"
   host_update_stop
+  host_update_drop_images
   trap cleanup EXIT
   rm -rf "$host_update_work"
   host_update_work=
   upgrade_assert_images
 }
 
-# Every one of the stack's six services now runs the build's own image, not the release's.
-# Podman names a local image `localhost/…` and a Hub one `docker.io/…`; neither prefix counts.
+# Every one of the stack's five services now runs the build's own image, not the release's, and
+# the updater of a release before 0.9.1 is gone once the host agent ran (setup/agent.sh), as its
+# timer runs it on an operator's host within ten minutes. Podman names a local image
+# `localhost/…` and a Hub one `docker.io/…`; neither prefix counts.
 upgrade_assert_images() {
   local service var expected running
-  for service in asterisk migrate core api proxy updater; do
+  ZAMFONO_AGENT_TEST_TREE=1 ZAMFONO_RUNTIME=$RUNTIME bash "$run_dir/setup/agent.sh" \
+    || fail "the host agent's first run after the upgrade failed"
+  [ -z "$("$RUNTIME" ps -aq --filter label=com.docker.compose.service=updater \
+    --filter "label=com.docker.compose.project=$(stack_project "$run_dir")")" ] \
+    || fail "the updater of the release upgraded from is still there: $(dc ps -a)"
+  for service in asterisk migrate core api proxy; do
     var=${service^^}_IMAGE
     expected=${!var}
     running=$(dc ps -a --format '{{.Service}} {{.Image}}' \

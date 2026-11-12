@@ -3,7 +3,7 @@
 # (.env.example), on the stack and the release server update-test.sh set up (`work`, `port`,
 # `fresh_stack`, `fail`, `update`, `pin`).
 
-echo "  - --check: RELEASING.md's policy, its verdict as the exit status the updater reads, no runtime needed"
+echo "  - --check: RELEASING.md's policy, its verdict as the exit status, no runtime needed"
 # check_status FROM TO [ENV...] — --check's exit status for TO on a stack .env pins at FROM, its
 # text in $work/out; no run of it may leave a record.
 check_status() {
@@ -17,10 +17,10 @@ check_status() {
   echo "$status"
 }
 fresh_stack
-# from, to, the status: 0 update, 10 breaking, 11 not newer.
 while read -r from to expected; do
   [[ -n $from ]] || continue
-  # The updater's container has no runtime: one that names none must answer the same.
+  # An updater of 0.9.0 or earlier asks in its container, which has no runtime: one that names none
+  # must answer the same.
   for run in host updater; do
     if [[ $run == host ]]; then
       got=$(check_status "$from" "$to" PATH="$work/bin:$PATH" ZAMFONO_RUNTIME=docker)
@@ -35,30 +35,8 @@ while read -r from to expected; do
     10) grep -qx "$from -> $to (breaking update)" "$work/out" ;;
     *) true ;;
   esac || fail "$from to $to: --check said $(cat "$work/out")"
-done <<'CASES'
-0.0.6 0.0.6 11
-1.2.3 1.2.3 11
-0.0.6 0.0.5 11
-0.1.0 0.0.9 11
-1.0.0 0.9.9 11
-2.0.0 1.9.9 11
-1.10.0 1.9.0 11
-0.0.5 0.0.6 0
-0.0.5 0.0.7 0
-0.0.9 0.0.10 0
-0.1.0 0.1.1 0
-1.2.3 1.2.4 0
-1.2.3 1.3.0 0
-1.9.9 1.10.0 0
-1.2.3 1.12.0 0
-0.0.6 0.1.0 10
-0.1.3 0.2.0 10
-0.9.0 1.0.0 10
-0.0.6 1.0.0 10
-1.9.0 2.0.0 10
-1.2.3 3.0.0 10
-CASES
-# The release an update stopped at is one the updater may install: its run finishes that update.
+done < <(grep -v '^#' "$repo_root/deploy/update-check-cases.txt")
+# The release an update stopped at is one an update may install: its run finishes that update.
 echo 1.2.3 >"$work/stack/.update-pending"
 [[ $(check_status 1.2.3 1.2.3 ZAMFONO_RUNTIME=none) == 0 ]] ||
   fail "--check on an unfinished update did not exit 0: $(cat "$work/out")"
@@ -150,7 +128,7 @@ grep -qx 'edge -> edge (update)' "$work/out" || fail "--check edge said $(cat "$
 : >"$work/runtime.log"
 update >"$work/out" 2>&1 || { cat "$work/out"; fail "the update of an edge stack failed"; }
 grep -qx 'compose pull' "$work/runtime.log" || fail "no pull of edge: $(cat "$work/runtime.log")"
-grep -qx 'compose up -d --wait --wait-timeout 180' "$work/runtime.log" ||
+grep -qx 'compose up -d --remove-orphans --wait --wait-timeout 180' "$work/runtime.log" ||
   fail "no up -d after the edge pull: $(cat "$work/runtime.log")"
 [[ $(pin) == '1.2.3 ZAMFONO_VERSION:-1.2.3' ]] || fail "the edge update installed a bundle: $(pin)"
 grep -qx 'ZAMFONO_VERSION=edge' "$work/stack/.env" || fail "the edge update changed ZAMFONO_VERSION"

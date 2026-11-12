@@ -2,7 +2,7 @@
  * The host's upkeep (§6.3 "Host control"), only while `HOST_CONTROL` is `true`: the host's
  * unattended upgrades kept as `settings.host_updates` says, and a reboot through the maintenance
  * gate (`maintenanceWindow.ts`) once an owner scheduled one, or once the host waits for one and
- * `settings.auto_reboot` is on. A reboot also waits while a backup runs, and the updater refuses
+ * `settings.auto_reboot` is on. A reboot also waits while a backup runs, and the host agent refuses
  * one while an update runs; the pass then tries again soon.
  */
 import pino from 'pino';
@@ -71,8 +71,8 @@ async function backupRunning(db: Db): Promise<boolean> {
 }
 
 /**
- * Asks the updater for the reboot, the request dropped first, since the host may go down soon
- * after, and put back when the updater refuses; `true` once it began, which is audited.
+ * Asks the host agent for the reboot, the request dropped first, since the host may go down soon
+ * after, and put back when it is refused; `true` once it began, which is audited.
  */
 async function reboot(
   deps: HostJobDeps,

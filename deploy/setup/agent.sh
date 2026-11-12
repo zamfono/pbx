@@ -1,25 +1,26 @@
 #!/usr/bin/env bash
-# The stack's host agent (docs/spec.md §6.3 "Updates" and "Host control"): what the updater service
-# asks of the host, carried out on the host as root, so no container holds the runtime's socket.
-# systemd runs it for one stack directory through three units named after it (setup/boot-unit.sh,
-# stack_unit_base): <name>-agent.path starts <name>-agent.service whenever the updater has left a
-# request in .update/requests/request, and <name>-agent.timer every ten minutes. A fourth, a mount
-# unit named after the path, makes .update/requests a tmpfs of its own, 1 MB, nosuid, nodev,
-# noexec: the updater fills that at most, never the host's disk, and nothing it leaves there runs.
+# The stack's host agent (docs/spec.md §6.3 "Updates" and "Host control"): what api asks of the
+# host, carried out on the host as root, so no container holds the runtime's socket. systemd runs
+# it for one stack directory through three units named after it (setup/boot-unit.sh,
+# stack_unit_base): <name>-agent.path starts <name>-agent.service whenever api has left a request
+# in .update/requests/request, and <name>-agent.timer every ten minutes. A fourth, a mount unit
+# named after the path, makes .update/requests a tmpfs of its own, 1 MB, nosuid, nodev, noexec: api
+# fills that at most, never the host's disk, and nothing it leaves there runs.
 #
 #   setup/agent.sh                      take the request, if there is one, answer it in
 #                                       .update/result, carry it out, and report: .update/agent,
-#                                       and .update/host.json with HOST_CONTROL=true in .env
+#                                       .update/stack.json, what the directory runs, and
+#                                       .update/host.json with HOST_CONTROL=true in .env
 #   setup/agent.sh install [RUNTIME]    install and start the units (root, systemd); RUNTIME is
 #                                       docker or podman, the one the stack runs on
 #   setup/agent.sh refresh [RUNTIME]    rewrite this directory's units where a newer release
 #                                       changed their text; nothing where none are (update.sh)
 #   setup/agent.sh uninstall            stop and remove them
 #
-# The request is the only thing a container writes that the agent reads: the updater may write in
-# .update/requests and nowhere else, the rest of the stack directory being mounted read-only, and
-# .update is root's alone (0700), so nothing the container leaves there reaches another user of the
-# host. The agent takes the request out of the container's reach first, reads it once, accepts a
+# The request is the only thing a container writes that the agent reads: api may write in
+# .update/requests and nowhere else, reading the rest of .update, which it mounts read-only in
+# root's group, and .update is root's and its group's alone (0750), so nothing the container leaves
+# there reaches another user of the host. The agent takes the request out of the container's reach first, reads it once, accepts a
 # regular file of at most 1 KB, no older than 10 s, of complete known key=value lines alone, every
 # value checked, never repeats it, and answers its id in .update/result, `ok` or the refusal's
 # reason, before the work:
@@ -45,6 +46,8 @@ cd "$(dirname "$0")/.."
 . setup/host-updates.sh
 # shellcheck source=setup/boot-unit.sh
 . setup/boot-unit.sh
+# shellcheck source=setup/recreate.sh
+. setup/recreate.sh
 
 REQUEST=.update/requests/request
 RESULT=.update/result
@@ -62,7 +65,7 @@ declare -A req=()
 # Moves the request into .update, which no container can write, before reading it, so it can be
 # neither swapped for a link nor changed meanwhile, and reads it once, at most one byte past what a
 # request may be; fills `req`. Returns 1 for no request, 3 for one it could not take (a full disk),
-# and 2 for one refused, with the reason in `refusal`: no regular file, older than the updater
+# and 2 for one refused, with the reason in `refusal`: no regular file, older than api
 # waits, too big, holding a NUL byte, a line unfinished or no key=value. It runs where errexit
 # does not (`take_request || ...`): every step is checked.
 refusal=
@@ -86,7 +89,7 @@ take_request() {
       [[ ${content: -1} != $'\n' ]]; then
       status=2
     elif (($(date +%s) - $(stat -c %Y "$file") > MAX_REQUEST_AGE_S)); then
-      # The updater waits no longer than this; one it gave up on must not happen after.
+      # api waits no longer than this; one it gave up on must not happen after.
       refusal="a request older than $MAX_REQUEST_AGE_S s, which its caller no longer waits for"
       status=2
     fi
@@ -117,8 +120,8 @@ allowed() {
   done
 }
 
-# answer ok | answer refused REASON — the request's answer in .update/result, for the updater to
-# pass on; nothing for a request without a valid id, which the updater never sends.
+# answer ok | answer refused REASON — the request's answer in .update/result, for api to pass on;
+# nothing for a request without a valid id, which api never sends.
 answer() {
   [[ ${req[id]:-} =~ ^$ID$ ]] || return 0
   {
@@ -126,6 +129,7 @@ answer() {
     [[ $1 == ok ]] || printf ',\n  "reason": %s' "$(json_string "$2")"
     printf '\n}\n'
   } >"$RESULT.next"
+  chmod 644 "$RESULT.next"
   mv -f "$RESULT.next" "$RESULT"
 }
 
@@ -185,7 +189,7 @@ run_update() {
   exec 9>&-
 }
 
-# .update/host.json, what the updater reports of the host (HostStatus in packages/shared), with
+# .update/host.json, what api reports of the host (HostStatus in packages/shared), with
 # HOST_CONTROL=true only; removed otherwise.
 report_host() {
   local file=.update/host.json
@@ -206,6 +210,7 @@ report_host() {
     [[ -z $refused ]] || printf ',\n  "rebootRefused": %s' "$(json_string "$refused")"
     printf '\n}\n'
   } >"$file.next"
+  chmod 644 "$file.next"
   mv -f "$file.next" "$file"
 }
 
@@ -231,7 +236,7 @@ serve_request() {
       [[ -z $refused ]] || { refuse "$refused"; return 0; }
       ! update_running || { refuse "an update is running on the host"; return 0; }
       answer ok
-      echo "Rebooting the host, as the stack's updater asked: an owner, or the automatic reboot."
+      echo "Rebooting the host, as the stack's api asked: an owner, or the automatic reboot."
       report_host
       # A moment for the api to record the reboot it asked for before the host goes down.
       sleep "${ZAMFONO_REBOOT_DELAY:-5}"
@@ -258,14 +263,13 @@ serve_request() {
   esac
 }
 
-# Fails, naming it, where the stack directory, anything in it but the updater's request
-# directory, or a directory above it could be written by anyone but root.
+# Fails, naming it, where the stack directory, anything in it but api's request directory, or a directory above it could be written by anyone but root.
 check_tree() {
   # deploy/test.sh's stacks live under /tmp, which everyone may write.
   [[ -z ${ZAMFONO_AGENT_TEST_TREE:-} ]] || return 0
   local bad dir=$PWD
   # It runs in a subshell where errexit does not: a find that fails is a failure too.
-  bad=$(find -L . -path ./.update/requests -prune -o \
+  bad=$(find -L . \( -path ./.update/requests -o -path './.update/taken.*' \) -prune -o \
     \( ! -user root -o \( ! -type l -perm /022 \) \) -print -quit) ||
     fail "could not look through $PWD for files others than root may write"
   [[ -z $bad ]] || fail "$PWD/${bad#./} must belong to root and be writable by no one else before" \
@@ -278,41 +282,48 @@ check_tree() {
   done
 }
 
-# Fails unless the request directory is its own tmpfs: without it, the updater would write on
-# the host's disk.
+# Fails unless the request directory is its own tmpfs: without it, api would write on the host's
+# disk.
 check_requests_mount() {
   [[ -z ${ZAMFONO_AGENT_TEST_TREE:-} ]] || return 0
   [[ $(findmnt -n -o FSTYPE --mountpoint "$PWD/.update/requests" 2>/dev/null) == tmpfs ]] ||
     fail "$PWD/.update/requests is not its own tmpfs: start $(requests_mount_unit) (setup/agent.sh install)"
 }
 
-# Recreates the updater, so its bind of the request directory is the tmpfs mounted there now,
-# with its options: a restart keeps the bind's flags on Podman.
-recreate_updater() {
-  setup/compose.sh up -d --force-recreate --no-deps updater >/dev/null 2>&1 ||
-    warn "could not recreate the updater; it may still write where the agent does not read"
+# Recreates api, so its bind of the request directory is the tmpfs mounted there now, with its
+# options: a restart keeps the bind's flags on Podman.
+recreate_api() {
+  setup/compose.sh up -d --force-recreate --no-deps api >/dev/null 2>&1 ||
+    warn "could not recreate api; it may still write where the agent does not read"
 }
 
-# Where the updater's bind of the request directory is no longer the tmpfs the host has there,
-# because systemd mounted a fresh one when the last went missing, it is recreated: until then it
-# writes into a tmpfs no one reads. The timer's runs heal it within ten minutes.
-rebind_updater() {
+# api's container, empty while it does not run.
+api_container() {
+  local id
+  id=$(setup/compose.sh ps -q api 2>/dev/null) && [[ $id =~ ^[0-9a-f]+$ ]] && echo "$id"
+}
+
+# Where api's bind of the request directory is no longer the tmpfs the host has there, because
+# systemd mounted a fresh one when the last went missing, it is recreated: until then it writes
+# into a tmpfs no one reads. The timer's runs heal it within ten minutes.
+rebind_api() {
   local host id pid bound
   host=$(mountpoint -d "$PWD/.update/requests" 2>/dev/null) || return 0
-  id=$(setup/compose.sh ps -q updater 2>/dev/null) && [[ $id =~ ^[0-9a-f]+$ ]] || return 0
+  id=$(api_container) || return 0
   pid=$("${ZAMFONO_RUNTIME:-docker}" inspect -f '{{.State.Pid}}' "$id" 2>/dev/null) &&
     [[ $pid =~ ^[1-9][0-9]*$ ]] || return 0
-  bound=$(awk '$5 == "/stack/.update/requests" { dev = $3 } END { print dev }' "/proc/$pid/mountinfo" 2>/dev/null)
+  bound=$(awk '$5 == "/update/requests" { dev = $3 } END { print dev }' "/proc/$pid/mountinfo" 2>/dev/null)
   [[ -n $bound && $bound != "$host" ]] || return 0
-  warn "the updater's request directory ($bound) is not the host's tmpfs ($host); recreating it"
-  recreate_updater
+  warn "api's request directory ($bound) is not the host's tmpfs ($host); recreating it"
+  recreate_api
 }
 
-# .update root's alone, and nothing in the request directory but the request and the updater's
-# own files being written: a container could leave setuid files or device nodes there.
+# .update root's and its group's alone, and nothing in the request directory but the request and
+# api's own files being written: a container could leave setuid files or device nodes there.
 tidy_update_dir() {
-  mkdir -p .update/requests
-  chmod 700 .update
+  update_dir
+  # What a run cut off between taking a request and removing it left: api's file, not root's.
+  rm -rf .update/taken.*
   find .update/requests -mindepth 1 -maxdepth 1 ! -name request \
     \( ! -name '.*' -o ! -type f -o -mmin +1 \) -exec rm -rf {} +
 }
@@ -331,14 +342,17 @@ serve() {
       refuse "the stack directory is not as the host agent needs it; the host's journal says why"
     return 1
   fi
-  rebind_updater
+  rebind_api
   if ((status == 2)); then
     refuse "$refusal"
   elif ((status == 0)); then
     serve_request
   fi
+  remove_old_updater
   report_host
-  outcome_now >.update/agent.next && mv -f .update/agent.next .update/agent
+  # An update's run reports it at its end; read now, it could name the run's pending release.
+  update_running || report_stack || warn "could not report what the stack directory runs"
+  outcome_now >.update/agent.next && chmod 644 .update/agent.next && mv -f .update/agent.next .update/agent
 }
 
 # The launcher systemd runs, root's, outside every stack directory: it checks a directory, as
@@ -358,7 +372,7 @@ refuse() {
   echo "zamfono-agent: $*; nothing runs from $dir" >&2
   exit 1
 }
-bad=$(find -L . -path ./.update/requests -prune -o \( ! -user root -o \( ! -type l -perm /022 \) \) -print -quit) ||
+bad=$(find -L . \( -path ./.update/requests -o -path './.update/taken.*' \) -prune -o \( ! -user root -o \( ! -type l -perm /022 \) \) -print -quit) ||
   refuse "could not look through it"
 [ -z "$bad" ] || refuse "$bad must belong to root and be writable by no one else"
 d=$dir
@@ -396,18 +410,19 @@ requests_mount_unit() {
   systemd-escape --path --suffix=mount "$PWD/.update/requests"
 }
 
-# Mounted early at boot, before the runtime starts the stack, so the updater binds the tmpfs.
+# Mounted early at boot, before the runtime starts the stack, so api binds the tmpfs. Root's group
+# may write there: api's, and no other user of the host reaches it through .update (update_dir).
 mount_unit() {
   cat <<EOF
 [Unit]
-Description=The Zamfono updater's request directory for the stack in $PWD
+Description=api's requests to the Zamfono host agent for the stack in $PWD
 Before=docker.service
 
 [Mount]
 What=tmpfs
 Where=$PWD/.update/requests
 Type=tmpfs
-Options=size=1m,nr_inodes=64,mode=0700,nosuid,nodev,noexec
+Options=size=1m,nr_inodes=64,mode=0770,nosuid,nodev,noexec
 
 [Install]
 WantedBy=local-fs.target
@@ -461,8 +476,7 @@ install_units() {
   owner=$(units_directory)
   [[ -z $owner || $owner == "$PWD" ]] ||
     fail "$base already serves the stack in $owner; give this stack directory another name"
-  mkdir -p .update/requests
-  chmod 700 .update
+  update_dir
   check_tree
   local mount mounted=
   mount=$(requests_mount_unit)
@@ -480,11 +494,14 @@ install_units() {
   systemctl enable --now "$mount" >/dev/null 2>&1
   systemctl enable --now "$base.path" "$base.timer" >/dev/null 2>&1
   if [[ -z $mounted ]]; then
-    # Mounted just now, over a directory a running updater and the path unit still hold: both
-    # take the tmpfs once restarted.
+    # Mounted just now, over a directory a running api and the path unit still hold: both take
+    # the tmpfs once restarted.
     systemctl restart "$base.path"
-    [[ -z $(setup/compose.sh ps -q updater 2>/dev/null) ]] || recreate_updater
+    ! api_container >/dev/null || recreate_api
   fi
+  # A tmpfs a release before 0.9.1 mounted, root's alone (0700), until the next boot mounts it as
+  # the unit now says.
+  update_dir
   # Not waited for: update.sh refreshes the units from within the agent's own run, which a
   # waiting start would wait for.
   systemctl start --no-block "$base.service"

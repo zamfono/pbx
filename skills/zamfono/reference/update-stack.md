@@ -8,20 +8,21 @@ arguments:
 
 # Update the stack
 
-The owner installs a newer release without a shell on the host. The stack's `updater` service
-judges the update and hands it to the host agent, which runs it on the host; it takes only a
+The owner installs a newer release without a shell on the host. The stack judges the update and
+hands it to the host agent, which runs it on the host; it takes only a
 published release that is newer than the running one, a breaking one only when asked to (see
 Breaking releases).
 
 1. Check what is available: `system.info` (`GET /api/v1/system/info`). Its `update` field names the
    `current` and the `latest` release. `updatable: true` means `system.update` can install it.
    `breaking: true` means the release needs the operator to read its upgrade notes first (see
-   Breaking releases). `unavailable` says why the updater cannot run at
+   Breaking releases). `unavailable` says why the stack cannot be updated this way at
    all: a missing `UPDATER_TOKEN` in `.env`, or no host agent, which the operator installs on the
-   host with `setup/agent.sh install`. On a test stack whose
+   host with `setup/agent.sh install`; right after an update it says so for up to ten minutes,
+   until the new release's host agent has reported. On a test stack whose
    `ZAMFONO_VERSION` is `edge`, `current` and `latest` both say `edge`, `latest` naming main's
    newest build; `updatable: true` means the stack runs an older one, and the update pulls it.
-   The updater asks GitHub once an hour; `system.checkUpdate` (`POST /api/v1/system/updateCheck`)
+   The stack asks GitHub once an hour; `system.checkUpdate` (`POST /api/v1/system/updateCheck`)
    has it ask now, at most once a minute, and answers with the same `update` field.
 2. Back up first: `backups.runs.start` (`POST /api/v1/backups/runs`) on a target from
    `backups.targets.list` (`GET /api/v1/backups/targets`), then read the run with `backups.runs.get`
@@ -32,7 +33,7 @@ Breaking releases).
    `breaking: true` for a breaking release. It asks for confirmation and answers as soon as the host agent has taken
    the update, with its record once the run began.
 4. Follow it with `system.info`: `update.last.state` goes from `running` to `succeeded` or `failed`,
-   with the end of the updater's log in `error`, and `update.last.trigger` says who asked:
+   with the end of the update's log in `error`, and `update.last.trigger` says who asked:
    `manual` (with the owner in `by`), `automatic` or `host` (`update.sh` on the host).
    `succeeded` means every recreated service reported healthy, `core` included. While the stack restarts, calls drop and the API
    does not answer for a minute or two; `system.info` answering again with the new `api.version`
@@ -44,8 +45,7 @@ Breaking releases).
 
 The stack takes newer non-breaking releases on its own while `autoUpdate` is on, as it is on a new
 stack; an owner turns it off or on with `settings.update` (`PATCH /api/v1/settings`) and
-`{ "autoUpdate": false }`. The stack then asks
-the updater every hour. When a release is available, it waits for the next maintenance moment, the
+`{ "autoUpdate": false }`. The stack then looks for a newer release every hour. When a release is available, it waits for the next maintenance moment, the
 same quiet time a renewed TLS certificate is swapped in at: the middle of a tenant-wide
 out-of-office period, else of the longest closed period of the opening hours, else
 `settings.tlsReloadHour`, else the hour `TLS_RELOAD_HOUR` in `.env` names, else 03:00. Then it waits
@@ -70,8 +70,8 @@ failure until an update succeeds:
   `zamfono_auto_update_failed 1` with the failed attempts in
   `zamfono_auto_update_failed_attempts`;
 - `system.info` shows the release in `autoUpdate.failed`, with the reason of the last attempt,
-  such as `no enabled backup target`, the target and error of a failed backup, the updater's
-  refusal, the end of the updater's log or what kept the stack busy, and the failed `attempts` on
+  such as `no enabled backup target`, the target and error of a failed backup, the stack's
+  refusal, the end of the update's log or what kept the stack busy, and the failed `attempts` on
   that release;
 - every owner gets one `updateFailed` mail once the last attempt failed (see `mail-templates`);
 - `audit.list` has a `system.autoUpdate` entry on channel `job` for every attempt and outcome:
@@ -89,8 +89,7 @@ automatically, whether `autoUpdate` is on or not, nor by `system.update` without
 `system.info` shows the release in `update.latest` with `update.breaking: true`, `/metrics` has
 `zamfono_breaking_update_available 1`, and every owner gets one `breakingUpdate` mail per such
 release. `/healthz`, the public uptime check, says nothing of releases, since anyone can read it.
-Without `UPDATER_TOKEN` the stack asks no updater, updates nothing on its own and announces
-nothing: `/healthz` passes `update:automatic`, the `/metrics` update gauges are
+Without `UPDATER_TOKEN` the stack updates nothing on its own and announces nothing: `/healthz` passes `update:automatic`, the `/metrics` update gauges are
 0, and `system.info` has no `autoUpdate.failed`. Read its upgrade notes, at `update.latest.url`, then install it with `system.update` and
 `breaking: true`, or on the host with `update.sh`. Notes that ask for work on the host, such as a
 new `.env` setting, need `update.sh` there.

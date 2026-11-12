@@ -124,7 +124,7 @@ modes=$(cd "$work/stack" && stat -c '%a %n' Caddyfile compose.yaml setup/compose
   fail "the update did not install the bundle's modes: $modes"
 grep -qx 'compose pull' "$work/runtime.log" ||
   fail "no pull of the whole stack: $(cat "$work/runtime.log")"
-grep -qx 'compose up -d --wait --wait-timeout 180' \
+grep -qx 'compose up -d --remove-orphans --wait --wait-timeout 180' \
   "$work/runtime.log" || fail "no up -d --wait of the whole stack"
 grep -q 'rm -sf proxy' "$work/runtime.log" && fail "Docker needs no removal of proxy"
 # The images of earlier releases, the stack's own alone, once the stack is up.
@@ -135,17 +135,22 @@ grep -q 'Updated 1.2.3 -> 1.2.4' "$work/out" || fail "no report of the update"
 echo "  - recorded in .update/state.json: running while it runs, then succeeded"
 record_is "$work/runtime.log.state" running 1.2.3 1.2.4
 record_is "$work/stack/.update/state.json" succeeded 1.2.3 1.2.4
+grep -qx '  "current": "1.2.4",' "$work/stack/.update/stack.json" &&
+  grep -qx '  "pending": null' "$work/stack/.update/stack.json" ||
+  fail "update.sh did not report what the directory runs now: $(cat "$work/stack/.update/stack.json" 2>&1)"
 
 echo "  - an update whose stack does not come up healthy is finished by a rerun"
 fresh_stack
 STUB_FAIL_UP=1 update 1.2.4 >"$work/out" 2>&1 && fail "an update whose up failed reported success"
 grep -q 'did not report healthy' "$work/out" || fail "no word of the failed up: $(cat "$work/out")"
 grep -q 'image prune' "$work/runtime.log" && fail "an update whose up failed removed images"
+grep -qx '  "pending": "1.2.4"' "$work/stack/.update/stack.json" ||
+  fail "the stack report does not name the update to finish: $(cat "$work/stack/.update/stack.json")"
 : >"$work/runtime.log"
 update 1.2.4 >"$work/out" 2>&1 || { cat "$work/out"; fail "the rerun failed"; }
 grep -q 'finishing it' "$work/out" || fail "the rerun did not finish the update: $(cat "$work/out")"
 grep -q ' pull' "$work/runtime.log" && fail "the rerun pulled again"
-grep -qx 'compose up -d --wait --wait-timeout 180' \
+grep -qx 'compose up -d --remove-orphans --wait --wait-timeout 180' \
   "$work/runtime.log" || fail "the rerun did not recreate the stack"
 update 1.2.4 | grep -q 'Already on 1.2.4' || fail "the finished update is still pending"
 record_is "$work/stack/.update/state.json" succeeded '' 1.2.4
@@ -199,7 +204,7 @@ grep -q 'needs --yes' "$work/out" || fail "no word of --yes: $(cat "$work/out")"
 update --yes 2.0.0 >/dev/null 2>&1 || fail "the breaking update with --yes failed"
 [[ $(pin) == '2.0.0 ZAMFONO_VERSION:-2.0.0' ]] || fail "the stack pins $(pin), not 2.0.0"
 
-echo "  - run by an updater from before the host agent: refused, but for --check and --current"
+echo "  - run by an updater from before 0.9.0: refused, but for --check and --current"
 fresh_stack
 (cd "$work/stack" && ZAMFONO_UPDATER=1 PATH="$work/bin:$PATH" STUB_LOG="$work/runtime.log" \
   ZAMFONO_REPO_URL="http://127.0.0.1:$port" ./update.sh 1.2.4 </dev/null >"$work/out" 2>&1) &&
@@ -228,8 +233,8 @@ grep -q 'reboot it through the API' "$work/out" && fail "HOST_CONTROL was offere
 sed -i 's/^HOST_CONTROL=.*/HOST_CONTROL=/' "$work/stack/.env"
 in_terminal ''
 grep -qx "HOST_CONTROL='true'" "$work/stack/.env" || fail "Enter did not take mode A's yes: $(grep HOST_CONTROL "$work/stack/.env")"
-# A plain up -d recreates what changed: api and updater for HOST_CONTROL, or an old updater.
-grep -qx 'compose up -d' "$work/runtime.log" ||
+# A plain up -d recreates what changed: api for HOST_CONTROL; it removes an old updater.
+grep -qx 'compose up -d --remove-orphans' "$work/runtime.log" ||
   fail "the stack was not brought up to date for HOST_CONTROL: $(cat "$work/runtime.log")"
 
 # shellcheck source=update-runtime-test.sh

@@ -3,9 +3,9 @@
 # downloads that release's bundle, checks it against the release's SHA256SUMS, pulls the images,
 # unpacks the bundle over this directory, moves .env's ZAMFONO_VERSION along by its form and lists
 # the settings a newer .env.example introduced, recreates the stack and, once it is healthy,
-# removes the stack's images no container uses. The host agent runs this same script for the
-# updater's `system.update` and automatic updates (setup/agent.sh, §6.3 "Updates"), and the
-# updater runs --check and --current, which need no container runtime. Compose reads
+# removes the stack's images no container uses. The host agent runs this same script for api's
+# `system.update` and automatic updates (setup/agent.sh, §6.3 "Updates"), and --current to report
+# what the directory runs, which needs no container runtime. Compose reads
 # compose.yaml and compose.override.yaml, the link to the mode's overlay setup.sh makes, and
 # compose.dr.yaml where the stack directory holds one (§6.5).
 #
@@ -16,11 +16,11 @@
 # which pulls the newest edge images and recreates the stack, files unchanged. A release that is breaking by RELEASING.md's
 # policy (a new major, or a new minor while 0.x) shows its upgrade notes and asks first; --yes
 # answers for a run without a terminal. --check only says what an update would do, and exits
-# with its verdict, which the updater reads: 0 the update is allowed, or finishes one that stopped
+# with its verdict, which api judges the same way: 0 the update is allowed, or finishes one that stopped
 # before its stack reported healthy, 10 it is breaking, 11 VERSION is not newer than the release
 # this directory runs, 12 the directory runs no release (setup/versions.sh, tag_kind);
 # any other status is a failure. --current prints the release this directory runs, which the
-# updater reads too, and exits 12 where it runs none.
+# host agent reports to api, and exits 12 where it runs none.
 #
 # Beyond the flags, from the environment:
 #   ZAMFONO_RUNTIME         docker | podman, when both are installed
@@ -83,6 +83,9 @@ on_exit() {
   local code=$?
   [[ -z $work ]] || rm -rf "$work"
   outcome_end "$code" || warn "could not record the outcome in $OUTCOME_FILE"
+  # What the directory runs now, for api, once a run changed it or may have.
+  [[ -z $outcome_started ]] || report_stack ||
+    warn "could not report what the stack directory runs"
 }
 trap on_exit EXIT
 
@@ -92,7 +95,7 @@ env_tag() {
 
 # The release this directory runs, by ZAMFONO_VERSION's form (tag_kind): a pinned release itself,
 # `edge` for main's newest build, any other release tag the bundle's VERSION. A sha- build runs
-# none, which exits CHECK_NO_RELEASE. The one reading of it: the updater asks --current.
+# none, which exits CHECK_NO_RELEASE. The one reading of it: the host agent asks --current.
 current_version() {
   local tag kind
   tag=$(env_tag)
@@ -194,7 +197,7 @@ update_edge() {
   echo "Pulling the newest edge images ..."
   "${compose[@]}" pull || fail "pulling the edge images failed; nothing was changed"
   offer_host_control || true
-  # Before the stack: the request directory's tmpfs must be there before the updater binds it.
+  # Before the stack: the request directory's tmpfs must be there before api binds it.
   agent_upkeep
   recreate_stack
   echo "Updated to the newest edge build."
@@ -203,13 +206,12 @@ update_edge() {
 
 # What a run needs beyond --check: the runtime and the stack's Compose files, the boot unit, the
 # one lock on the directory, so an update from the host and one through the host agent never run
-# at once, and the directory the updater leaves its requests in, which compose.yaml mounts.
+# at once, and .update, which compose.yaml mounts into api.
 prepare_run() {
   detect_runtime
   add_stack_files
   unit=$(find_boot_unit)
-  mkdir -p .update/requests
-  chmod 700 .update
+  update_dir
   exec 9>.update/lock
   if ! flock -n 9; then
     echo "error: another update runs in this directory" >&2
@@ -267,7 +269,7 @@ offer_host_control() {
 }
 
 main() {
-  # The updater of a release before the host agent runs update.sh in its own container, which
+  # The updater of a release before 0.9.0 runs update.sh in its own container, which
   # recreating the stack would now take down with it: such a run must not start.
   [[ -z ${ZAMFONO_UPDATER:-} || -n $check_only || -n $current_only ]] ||
     fail "the updater no longer runs update.sh; install this release with update.sh on the host" \
@@ -295,9 +297,9 @@ main() {
         prepare_run
         offer_host_control || true
         agent_upkeep
-        # What changed without a new release: HOST_CONTROL's answer, or an updater a release before
-        # the host agent left running, which it never recreated itself.
-        "${compose[@]}" up -d || warn "the stack did not take the changes; run up -d"
+        # What changed without a new release: HOST_CONTROL's answer, or the updater of a release
+        # before 0.9.1, which that release left running.
+        "${compose[@]}" up -d --remove-orphans || warn "the stack did not take the changes; run up -d"
         exit 0
       fi
       echo "The update to $from stopped before its stack reported healthy; finishing it."
@@ -369,7 +371,7 @@ main() {
   install_bundle
   update_env
   offer_host_control || true
-  # Before the stack: the request directory's tmpfs must be there before the updater binds it.
+  # Before the stack: the request directory's tmpfs must be there before api binds it.
   agent_upkeep
   recreate_stack
   rm -f "$PENDING"

@@ -163,7 +163,7 @@ jobs:
       - name: The image names, from docker-bake.hcl
         run: scripts/image-env.sh >>"$GITHUB_ENV"
       - name: Exercise each image's own checks
-        # db/test.sh, deploy/test.sh and the four images/*/test.sh each check the image their
+        # db/test.sh, deploy/test.sh and the three images/*/test.sh each check the image their
         # docker-bake.hcl variable names, the step above setting each to the one the `images` job
         # built, so nothing is built twice and what is checked is the archive main.yaml publishes,
         # asterisk with its label; run standalone, each builds its own under :test. `publish`
@@ -175,7 +175,6 @@ jobs:
           bash images/api/test.sh
           bash images/asterisk/test.sh
           bash images/proxy/test.sh
-          bash images/updater/test.sh
       - name: A macvlan stack's default route is public's, whatever its project name (Docker)
         # Root: the check makes a dummy interface and the `public` network (§6.2.1 step 3).
         run: sudo env PROXY_IMAGE="$PROXY_IMAGE" sh deploy/macvlan-route-test.sh

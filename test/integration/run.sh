@@ -62,7 +62,10 @@ SCENARIOS_DIR="$here/scenarios"
 export $("$repo/scripts/image-env.sh")
 # cert-sync.sh's own Caddyfile (§6.4): an absolute path, for the same reason SCENARIOS_DIR is one.
 CERT_SYNC_CADDYFILE="$here/Caddyfile.local-ca"
-export API_PORT SCENARIOS_DIR CERT_SYNC_CADDYFILE FQDN
+# The group of the stack directory's .update, which api reads in (compose.test.yaml): whoever
+# runs the suite owns the directory.
+STACK_GID=$(id -g)
+export API_PORT SCENARIOS_DIR CERT_SYNC_CADDYFILE FQDN STACK_GID
 api_base=http://127.0.0.1:$API_PORT
 MAIN_DID=+15551000
 # The stack's /metrics token (steps.sh writes it into .env), a constant so REUSE reads it too.

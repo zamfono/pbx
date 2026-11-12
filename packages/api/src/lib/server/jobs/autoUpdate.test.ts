@@ -292,6 +292,31 @@ describe('runAutoUpdatePass', () => {
     ]);
   });
 
+  it('follows its run up even before the current release is known again, as right after an update', async () => {
+    const db = await makeTestDb();
+    await seed(db, true);
+    const job = harness(db);
+    await runAutoUpdatePass(job.deps);
+    job.current.status = status({
+      current: null,
+      updatable: false,
+      unavailable: 'no host agent has reported the stack directory yet',
+      last: {
+        state: 'succeeded',
+        from: '0.1.1',
+        to: '0.1.2',
+        startedAt: STARTED_AT,
+        finishedAt: '2026-10-01T03:05:00.000Z'
+      }
+    });
+    await runAutoUpdatePass(job.deps);
+    expect(await loadUpdateState(db)).toMatchObject({ runRelease: null });
+    expect(await auditOutcomes(db)).toMatchObject([
+      { outcome: 'started' },
+      { outcome: 'succeeded', to: '0.1.2' }
+    ]);
+  });
+
   it("counts an edge run's failure on its own build, though main published a newer one meanwhile", async () => {
     const db = await makeTestDb();
     await seed(db, true);

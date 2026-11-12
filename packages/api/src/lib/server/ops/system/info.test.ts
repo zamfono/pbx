@@ -152,7 +152,7 @@ describe('system.info', () => {
     }));
     expect(await runOperation(db, 'system.info', {}, asUser)).toMatchObject({
       update: {
-        unavailable: 'the updater did not answer: connect ECONNREFUSED'
+        unavailable: 'the update status could not be read: connect ECONNREFUSED'
       }
     });
   });

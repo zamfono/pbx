@@ -9,10 +9,17 @@ import { decrypt, encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
 import { asRun, makeTestDb, owner } from '#testing/testDb.js';
 
 import { runOperation } from '../runner.js';
+import { hostClient } from '../system/_updater.js';
 import { type Actor } from '../types.js';
 import { loadSettings } from './_shared.js';
 
 import './index.js';
+
+vi.mock('../system/_updater.js', async importOriginal => {
+  const original =
+    await importOriginal<typeof import('../system/_updater.js')>();
+  return { ...original, hostClient: vi.fn(original.hostClient) };
+});
 
 const admin: Actor = { id: 'admin-1', name: 'Admin', role: 'admin' };
 
@@ -228,17 +235,17 @@ describe('settings', () => {
     expect(plain).not.toHaveProperty('autoReboot');
 
     vi.stubEnv('HOST_CONTROL', 'true');
-    vi.stubEnv('UPDATER_TOKEN', 'token');
-    const asked: unknown[] = [];
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((url: string, init?: RequestInit) => {
-        asked.push([url, init?.body]);
-        return Promise.resolve(
-          Response.json({ rebootRequired: null, updates: true })
-        );
-      })
-    );
+    const asked: boolean[] = [];
+    const report = { rebootRequired: null, updates: true };
+    vi.mocked(hostClient).mockImplementation(() => ({
+      read: () => Promise.resolve(report),
+      check: () => Promise.resolve(report),
+      setUpdates: enabled => {
+        asked.push(enabled);
+        return Promise.resolve();
+      },
+      reboot: () => Promise.reject(new Error('unused'))
+    }));
     try {
       await expect(
         runOperation(
@@ -256,11 +263,9 @@ describe('settings', () => {
           asRun({ actor: owner })
         )
       ).resolves.toMatchObject({ hostUpdates: true, autoReboot: false });
-      expect(asked).toEqual([
-        ['http://updater:8080/host/updates', JSON.stringify({ enabled: true })]
-      ]);
+      expect(asked).toEqual([true]);
     } finally {
-      vi.unstubAllGlobals();
+      vi.mocked(hostClient).mockRestore();
       vi.unstubAllEnvs();
     }
   });

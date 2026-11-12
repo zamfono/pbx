@@ -7,7 +7,7 @@
 # HOST_UPDATE_TO's are images of their own, the build's with another revision label
 # (`host_update_images`), which the run names through compose.test.yaml's *_IMAGE variables, so
 # `update.sh`'s `pull` finds them present (`pull_policy: missing`) and its `up --wait` recreates
-# every service of the stack, the updater among them, as a real release's does. The step puts the
+# every service of the stack, as a real release's does. The step puts the
 # stack back on the build's images and removes its own once it passed.
 #
 # Compose reads this run's files and project from `COMPOSE_FILE` and `COMPOSE_PROJECT_NAME`, as
@@ -21,7 +21,7 @@ HOST_UPDATE_FROM=0.2.0
 HOST_UPDATE_TO=0.2.1
 
 # The services a release replaces, each running the image of its *_IMAGE variable.
-HOST_UPDATE_SERVICES=(asterisk migrate core api proxy updater)
+HOST_UPDATE_SERVICES=(asterisk migrate core api proxy)
 
 # The web server's PID, for `host_update_stop`, and its base URL, for `host_update`.
 host_update_server=
@@ -170,7 +170,7 @@ if wrong or not state.get('finishedAt'):
     sys.exit('.update/state.json: %s' % json.dumps(state))
 PY
   # The stack it left: every service recreated on the new images and healthy, api and core
-  # answer, and the updater, recreated while the run ran, reports the host's run as finished.
+  # answer, and api, recreated while the run ran, reports the host's run as finished.
   host_update_assert_images
   host_update_assert_healthy
   [[ $(healthz_http_status) == @(200|503) ]] || fail "/healthz did not answer after the update"

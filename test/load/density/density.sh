@@ -194,7 +194,7 @@ stack_create() {
     # Wider than the default 10000-10200 (~50 calls) where a step puts more calls on one stack
     [ -z "${RTP_PORT_END:-}" ] || printf 'RTP_PORT_START=%s\nRTP_PORT_END=%s\n' \
       "${RTP_PORT_START:-10000}" "$RTP_PORT_END"
-    for var in ASTERISK_IMAGE MIGRATE_IMAGE CORE_IMAGE API_IMAGE PROXY_IMAGE UPDATER_IMAGE; do
+    for var in ASTERISK_IMAGE MIGRATE_IMAGE CORE_IMAGE API_IMAGE PROXY_IMAGE; do
       echo "$var=${!var}"
     done
   } >> "$STACK_DIR/.env"

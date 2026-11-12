@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { GitHubRateLimited } from './releases.js';
-import type { ServerDeps } from './server.js';
+import type { UpdaterDeps } from './service.js';
 import type { UpdateVerdict } from './stack.js';
 import { describeStatus } from './status.js';
 
@@ -13,14 +13,12 @@ const EDGE_BUILD = {
 };
 
 /** An edge stack, with every check recorded. */
-function edgeDeps(): ServerDeps & {
+function edgeDeps(): UpdaterDeps & {
   checked: string[];
 } {
   const checked: string[] = [];
   return {
     checked,
-    token: 'token',
-    hostControl: false,
     releases: {
       latest: () =>
         Promise.reject(new Error('an edge stack asks for no release')),
@@ -72,7 +70,7 @@ describe('describeStatus asked to look afresh', () => {
   it('asks for the latest afresh, and fails on a spent GitHub rate limit that a cached look reports', async () => {
     const fresh: (boolean | undefined)[] = [];
     const limited = new GitHubRateLimited('GitHub answered 403', 0);
-    const deps: ServerDeps = {
+    const deps: UpdaterDeps = {
       ...edgeDeps(),
       currentVersion: () => Promise.resolve([0, 0, 6]),
       releases: {

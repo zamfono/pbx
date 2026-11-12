@@ -1,10 +1,10 @@
 # shellcheck shell=bash
 # shellcheck disable=SC2154 # failure is checks.sh's
-# The outcome of an update run, in the stack directory's .update/state.json, which the updater
-# reads and `system.info` reports (§6.3 "Updates"): `running` from the start of the run, then
-# `succeeded` or `failed`, with who asked for it: `host` for update.sh run on the host, or as the
-# host agent passes it on from the updater's request, `manual` with the owner in `by`, or
-# `automatic` (setup/agent.sh).
+# The stack directory's .update (§6.3 "Updates"), which api reads in root's group: the outcome of
+# an update run in .update/state.json, which `system.info` reports, `running` from the start of
+# the run, then `succeeded` or `failed`, with who asked for it: `host` for update.sh run on the
+# host, or as the host agent passes it on from api's request, `manual` with the owner in `by`, or
+# `automatic` (setup/agent.sh); and what the directory runs, in .update/stack.json.
 
 OUTCOME_FILE=.update/state.json
 # Set by outcome_start: the run whose end outcome_end records.
@@ -14,7 +14,13 @@ outcome_started=
 outcome_trigger=${ZAMFONO_TRIGGER:-host}
 outcome_by=${ZAMFONO_BY:-}
 
-# An instant as the updater writes one, ISO 8601 UTC with milliseconds.
+# .update, root's and its group's alone (0750), which api reads in root's group, and the request
+# directory in it that api writes, 0770; no other user of the host reaches either.
+update_dir() {
+  mkdir -p .update/requests && chmod 750 .update && chmod 770 .update/requests
+}
+
+# An instant as api writes one, ISO 8601 UTC with milliseconds.
 outcome_now() {
   date -u +%Y-%m-%dT%H:%M:%S.%3NZ
 }
@@ -44,6 +50,8 @@ outcome_write() {
     [[ -z ${3:-} ]] || printf ',\n  "error": %s' "$(json_string "$3")"
     printf '\n}\n'
   } >"$tmp"
+  # Readable by api, in root's group, whatever root's umask (update_dir).
+  chmod 644 "$tmp"
   mv -f "$tmp" "$OUTCOME_FILE"
 }
 
@@ -63,4 +71,31 @@ outcome_end() {
   else
     outcome_write failed "$(outcome_now)" "${failure:-update.sh exited $1}"
   fi
+}
+
+# stack_report CURRENT [ERROR] — .update/stack.json, what api knows of the stack directory: the
+# release it runs as `update.sh --current` prints it, empty for none; the release an update that
+# stopped before its stack reported healthy installed (update.sh's .update-pending), which an
+# update to it finishes; and why --current failed.
+stack_report() {
+  local file=.update/stack.json pending
+  pending=$(cat .update-pending 2>/dev/null || true)
+  {
+    printf '{\n  "current": %s' "$(if [[ -n $1 ]]; then json_string "$1"; else echo null; fi)"
+    printf ',\n  "pending": %s' "$(if [[ -n $pending ]]; then json_string "$pending"; else echo null; fi)"
+    [[ -z ${2:-} ]] || printf ',\n  "error": %s' "$(json_string "$2")"
+    printf '\n}\n'
+  } >"$file.next" && chmod 644 "$file.next" && mv -f "$file.next" "$file"
+}
+
+# .update/stack.json from what `update.sh --current` prints, or why it failed.
+report_stack() {
+  local current status=0
+  current=$(./update.sh --current 2>.update/current.err) || status=$?
+  if ((status == 0 || status == 12)); then
+    stack_report "$current"
+  else
+    stack_report '' "$(tail -n 1 .update/current.err)"
+  fi
+  rm -f .update/current.err
 }

@@ -5,7 +5,7 @@ import type { UpdateState } from '@zamfono/shared';
 import type { Agent } from './agent.js';
 
 /** An update's record in `.update/state.json`, which the host agent's run of `update.sh`
- * writes and the updater reads (§6.3 "Updates"). */
+ * writes and `api` reads (§6.3 "Updates"). */
 const POLL_MS = 200;
 
 /**

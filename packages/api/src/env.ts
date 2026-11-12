@@ -106,8 +106,8 @@ export const variables = defineEnvVars({
   STUN_ENABLED: onUnlessFalse,
   TLS_RELOAD_HOUR: reloadHour,
   TZ: optional,
+  UPDATE_DIR: withDefault('/update'),
   UPDATER_TOKEN: optional,
-  UPDATER_URL: withDefault('http://updater:8080'),
   ZAMFONO_REVISION: optional,
   ZAMFONO_VERSION: optional
 });

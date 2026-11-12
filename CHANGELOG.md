@@ -11,6 +11,30 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+### Upgrade notes
+
+- Only for a stack without the host agent (`ZAMFONO_AGENT=false`, or no systemd): run
+  `./update.sh` on the host once more after this update. That run removes the `updater` container
+  the previous release left running, which on a stack installed through the API from a release
+  before 0.9.0 still holds the container runtime's socket, and lets `api` read `.update`.
+- Only for a test stack that follows `edge`: its update keeps its files, so replace
+  `compose.yaml` and `setup/` with main's and run `setup/agent.sh refresh` as root; until then
+  updates through the API are unavailable.
+
+### Changed
+
+- The stack runs no `updater` service any more: `api` itself asks GitHub for new releases, judges
+  an update by the release policy and leaves the host agent its requests, reading the agent's
+  reports in the stack directory's `.update`, which it mounts read-only in root's group. Nothing
+  to do on a host with the host agent, which `setup.sh` installs: an update from 0.9.0, by
+  `system.update`, the automatic update or `update.sh`, refreshes the agent, whose first run,
+  within ten minutes, removes the old `updater` container and its image; until then `system.info`
+  says updates through the API are unavailable. The `updater` image is still published, idle,
+  because the `update.sh` of 0.9.0 and earlier pulls it.
+- `UPDATER_TOKEN` now only turns updates through the API on, while set, or off, while empty: its
+  value is no longer a secret anything checks. Host control needs `HOST_CONTROL=true` alone.
+- `update.sh` removes the containers of a service the stack's files no longer name.
+
 ## [0.9.0] - 2026-11-12
 
 ### Upgrade notes

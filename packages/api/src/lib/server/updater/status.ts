@@ -1,8 +1,9 @@
 import type { UpdaterStatus } from '@zamfono/shared';
 
-import { errorMessage } from './errors.js';
+import { errorMessage } from '#lib/server/errors.js';
+
 import { GitHubRateLimited } from './releases.js';
-import type { ServerDeps } from './server.js';
+import type { UpdaterDeps } from './service.js';
 import type { UpdateVerdict } from './stack.js';
 import {
   EDGE,
@@ -12,26 +13,26 @@ import {
 } from './version.js';
 
 /**
- * `GET /status` and `POST /check` (§6.3 "Updates"): what the stack runs, the newest version it
- * could take, the latest release or, on `edge`, main's newest build, and whether the updater would
- * install it.
+ * The update status (§6.3 "Updates"): what the stack runs, the newest version it could take, the
+ * latest release or, on `edge`, main's newest build, and whether `system.update` would install it.
  */
 type Latest = NonNullable<UpdaterStatus['latest']>;
 
-/** Why the updater cannot update at all, `undefined` while it can: without the host agent. */
+/** Why the stack cannot be updated through `api` at all, `undefined` while it can: without the
+ * host agent, or before one of this release reported the stack directory. */
 export async function unavailable(
-  deps: Pick<ServerDeps, 'agent'>
+  deps: Pick<UpdaterDeps, 'agent'>
 ): Promise<string | undefined> {
   return (await deps.agent.present())
     ? undefined
-    : 'no host agent has run for the stack directory: install it with setup/agent.sh install on the host (deploy/README.md, step 5)';
+    : 'no host agent has reported the stack directory yet: it does within ten minutes of an update, or install it with setup/agent.sh install on the host (deploy/README.md, step 5)';
 }
 
 /** The newest version GitHub names for a stack running `current`, `fresh` asking GitHub now;
  * `newer` is `false` for an `edge` build the stack already runs, the commit `revision` names
  * that `api` was built from. */
 async function lookUpLatest(
-  deps: ServerDeps,
+  deps: UpdaterDeps,
   current: StackVersion | undefined,
   fresh: boolean,
   revision: string | undefined
@@ -56,16 +57,17 @@ async function lookUpLatest(
       };
 }
 
-/** `fresh` (`POST /check`) asks GitHub now, at most once a minute, and fails on a spent GitHub
- * rate limit, which `GET /status` reports in `latestError` like any other failure. `revision` is
- * the commit `api` was built from, which `api` names. */
+/** `fresh` (`system.checkUpdate`) asks GitHub now, at most once a minute, and fails on a spent
+ * GitHub rate limit, which the cached status reports in `latestError` like any other failure.
+ * `revision` is the commit `api` was built from. */
 export async function describeStatus(
-  deps: ServerDeps,
+  deps: UpdaterDeps,
   fresh = false,
   revision?: string
 ): Promise<UpdaterStatus> {
-  const current = await deps.currentVersion();
   const reason = await unavailable(deps);
+  const current =
+    reason === undefined ? await deps.currentVersion() : undefined;
   const base = {
     current: current === undefined ? null : formatStackVersion(current),
     last: deps.agent.state(),

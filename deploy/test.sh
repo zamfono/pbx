@@ -170,7 +170,7 @@ echo "$setup_config" | grep -qF 'BOOTSTRAP_OWNER_PASSWORD_HASH: $$argon2id$$v=19
 echo "$setup_config" | grep -qF 'COUNTRY: DE'
 echo "$setup_config" | grep -qF 'TZ: Europe/Vienna'
 # Without a terminal, nobody was asked: the owners do not control the host unless told so.
-[ "$(echo "$setup_config" | grep -cF 'HOST_CONTROL: "false"')" = 2 ]   # api and updater
+[ "$(echo "$setup_config" | grep -cF 'HOST_CONTROL: "false"')" = 1 ]   # api's
 echo "$setup_config" | grep -qE 'SECRETBOX_KEY: "?1:'
 echo "$setup_config" | grep -qE 'BACKUP_PASSWORD: "?[0-9a-f]{48}'
 echo "$setup_config" | grep -qF 'source: backups'

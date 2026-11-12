@@ -121,8 +121,7 @@ export async function followUpRun(
   await reportFailure(deps, {
     ...attempt,
     outcome: 'failed',
-    reason:
-      last.error ?? 'the updater reported the run failed without naming why'
+    reason: last.error ?? 'the run is recorded failed without naming why'
   });
   return false;
 }

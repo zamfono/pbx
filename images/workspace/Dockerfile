@@ -15,6 +15,5 @@ COPY package.json package-lock.json tsconfig.base.json tsconfig.json ./
 COPY packages/api/package.json packages/api/
 COPY packages/core/package.json packages/core/
 COPY packages/shared/package.json packages/shared/
-COPY packages/updater/package.json packages/updater/
 RUN npm ci
 COPY packages packages

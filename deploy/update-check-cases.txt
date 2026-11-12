@@ -1,0 +1,24 @@
+# update.sh --check's verdicts by RELEASING.md's policy, which update-check-test.sh and api's
+# packages/api/src/lib/server/updater/stack.test.ts both check: from, to, the exit status, 0 update,
+# 10 breaking, 11 not newer.
+0.0.6 0.0.6 11
+1.2.3 1.2.3 11
+0.0.6 0.0.5 11
+0.1.0 0.0.9 11
+1.0.0 0.9.9 11
+2.0.0 1.9.9 11
+1.10.0 1.9.0 11
+0.0.5 0.0.6 0
+0.0.5 0.0.7 0
+0.0.9 0.0.10 0
+0.1.0 0.1.1 0
+1.2.3 1.2.4 0
+1.2.3 1.3.0 0
+1.9.9 1.10.0 0
+1.2.3 1.12.0 0
+0.0.6 0.1.0 10
+0.1.3 0.2.0 10
+0.9.0 1.0.0 10
+0.0.6 1.0.0 10
+1.9.0 2.0.0 10
+1.2.3 3.0.0 10

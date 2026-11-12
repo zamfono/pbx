@@ -175,7 +175,7 @@ let unknownCurrentLogged = false;
 function logUnknownCurrentOnce(): void {
   if (!unknownCurrentLogged) {
     logger.warn(
-      'autoUpdate: the updater knows no current release, so nothing is attempted or reported'
+      'autoUpdate: no current release is known, so nothing is attempted or reported'
     );
     unknownCurrentLogged = true;
   }
@@ -183,7 +183,8 @@ function logUnknownCurrentOnce(): void {
 
 /**
  * One pass: follows up the automatic run `api` started, reports a breaking release, and installs
- * a wanted release once the gate opens; nothing while the updater knows no current release. Resolves to when the job is worth running again sooner
+ * a wanted release once the gate opens; nothing but the follow-up while no current release is
+ * known. Resolves to when the job is worth running again sooner
  * than its hourly poll, `null` for no sooner.
  */
 export async function runAutoUpdatePass(
@@ -195,17 +196,19 @@ export async function runAutoUpdatePass(
     return null;
   }
   const status = await client.status();
+  const now = (deps.now ?? (() => new Date()))();
+  const soon = new Date(now.getTime() + IDLE_RECHECK_MS);
+  // Before the current release is known: right after an update the host agent of the release it
+  // installed may not have reported the stack directory yet, but the run's record is there.
+  if (await followUpRun(deps, row, status)) {
+    return soon;
+  }
   const from = status.current;
   if (from === null) {
     logUnknownCurrentOnce();
     return null;
   }
   unknownCurrentLogged = false;
-  const now = (deps.now ?? (() => new Date()))();
-  const soon = new Date(now.getTime() + IDLE_RECHECK_MS);
-  if (await followUpRun(deps, row, status)) {
-    return soon;
-  }
   await clearFailureAfterSuccess(deps.db, row, status);
   await announceBreaking(deps, row, status, from);
   const fresh = await loadUpdateState(deps.db);

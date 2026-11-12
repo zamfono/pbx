@@ -91,13 +91,13 @@ function assertHostFields(input: SettingsInput): void {
   ) {
     throw new OpError(
       HTTP_UNPROCESSABLE_CONTENT,
-      'settings: hostUpdates and autoReboot need HOST_CONTROL=true and an UPDATER_TOKEN in .env'
+      'settings: hostUpdates and autoReboot need HOST_CONTROL=true in .env'
     );
   }
 }
 
 /**
- * Once the write committed, applies `hostUpdates` to the host through the updater, which may
+ * Once the write committed, applies `hostUpdates` to the host through the host agent, which may
  * install a package meanwhile, or runs the host job for an `autoReboot` change (§6.3 "Host
  * control"). A host that does not take it is a warning: the setting stands, and the host job
  * applies it at its next pass.

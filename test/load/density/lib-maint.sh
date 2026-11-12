@@ -14,8 +14,8 @@
 #           loopback the way test/integration/host-update.sh serves it (its functions, sourced),
 #           with images that are this run's images relabelled, so every service is recreated as
 #           in a real release. Simulated: the trigger (the maintenance gate opening at the
-#           maintenance moment and `system.update` through the updater container -- here
-#           update.sh runs on the host, as an operator runs it; the updater runs the same script)
+#           maintenance moment and `system.update` through the host agent -- here update.sh
+#           runs on the host, as an operator runs it; the agent runs the same script)
 #           and the image pull (the images are local).
 #   tls     a certificate reload wave (§6.4): prep makes Caddy issue every stack a new
 #           certificate from its local CA (stored certificate removed, proxy restarted), which

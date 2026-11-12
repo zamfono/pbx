@@ -273,7 +273,7 @@ Generate the secrets:
 openssl rand -base64 32                       # JWT_SECRET
 printf '1:%s' "$(openssl rand -base64 32)"    # SECRETBOX_KEY
 openssl rand -hex 24                          # ARI_PASSWORD, and again for AMI_PASSWORD
-openssl rand -hex 24                          # BACKUP_PASSWORD, and again for UPDATER_TOKEN
+openssl rand -hex 24                          # BACKUP_PASSWORD, and again for UPDATER_TOKEN (any value turns updates through the API on)
 ```
 
 **Keep a copy of `.env` outside the host.** `SECRETBOX_KEY` is the only way to read the encrypted
@@ -392,17 +392,19 @@ latest release, whether it can be installed this way, and how the last update we
 way, and `system.update` installs it, only to a newer release, a breaking one only when the
 owner sets `breaking: true` after reading its upgrade notes, and only once a backup run finished
 `ok` within the last hour. Notes that ask for work on the host, such as a new `.env` setting,
-still need `update.sh` there. The `updater` service needs `UPDATER_TOKEN` in `.env`, which
-`setup.sh` writes, and the host agent.
+still need `update.sh` there. It needs `UPDATER_TOKEN` set in `.env`, which `setup.sh` does
+(empty turns updates through the API off), and the host agent. Since 0.9.1 the stack runs no
+`updater` service: `api` reads the host agent's reports and leaves it its requests itself, and the
+agent removes the `updater` container an earlier release's `update.sh` left running.
 
-**The host agent** runs `update.sh` on the host for the updater, as root, so no container holds
+**The host agent** runs `update.sh` on the host for `api`, as root, so no container holds
 the runtime's socket. `setup.sh` installs it as root on a systemd host: three units named after
-the stack directory, `<name>-agent.path`, which starts `<name>-agent.service` when the updater
+the stack directory, `<name>-agent.path`, which starts `<name>-agent.service` when `api`
 leaves a request in `.update/requests`, and `<name>-agent.timer`, which runs it every ten
 minutes, and a mount unit that makes `.update/requests` a 1 MB tmpfs of its own, `nosuid`,
-`nodev` and `noexec`. The updater, without capabilities and with a read-only root filesystem, may write there
-and nowhere else; the agent takes nothing but a known request, checks every value, answers it,
-and reports in `.update/`, which only root may enter and only it writes. It runs scripts of the
+`nodev` and `noexec`. `api` may write there and nowhere else in the stack directory; the agent
+takes nothing but a known request, checks every value, answers it, and reports in `.update/`,
+which only root and root's group, which `api` runs in, may enter (0750), and only it writes. It runs scripts of the
 stack directory as root, so it runs nothing while the directory, anything in it or a directory
 above it could be written by anyone but root. `update.sh`, run as root, keeps its units up to date with
 each release, and where it is missing offers to install it; in a terminal it also asks once
@@ -416,7 +418,7 @@ journalctl -u zamfono-agent.service   # what it did; the update's own output is 
 ```
 
 It needs Docker or rootful Podman as this README installs them, with root in a container being
-root on the host: with Docker's `userns-remap` or rootless Podman, the updater cannot reach its
+root on the host: with Docker's `userns-remap` or rootless Podman, `api` cannot reach its
 request directory, and updates through the API are refused. The stack directory must be on a
 local disk, not a network filesystem, since its request directory is mounted at boot before the
 network is up. systemd runs the agent through `/usr/local/libexec/zamfono-agent`, which checks
@@ -468,8 +470,8 @@ the whole stack (`up -d`), since they would stay on the old namespace.
 ## Continuous replication
 
 The optional Litestream sidecar of `docs/spec.md` §6.5 is an overlay of your own, named
-`compose.dr.yaml` in the stack directory. Where that file exists, `update.sh`, the `updater` and
-the boot unit of step 7 run Compose on `compose.yaml`, `compose.override.yaml` and
+`compose.dr.yaml` in the stack directory. Where that file exists, `update.sh` and the boot unit
+of step 7 run Compose on `compose.yaml`, `compose.override.yaml` and
 `compose.dr.yaml`, so an update or a reboot keeps the sidecar. By hand, run Compose through
 `setup/compose.sh`, which names the same files:
 

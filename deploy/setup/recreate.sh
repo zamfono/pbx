@@ -41,7 +41,8 @@ await_healthy() {
 # `stun` and `proxy` share its network namespace (§6.3), so on Podman the old containers go first: the boot
 # unit's restart does that with `down`, and its `up -d` does not wait, so an `up` that recreates
 # nothing waits for it; without the unit, `down` here, which podman-compose has where it has no
-# `rm`. Every run is on the host, the host agent's too, so the updater is recreated with the rest.
+# `rm`. A service the files no longer name, such as the updater of a release before 0.9.1, is
+# removed.
 recreate_stack() {
   local -a wait_args=()
   if compose_waits; then
@@ -54,17 +55,43 @@ recreate_stack() {
     echo "Restarting $unit ..."
     systemctl restart "$unit"
     if ((${#wait_args[@]} > 0)); then
-      "${compose[@]}" up -d --no-recreate "${wait_args[@]}" || unhealthy
+      "${compose[@]}" up -d --no-recreate --remove-orphans "${wait_args[@]}" || unhealthy
     fi
   else
     if [[ $runtime == podman ]]; then
       "${compose[@]}" down
     fi
-    "${compose[@]}" up -d "${wait_args[@]}" || unhealthy
+    "${compose[@]}" up -d --remove-orphans "${wait_args[@]}" || unhealthy
   fi
   ((${#wait_args[@]} > 0)) || await_healthy
+  remove_old_updater
   # Only the stack's own images, which carry its source label, so other projects' stay; an image a
   # container still uses stays too.
   "$runtime" image prune -a -f --filter label=org.opencontainers.image.source=https://github.com/zamfono/pbx \
     >/dev/null || warn "could not remove the images of earlier releases"
+}
+
+# The updater container of a release before 0.9.1, which that release's update.sh recreated the
+# stack without but left running, as Compose leaves a service the files no longer name, and which
+# `up --remove-orphans` misses where the boot unit or podman-compose recreates the stack: removed
+# with its image, by the host agent's runs and by update.sh's, so nobody has to on the host.
+# Compose labels it with the stack directory as written; podman-compose with its real path.
+remove_old_updater() {
+  local rt=${runtime:-${ZAMFONO_RUNTIME:-docker}} old='' dir image
+  for dir in "$PWD" "$(pwd -P)"; do
+    old+=$("$rt" ps -aq --filter label=com.docker.compose.service=updater \
+      --filter "label=com.docker.compose.project.working_dir=$dir" 2>/dev/null)$'\n'
+  done
+  old=$(sort -u <<<"$old" | sed '/^$/d')
+  [[ -n $old ]] || return 0
+  # shellcheck disable=SC2086 # one container ID per word
+  image=$("$rt" inspect -f '{{.Image}}' $old 2>/dev/null | sort -u)
+  # shellcheck disable=SC2086 # see above
+  if "$rt" rm -f $old >/dev/null; then
+    echo "Removed the updater container of an earlier release, which api replaces."
+    # shellcheck disable=SC2086 # one image ID per word
+    [[ -z $image ]] || "$rt" rmi $image >/dev/null 2>&1 || true
+  else
+    warn "could not remove the updater container of an earlier release"
+  fi
 }

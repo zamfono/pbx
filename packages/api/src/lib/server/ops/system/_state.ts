@@ -11,7 +11,7 @@ import {
 import { updaterClient } from './_updater.js';
 
 /**
- * `update_state` (§11.2), the one row of what `api` knows about updates beyond the updater's own
+ * `update_state` (§11.2), the one row of what `api` knows about updates beyond the run's own
  * record (§6.3 "Updates"): when the last run `api` started began, the last automatic attempt's
  * failure with the failed attempts on its release, and the breaking release last seen and
  * announced.
@@ -125,8 +125,8 @@ const NO_UPDATE_NEWS: UpdateNews = {
 };
 
 /**
- * `UpdateNews` from `update_state`; none while `.env` sets no `UPDATER_TOKEN`: without an
- * updater there are no automatic updates and no report of a breaking release. The record is
+ * `UpdateNews` from `update_state`; none while `.env` sets no `UPDATER_TOKEN`: without updates
+ * through the API there are no automatic updates and no report of a breaking release. The record is
  * kept, should the token come back.
  */
 export async function updateNews(db: Db): Promise<UpdateNews> {

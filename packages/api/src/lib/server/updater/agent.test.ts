@@ -14,7 +14,7 @@ import { describe, expect, it } from 'vitest';
 import { AgentRefusal, createAgent } from './agent.js';
 import { RUN_STALE_MS } from './record.js';
 
-/** A stack directory with the `.update/requests` the agent and the updater share. */
+/** A stack directory with the `.update/requests` the agent and `api` share. */
 async function stackDir(): Promise<string> {
   const dir = await mkdtemp(path.join(os.tmpdir(), 'agent-'));
   await mkdir(path.join(dir, '.update', 'requests'), { recursive: true });
@@ -46,14 +46,19 @@ async function takeOnce(dir: string, reason?: string): Promise<string> {
   }
 }
 
-describe('the host agent, from the updater', () => {
-  it('is present once it has run', async () => {
+describe('the host agent, from api', () => {
+  it('is present once it has run and reported the stack directory', async () => {
     const dir = await stackDir();
-    const agent = createAgent(dir);
+    const agent = createAgent(path.join(dir, '.update'));
     expect(await agent.present()).toBe(false);
     await writeFile(
       path.join(dir, '.update', 'agent'),
       '2026-11-12T10:00:00.000Z\n'
+    );
+    expect(await agent.present()).toBe(false);
+    await writeFile(
+      path.join(dir, '.update', 'stack.json'),
+      '{ "current": "0.9.1" }\n'
     );
     expect(await agent.present()).toBe(true);
   });
@@ -61,7 +66,7 @@ describe('the host agent, from the updater', () => {
   it('leaves a request of key=value lines with an id, and resolves once the agent answered it', async () => {
     const dir = await stackDir();
     const taken = takeOnce(dir);
-    await createAgent(dir).send(
+    await createAgent(path.join(dir, '.update')).send(
       {
         action: 'update',
         version: '0.9.0',
@@ -77,14 +82,17 @@ describe('the host agent, from the updater', () => {
 
   it('places no request whose time ran out while it waited its turn', async () => {
     const dir = await stackDir();
-    const late = createAgent(dir).send({ action: 'reboot' }, Date.now() + 500);
+    const late = createAgent(path.join(dir, '.update')).send(
+      { action: 'reboot' },
+      Date.now() + 500
+    );
     await expect(late).rejects.toMatchObject({ reason: 'notTaken' });
     await expect(stat(request(dir))).rejects.toThrow();
   });
 
   it('sends one request at a time, each getting its own answer', async () => {
     const dir = await stackDir();
-    const agent = createAgent(dir);
+    const agent = createAgent(path.join(dir, '.update'));
     // The agent takes and answers two requests, one after the other.
     const taken = (async () => [await takeOnce(dir), await takeOnce(dir)])();
     await Promise.all([
@@ -99,7 +107,7 @@ describe('the host agent, from the updater', () => {
   it("passes the agent's refusal on, with its reason", async () => {
     const dir = await stackDir();
     const taken = takeOnce(dir, 'HOST_CONTROL is not true in .env');
-    const refusal = createAgent(dir).send(
+    const refusal = createAgent(path.join(dir, '.update')).send(
       { action: 'reboot' },
       Date.now() + 5000
     );
@@ -131,7 +139,7 @@ describe('the host agent, from the updater', () => {
         await sleep(20);
       }
     })();
-    const refusal = createAgent(dir).send(
+    const refusal = createAgent(path.join(dir, '.update')).send(
       { action: 'report' },
       Date.now() + 1500
     );
@@ -143,7 +151,7 @@ describe('the host agent, from the updater', () => {
   it('refuses a second request while one waits, and takes back one the agent did not take', async () => {
     const dir = await stackDir();
     await writeFile(request(dir), 'action=reboot\n');
-    const agent = createAgent(dir);
+    const agent = createAgent(path.join(dir, '.update'));
     await expect(
       agent.send({ action: 'reboot' }, Date.now() + 1500)
     ).rejects.toMatchObject({
@@ -162,7 +170,7 @@ describe('the host agent, from the updater', () => {
   it("reads the run's record and the host's report, a long-running run as cut off", async () => {
     const dir = await stackDir();
     const now = Date.parse('2026-11-12T12:00:00Z');
-    const agent = createAgent(dir, { now: () => now });
+    const agent = createAgent(path.join(dir, '.update'), { now: () => now });
     expect(agent.state()).toEqual({ state: 'idle' });
     expect(await agent.host()).toBeUndefined();
     const record = (startedAt: string): Promise<void> =>

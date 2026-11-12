@@ -130,7 +130,7 @@ services:
       SECRETBOX_KEY: ${SECRETBOX_KEY}           # encryption key for every *_enc column (§5.4)
       SECRETBOX_KEY_PREVIOUS: ${SECRETBOX_KEY_PREVIOUS:-}   # set only during a key rotation (§5.4)
       BACKUP_PASSWORD: ${BACKUP_PASSWORD:-}     # restic password of the default local backup target; empty = none (§6.5)
-      UPDATER_TOKEN: ${UPDATER_TOKEN:-}         # system.update's token for the updater service; empty = no updates through the API (§6.3)
+      UPDATER_TOKEN: ${UPDATER_TOKEN:-}         # set = owners update the stack through the API, the host agent carrying it out; empty = no updates through the API (§6.3)
       HOST_CONTROL: ${HOST_CONTROL:-}           # true shows and offers the host's upgrades and reboot (§6.3 "Host control")
       HEP_ENABLED: ${HEP_ENABLED:-}             # false rejects call_log_level 'sip' (§7)
       SIP_UDP_ENABLED: ${SIP_UDP_ENABLED:-}     # false rejects trunks on that transport; both false reject plain devices (§9.3, §9.4)
@@ -160,6 +160,10 @@ services:
       - asterisk-config:/etc/asterisk/gen
       - caddy-data:/caddy-data:ro               # certificate sync source (§6.4)
       - backups:/backups                        # the default local backup target's repository (§6.5)
+      - ./.update:/update:ro                    # the host agent's reports: root's, 0750 (§6.3 "Updates")
+      - ./.update/requests:/update/requests     # the one place it writes there: its requests to the host agent, a tmpfs
+    group_add:
+      - "0"                                     # root's group, which alone may read .update besides root
     healthcheck:                                # gates core's start; 200 = database open, no pending migration (§6.3 "Health")
       test: *readyz
     restart: unless-stopped
@@ -175,25 +179,6 @@ services:
     volumes:
       - caddy-data:/data
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
-    restart: unless-stopped
-
-  updater:
-    image: ghcr.io/zamfono/updater:${ZAMFONO_VERSION:-latest}   # node:26-alpine; hands system.update to the host agent (§6.3 "Updates")
-    networks:
-      - internal                                # no published port: only api, which holds the token, reaches it
-    environment:
-      UPDATER_TOKEN: ${UPDATER_TOKEN:-}         # shared with api alone; empty = every request refused
-      HOST_CONTROL: ${HOST_CONTROL:-}           # anything but true refuses every /host request
-    volumes:
-      - .:/stack:ro                             # this directory, read only: update.sh --check, .env, the host agent's reports
-      - ./.update/requests:/stack/.update/requests   # the one place it writes: its requests to the host agent
-    # Root in the container only to own what it reads and writes, with no capability: no device
-    # nodes. A setuid file it could still leave in .update/requests reaches no one: .update is
-    # root's alone, and the host agent removes everything there but the request (§6.3 "Updates").
-    cap_drop: [ALL]
-    security_opt: [no-new-privileges:true]
-    read_only: true
-    tmpfs: [/tmp]
     restart: unless-stopped
 
 volumes:

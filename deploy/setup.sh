@@ -191,15 +191,14 @@ ask_password() {
   unset OWNER_PASSWORD
 }
 
-# The host agent, which carries out updates and host control for the updater (setup/agent.sh):
+# The host agent, which carries out updates and host control for api (setup/agent.sh):
 # installed where setup.sh runs as root on a systemd host, else said how.
 install_agent() {
   if [[ ${ZAMFONO_AGENT:-} != false ]] && (($(id -u) == 0)) && command -v systemctl >/dev/null 2>&1; then
     setup/agent.sh install "$runtime" || warn "the host agent was not installed; updates through" \
       "the API need it: fix the above, then run \`setup/agent.sh install $runtime\` as root"
   else
-    mkdir -p .update/requests
-    chmod 700 .update
+    mkdir -p .update/requests && chmod 750 .update && chmod 770 .update/requests
     warn "updates through the API need the host agent: run \`setup/agent.sh install $runtime\` as" \
       "root on a systemd host (README.md, step 5)"
   fi

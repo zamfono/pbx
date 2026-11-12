@@ -2,10 +2,16 @@
 # update-test.sh's stub runtime: `docker compose version` answers, `up --help` names --wait unless
 # STUB_PODMAN_COMPOSE, which also has no `rm`, as podman-compose has neither; everything else is
 # recorded and succeeds, `ps -q` naming two containers, which `inspect` reports healthy and
-# without a healthcheck, bar a pull under STUB_FAIL_PULL and an `up` under STUB_FAIL_UP. A pull
+# without a healthcheck, bar a pull under STUB_FAIL_PULL and an `up` under STUB_FAIL_UP, and
+# `ps -aq`, the host agent's look for an old updater, goes unrecorded. A pull
 # copies the update's record, .update/state.json, to $STUB_LOG.state, as it stands mid-run.
 if [[ $* == compose*' up --help' ]]; then
   [[ -n ${STUB_PODMAN_COMPOSE:-} ]] || echo '      --wait    Wait for services to be running|healthy.'
+  exit 0
+fi
+# The host agent's look for an old updater container, every run: one under STUB_OLD_UPDATER.
+if [[ $* == 'ps -aq '* ]]; then
+  [[ -z ${STUB_OLD_UPDATER:-} ]] || echo updater-1
   exit 0
 fi
 echo "$*" >>"$STUB_LOG"

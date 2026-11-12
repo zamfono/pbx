@@ -27,5 +27,3 @@ services:
       ZAMFONO_VERSION: ${ZAMFONO_PR:?set it to the PR number}
   proxy:
     image: ghcr.io/zamfono/proxy-pr:${ZAMFONO_PR:?set it to the PR number}
-  updater:
-    image: ghcr.io/zamfono/updater-pr:${ZAMFONO_PR:?set it to the PR number}

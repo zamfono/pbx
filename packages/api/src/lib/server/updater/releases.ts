@@ -1,7 +1,7 @@
 import { parseVersion, type Version } from './version.js';
 
 /**
- * What the updater installs, as GitHub tells it (§6.3 "Updates"): the project's releases, and for
+ * What `api` installs, as GitHub tells it (§6.3 "Updates"): the project's releases, and for
  * a stack on `edge` main's newest build, the one the latest successful `main.yaml` run published
  * as `edge`. The anonymous GitHub API allows 60 requests an hour per address, so the latest
  * release and the newest edge build are each cached for an hour, a fresh lookup asks at most once
@@ -18,7 +18,7 @@ const HTTP_FORBIDDEN = 403;
 const HTTP_NOT_FOUND = 404;
 const HTTP_TOO_MANY_REQUESTS = 429;
 const MS_PER_SECOND = 1000;
-// Well inside api's own 10 s for the updater's answer, so a host that cannot reach GitHub still
+// Well inside an operation's 10 s, so a stack whose host cannot reach GitHub still
 // gets its status, with the reason in `latestError`.
 const GITHUB_TIMEOUT_MS = 5000;
 // A failed lookup is kept this long, so a host without a way to GitHub does not wait on every
@@ -57,7 +57,7 @@ type GitHubRuns = {
   }[];
 };
 
-/** A published release GitHub describes in full; anything else is none the updater installs. */
+/** A published release GitHub describes in full; anything else is none `api` installs. */
 function toRelease(body: GitHubRelease): Release | undefined {
   if (body.draft === true || body.prerelease === true) {
     return undefined;

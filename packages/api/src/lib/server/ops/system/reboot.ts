@@ -18,7 +18,7 @@ import { hostClient, UpdaterRefusal, type HostClient } from './_updater.js';
 
 const WHEN = ['now', 'maintenance'] as const;
 
-/** The updater's refusal keeps its status where it is a conflict or not found, else 503. */
+/** A refusal keeps its status where it is a conflict or not found, else 503. */
 function passOn(error: unknown): never {
   if (
     error instanceof UpdaterRefusal &&
@@ -28,7 +28,7 @@ function passOn(error: unknown): never {
   }
   throw new OpError(
     HTTP_SERVICE_UNAVAILABLE,
-    `system.reboot: the updater did not answer: ${errorMessage(error)}`
+    `system.reboot: ${errorMessage(error)}`
   );
 }
 
@@ -43,15 +43,14 @@ function client(): HostClient {
 /**
  * `POST /system/reboot` (§6.3 "Host control", §10.3): reboots the host the stack runs on, now or
  * at the next maintenance moment once nothing is in progress (`jobs/host.ts`); a later `now`
- * drops a scheduled one. Offered only while `.env` sets `HOST_CONTROL=true` and an
- * `UPDATER_TOKEN`; refused while an update runs, and on Podman without the stack's boot unit,
+ * drops a scheduled one. Offered only while `.env` sets `HOST_CONTROL=true`; refused while an update runs, and on Podman without the stack's boot unit,
  * since the stack would not start again. Not undoable.
  */
 export const reboot = defineOperation({
   name: 'system.reboot',
   description:
     "Reboots the host the stack runs on: now, dropping every call, or at the next maintenance moment once no call is in progress; system.info's host.rebootRequired says when the host waits for one.",
-  available: () => env.HOST_CONTROL && env.UPDATER_TOKEN !== undefined,
+  available: () => env.HOST_CONTROL,
   input: z
     .object({
       when: z

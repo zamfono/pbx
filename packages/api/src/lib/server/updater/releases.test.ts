@@ -216,7 +216,12 @@ describe('createReleases', () => {
     'names when GitHub takes questions again after a $status',
     async ({ status, headers, retryAt }) => {
       const fetchFn: typeof fetch = () =>
-        Promise.resolve(new Response('{}', { status, headers }));
+        Promise.resolve(
+          new Response('{}', {
+            status,
+            headers: headers as Record<string, string>
+          })
+        );
       const error = await createReleases(fetchFn, () => 1_000_000)
         .latest()
         .catch((caught: unknown) => caught);

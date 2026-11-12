@@ -10,7 +10,7 @@ import type { updateOut } from './_wire.js';
 
 /**
  * The `update` block of `system.info` and `system.checkUpdate` (§6.3 "Updates", §10.3): the
- * updater's status, `fresh` from GitHub now, or why there is none. A refusal with `Retry-After`,
+ * update status, `fresh` from GitHub now, or why there is none. A refusal with `Retry-After`,
  * GitHub's spent rate limit on a fresh look, is a 503 that passes on when to retry.
  */
 export async function updateStatus(
@@ -36,7 +36,7 @@ export async function updateStatus(
       );
     }
     return {
-      unavailable: `the updater did not answer: ${errorMessage(error)}`
+      unavailable: `the update status could not be read: ${errorMessage(error)}`
     };
   }
 }

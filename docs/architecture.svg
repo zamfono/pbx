@@ -39,8 +39,8 @@
   <text class="s" x="315" y="220" text-anchor="middle">one-shot · schema first</text>
 
   <rect class="box" x="402" y="178" width="110" height="56" rx="6"/>
-  <text class="t" x="457" y="201" text-anchor="middle" font-weight="600">updater</text>
-  <text class="s" x="457" y="220" text-anchor="middle">system.update</text>
+  <text class="t" x="457" y="201" text-anchor="middle" font-weight="600">host agent</text>
+  <text class="s" x="457" y="220" text-anchor="middle">on the host · update.sh</text>
 
   <rect class="store" x="240" y="375" width="450" height="40" rx="4"/>
   <text class="s" x="465" y="392" text-anchor="middle">shared volumes</text>

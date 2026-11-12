@@ -51,7 +51,3 @@ services:
     pull_policy: missing
     volumes:
       - ${CERT_SYNC_CADDYFILE:?set by density.sh}:/etc/caddy/global.d/local-certs.caddy:ro
-
-  updater:
-    image: ${UPDATER_IMAGE:?set by density.sh}
-    pull_policy: missing

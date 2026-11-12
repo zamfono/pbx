@@ -140,14 +140,13 @@ target "proxy" {
   no-cache-filter = FRESH ? ["runtime"] : []
 }
 
+# Retired, kept for the update.sh of 0.9.0 and earlier (images/updater/Dockerfile): the proxy
+# image, idle, built from it and so sharing its layers.
 target "updater" {
-  context    = "."
-  dockerfile = "images/updater/Dockerfile"
+  context    = "images/updater"
+  dockerfile = "Dockerfile"
+  contexts   = { proxy = "target:proxy" }
   tags       = [UPDATER_IMAGE]
-  args       = { ZAMFONO_REVISION = REVISION }
-  cache-from = cache_from("updater")
-  cache-to   = cache_to("updater")
-  no-cache   = FRESH
 }
 
 target "test-devices" {

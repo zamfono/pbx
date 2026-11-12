@@ -11,7 +11,7 @@ const runFields = {
   error: z.string().optional()
 };
 
-/** The updater's record of a run (`UpdateState`, §6.3 "Updates"), with who asked for it. */
+/** An update run's record (`UpdateState`, §6.3 "Updates"), with who asked for it. */
 export const updateStateOut = z.union([
   z.object({
     ...runFields,
@@ -22,7 +22,7 @@ export const updateStateOut = z.union([
   z.object(runFields)
 ]);
 
-/** The updater's `GET /status` (`UpdaterStatus`, §6.3 "Updates"). */
+/** The update status (`UpdaterStatus`, §6.3 "Updates"). */
 export const updaterStatusOut = z.object({
   current: z.string().nullable(),
   latest: z
@@ -46,15 +46,15 @@ export const updaterStatusOut = z.object({
   unavailable: z
     .string()
     .optional()
-    .describe('Why the updater cannot update at all.')
+    .describe('Why the stack cannot be updated through the API at all.')
 });
 
-/** `system.info`'s and `system.checkUpdate`'s `update`: the updater's status, or why there is
+/** `system.info`'s and `system.checkUpdate`'s `update`: the update status, or why there is
  * none. */
 export const updateOut = z
   .union([updaterStatusOut, z.object({ unavailable: z.string() })])
   .describe(
-    "The updater's view (§6.3): the latest release, whether system.update can take the stack there (a breaking one with breaking: true), and how the last update went and who asked for it; unavailable says why there is none."
+    'The update status (§6.3): the latest release, whether system.update can take the stack there (a breaking one with breaking: true), and how the last update went and who asked for it; unavailable says why there is none.'
   );
 
 /** A process's version (`ZamfonoVersion`, §7 "Version"). */

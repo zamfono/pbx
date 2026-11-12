@@ -31,11 +31,11 @@ const inputSchema = z
   .strict();
 
 /**
- * `POST /system/update` (§6.3 "Updates", §10.3): has the updater service take the stack to the
+ * `POST /system/update` (§6.3 "Updates", §10.3): has the host agent take the stack to the
  * latest release, or to `version`, when that release is newer and non-breaking, or breaking and
  * `breaking` is set. Refused unless a
  * backup run finished `ok` within the last hour, so the update begins from a restorable point;
- * answers as soon as the updater has begun, and `system.info` reports how it went and who asked.
+ * answers as soon as the host agent has begun, and `system.info` reports how it went and who asked.
  * Not undoable: migrations only go forward (§6.3 "Upgrades").
  */
 export const update = defineOperation({
@@ -44,7 +44,7 @@ export const update = defineOperation({
     'Updates the stack to the latest release, or to version, if newer and non-breaking, or breaking with breaking: true once its upgrade notes were read; needs a backup run finished ok within the last hour. system.info reports the progress.',
   input: inputSchema,
   output: updateStateOut,
-  // The updater's own refusals keep their status; anything else, or no updater, is a 503.
+  // The updater's own refusals keep their status; anything else, or no updates through the API, is a 503.
   problems: [HTTP_BAD_REQUEST, HTTP_NOT_FOUND, HTTP_SERVICE_UNAVAILABLE],
   minRole: 'owner',
   pureAction: true,

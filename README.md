@@ -80,7 +80,7 @@ claude mcp add --transport http zamfono https://<your FQDN>/mcp
 | `docs/guide/`     | the admin guide above                                                                                                                    |
 | `CHANGELOG.md`    | what each release changes for operators, with its upgrade notes; each release's description                                              |
 | `docs/spec.md`    | the full technical specification — the contract the code is built against                                                                |
-| `images/`         | the Dockerfiles for `asterisk`, `migrate`, `api`, `core`, `proxy` and `updater`                                                          |
+| `images/`         | the Dockerfiles for `asterisk`, `migrate`, `api`, `core`, `proxy` and the retired `updater`                                              |
 | `db/`             | the schema migrations and `migrate.ts`, which the `migrate` image runs                                                                   |
 | `packages/shared` | the database schema types, wire contracts and shared helpers                                                                             |
 | `packages/core`   | the ARI client and the call pipeline                                                                                                     |

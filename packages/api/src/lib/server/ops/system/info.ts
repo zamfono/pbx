@@ -101,7 +101,7 @@ const outputSchema = z.object({
 });
 type Output = z.infer<typeof outputSchema>;
 
-/** `failed` stays `null` without an updater, which automatic updates need; the record is kept. */
+/** `failed` stays `null` without updates through the API, which automatic updates need; the record is kept. */
 async function autoUpdateStatus(db: Db): Promise<Output['autoUpdate']> {
   const [enabled, row] = await Promise.all([
     autoUpdateEnabled(db),

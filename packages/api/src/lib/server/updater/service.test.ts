@@ -1,19 +1,17 @@
-import type { AddressInfo } from 'node:net';
-import { afterEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import type { HostStatus, UpdateState } from '@zamfono/shared';
 
 import { AgentRefusal, type Agent, type AgentRequest } from './agent.js';
+import { UpdaterRefusal } from './errors.js';
 import { GitHubRateLimited, type Release, type Releases } from './releases.js';
-import { createServer, type ServerDeps } from './server.js';
+import { createUpdater, type Updater, type UpdaterDeps } from './service.js';
 import type { UpdateVerdict } from './stack.js';
 import type { Version } from './version.js';
 
-const TOKEN = 'secret-token';
 const HTTP_OK = 200;
 const HTTP_ACCEPTED = 202;
 const HTTP_BAD_REQUEST = 400;
-const HTTP_UNAUTHORIZED = 401;
 const HTTP_NOT_FOUND = 404;
 const HTTP_CONFLICT = 409;
 const HTTP_SERVICE_UNAVAILABLE = 503;
@@ -75,40 +73,75 @@ function fakeAgent(
   };
 }
 
-const servers: { close: () => void }[] = [];
-afterEach(() => {
-  for (const server of servers.splice(0)) {
-    server.close();
-  }
-});
-
-async function serve(serverDeps: ServerDeps): Promise<string> {
-  const server = createServer(serverDeps);
-  servers.push(server);
-  await new Promise<void>(resolve => {
-    server.listen(0, '127.0.0.1', () => {
-      resolve();
-    });
-  });
-  return `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+/** The updater for `deps`, the host part offered only with `hostControl`, as `api` offers it. */
+function serve(
+  serverDeps: UpdaterDeps & { hostControl?: boolean }
+): Updater & { hostControl: boolean } {
+  return {
+    ...createUpdater(serverDeps),
+    hostControl: serverDeps.hostControl ?? false
+  };
 }
 
+/** What the updater answers a call by its old HTTP route: the status and body a refusal
+ * carries, `{ error }`, or the result. */
 async function call(
-  base: string,
+  updater: Updater & { hostControl: boolean },
   method: string,
   route: string,
-  body?: unknown,
-  token = TOKEN
-): Promise<{ status: number; body: Record<string, unknown> }> {
-  const response = await fetch(`${base}${route}`, {
-    method,
-    headers: { authorization: `Bearer ${token}` },
-    ...(body === undefined ? {} : { body: JSON.stringify(body) })
-  });
-  return {
-    status: response.status,
-    body: (await response.json()) as Record<string, unknown>
+  body?: unknown
+): Promise<{
+  status: number;
+  body: Record<string, unknown>;
+  retryAfterS?: number;
+}> {
+  const url = new URL(route, 'http://updater');
+  const revision = url.searchParams.get('revision') ?? undefined;
+  const routes: Record<string, () => Promise<[number, unknown]>> = {
+    'GET /status': async () => [HTTP_OK, await updater.status(false, revision)],
+    'POST /check': async () => [HTTP_OK, await updater.status(true, revision)],
+    'POST /update': async () => [
+      HTTP_ACCEPTED,
+      await updater.update(body ?? {})
+    ],
+    'GET /host': async () => [HTTP_OK, await updater.host.read()],
+    'POST /host/check': async () => [HTTP_OK, await updater.host.check()],
+    'POST /host/updates': async () => {
+      const { enabled } = (body ?? {}) as { enabled?: unknown };
+      if (typeof enabled !== 'boolean') {
+        return [HTTP_BAD_REQUEST, { error: 'enabled must be a boolean' }];
+      }
+      await updater.host.setUpdates(enabled);
+      return [HTTP_ACCEPTED, {}];
+    },
+    'POST /host/reboot': async () => {
+      await updater.host.reboot();
+      return [HTTP_ACCEPTED, {}];
+    }
   };
+  const key = `${method} ${url.pathname}`;
+  if (url.pathname.startsWith('/host') && !updater.hostControl) {
+    return { status: HTTP_NOT_FOUND, body: {} };
+  }
+  const handler = routes[key];
+  if (handler === undefined) {
+    throw new Error(`no route ${key}`);
+  }
+  try {
+    const [status, result] = await handler();
+    return { status, body: result as Record<string, unknown> };
+  } catch (error) {
+    if (error instanceof UpdaterRefusal) {
+      return {
+        status: error.status,
+        body: { error: error.message },
+        ...(error.retryAfterS === undefined
+          ? {}
+          : { retryAfterS: error.retryAfterS })
+      };
+    }
+    throw error;
+  }
 }
 
 /** update.sh --check's verdicts on the stack at 0.0.6, which the tests stub. */
@@ -119,9 +152,10 @@ const VERDICTS: Record<string, UpdateVerdict> = {
   '0.1.0': 'breaking'
 };
 
-function deps(overrides: Partial<ServerDeps> = {}): ServerDeps {
+function deps(
+  overrides: Partial<UpdaterDeps & { hostControl: boolean }> = {}
+): UpdaterDeps & { hostControl: boolean } {
   return {
-    token: TOKEN,
     releases: fakeReleases([0, 0, 7]),
     currentVersion: () => Promise.resolve([0, 0, 6]),
     checkUpdate: version => Promise.resolve(VERDICTS[version] ?? 'update'),
@@ -133,9 +167,9 @@ function deps(overrides: Partial<ServerDeps> = {}): ServerDeps {
 
 const NO_REBOOT: HostStatus = { rebootRequired: null, updates: false };
 
-describe('the host API', () => {
+describe('the host', () => {
   it('offers nothing while HOST_CONTROL is not true', async () => {
-    const base = await serve(deps({ agent: fakeAgent({ host: NO_REBOOT }) }));
+    const base = serve(deps({ agent: fakeAgent({ host: NO_REBOOT }) }));
     const answers = await Promise.all([
       call(base, 'GET', '/host'),
       call(base, 'POST', '/host/updates'),
@@ -150,7 +184,7 @@ describe('the host API', () => {
 
   it("reports what the agent saw of the host, and hands it the upgrades' switch", async () => {
     const agent = fakeAgent({ host: NO_REBOOT });
-    const base = await serve(deps({ agent, hostControl: true }));
+    const base = serve(deps({ agent, hostControl: true }));
     expect((await call(base, 'GET', '/host')).body).toEqual(NO_REBOOT);
     expect(
       (await call(base, 'POST', '/host/updates', { enabled: 'yes' })).status
@@ -162,12 +196,12 @@ describe('the host API', () => {
   });
 
   it('says so before the agent reported the host, and refuses upgrades without apt', async () => {
-    const silent = await serve(deps({ agent: fakeAgent(), hostControl: true }));
+    const silent = serve(deps({ agent: fakeAgent(), hostControl: true }));
     expect((await call(silent, 'GET', '/host')).status).toBe(
       HTTP_SERVICE_UNAVAILABLE
     );
     const agent = fakeAgent({ host: { rebootRequired: null, updates: null } });
-    const noApt = await serve(deps({ agent, hostControl: true }));
+    const noApt = serve(deps({ agent, hostControl: true }));
     expect(
       (await call(noApt, 'POST', '/host/updates', { enabled: true })).status
     ).toBe(HTTP_CONFLICT);
@@ -176,7 +210,7 @@ describe('the host API', () => {
 
   it('asks for a reboot, unless an update runs or the stack would not come back', async () => {
     const agent = fakeAgent({ host: NO_REBOOT });
-    const base = await serve(deps({ agent, hostControl: true }));
+    const base = serve(deps({ agent, hostControl: true }));
     expect((await call(base, 'POST', '/host/reboot')).status).toBe(
       HTTP_ACCEPTED
     );
@@ -187,7 +221,7 @@ describe('the host API', () => {
     expect(
       (
         await call(
-          await serve(deps({ agent: busy, hostControl: true })),
+          serve(deps({ agent: busy, hostControl: true })),
           'POST',
           '/host/reboot'
         )
@@ -198,7 +232,7 @@ describe('the host API', () => {
       host: { ...NO_REBOOT, rebootRefused: 'no boot unit' }
     });
     const refused = await call(
-      await serve(deps({ agent: podman, hostControl: true })),
+      serve(deps({ agent: podman, hostControl: true })),
       'POST',
       '/host/reboot'
     );
@@ -211,7 +245,7 @@ describe('the host API', () => {
 
   it('has the agent read the host now, and answers with its report', async () => {
     const agent = fakeAgent({ host: NO_REBOOT });
-    const base = await serve(deps({ agent, hostControl: true }));
+    const base = serve(deps({ agent, hostControl: true }));
     expect(await call(base, 'POST', '/host/check')).toEqual({
       status: HTTP_OK,
       body: NO_REBOOT
@@ -221,7 +255,7 @@ describe('the host API', () => {
 
   it("shares one check among those asked at once, and passes the agent's refusal on as 409", async () => {
     const agent = fakeAgent({ host: NO_REBOOT });
-    const base = await serve(deps({ agent, hostControl: true }));
+    const base = serve(deps({ agent, hostControl: true }));
     const answers = await Promise.all([
       call(base, 'POST', '/host/check'),
       call(base, 'POST', '/host/check')
@@ -240,7 +274,7 @@ describe('the host API', () => {
     };
     expect(
       await call(
-        await serve(deps({ agent: refusing, hostControl: true })),
+        serve(deps({ agent: refusing, hostControl: true })),
         'POST',
         '/host/reboot'
       )
@@ -257,7 +291,7 @@ describe('the host API', () => {
         Promise.reject(new AgentRefusal('notTaken', 'did not take it'))
     };
     const answer = await call(
-      await serve(deps({ agent, hostControl: true })),
+      serve(deps({ agent, hostControl: true })),
       'POST',
       '/host/reboot'
     );
@@ -268,20 +302,9 @@ describe('the host API', () => {
   });
 });
 
-describe('the updater API', () => {
-  it('refuses a request without the token, and every request without a token set', async () => {
-    const base = await serve(deps());
-    expect(
-      (await call(base, 'GET', '/status', undefined, 'wrong')).status
-    ).toBe(HTTP_UNAUTHORIZED);
-    const unset = await serve(deps({ token: undefined }));
-    expect((await call(unset, 'GET', '/status', undefined, '')).status).toBe(
-      HTTP_SERVICE_UNAVAILABLE
-    );
-  });
-
+describe('the updater', () => {
   it('reports the running and the latest release, and whether it can update', async () => {
-    const base = await serve(deps());
+    const base = serve(deps());
     const { status, body } = await call(base, 'GET', '/status');
     expect(status).toBe(HTTP_OK);
     expect(body).toMatchObject({
@@ -294,7 +317,7 @@ describe('the updater API', () => {
   });
 
   it('calls a newer breaking release breaking, not updatable', async () => {
-    const base = await serve(deps({ releases: fakeReleases([0, 1, 0]) }));
+    const base = serve(deps({ releases: fakeReleases([0, 1, 0]) }));
     expect((await call(base, 'GET', '/status')).body).toMatchObject({
       updatable: false,
       breaking: true
@@ -303,7 +326,7 @@ describe('the updater API', () => {
 
   it("hands an update to the latest release to the host agent, and answers with the run's record", async () => {
     const agent = fakeAgent();
-    const base = await serve(deps({ agent }));
+    const base = serve(deps({ agent }));
     const { status, body } = await call(base, 'POST', '/update', MANUAL);
     expect(status).toBe(HTTP_ACCEPTED);
     expect(body).toMatchObject({ state: 'running', to: '0.0.7' });
@@ -321,7 +344,7 @@ describe('the updater API', () => {
   });
 
   it('takes a named release only if GitHub has it, and only a non-breaking newer one', async () => {
-    const base = await serve(
+    const base = serve(
       deps({
         releases: fakeReleases(
           [0, 1, 0],
@@ -363,9 +386,7 @@ describe('the updater API', () => {
 
   it('takes a breaking release when the owner sets breaking, which the agent passes on as --yes', async () => {
     const agent = fakeAgent();
-    const base = await serve(
-      deps({ releases: fakeReleases([0, 1, 0]), agent })
-    );
+    const base = serve(deps({ releases: fakeReleases([0, 1, 0]), agent }));
     const { status, body } = await call(base, 'POST', '/update', {
       ...MANUAL,
       breaking: true
@@ -387,7 +408,7 @@ describe('the updater API', () => {
     { trigger: 'manual', by: `${'Ł'.repeat(100)}x` }
   ])('refuses the requester %j', async requester => {
     const agent = fakeAgent();
-    const base = await serve(deps({ agent }));
+    const base = serve(deps({ agent }));
     expect((await call(base, 'POST', '/update', requester)).status).toBe(
       HTTP_BAD_REQUEST
     );
@@ -395,7 +416,7 @@ describe('the updater API', () => {
   });
 
   it('records who asked for the run', async () => {
-    const base = await serve(deps());
+    const base = serve(deps());
     const { status, body } = await call(base, 'POST', '/update', {
       trigger: 'manual',
       by: 'Olga Owner'
@@ -405,7 +426,7 @@ describe('the updater API', () => {
   });
 
   it('refuses updates while no host agent has run, and says why', async () => {
-    const base = await serve(deps({ agent: fakeAgent({ present: false }) }));
+    const base = serve(deps({ agent: fakeAgent({ present: false }) }));
     const { status, body } = await call(base, 'POST', '/update', MANUAL);
     expect(status).toBe(HTTP_SERVICE_UNAVAILABLE);
     expect(String(body.error)).toContain('setup/agent.sh install');
@@ -421,15 +442,12 @@ describe('the updater API', () => {
       send: () => Promise.reject(new AgentRefusal('pending', 'still waits'))
     };
     expect(
-      (await call(await serve(deps({ agent })), 'POST', '/update', MANUAL))
-        .status
+      (await call(serve(deps({ agent })), 'POST', '/update', MANUAL)).status
     ).toBe(HTTP_CONFLICT);
   });
 
   it("compares an edge stack's newest build with the commit api names", async () => {
-    const base = await serve(
-      deps({ currentVersion: () => Promise.resolve('edge') })
-    );
+    const base = serve(deps({ currentVersion: () => Promise.resolve('edge') }));
     expect(
       (await call(base, 'GET', `/status?revision=${RUNNING_COMMIT}`)).body
     ).toMatchObject({ updatable: true });
@@ -440,7 +458,7 @@ describe('the updater API', () => {
 
   it('updates an edge stack to edge alone', async () => {
     const agent = fakeAgent({ from: 'edge' });
-    const base = await serve(
+    const base = serve(
       deps({ agent, currentVersion: () => Promise.resolve('edge') })
     );
     const refused = await call(base, 'POST', '/update', {
@@ -459,11 +477,11 @@ describe('the updater API', () => {
   });
 
   it('looks the latest up afresh, and passes a spent GitHub rate limit on with when to retry', async () => {
-    const base = await serve(deps());
+    const base = serve(deps());
     const { status, body } = await call(base, 'POST', '/check');
     expect(status).toBe(HTTP_OK);
     expect(body).toMatchObject({ latest: { version: '0.0.7' } });
-    const limited = await serve(
+    const limited = serve(
       deps({
         releases: {
           ...fakeReleases([0, 0, 7]),
@@ -474,12 +492,10 @@ describe('the updater API', () => {
         }
       })
     );
-    const response = await fetch(`${limited}/check`, {
-      method: 'POST',
-      headers: { authorization: `Bearer ${TOKEN}` }
+    expect(await call(limited, 'POST', '/check')).toEqual({
+      status: HTTP_SERVICE_UNAVAILABLE,
+      body: { error: 'rate limited' },
+      retryAfterS: 120
     });
-    expect(response.status).toBe(HTTP_SERVICE_UNAVAILABLE);
-    expect(response.headers.get('retry-after')).toBe('120');
-    expect(await response.json()).toEqual({ error: 'rate limited' });
   });
 });

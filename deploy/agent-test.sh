@@ -13,7 +13,7 @@ agent() {
     ZAMFONO_REPO_URL="http://127.0.0.1:$port" "$@" setup/agent.sh </dev/null >>"$work/out" 2>&1)
 }
 
-# ask LINE... — leaves a request of these lines with an id, as the updater does; `$request_id` is
+# ask LINE... — leaves a request of these lines with an id, as api does; `$request_id` is
 # that id.
 request_id=
 ask() {
@@ -49,19 +49,33 @@ echo "  - the host agent: reports, and takes an automatic update"
 fresh_stack
 host_control ''
 : >"$work/out"
-agent || { cat "$work/out"; fail "the agent's run without a request failed"; }
+mkdir -p "$work/stack/.update/taken.cutoff" && : >"$work/stack/.update/taken.cutoff/request"
+# Root's umask on a hardened host: api, in root's group, must still read every report.
+(umask 077 && agent) || { cat "$work/out"; fail "the agent's run without a request failed"; }
+for file in agent stack.json; do
+  [[ $(stat -c %a "$work/stack/.update/$file") == 644 ]] ||
+    fail ".update/$file is not readable by api under umask 077: $(stat -c %a "$work/stack/.update/$file")"
+done
+[[ ! -e $work/stack/.update/taken.cutoff ]] || fail "the agent left what a cut-off run had taken"
 [[ -s $work/stack/.update/agent && -d $work/stack/.update/requests ]] ||
   fail "the agent did not report itself or make the request directory"
 [[ ! -e $work/stack/.update/host.json ]] || fail "the agent reported the host without HOST_CONTROL"
-[[ $(stat -c %a "$work/stack/.update") == 700 ]] || fail ".update is not root's alone"
+[[ $(stat -c %a "$work/stack/.update") == 750 && $(stat -c %a "$work/stack/.update/requests") == 770 ]] ||
+  fail ".update is not root's and its group's alone, or api, in root's group, cannot leave requests"
+python3 - "$work/stack/.update/stack.json" <<'PY' || fail "stack.json is not what the directory runs: $(cat "$work/stack/.update/stack.json")"
+import json, sys
+assert json.load(open(sys.argv[1])) == {'current': '1.2.3', 'pending': None}
+PY
 ask action=update version=1.2.4 breaking=false trigger=automatic
 agent || { cat "$work/out"; fail "the agent's automatic update failed"; }
 answered ok
 [[ ! -e $work/stack/.update/requests/request ]] || fail "the agent left the request"
 [[ $(pin) == '1.2.4 ZAMFONO_VERSION:-1.2.4' ]] || fail "the agent's update left the stack on $(pin)"
 RECORD_TRIGGER=automatic record_is "$work/stack/.update/state.json" succeeded 1.2.3 1.2.4
-# On the host, every service is recreated, the updater among them.
-grep -qx 'compose up -d --wait --wait-timeout 180' "$work/runtime.log" ||
+grep -q '"current": "1.2.4"' "$work/stack/.update/stack.json" ||
+  fail "the stack report does not name the release installed: $(cat "$work/stack/.update/stack.json")"
+# On the host, every service is recreated, and one the files no longer name removed.
+grep -qx 'compose up -d --remove-orphans --wait --wait-timeout 180' "$work/runtime.log" ||
   fail "the agent's run did not recreate the whole stack: $(cat "$work/runtime.log")"
 grep -q ' rm ' "$work/runtime.log" && fail "the agent's run removed services first"
 
@@ -168,6 +182,11 @@ agent || { cat "$work/out"; fail "the agent's report on request failed"; }
 answered ok
 [[ -s $work/stack/.update/host.json && ! -s $work/runtime.log ]] ||
   fail "a report request did not report the host alone"
+echo "  - the host agent: removes the updater container a release before 0.9.1 left running"
+: >"$work/runtime.log"
+agent STUB_OLD_UPDATER=1 || { cat "$work/out"; fail "the agent's run beside an old updater failed"; }
+grep -qx 'rm -f updater-1' "$work/runtime.log" || fail "the old updater was not removed: $(cat "$work/runtime.log")"
+: >"$work/runtime.log"
 ask action=reboot
 agent || { cat "$work/out"; fail "the agent's reboot failed"; }
 answered ok
@@ -193,7 +212,7 @@ if (($(id -u) == 0)); then
     fail "requests in quick succession would hit systemd's start limit"
   # The request directory, a tmpfs of its own, which the path unit and the service require.
   mount=$(systemd-escape --path --suffix=mount "$work/stack/.update/requests")
-  grep -qx 'Options=size=1m,nr_inodes=64,mode=0700,nosuid,nodev,noexec' "$work/units/$mount" ||
+  grep -qx 'Options=size=1m,nr_inodes=64,mode=0770,nosuid,nodev,noexec' "$work/units/$mount" ||
     fail "no tmpfs for the request directory: $(cat "$work/units/$mount" 2>&1)"
   grep -qx "RequiresMountsFor=$work/stack/.update/requests" "$work/units/$base.path" ||
     fail "the path unit could watch the directory under the tmpfs"

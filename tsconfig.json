@@ -11,9 +11,6 @@
       "path": "packages/api"
     },
     {
-      "path": "packages/updater"
-    },
-    {
       "path": "db"
     },
     {

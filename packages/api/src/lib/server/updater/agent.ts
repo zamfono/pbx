@@ -17,11 +17,12 @@ import type { HostStatus, RunRequester, UpdateState } from '@zamfono/shared';
 import { settle } from './record.js';
 
 /**
- * The updater's side of the host agent (deploy/setup/agent.sh, §6.3 "Updates" and "Host
- * control"), which carries out on the host what the updater may only ask for: it leaves one
- * request at a time in `.update/requests/request`, the one place of the stack directory it may
- * write, and reads what the agent writes back in `.update/`: `agent`, when it last ran,
- * `state.json`, the last update's record, and with `HOST_CONTROL` `host.json`.
+ * `api`'s side of the host agent (deploy/setup/agent.sh, §6.3 "Updates" and "Host control"),
+ * which carries out on the host what `api` may only ask for: it leaves one request at a time in
+ * `.update/requests/request`, the one place of the stack directory it may write, and reads what
+ * the agent writes back in `.update/`, which it mounts read-only: `agent`, when it last ran,
+ * `stack.json`, what the stack directory runs, `state.json`, the last update's record, and with
+ * `HOST_CONTROL` `host.json`.
  */
 export type AgentRequest =
   | {
@@ -35,7 +36,8 @@ export type AgentRequest =
   | { action: 'updates'; enabled: boolean };
 
 export type Agent = {
-  /** Whether a host agent has run for the stack directory. */
+  /** Whether a host agent of this release has run for the stack directory: one that reports
+   * what it runs. */
   present: () => Promise<boolean>;
   /** The last update's record, a `running` one that cannot still be running marked failed. */
   state: () => UpdateState;
@@ -60,10 +62,10 @@ export class AgentRefusal extends Error {
 }
 
 /**
- * How long a request may take from the HTTP call that asked for it until the agent answered it:
- * well inside api's own wait for the updater (10 s, `packages/api`'s `_updater.ts`), so nothing
- * the updater asks of the host happens after api has given up and reported a failure. The host
- * agent refuses a request older than 10 s for the same reason (`deploy/setup/agent.sh`).
+ * How long a request may take from the operation that asked for it until the agent answered it:
+ * the operation answers within 10 s, so nothing it asks of the host happens after it has given
+ * up and reported a failure. The host agent refuses a request older than 10 s for the same
+ * reason (`deploy/setup/agent.sh`).
  */
 export const REQUEST_BUDGET_MS = 8000;
 /** The part of the budget kept for the agent's answer, which follows its take at once. */
@@ -218,18 +220,20 @@ async function deliver(
   }
 }
 
+/** The agent of the stack directory whose `.update` is mounted at `update`. */
 export function createAgent(
-  stackDir: string,
+  update: string,
   options: { now?: () => number } = {}
 ): Agent {
   const now = options.now ?? Date.now;
-  const update = path.join(stackDir, '.update');
   const requestFile = path.join(update, 'requests', 'request');
   const resultFile = path.join(update, 'result');
   let queue: Promise<unknown> = Promise.resolve();
 
   return {
-    present: async () => exists(path.join(update, 'agent')),
+    present: async () =>
+      (await exists(path.join(update, 'agent'))) &&
+      exists(path.join(update, 'stack.json')),
     state: () => {
       try {
         return settle(

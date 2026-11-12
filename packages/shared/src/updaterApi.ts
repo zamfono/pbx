@@ -1,12 +1,11 @@
 /**
- * The updater's HTTP API (§6.3 "Updates"), which `api` calls on the stack's internal network:
- * `GET /status`, `POST /check` (the same status, GitHub asked now) and `POST /update`, each with
- * `UPDATER_TOKEN`.
+ * What `api`'s updater (§6.3 "Updates", packages/api's `lib/server/updater/`) reads and answers:
+ * an update's record, who asked for it, the update status and the host agent's report of the host.
  */
 
 /**
- * An update's record in the stack directory's `.update/state.json`, which the updater writes for
- * its own runs and `update.sh` on the host for its own, so it outlives the updater.
+ * An update's record in the stack directory's `.update/state.json`, which `update.sh` writes for
+ * every run, the host agent's and one started on the host alike.
  */
 export type UpdateState = {
   state: 'idle' | 'running' | 'succeeded' | 'failed';
@@ -49,13 +48,13 @@ export type UpdaterStatus = {
    * the host, takes it. */
   breaking: boolean;
   last: UpdateState;
-  /** Why the updater cannot update at all, such as a container without Compose labels. */
+  /** Why the stack cannot be updated through `api` at all, such as no host agent. */
   unavailable?: string;
 };
 
 /**
  * `GET /host`, `POST /host/updates` and `POST /host/reboot` (§6.3 "Host control"), only while
- * `HOST_CONTROL` is `true`: what the updater sees of the host the stack runs on.
+ * `HOST_CONTROL` is `true`: what the host agent reports of the host the stack runs on.
  */
 export type HostStatus = {
   /** Since when the host waits for a reboot, by `/run/reboot-required`, and the packages

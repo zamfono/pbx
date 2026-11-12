@@ -42,7 +42,8 @@ version_cmp() {
 }
 
 # breaking FROM TO — RELEASING.md's policy: a new major from 1.0.0 on, a new minor while 0.x.
-# With version_cmp, the one implementation of it: the updater asks `update.sh --check`.
+# With version_cmp, the script's implementation of it; api applies the same to judge an update
+# (packages/api's updater/stack.ts), both tested on deploy/update-check-cases.txt.
 # shellcheck disable=SC2206 # the split on IFS=. is the point
 breaking() {
   local IFS=.

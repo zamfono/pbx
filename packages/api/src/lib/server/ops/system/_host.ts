@@ -100,12 +100,12 @@ export const hostOut = z
   .or(z.object({ unavailable: z.string() }))
   .optional()
   .describe(
-    'The host the stack runs on (§6.3 "Host control"), present only where .env sets HOST_CONTROL=true; unavailable says why the updater could not tell.'
+    'The host the stack runs on (§6.3 "Host control"), present only where .env sets HOST_CONTROL=true; unavailable says why the host agent could not be read.'
   );
 
 /**
- * The `host` block from what `ask` has the updater answer, `read` or `check`; `undefined` without
- * host control, `{ unavailable }` while the updater or the agent cannot answer.
+ * The `host` block from what `ask` reads, `read` or `check`; `undefined` without host control,
+ * `{ unavailable }` while the host agent cannot answer.
  */
 export async function hostStatus(
   db: Db,
