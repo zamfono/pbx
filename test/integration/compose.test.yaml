@@ -73,6 +73,10 @@ services:
   updater:
     image: ${UPDATER_IMAGE:?set by run.sh}
     pull_policy: missing
+    # The run's stack directory belongs to whoever runs the suite, CI's runner user among them,
+    # where an operator's belongs to root (deploy/README.md, step 8); without a capability, root in
+    # the updater could not read .env or .update there. The deployed updater keeps none.
+    cap_add: [DAC_OVERRIDE, DAC_READ_SEARCH]
 
   api:
     image: ${API_IMAGE:?set by run.sh}
