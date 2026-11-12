@@ -56,10 +56,16 @@ sip_ban_has_active() {
   [ -n "$(sip_ban_active)" ]
 }
 
-# Fails attempts until the scanner holds an active ban, at most SIP_BAN_ATTEMPTS of them.
+# Fails attempts until the scanner holds an active ban, at most SIP_BAN_ATTEMPTS of them. The ban
+# follows the attempt that reached the threshold by milliseconds, and can land after the look for
+# it but before the next attempt, which nftables then drops: an attempt unanswered is the ban,
+# once it shows.
 sip_ban_fail_until_banned() {
   for ((attempt = 1; attempt <= SIP_BAN_ATTEMPTS; attempt++)); do
-    sip_ban_attempt || fail "Asterisk did not answer the scanner's attempt $attempt"
+    if ! sip_ban_attempt; then
+      poll $SIP_BAN_POLLS 1 sip_ban_has_active && return 0
+      fail "Asterisk did not answer the scanner's attempt $attempt, and no ban holds"
+    fi
     sip_ban_has_active && return 0
   done
   fail "$SIP_BAN_ATTEMPTS failed attempts did not ban the scanner"
