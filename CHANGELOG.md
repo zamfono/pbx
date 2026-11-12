@@ -11,8 +11,14 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-11-12
+
 ### Upgrade notes
 
+- From 0.8.x: follow 0.9.0's upgrade notes as well, which `update.sh` shows with these: update with
+  `./update.sh` on the host in a terminal, then run it once more. That second run offers the host
+  agent and `HOST_CONTROL`, and removes the `updater` container of 0.8.x, which holds the
+  container runtime's socket; the agent's first run removes its image.
 - Only for a stack without the host agent (`ZAMFONO_AGENT=false`, or no systemd): run
   `./update.sh` on the host once more after this update. That run removes the `updater` container
   the previous release left running, which on a stack installed through the API from a release
@@ -1045,7 +1051,8 @@ The first 0.2 release; its `v0.2.0` tag was never published.
 
 The first tagged version, before any deployment.
 
-[Unreleased]: https://github.com/zamfono/pbx/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/zamfono/pbx/compare/v0.9.1...HEAD
+[0.9.1]: https://github.com/zamfono/pbx/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/zamfono/pbx/compare/v0.8.6...v0.9.0
 [0.8.6]: https://github.com/zamfono/pbx/compare/v0.8.5...v0.8.6
 [0.8.5]: https://github.com/zamfono/pbx/compare/v0.8.4...v0.8.5
