@@ -8,6 +8,7 @@ import pino from 'pino';
 import {
   addressKey,
   HTTP_NOT_FOUND,
+  HTTP_SEE_OTHER,
   HTTP_TOO_MANY_REQUESTS,
   HTTP_UNAUTHORIZED,
   MS_PER_SECOND,
@@ -38,6 +39,9 @@ import { problem } from '#lib/server/problem.js';
 import { API_PREFIX } from '#lib/server/restRoutes.js';
 import { keyringFromEnv } from '#lib/server/secretbox.js';
 import { stackIpv4 } from '#lib/server/stackAddress.js';
+import { uploadLinkAuth } from '#lib/server/uploadLink.js';
+
+import { upload } from './routes/upload/[...path]/upload.remote.js';
 
 const jobsLogger = pino({ name: 'hooks' });
 
@@ -108,6 +112,69 @@ function rateLimitResponse(
   });
 }
 
+// SvelteKit's id of the upload page's remote form, `<hash of its file>/upload`, which it sets on
+// the form when it loads the module (`init_remote_functions`); not part of the form's typed API.
+// eslint-disable-next-line no-underscore-dangle -- SvelteKit's own name for the form's internals
+const UPLOAD_FORM_ID = (upload as unknown as { __: { id: string } }).__.id;
+// Where an enhanced remote call posts: `/_app/remote/<id>` (no `paths.base`).
+const REMOTE_CALL_PREFIX = '/_app/remote/';
+
+/**
+ * How `event` submits the upload page's remote form, read as SvelteKit reads it: `enhanced` posts
+ * to `/_app/remote/<id>` (`event.url` is then the page's, from `x-sveltekit-pathname` and
+ * `x-sveltekit-search`), `plain`, without JavaScript, to a page, any page, with the id as its
+ * `/remote` query; `null` for no submission of it. A further segment after the id is a keyed
+ * instance's key, which runs the same form.
+ */
+function uploadFormCall(event: RequestEvent): 'enhanced' | 'plain' | null {
+  if (event.request.method !== 'POST') {
+    return null;
+  }
+  const { pathname } = new URL(event.request.url);
+  const enhanced = pathname.startsWith(REMOTE_CALL_PREFIX);
+  const id = enhanced
+    ? pathname.slice(REMOTE_CALL_PREFIX.length)
+    : event.url.searchParams.get('/remote');
+  if (id !== UPLOAD_FORM_ID && id?.startsWith(`${UPLOAD_FORM_ID}/`) !== true) {
+    return null;
+  }
+  return enhanced ? 'enhanced' : 'plain';
+}
+
+/**
+ * The answer to a submission of the upload page's form whose page URL carries no valid upload
+ * link (§10.5 "Uploads"), given before SvelteKit reads its body, else `null` to let it through;
+ * the form checks its `link` field again. The page's own load then finds the link expired and
+ * says so: an enhanced submission gets an empty result, after which the page reloads its data,
+ * one without JavaScript a 303 to the page without the `/remote` query.
+ */
+async function uploadFormRefusal(
+  event: RequestEvent
+): Promise<Response | null> {
+  const call = uploadFormCall(event);
+  if (
+    call === null ||
+    (await uploadLinkAuth(
+      { db: getDb(), jwtSecret: env.JWT_SECRET },
+      event.url
+    )) !== null
+  ) {
+    return null;
+  }
+  if (call === 'enhanced') {
+    return Response.json(
+      { type: 'result' },
+      { headers: { 'cache-control': 'private, no-store' } }
+    );
+  }
+  const page = new URL(event.url);
+  page.searchParams.delete('/remote');
+  return new Response(null, {
+    status: HTTP_SEE_OTHER,
+    headers: { location: `${page.pathname}${page.search}` }
+  });
+}
+
 // `src/app.html`'s placeholder for the page language.
 const LANG_PLACEHOLDER = '%lang%';
 
@@ -125,7 +192,9 @@ async function fillLanguage({ html }: { html: string }): Promise<string> {
 }
 
 /**
- * Refuses a cross-site form submission to a browser-served page (`crossSiteFormRejection`);
+ * Refuses a cross-site form submission to a browser-served page (`crossSiteFormRejection`), and
+ * a submission of the upload page's form without a valid upload link before its body is read
+ * (`uploadFormRefusal`);
  * resolves `/api/v1/*`'s bearer token, or a download link's token (§10.5), into
  * `event.locals.auth`, 401 problem+json without one (the OpenAPI document needs neither);
  * refuses `/internal/*` and `/readyz` when the request carries `X-Forwarded-For`, since only the
@@ -139,6 +208,10 @@ const handleRequest: Handle = async ({ event, resolve }) => {
   const crossSite = crossSiteFormRejection(event.request, routeId);
   if (crossSite) {
     return crossSite;
+  }
+  const uploadRefused = await uploadFormRefusal(event);
+  if (uploadRefused) {
+    return uploadRefused;
   }
   if (
     (routeId?.startsWith(INTERNAL_PREFIX) === true ||

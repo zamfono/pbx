@@ -61,6 +61,12 @@ why the specified behaviour changed; the commit history, how.
 
 ### Security
 
+- Anyone could make `api` hold 50 MB in memory per request, without a token, through the
+  upload page's form, which `api` read whole before it checked the link inside it; many such
+  requests at once could take `api`, or the host, down. A submission of that form is now refused
+  before its body is read unless it was sent from a page whose link is valid, and the page then
+  shows that the link has expired. `proxy` no longer lets a body over 512 KiB through for another
+  form posted to an upload link under a name ending in `/upload`.
 - `/oauth/authorize` fetched any client metadata document URL for anyone, without a limit. A fetch
   the cache cannot answer now counts against the client address, 240 a minute, which four
   fetches per sign-in times the login's 60 sign-ins a minute leaves room for; a client whose

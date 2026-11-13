@@ -152,7 +152,8 @@ status() {
     "https://localhost:$port$2"
 }
 for case in 'POST /api/v1/contacts' 'POST /api/v1/contacts chunked' 'POST /oauth/token' \
-  'POST /mcp' 'POST /_app/remote/abc123/authorize' 'POST /upload/audio?/remote=abc123%2Fforgot'; do
+  'POST /mcp' 'POST /_app/remote/abc123/authorize' 'POST /upload/audio?/remote=abc123%2Fforgot' \
+  'POST /upload/audio?/remote=abc123%2Flogin%2F%22k%2Fupload%22' 'POST /_app/remote/abc123/login/upload'; do
   # The case's words are its arguments.
   # shellcheck disable=SC2086
   [ "$(status $case)" = 413 ] || fail "$case: a 600 KB body was not refused with 413"

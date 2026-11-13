@@ -12,6 +12,7 @@ import { seedSession } from '#testing/testDb.js';
 
 import { handle, init as initHooks } from './hooks.server.js';
 import { GET as getOpenApi } from './routes/api/v1/openapi.json/+server.js';
+import { upload } from './routes/upload/[...path]/upload.remote.js';
 
 const JWT_SECRET = 'test-secret';
 const KEY_BYTE_LENGTH = 32;
@@ -313,5 +314,173 @@ describe('hooks handle', () => {
         )
     });
     expect(await response.text()).toBe('<html lang="de">');
+  });
+});
+
+// §10.5 "Uploads": the upload page's remote form takes up to 50 MB, so a submission of it is
+// refused before SvelteKit reads its body unless the page URL carries a valid upload link.
+describe('hooks handle, a submission of the upload page form', () => {
+  // eslint-disable-next-line no-underscore-dangle -- SvelteKit's own name for the form's internals
+  const formId = (upload as unknown as { __: { id: string } }).__.id;
+  const ORIGIN = 'http://internal';
+  const PAGE_ROUTE = '/upload/[...path]';
+  const CHUNK_BYTES = 64 * 1024;
+  const BODY_BYTES = 8 * 1024 * 1024;
+
+  async function uploadLink(
+    expiresInS: number,
+    aud = '/api/v1/audio'
+  ): Promise<string> {
+    const nowS = epochSeconds(Date.now());
+    const token = await encodeLinkToken(JWT_SECRET, 'upload', {
+      sub: 'admin1',
+      cid: null,
+      ep: 0,
+      aud,
+      iat: nowS - 60,
+      exp: nowS + expiresInS
+    });
+    return `/upload/audio?kind=moh&label=Hold&access_token=${token}`;
+  }
+
+  /** An 8 MiB request body that counts the chunks read from it; it is pulled only when read. */
+  function trackedBody(): {
+    body: ReadableStream<Uint8Array>;
+    pulls: () => number;
+  } {
+    let pulled = 0;
+    const body = new ReadableStream<Uint8Array>(
+      {
+        pull(controller) {
+          pulled += 1;
+          if (pulled * CHUNK_BYTES > BODY_BYTES) {
+            controller.close();
+          } else {
+            controller.enqueue(new Uint8Array(CHUNK_BYTES));
+          }
+        }
+      },
+      { highWaterMark: 0 }
+    );
+    return { body, pulls: () => pulled };
+  }
+
+  /** `handle`'s answer to a POST of a tracked body to `requestPath`, for the page at `pagePath`
+   *  that SvelteKit matched to `routeId`: an enhanced submission when the two differ (the page's
+   *  URL then comes from `x-sveltekit-pathname` and `x-sveltekit-search`), else one without
+   *  JavaScript. A request let through has its body read, as SvelteKit would. */
+  async function submit(
+    requestPath: string,
+    pagePath: string,
+    routeId: string | null = PAGE_ROUTE
+  ): Promise<{ response: Response; resolved: boolean; pulls: number }> {
+    const { body, pulls } = trackedBody();
+    const event = requestEvent(`${ORIGIN}${pagePath}`, { routeId });
+    const request = new Request(`${ORIGIN}${requestPath}`, {
+      method: 'POST',
+      body,
+      duplex: 'half'
+    } as RequestInit);
+    let resolved = false;
+    const response = await handle({
+      event: { ...event, request },
+      // SvelteKit reads the whole body once the request is let through.
+      resolve: async resolvedEvent => {
+        resolved = true;
+        await resolvedEvent.request.arrayBuffer();
+        return new Response('ok');
+      }
+    });
+    return { response, resolved, pulls: pulls() };
+  }
+
+  const enhanced = (pagePath: string, id = formId) =>
+    submit(`/_app/remote/${id}`, pagePath);
+  const plain = (pagePath: string, id = formId) =>
+    submit(
+      `${pagePath}${pagePath.includes('?') ? '&' : '?'}/remote=${encodeURIComponent(id)}`,
+      `${pagePath}${pagePath.includes('?') ? '&' : '?'}/remote=${encodeURIComponent(id)}`
+    );
+
+  const badLinks: [string, () => Promise<string>][] = [
+    ['no token', () => Promise.resolve('/upload/audio?kind=moh&label=Hold')],
+    ['an expired token', () => uploadLink(-60)],
+    ['a token for another path', () => uploadLink(300, '/api/v1/contacts')],
+    ['a forged token', async () => `${await uploadLink(300)}x`]
+  ];
+
+  it.each(badLinks)(
+    'answers an enhanced submission with %s an empty result, its body unread',
+    async (_name, link) => {
+      const { response, resolved, pulls } = await enhanced(await link());
+      expect(resolved).toBe(false);
+      expect(pulls).toBe(0);
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ type: 'result' });
+      expect(response.headers.get('cache-control')).toBe('private, no-store');
+    }
+  );
+
+  it.each(badLinks)(
+    'redirects a submission without JavaScript with %s to the page, its body unread',
+    async (_name, link) => {
+      const page = await link();
+      const { response, resolved, pulls } = await plain(page);
+      expect(resolved).toBe(false);
+      expect(pulls).toBe(0);
+      expect(response.status).toBe(303);
+      expect(response.headers.get('location')).toBe(page);
+    }
+  );
+
+  it('refuses an enhanced submission that names no page, its body unread', async () => {
+    const { body, pulls } = trackedBody();
+    const url = `${ORIGIN}/_app/remote/${formId}`;
+    const response = await handle({
+      event: requestEvent(url, {
+        init: { method: 'POST', body, duplex: 'half' } as RequestInit
+      }),
+      resolve: resolvePassThrough
+    });
+    expect(await response.json()).toEqual({ type: 'result' });
+    expect(pulls()).toBe(0);
+  });
+
+  it('refuses a keyed instance of the form, and the form posted to another page, its body unread', async () => {
+    const keyed = await enhanced(
+      '/upload/audio?kind=moh',
+      `${formId}/${encodeURIComponent('"k"')}`
+    );
+    expect(keyed.resolved).toBe(false);
+    expect(keyed.pulls).toBe(0);
+    const elsewhere = await submit(
+      `/oauth/authorize?/remote=${encodeURIComponent(formId)}`,
+      `/oauth/authorize?/remote=${encodeURIComponent(formId)}`,
+      '/oauth/authorize'
+    );
+    expect(elsewhere.resolved).toBe(false);
+    expect(elsewhere.pulls).toBe(0);
+    expect(elsewhere.response.headers.get('location')).toBe('/oauth/authorize');
+  });
+
+  it('lets a submission with a valid upload link through on both paths', async () => {
+    const link = await uploadLink(300);
+    for (const { resolved, pulls } of [
+      await enhanced(link),
+      await plain(link)
+    ]) {
+      expect(resolved).toBe(true);
+      expect(pulls).toBeGreaterThan(BODY_BYTES / CHUNK_BYTES);
+    }
+  });
+
+  it("leaves another remote form's submission to it", async () => {
+    const [hash] = formId.split('/');
+    expect((await enhanced('/auth/forgot', `${hash}x/upload`)).resolved).toBe(
+      true
+    );
+    expect(
+      (await submit(`/_app/remote/${hash}/login`, '/oauth/authorize')).resolved
+    ).toBe(true);
   });
 });
