@@ -37,6 +37,9 @@ why the specified behaviour changed; the commit history, how.
 - `setup.sh` generates a random 256-bit `METRICS_TOKEN`, which turns `/metrics` and the full
   `/healthz` on behind it, and prints it once; `update.sh` gives a stack whose `.env` has none, or
   an empty one, a generated token, written only to `.env`, and never replaces one that is set.
+- `proxy` runs Caddy 2.11.9, and `api` and `core` take the current releases of their
+  dependencies, among them zod 4.6.7 and nodemailer 10.3.1, past the advisories against zod 4.6.5
+  (GHSA-mrhx-c7xc-m3w5) and nodemailer's address parser up to 10.1.3.
 - The operator's own Compose overlay, for continuous replication, a backup disk or anything else
   added to the stack, is `compose.local.yaml`; `update.sh`, the Podman boot unit and
   `setup/compose.sh` no longer read `compose.dr.yaml`.

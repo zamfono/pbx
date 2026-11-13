@@ -76,7 +76,7 @@ function checkClaims(
   }
   const emailVouched =
     cfg.provider === 'microsoft' || payload.email_verified === true;
-  return { sub, email, emailVouched };
+  return { sub, email, emailVouched } satisfies SsoClaims;
 }
 
 /** What the SSO callback hands `finishLogin`: the upstream code and the login's own values. */
