@@ -5,10 +5,10 @@ import {
   HTTP_NOT_FOUND,
   HTTP_OK,
   HTTP_UNAUTHORIZED,
+  isValidBearer,
   resolveVersion
 } from '@zamfono/shared';
 
-import { isValidBearer } from '#lib/server/auth/bearer.js';
 import { getCoreClient } from '#lib/server/coreClient.js';
 import { getDb } from '#lib/server/db.js';
 import { certSyncStatus } from '#lib/server/jobs/certSync.js';

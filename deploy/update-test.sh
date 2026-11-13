@@ -121,15 +121,23 @@ echo "  - to a newer release"
 fresh_stack
 key=$(grep '^SECRETBOX_KEY=' "$work/stack/.env")
 metrics_token=$(grep '^METRICS_TOKEN=' "$work/stack/.env")
+internal_token=$(grep '^INTERNAL_TOKEN=' "$work/stack/.env")
+[[ $internal_token =~ ^INTERNAL_TOKEN=\'?[0-9a-f]{64}\'?$ ]] || fail "setup.sh wrote no 256-bit INTERNAL_TOKEN"
 # A setting .env.example names and .env lacks is listed for the operator, not filled in.
-sed -i '/^UPDATER_TOKEN=/d' "$work/stack/.env"
+sed -i '/^UPDATER_TOKEN=/d;/^ALLOW_PRIVATE_TARGETS=/d' "$work/stack/.env"
 update 1.2.4 >"$work/out" 2>&1 || { cat "$work/out"; fail "the update to 1.2.4 failed"; }
 [[ $(pin) == '1.2.4 ZAMFONO_VERSION:-1.2.4' ]] || fail "the stack pins $(pin), not 1.2.4"
 [[ $(grep '^SECRETBOX_KEY=' "$work/stack/.env") == "$key" ]] || fail "the update changed SECRETBOX_KEY"
 [[ $(grep '^METRICS_TOKEN=' "$work/stack/.env") == "$metrics_token" ]] ||
   fail "the update replaced a set METRICS_TOKEN"
 grep -q 'METRICS_TOKEN' "$work/out" && fail "the update spoke of a METRICS_TOKEN it kept"
+[[ $(grep '^INTERNAL_TOKEN=' "$work/stack/.env") == "$internal_token" ]] ||
+  fail "the update replaced a set INTERNAL_TOKEN"
+grep -q 'INTERNAL_TOKEN' "$work/out" && fail "the update spoke of an INTERNAL_TOKEN it kept"
 grep -q 'new setting UPDATER_TOKEN, unset' "$work/out" || fail "UPDATER_TOKEN was not listed as new"
+grep -q 'new setting ALLOW_PRIVATE_TARGETS, unset' "$work/out" ||
+  fail "ALLOW_PRIVATE_TARGETS was not listed as new"
+grep -q '^ALLOW_PRIVATE_TARGETS=' "$work/stack/.env" && fail "the update filled in ALLOW_PRIVATE_TARGETS"
 grep -q '^UPDATER_TOKEN=' "$work/stack/.env" && fail "the update filled in UPDATER_TOKEN"
 [[ $(stat -c %a "$work/stack/.env") == 600 ]] || fail ".env is no longer private"
 # The bundle's files keep the modes it ships, whoever runs update.sh: proxy (uid 1000) reads the
@@ -166,8 +174,11 @@ grep -q 'image prune' "$work/runtime.log" && fail "an update whose up failed rem
 grep -qx '  "pending": "1.2.4"' "$work/stack/.update/stack.json" ||
   fail "the stack report does not name the update to finish: $(cat "$work/stack/.update/stack.json")"
 : >"$work/runtime.log"
+# As an update by 0.9.1's update.sh leaves it, which only lists INTERNAL_TOKEN as new.
+sed -i '/^INTERNAL_TOKEN=/d' "$work/stack/.env"
 update 1.2.4 >"$work/out" 2>&1 || { cat "$work/out"; fail "the rerun failed"; }
 grep -q 'finishing it' "$work/out" || fail "the rerun did not finish the update: $(cat "$work/out")"
+grep -qE "^INTERNAL_TOKEN='[0-9a-f]{64}'\$" "$work/stack/.env" || fail "the rerun left INTERNAL_TOKEN missing"
 grep -q ' pull' "$work/runtime.log" && fail "the rerun pulled again"
 grep -qx 'compose up -d --remove-orphans --wait --wait-timeout 180' \
   "$work/runtime.log" || fail "the rerun did not recreate the stack"
@@ -226,7 +237,10 @@ update 1.2.4 >/dev/null 2>&1 || fail "the update to 1.2.4 failed"
 echo "  - the same release again"
 record=$(cat "$work/stack/.update/state.json")
 rm "$work/stack/.update/stack.json"
-update 1.2.4 | grep -q 'Already on 1.2.4' || fail "a second run did not say it is already on 1.2.4"
+sed -i '/^INTERNAL_TOKEN=/d' "$work/stack/.env"
+update 1.2.4 >"$work/out" 2>&1 || { cat "$work/out"; fail "a second run failed"; }
+grep -q 'Already on 1.2.4' "$work/out" || fail "a second run did not say it is already on 1.2.4"
+grep -qE "^INTERNAL_TOKEN='[0-9a-f]{64}'\$" "$work/stack/.env" || fail "a second run left INTERNAL_TOKEN missing"
 [[ $(cat "$work/stack/.update/state.json") == "$record" ]] || fail "a run that did nothing was recorded"
 grep -qx '  "current": "1.2.4",' "$work/stack/.update/stack.json" ||
   fail "the second run did not report what the directory runs"
@@ -358,20 +372,48 @@ grep -qx "HOST_CONTROL='true'" "$work/stack/.env" || fail "Enter did not take mo
 grep -qx 'compose up -d --remove-orphans' "$work/runtime.log" ||
   fail "the stack was not brought up to date for HOST_CONTROL: $(cat "$work/runtime.log")"
 
-echo "  - an empty or missing METRICS_TOKEN is generated, its value kept out of the output"
-for how in empty missing; do
+echo "  - an empty or missing METRICS_TOKEN or INTERNAL_TOKEN is generated, its value kept out of the output"
+for name in METRICS_TOKEN INTERNAL_TOKEN; do
+  for how in empty missing; do
+    fresh_stack
+    if [[ $how == empty ]]; then
+      sed -i "s/^$name=.*/$name=/" "$work/stack/.env"
+    else
+      sed -i "/^$name=/d" "$work/stack/.env"
+    fi
+    update 1.2.4 >"$work/out.token" 2>&1 || { cat "$work/out.token"; fail "the update to 1.2.4 failed"; }
+    token=$(sed -nE "s/^$name='([0-9a-f]{64})'\$/\\1/p" "$work/stack/.env")
+    [[ -n $token ]] || fail "the update left $name $how: $(grep "$name" "$work/stack/.env")"
+    [[ $(grep -c "^$name=" "$work/stack/.env") == 1 ]] || fail "two $name lines"
+    grep -q "$name generated" "$work/out.token" || fail "the update did not say it generated $name"
+    grep -qF "$token" "$work/out.token" && fail "the update printed $name"
+  done
+done
+
+echo "  - a set token in any spelling Compose reads is kept, an empty one generated, neither duplicated"
+# Compose reads blanks around = or :, an export prefix, quotes and a comment after them, which
+# env_value did not parse.
+for forms in "METRICS_TOKEN='operator-set' # monitoring|INTERNAL_TOKEN='' # none yet" \
+  'METRICS_TOKEN="operator-set" # monitoring|INTERNAL_TOKEN="" # none yet' \
+  "METRICS_TOKEN=operator-set|INTERNAL_TOKEN= # none yet" \
+  "METRICS_TOKEN='operator-set'|INTERNAL_TOKEN=''" \
+  "METRICS_TOKEN = 'operator-set'|INTERNAL_TOKEN= ''" \
+  'export METRICS_TOKEN=operator-set|INTERNAL_TOKEN = "" # none yet' \
+  "METRICS_TOKEN: operator-set|export INTERNAL_TOKEN =" \
+  "  METRICS_TOKEN	=	'operator-set'  #x|  INTERNAL_TOKEN : ''#x"; do
   fresh_stack
-  if [[ $how == empty ]]; then
-    sed -i 's/^METRICS_TOKEN=.*/METRICS_TOKEN=/' "$work/stack/.env"
-  else
-    sed -i '/^METRICS_TOKEN=/d' "$work/stack/.env"
-  fi
+  kept=${forms%%|*}
+  sed -i "s/^METRICS_TOKEN=.*/$kept/;s/^INTERNAL_TOKEN=.*/${forms#*|}/" "$work/stack/.env"
   update 1.2.4 >"$work/out.token" 2>&1 || { cat "$work/out.token"; fail "the update to 1.2.4 failed"; }
-  token=$(sed -nE "s/^METRICS_TOKEN='([0-9a-f]{64})'\$/\\1/p" "$work/stack/.env")
-  [[ -n $token ]] || fail "the update left METRICS_TOKEN $how: $(grep METRICS_TOKEN "$work/stack/.env")"
-  [[ $(grep -c '^METRICS_TOKEN=' "$work/stack/.env") == 1 ]] || fail "two METRICS_TOKEN lines"
-  grep -q 'METRICS_TOKEN generated' "$work/out.token" || fail "the update did not say it generated METRICS_TOKEN"
-  grep -qF "$token" "$work/out.token" && fail "the update printed METRICS_TOKEN"
+  for name in METRICS_TOKEN INTERNAL_TOKEN; do
+    [[ $(grep -cE "^[[:space:]]*(export[[:space:]]+)?${name}[[:space:]]*[=:]" "$work/stack/.env") == 1 ]] ||
+      fail "two $name lines from $forms: $(grep "$name" "$work/stack/.env")"
+  done
+  grep -qxF "$kept" "$work/stack/.env" ||
+    fail "the update replaced $kept: $(grep 'METRICS_TOKEN' "$work/stack/.env")"
+  grep -q 'METRICS_TOKEN generated' "$work/out.token" && fail "the update generated over $kept"
+  grep -qE "^INTERNAL_TOKEN='[0-9a-f]{64}'\$" "$work/stack/.env" ||
+    fail "the update left ${forms#*|}: $(grep 'INTERNAL_TOKEN' "$work/stack/.env")"
 done
 
 # shellcheck source=update-runtime-test.sh

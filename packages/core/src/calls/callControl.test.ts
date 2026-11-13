@@ -23,6 +23,7 @@ import {
 import type { FakeAri } from '../testing/ari/fake.js';
 import { defaultChannel } from '../testing/ari/fakeChannel.js';
 import { eventually } from '../testing/eventually.js';
+import { internalFetch } from '../testing/internalFetch.js';
 import {
   answeredCall,
   legOf,
@@ -565,7 +566,7 @@ describe('call control', () => {
     const call = await answeredCall(rig, memberId);
     const baseUrl = await rig.startServer(actions);
     const post = (path: string, body: unknown): Promise<Response> =>
-      fetch(`${baseUrl}/internal/calls/${path}`, {
+      internalFetch(`${baseUrl}/internal/calls/${path}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)

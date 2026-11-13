@@ -179,6 +179,7 @@ function relayCoreEvents(
   });
   return connectCoreEvents({
     url: coreEventsUrl(env.CORE_URL),
+    token: env.INTERNAL_TOKEN,
     onOpen: () => {
       rereg.streamConnected();
     },
@@ -216,7 +217,11 @@ export async function startBackgroundJobs(
     log.error({ err: error }, 'boot: key-rotation sweep failed');
   }
   const certSync = syncCertificates(db, log);
-  const dispatcher = new WebhookDispatcher({ db, kr });
+  const dispatcher = new WebhookDispatcher({
+    db,
+    kr,
+    targetPolicy: { allowPrivate: env.ALLOW_PRIVATE_TARGETS }
+  });
   // The deliveries the previous process left pending (§10.6), alongside the new ones.
   dispatcher.resume().catch((error: unknown) => {
     log.error({ err: error }, 'webhook delivery failed');

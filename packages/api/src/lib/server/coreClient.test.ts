@@ -42,6 +42,25 @@ describe('createCoreClient', () => {
     );
   });
 
+  // §3.1: every request to core carries INTERNAL_TOKEN as its bearer token, a body's content
+  // type kept.
+  it('sends INTERNAL_TOKEN with every request', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(noContentResponse());
+    const client = createCoreClient('http://core:3000', fetchFn, 's3cret');
+
+    await client.configChanged(['pjsip']);
+    await client.reregisterTrunk('t1');
+
+    for (const [, init] of fetchFn.mock.calls as [string, RequestInit][]) {
+      const headers = new Headers(init.headers);
+      expect(headers.get('authorization')).toBe('Bearer s3cret');
+    }
+    const [, first] = fetchFn.mock.calls[0] as [string, RequestInit];
+    expect(new Headers(first.headers).get('content-type')).toBe(
+      'application/json'
+    );
+  });
+
   it('GETs /internal/state and returns the parsed snapshot', async () => {
     const snapshot = { calls: [], trunks: {}, presence: {} };
     const fetchFn = vi.fn().mockResolvedValue(jsonResponse(200, snapshot));
@@ -194,9 +213,10 @@ describe('CoreClient.health', () => {
     const health = await createCoreClient('http://core:3000', fetchFn).health();
 
     expect(health).toEqual(failing);
-    expect(fetchFn).toHaveBeenCalledWith('http://core:3000/healthz', {
-      signal: expect.any(AbortSignal) as unknown
-    });
+    expect(fetchFn).toHaveBeenCalledWith(
+      'http://core:3000/healthz',
+      expect.objectContaining({ signal: expect.any(AbortSignal) as unknown })
+    );
   });
 
   it('rejects a body that is no health document', async () => {

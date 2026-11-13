@@ -1,7 +1,9 @@
 /**
  * `core`'s internal HTTP+WS API on the Docker `internal` network (§3, §3.1): health, readiness, the
- * config-reload trigger and a live-state and event-stream surface for `api`. No authentication:
- * the internal network is the trust boundary.
+ * config-reload trigger and a live-state and event-stream surface for `api`. Every `/internal/*`
+ * request, the event stream's handshake included, carries `INTERNAL_TOKEN` as its bearer token or
+ * is refused with 401; `/healthz` and `/readyz`, which the compose healthcheck asks from inside the
+ * container, need none and tell nothing but whether the database and ARI are up.
  */
 import http from 'node:http';
 
@@ -12,7 +14,9 @@ import {
   HTTP_NOT_FOUND,
   HTTP_OK,
   HTTP_SERVICE_UNAVAILABLE,
+  HTTP_UNAUTHORIZED,
   isDbOpen,
+  isValidBearer,
   processStartedAtIso,
   type CoreVersionResponse,
   type Db,
@@ -50,6 +54,8 @@ import { handleTrunkRoute, type TrunkReregister } from './trunkRoute.js';
 const processStartedAt = processStartedAtIso();
 
 type InternalDeps = {
+  /** `INTERNAL_TOKEN` (§3.1). */
+  token: string;
   db: Db;
   ari: AriClient;
   log: Logger;
@@ -181,6 +187,9 @@ function at(
     pathname === path ? serve(deps, response, request) : null;
 }
 
+// The paths only `api` asks for, with `INTERNAL_TOKEN` (§3.1).
+const INTERNAL_PREFIX = '/internal/';
+
 const ROUTES: Partial<Record<string, Route[]>> = {
   GET: [
     at('/healthz', handleHealthz),
@@ -204,6 +213,13 @@ function routeRequest(
   response: http.ServerResponse
 ): Promise<void> {
   const { pathname } = new URL(request.url ?? '/', 'http://internal');
+  if (
+    pathname.startsWith(INTERNAL_PREFIX) &&
+    !isValidBearer(request.headers.authorization, deps.token)
+  ) {
+    respondProblem(response, HTTP_UNAUTHORIZED, 'unauthorized');
+    return Promise.resolve();
+  }
   for (const route of ROUTES[request.method ?? ''] ?? []) {
     const served = route(deps, pathname, response, request);
     if (served !== null) {

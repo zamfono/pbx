@@ -5,10 +5,10 @@
  */
 import { createHash } from 'node:crypto';
 
-import { SESSION_TOKEN_PREFIX } from '@zamfono/shared';
+import { BEARER_PREFIX, SESSION_TOKEN_PREFIX } from '@zamfono/shared';
 
 import { getCoreClient } from '../coreClient.js';
-import { BEARER_PREFIX, type Authenticated } from './bearer.js';
+import type { Authenticated } from './bearer.js';
 
 /** The session token in `request`'s `Authorization` header, `null` for any other or none. */
 export function sessionTokenOf(request: Request): string | null {

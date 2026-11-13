@@ -17,7 +17,7 @@ import { WebhookDispatcher } from '#lib/server/webhooks.js';
 /**
  * `POST /internal/sipBan` (§3.1, §5.6 "Bans"): `core` reports an address whose failed SIP
  * attempts reached the threshold, over the `internal` network (`hooks.server.ts` refuses one that
- * came through the proxy hop). 204 whether a ban was written, the address already had one or
+ * came through the proxy hop or carries no `INTERNAL_TOKEN`). 204 whether a ban was written, the address already had one or
  * banning is off; 400 for a body the schema refuses.
  */
 export async function POST(event: RequestEvent): Promise<Response> {
@@ -28,7 +28,11 @@ export async function POST(event: RequestEvent): Promise<Response> {
     return new Response(null, { status: HTTP_BAD_REQUEST });
   }
   const db = getDb();
-  const dispatcher = new WebhookDispatcher({ db, kr: keyringFromEnv(env) });
+  const dispatcher = new WebhookDispatcher({
+    db,
+    kr: keyringFromEnv(env),
+    targetPolicy: { allowPrivate: env.ALLOW_PRIVATE_TARGETS }
+  });
   await recordSipBan(
     db,
     {

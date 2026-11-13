@@ -11,6 +11,7 @@ import {
   HTTP_SEE_OTHER,
   HTTP_TOO_MANY_REQUESTS,
   HTTP_UNAUTHORIZED,
+  isValidBearer,
   MS_PER_SECOND,
   stackTimeZoneError
 } from '@zamfono/shared';
@@ -198,7 +199,8 @@ async function fillLanguage({ html }: { html: string }): Promise<string> {
  * resolves `/api/v1/*`'s bearer token, or a download link's token (§10.5), into
  * `event.locals.auth`, 401 problem+json without one (the OpenAPI document needs neither);
  * refuses `/internal/*` and `/readyz` when the request carries `X-Forwarded-For`, since only the
- * proxy hop sets it and those paths are reachable from the internal network alone (§3.1); answers 429 problem+json
+ * proxy hop sets it and those paths are reachable from the internal network alone, and
+ * `/internal/*` with 401 unless it carries `INTERNAL_TOKEN` as its bearer token (§3.1); answers 429 problem+json
  * once a client address exceeds the §5.5 limit of the auth endpoint it called. Each check keys on
  * the route SvelteKit matched, which it finds on the decoded path, so a percent-encoded spelling
  * of a path meets the same checks as the route it runs.
@@ -219,6 +221,15 @@ const handleRequest: Handle = async ({ event, resolve }) => {
     event.request.headers.has('x-forwarded-for')
   ) {
     return new Response(null, { status: HTTP_NOT_FOUND });
+  }
+  if (
+    routeId?.startsWith(INTERNAL_PREFIX) === true &&
+    !isValidBearer(
+      event.request.headers.get('authorization'),
+      env.INTERNAL_TOKEN
+    )
+  ) {
+    return new Response(null, { status: HTTP_UNAUTHORIZED });
   }
   const limited = rateLimitResponse(routeId, event);
   if (limited) {

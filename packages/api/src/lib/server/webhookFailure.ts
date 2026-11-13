@@ -1,9 +1,12 @@
 /**
  * Why a webhook delivery failed (§10.6 "Webhooks"), as one short reason a hook's failure is
  * logged and deduplicated on and `webhooks.list` shows: the HTTP status of a response that was
- * not 2xx, or the class of error of a request that got none, a timeout, a DNS lookup, TLS or the
- * connection, and a secret that cannot be decrypted.
+ * not 2xx, or the class of error of a request that got none, a timeout, a DNS lookup, an address
+ * the stack refuses to connect to (§3.1 "Outbound targets"), TLS or the connection, and a secret
+ * that cannot be decrypted.
  */
+
+import { FORBIDDEN_ADDRESS_CODE } from '@zamfono/shared';
 
 /** The reason of a delivery dropped because its hook's secret cannot be decrypted. */
 export const SECRET_UNREADABLE = 'secret unreadable — set a new secret';
@@ -13,6 +16,7 @@ const DNS_CODES = new Set(['ENOTFOUND', 'EAI_AGAIN', 'EAI_FAIL', 'EAI_NONAME']);
 const TLS_CODE =
   /^(?:ERR_TLS_|ERR_SSL_|CERT_|UNABLE_TO_|DEPTH_ZERO_|SELF_SIGNED_)/u;
 const SOCKET_REASONS: Record<string, string> = {
+  [FORBIDDEN_ADDRESS_CODE]: 'forbidden address',
   ECONNREFUSED: 'connection refused',
   ECONNRESET: 'connection reset',
   EHOSTUNREACH: 'host unreachable',

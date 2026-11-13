@@ -81,13 +81,20 @@ the body and an `X-Zamfono-Signature` header.
 
 - A delivery succeeds on any `2xx` answer within 5 seconds. A connection error, another status or
   a timeout fails the attempt; after three attempts, 1 s and then 4 s apart, the delivery is
-  given up.
+  given up. A redirect is not followed: a `3xx` answer fails the attempt like any other.
+- The receiver must be on an address the stack connects to, checked as each delivery connects:
+  never loopback (`127.0.0.1`, `localhost`), link-local (`169.254.x.x`) or the stack's own
+  internal network, and a private network (`10.x`, `172.16–31.x`, `192.168.x`, `100.64–127.x`,
+  `fc00::/7`) only while the host's operator allows it, as an on-premises install does and a
+  provider's shared host does not. A `url` with a loopback, link-local or unspecified address
+  literal is refused with 422 when saved; a name resolving to a refused address fails each
+  delivery with `forbidden address`.
 - `lastStatus` in `webhooks.list` is `ok` after a delivery that succeeded and `failing` after one
   that gave up, with `lastDeliveryAt` its time; `null` before the first. A failing hook stays
   active and keeps receiving new events: it is never switched off automatically.
 - `lastError` is why the last delivery that gave up failed, with `lastErrorAt` its time: the
   status, such as `HTTP 404` or `HTTP 403`, or the kind of error, `timeout`, `DNS lookup failed`,
-  `TLS error <code>`, `connection refused`, `connection reset`. While the hook is failing,
+  `forbidden address`, `TLS error <code>`, `connection refused`, `connection reset`. While the hook is failing,
   `failingSince` is when it turned so and `failedDeliveries` how many deliveries gave up since; a
   delivery that succeeds sets them back to `null` and 0, and `lastError` stays as a record.
 - `api` logs a warning when a hook turns `failing`, again whenever the reason changes while it

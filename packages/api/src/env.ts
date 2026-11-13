@@ -51,7 +51,7 @@ function withDefault(fallback: string) {
   };
 }
 
-/** A switch that is on unless the value is the literal `false` (§6.1, §7, §9.1). */
+/** A switch that is on unless the value is the literal `false` (§3.1, §6.1, §7, §9.1). */
 const onUnlessFalse = {
   schema: (value: string | undefined): boolean => value !== 'false'
 };
@@ -75,6 +75,7 @@ const reloadHour = {
 };
 
 export const variables = defineEnvVars({
+  ALLOW_PRIVATE_TARGETS: onUnlessFalse,
   ASTERISK_GEN_DIR: withDefault('/etc/asterisk/gen'),
   BACKUP_PASSWORD: optional,
   BOOTSTRAP_OWNER_EMAIL: optional,
@@ -90,6 +91,7 @@ export const variables = defineEnvVars({
   FQDN: requiredHost,
   HEP_ENABLED: onUnlessFalse,
   HOST_CONTROL: offUnlessTrue,
+  INTERNAL_TOKEN: required,
   JWT_SECRET: required,
   MAIL_FROM: optional,
   MAIN_DID: optional,

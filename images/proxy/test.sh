@@ -136,8 +136,9 @@ trap cleanup EXIT
 docker network create "$tag" >/dev/null
 # The Caddyfile placeholder is Caddy's, not the shell's.
 # shellcheck disable=SC2016
+# Its /internal/certificate answers 202 only to INTERNAL_TOKEN, as api does (§3.1).
 docker run -d --name "$tag-api" --network "$tag" --network-alias api --entrypoint sh \
-  "$PROXY_IMAGE" -c 'printf ":3000 {\n\trespond \"{http.request.body}\" 200\n}\n" >/tmp/Caddyfile &&
+  "$PROXY_IMAGE" -c 'printf ":3000 {\n\t@hook {\n\t\tpath /internal/certificate\n\t\theader Authorization \"Bearer hook-token\"\n\t}\n\trespond @hook 202\n\trespond /internal/* 401\n\trespond \"{http.request.body}\" 200\n}\n" >/tmp/Caddyfile &&
     exec caddy run --config /tmp/Caddyfile --adapter caddyfile' >/dev/null
 # Hardened as deploy/compose.yaml runs proxy, and binding 80 and 443 by the sysctl compose sets on
 # netns (here the proxy's own namespace), stated even where the runtime's default (Docker's 0)
@@ -224,5 +225,13 @@ logged=$(docker logs "$tag-proxy" 2>&1 | grep '"uri":"/provision/REDACTED/y00000
 if docker logs "$tag-proxy" 2>&1 | grep -q secret-provisioning-token; then
   fail "the access log kept a provisioning link's token"
 fi
+
+echo "==> the hook notifies api with INTERNAL_TOKEN (§3.1, §6.4)"
+docker run --rm --network "$tag" -e FQDN=x -e INTERNAL_TOKEN=hook-token --entrypoint sh \
+  "$PROXY_IMAGE" -c 'src=/data/caddy/certificates/i/x && mkdir -p $src &&
+    echo crt > $src/x.crt && echo key > $src/x.key &&
+    zamfono-cert-hook certificates/i/x/x.crt certificates/i/x/x.key x 2>&1' \
+  | grep -q 'zamfono-cert-hook: api notified' \
+  || fail "the hook's notification was not accepted by an api that requires INTERNAL_TOKEN"
 
 echo "PASS: images/proxy"

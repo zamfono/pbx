@@ -94,11 +94,14 @@ log "copy complete"
 # same path deploy/Caddyfile's own `reverse_proxy api:3000` already uses. On a first boot Caddy
 # can issue before `api` listens, after its start sync has already found no copy, so the
 # notification is retried for a minute (caddy-events-exec runs this in the background); a
-# notification still missed after that is not fatal: the hourly poll picks the copy up.
+# notification still missed after that is not fatal: the hourly poll picks the copy up. It carries
+# INTERNAL_TOKEN, which api requires of every /internal/* request (§3.1); without one api refuses
+# it, the hourly poll still picking the copy up.
 log "notifying api"
 notified=false
 for _ in $(seq 1 30); do
-  if wget -q -T 5 -O /dev/null --post-data='' http://api:3000/internal/certificate; then
+  if wget -q -T 5 -O /dev/null --header "Authorization: Bearer ${INTERNAL_TOKEN:-}" \
+    --post-data='' http://api:3000/internal/certificate; then
     notified=true
     break
   fi

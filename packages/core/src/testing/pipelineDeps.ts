@@ -123,6 +123,7 @@ export function testPipelineDeps(
     now: nowIso,
     stackTz: 'UTC',
     stackFqdn: 'pbx.example.com',
+    targetPolicy: null,
     legStasisWaitMs: STASIS_WAIT_MS,
     callLogMaxBytes: 1_048_576,
     mediaDir,

@@ -86,9 +86,37 @@ describe('hooks handle', () => {
     expect(response.status).toBe(404);
   });
 
-  it('resolves /internal/* through without the header', async () => {
+  // §3.1: /internal/* answers only a request carrying INTERNAL_TOKEN (testEnv.ts's) as its
+  // bearer token; /readyz, the compose healthcheck's, needs none.
+  it.each(['/internal/mail', '/internal/sipBan', '/internal/certificate'])(
+    'resolves %s through with INTERNAL_TOKEN',
+    async routeId => {
+      const event = requestEvent(`http://internal${routeId}`, {
+        routeId,
+        init: { headers: { authorization: 'Bearer test-internal-token' } }
+      });
+      const response = await handle({ event, resolve: resolvePassThrough });
+      expect(await response.text()).toBe('ok');
+    }
+  );
+
+  it.each([
+    ['no token', {}],
+    ['a wrong token', { authorization: 'Bearer wrong-token' }],
+    ['the token without its scheme', { authorization: 'test-internal-token' }],
+    ['a longer token', { authorization: 'Bearer test-internal-tokenx' }]
+  ])('refuses /internal/* with 401 for %s', async (_case, headers) => {
     const event = requestEvent('http://internal/internal/mail', {
-      routeId: '/internal/mail'
+      routeId: '/internal/mail',
+      init: { headers }
+    });
+    const response = await handle({ event, resolve: resolvePassThrough });
+    expect(response.status).toBe(401);
+  });
+
+  it('resolves /readyz through without a token', async () => {
+    const event = requestEvent('http://internal/readyz', {
+      routeId: '/readyz'
     });
     const response = await handle({ event, resolve: resolvePassThrough });
     expect(await response.text()).toBe('ok');

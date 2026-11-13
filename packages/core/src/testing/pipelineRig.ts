@@ -17,6 +17,7 @@ import { StateStore } from '../internal/stateStore.js';
 import { Presence } from '../presence.js';
 import { FakeContacts } from './ami/contacts.js';
 import { FakeAri } from './ari/fake.js';
+import { TEST_INTERNAL_TOKEN } from './internalFetch.js';
 import {
   idleMedia,
   idleRecorder,
@@ -110,6 +111,7 @@ export async function startRig(
     startServer: async actions => {
       const started = await startInternalServer(
         {
+          token: TEST_INTERNAL_TOKEN,
           db,
           ari,
           log: noopLogger,

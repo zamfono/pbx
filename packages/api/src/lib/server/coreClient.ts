@@ -1,8 +1,8 @@
 /**
  * The HTTP client for `core`'s internal API (§3, §3.1; `@zamfono/shared`'s `internalApi.ts`):
  * config-reload triggers, live state, health and version, call actions, MWI and a trunk's
- * re-registration, reached over the Docker `internal` network with no authentication, since that
- * network is the trust boundary.
+ * re-registration, reached over the Docker `internal` network, every request carrying
+ * `INTERNAL_TOKEN` as its bearer token (§3.1).
  */
 
 import * as env from '$app/env/private';
@@ -10,6 +10,7 @@ import * as env from '$app/env/private';
 import {
   healthDocumentSchema,
   HTTP_NOT_FOUND,
+  internalAuthorization,
   type AddPartyRequest,
   type AttendedTransferRequest,
   type ConsultRequest,
@@ -83,11 +84,23 @@ async function fetchCallSession(
   return (await response.json()) as { callId: string; legId: string };
 }
 
-/** `core`'s internal API at `baseUrl` (default `CORE_URL`). */
+/** `send` with `token` as every request's bearer token (§3.1 "Internal trust"). */
+function withToken(send: typeof fetch, token: string): typeof fetch {
+  return (url, init) => {
+    const headers = new Headers(init?.headers);
+    headers.set('authorization', internalAuthorization(token).authorization);
+    return send(url, { ...init, headers });
+  };
+}
+
+/** `core`'s internal API at `baseUrl` (default `CORE_URL`), each request through `send` with
+ *  `token` (default `INTERNAL_TOKEN`) as its bearer token. */
 export function createCoreClient(
   baseUrl: string = env.CORE_URL,
-  fetchFn: typeof fetch = fetch
+  send: typeof fetch = fetch,
+  token: string = env.INTERNAL_TOKEN
 ): CoreClient {
+  const fetchFn = withToken(send, token);
   const call = (callId: string, action: string): string =>
     `${baseUrl}/internal/calls/${encodeURIComponent(callId)}/${action}`;
   const getJson = async <T>(url: string, init?: RequestInit): Promise<T> => {

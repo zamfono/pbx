@@ -166,12 +166,20 @@ services:
 
   # The `inbound-forward-web-socket*` scenarios' voice bot, which each scenario's setup starts;
   # idle otherwise, like the sipp containers. It runs from the api image under test, which has the
-  # Node and `ws` the bot needs, so the harness pulls nothing from Docker Hub for it.
+  # Node and `ws` the bot needs, so the harness pulls nothing from Docker Hub for it. On `internal`,
+  # where it reaches api, but core never connects to that network's addresses (§3.1 "Outbound
+  # targets"), so its port is published on a host address outside it, `outside`'s gateway, which
+  # the scenarios' targets name (_voice-bot-setup.sh), as a bot on the LAN would be reached.
+  # Podman's netavark gives a network its bridge, and the host that address, only once a container
+  # joins it, so the bot starts after `sipp-outside`, the one on `outside`; Docker makes the bridge
+  # with the network.
   voice-bot:
     image: ${API_IMAGE:?set by run.sh}
     pull_policy: missing
     networks:
       - internal
+    ports:
+      - '10.213.48.1:8765:8765'
     volumes:
       - ${SCENARIOS_DIR:?set by run.sh}:/scenarios:ro
     entrypoint: ['sleep', 'infinity']
@@ -179,6 +187,8 @@ services:
     depends_on:
       api:
         condition: service_healthy
+      sipp-outside:
+        condition: service_started
 
   # The real devices: baresip, the same image test/load/stress runs its Ringotel stand-ins from
   # (test/load/stress/devices/Dockerfile), registering over TLS with SDES-SRTP, Opus (§3, §9.1

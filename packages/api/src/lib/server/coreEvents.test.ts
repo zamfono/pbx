@@ -79,8 +79,10 @@ describe('connectCoreEvents', () => {
 
   it('receives events and reconnects after the connection drops', async () => {
     let connectionCount = 0;
+    const authorizations: (string | undefined)[] = [];
     wss = await listeningServer();
-    wss.on('connection', socket => {
+    wss.on('connection', (socket, request) => {
+      authorizations.push(request.headers.authorization);
       connectionCount += 1;
       socket.send(
         JSON.stringify(envelope(connectionCount === 1 ? 'e1' : 'e2'))
@@ -90,6 +92,7 @@ describe('connectCoreEvents', () => {
     const received: Envelope[] = [];
     const connection = connectCoreEvents({
       url: serverUrl(wss),
+      token: 'internal-token',
       onEvent: ev => {
         received.push(ev);
       },
@@ -109,6 +112,11 @@ describe('connectCoreEvents', () => {
     await wait(WAIT_MS);
     expect(connectionCount).toBe(2);
     expect(received.map(ev => ev.id)).toEqual(['e1', 'e2']);
+    // Each handshake, the reconnect's too, carries INTERNAL_TOKEN (§3.1).
+    expect(authorizations).toEqual([
+      'Bearer internal-token',
+      'Bearer internal-token'
+    ]);
 
     connection.close();
   });
@@ -130,6 +138,7 @@ describe('connectCoreEvents', () => {
     let opens = 0;
     const connection = connectCoreEvents({
       url: serverUrl(wss),
+      token: 'internal-token',
       onEvent: ev => {
         received.push(ev);
       },
@@ -164,6 +173,7 @@ describe('connectCoreEvents', () => {
     logged.length = 0;
     const connection = connectCoreEvents({
       url: serverUrl(wss),
+      token: 'internal-token',
       onEvent: () => undefined,
       reconnectDelayMs: RECONNECT_DELAY_MS
     });

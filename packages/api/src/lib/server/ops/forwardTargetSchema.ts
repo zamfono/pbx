@@ -1,8 +1,10 @@
 import { z } from 'zod';
 
 import {
+  ALWAYS_FORBIDDEN_REASON,
   DEFAULT_SIP_HEADERS,
   DEFAULT_VONAGE_SAMPLE_RATE,
+  isAlwaysForbiddenLiteral,
   isE164,
   TWILIO_SAMPLE_RATE,
   WEB_SOCKET_PROTOCOLS,
@@ -44,10 +46,14 @@ const ringTimeoutSchema = timeoutSeconds
   );
 
 /** The URL a `webSocket` target connects to (§9.4 "WebSocket targets"); `forward_targets`' CHECK
- * holds the same. */
+ * holds the same. An address literal no connection could reach is refused at once (§3.1
+ * "Outbound targets"). */
 const webSocketUrlSchema = z
   .url({ protocol: /^wss?$/u, hostname: z.regexes.hostname })
   .max(WEB_SOCKET_URL_MAX_LENGTH)
+  .refine(url => !isAlwaysForbiddenLiteral(URL.parse(url)?.hostname ?? ''), {
+    message: ALWAYS_FORBIDDEN_REASON
+  })
   .describe(
     "The bot's WebSocket URL, wss:// (or ws://), at most 2048 characters; a token the bot checks goes in its query string."
   );

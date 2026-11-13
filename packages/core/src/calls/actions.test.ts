@@ -19,6 +19,7 @@ import { type FakeAri } from '../testing/ari/fake.js';
 import { defaultChannel } from '../testing/ari/fakeChannel.js';
 import { isPlacement, placedCallerId } from '../testing/ari/fakeDial.js';
 import { eventually, flush } from '../testing/eventually.js';
+import { internalFetch } from '../testing/internalFetch.js';
 import {
   answeredCall,
   languageSet,
@@ -699,7 +700,7 @@ describe('CallActions', () => {
     const actorUserId = newId();
     const baseUrl = await rig.startServer(actions);
 
-    const response = await fetch(`${baseUrl}/internal/calls`, {
+    const response = await internalFetch(`${baseUrl}/internal/calls`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -739,7 +740,7 @@ describe('CallActions', () => {
     const actorUserId = newId();
     const baseUrl = await rig.startServer(actions);
 
-    const response = await fetch(
+    const response = await internalFetch(
       `${baseUrl}/internal/calls/${call.id}/hangup`,
       {
         method: 'POST',
@@ -765,11 +766,14 @@ describe('CallActions', () => {
       `{"callId":"${call.id}","event":"hangup","actorUserId":"${actorUserId}"}`
     );
 
-    const missing = await fetch(`${baseUrl}/internal/calls/${newId()}/hangup`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ actorUserId })
-    });
+    const missing = await internalFetch(
+      `${baseUrl}/internal/calls/${newId()}/hangup`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ actorUserId })
+      }
+    );
     expect(missing.status).toBe(HTTP_NOT_FOUND);
   });
 
@@ -1109,7 +1113,7 @@ describe('CallActions', () => {
     await rig.devicesUp();
     const baseUrl = await rig.startServer(actions);
 
-    const response = await fetch(`${baseUrl}/internal/calls`, {
+    const response = await internalFetch(`${baseUrl}/internal/calls`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1123,7 +1127,7 @@ describe('CallActions', () => {
     const body = (await response.json()) as { callId?: string };
     expect(typeof body.callId).toBe('string');
 
-    const mwi = await fetch(`${baseUrl}/internal/mwi/user:${userId}`, {
+    const mwi = await internalFetch(`${baseUrl}/internal/mwi/user:${userId}`, {
       method: 'POST'
     });
     expect(mwi.status).toBe(HTTP_NO_CONTENT);
@@ -1135,17 +1139,17 @@ describe('CallActions', () => {
     ).toBe(true);
 
     // A client that percent-encodes the segment's colon names the same mailbox.
-    const encoded = await fetch(
+    const encoded = await internalFetch(
       `${baseUrl}/internal/mwi/${encodeURIComponent(`user:${userId}`)}`,
       { method: 'POST' }
     );
     expect(encoded.status).toBe(HTTP_NO_CONTENT);
-    const unknown = await fetch(`${baseUrl}/internal/mwi/nobody`, {
+    const unknown = await internalFetch(`${baseUrl}/internal/mwi/nobody`, {
       method: 'POST'
     });
     expect(unknown.status).toBe(HTTP_NOT_FOUND);
     // The mailbox name is interpolated into the ARI path, so only `<kind>:<uuid>` reaches it.
-    const traversal = await fetch(
+    const traversal = await internalFetch(
       `${baseUrl}/internal/mwi/user:%2F..%2F..%2Fasterisk%2Fmodules%2Fres_pjsip`,
       { method: 'POST' }
     );

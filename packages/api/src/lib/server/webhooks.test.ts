@@ -123,6 +123,7 @@ function stoppedAtFirstRetry(
   const dispatcher = new WebhookDispatcher({
     db,
     kr,
+    targetPolicy: null,
     now: () => now,
     delay: () => {
       retrying.resolve(undefined);
@@ -155,7 +156,12 @@ describe('WebhookDispatcher', () => {
     const db = await migratedTestDb();
     const kr = testKeyring();
     await insertWebhook(db, kr, { url: stub.url, secret: 'top-secret' });
-    const dispatcher = new WebhookDispatcher({ db, kr, delay: noDelay });
+    const dispatcher = new WebhookDispatcher({
+      db,
+      kr,
+      targetPolicy: null,
+      delay: noDelay
+    });
     const ev = sampleEvent();
 
     await dispatcher.enqueue(ev);
@@ -176,7 +182,12 @@ describe('WebhookDispatcher', () => {
     const db = await migratedTestDb();
     const kr = testKeyring();
     await insertWebhook(db, kr, { url: stub.url, secret: 'top-secret' });
-    const dispatcher = new WebhookDispatcher({ db, kr, delay: noDelay });
+    const dispatcher = new WebhookDispatcher({
+      db,
+      kr,
+      targetPolicy: null,
+      delay: noDelay
+    });
     const ev: Envelope = {
       id: 'evt-2',
       at: nowIso(),
@@ -210,7 +221,12 @@ describe('WebhookDispatcher', () => {
     const db = await migratedTestDb();
     const kr = testKeyring();
     await insertWebhook(db, kr, { url: stub.url, secret: 'top-secret' });
-    const dispatcher = new WebhookDispatcher({ db, kr, delay: noDelay });
+    const dispatcher = new WebhookDispatcher({
+      db,
+      kr,
+      targetPolicy: null,
+      delay: noDelay
+    });
 
     await dispatcher.enqueue({
       id: 'evt-3',
@@ -236,7 +252,12 @@ describe('WebhookDispatcher', () => {
     const db = await migratedTestDb();
     const kr = testKeyring();
     await insertWebhook(db, kr, { url: stub.url });
-    const dispatcher = new WebhookDispatcher({ db, kr, delay: noDelay });
+    const dispatcher = new WebhookDispatcher({
+      db,
+      kr,
+      targetPolicy: null,
+      delay: noDelay
+    });
     stub.setStatus(FAILING_STATUS);
 
     await dispatcher.enqueue(sampleEvent());
@@ -254,7 +275,12 @@ describe('WebhookDispatcher', () => {
     const db = await migratedTestDb();
     const kr = testKeyring();
     await insertWebhook(db, kr, { url: stub.url, active: 0 });
-    const dispatcher = new WebhookDispatcher({ db, kr, delay: noDelay });
+    const dispatcher = new WebhookDispatcher({
+      db,
+      kr,
+      targetPolicy: null,
+      delay: noDelay
+    });
 
     await dispatcher.enqueue(sampleEvent());
 
@@ -268,7 +294,12 @@ describe('WebhookDispatcher', () => {
       url: stub.url,
       eventTypesJson: JSON.stringify(['backup.failed'])
     });
-    const dispatcher = new WebhookDispatcher({ db, kr, delay: noDelay });
+    const dispatcher = new WebhookDispatcher({
+      db,
+      kr,
+      targetPolicy: null,
+      delay: noDelay
+    });
 
     await dispatcher.enqueue(sampleEvent());
 
@@ -282,7 +313,12 @@ describe('WebhookDispatcher', () => {
       url: stub.url,
       eventTypesJson: JSON.stringify(['call.legs'])
     });
-    const dispatcher = new WebhookDispatcher({ db, kr, delay: noDelay });
+    const dispatcher = new WebhookDispatcher({
+      db,
+      kr,
+      targetPolicy: null,
+      delay: noDelay
+    });
     const legs: Envelope = {
       id: 'evt-4',
       at: nowIso(),
@@ -311,7 +347,12 @@ describe('WebhookDispatcher', () => {
       eventTypesJson: 'not json'
     });
     await insertWebhook(db, kr, { id: 'hook-2', url: stub.url });
-    const dispatcher = new WebhookDispatcher({ db, kr, delay: noDelay });
+    const dispatcher = new WebhookDispatcher({
+      db,
+      kr,
+      targetPolicy: null,
+      delay: noDelay
+    });
 
     await dispatcher.enqueue(sampleEvent());
 
@@ -328,7 +369,12 @@ describe('WebhookDispatcher', () => {
     const db = await migratedTestDb();
     const kr = testKeyring();
     await insertWebhook(db, kr, { url: stub.url });
-    const dispatcher = new WebhookDispatcher({ db, kr, delay: noDelay });
+    const dispatcher = new WebhookDispatcher({
+      db,
+      kr,
+      targetPolicy: null,
+      delay: noDelay
+    });
 
     await dispatcher.enqueue(sampleEvent());
     stub.setStatus(FAILING_STATUS);
@@ -367,6 +413,7 @@ describe('WebhookDispatcher across a restart', () => {
     const second = new WebhookDispatcher({
       db,
       kr,
+      targetPolicy: null,
       now: () => '2026-10-01T10:00:00.400Z',
       delay: ms => {
         delays.push(ms);
@@ -407,7 +454,12 @@ describe('WebhookDispatcher across a restart', () => {
       .execute();
     stub.setStatus(FAILING_STATUS);
 
-    await new WebhookDispatcher({ db, kr, delay: noDelay }).resume();
+    await new WebhookDispatcher({
+      db,
+      kr,
+      targetPolicy: null,
+      delay: noDelay
+    }).resume();
 
     expect(stub.requests).toHaveLength(1);
     expect(await pendingDeliveries(db)).toEqual([]);
@@ -424,6 +476,7 @@ describe('WebhookDispatcher across a restart', () => {
     const dispatcher = new WebhookDispatcher({
       db,
       kr,
+      targetPolicy: null,
       delay: () => {
         retrying.resolve(undefined);
         return retry.promise;
@@ -443,5 +496,56 @@ describe('WebhookDispatcher across a restart', () => {
     expect(stub.requests).toHaveLength(1);
     expect(await pendingDeliveries(db)).toEqual([]);
     expect(await lastStatusOf(db)).toBeNull();
+  });
+
+  // §3.1 "Outbound targets": loopback is never delivered to, named by its literal or by a name
+  // that resolves to it, and the hook's lastError says so, nothing more.
+  it.each([
+    ['an address literal', (url: string) => url],
+    [
+      'a name resolving to it',
+      (url: string) => url.replace('127.0.0.1', 'localhost')
+    ]
+  ])('refuses a receiver on loopback named by %s', async (_case, urlOf) => {
+    const db = await migratedTestDb();
+    const kr = testKeyring();
+    await insertWebhook(db, kr, { url: urlOf(stub.url) });
+    const dispatcher = new WebhookDispatcher({
+      db,
+      kr,
+      targetPolicy: { allowPrivate: true, ownSubnets: [] },
+      delay: noDelay
+    });
+
+    await dispatcher.enqueue(sampleEvent());
+
+    expect(stub.requests).toEqual([]);
+    const hook = await db
+      .selectFrom('webhooks')
+      .select(['lastStatus', 'lastError'])
+      .where('id', '=', 'hook-1')
+      .executeTakeFirstOrThrow();
+    expect(hook).toEqual({
+      lastStatus: 'failing',
+      lastError: 'forbidden address'
+    });
+  });
+
+  it('follows no redirect: a 3xx is a failed attempt (§10.6)', async () => {
+    const db = await migratedTestDb();
+    const kr = testKeyring();
+    await insertWebhook(db, kr, { url: stub.url });
+    stub.setStatus(307);
+    const dispatcher = new WebhookDispatcher({
+      db,
+      kr,
+      targetPolicy: null,
+      delay: noDelay
+    });
+
+    await dispatcher.enqueue(sampleEvent());
+
+    expect(stub.requests).toHaveLength(3);
+    expect(await lastStatusOf(db)).toBe('failing');
   });
 });

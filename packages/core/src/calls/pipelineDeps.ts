@@ -1,6 +1,6 @@
 // What a `Pipeline` is built from: the collaborators and settings the call modules reach through
 // `pipeline.deps`.
-import type { Db } from '@zamfono/shared';
+import type { Db, TargetPolicy } from '@zamfono/shared';
 
 import type { AmiClient } from '../ami/client.js';
 import type { AriClient } from '../ari/client.js';
@@ -50,6 +50,9 @@ export type PipelineDeps = {
   // The stack's FQDN (`CoreEnv.fqdn`), the `From` host of a trunk leg not on a `pai` trunk and the
   // host a forwarded leg's `Diversion` entries name (§9.4 "Caller-ID", "Forwarded calls").
   stackFqdn: string;
+  /** The addresses a `webSocket` target may connect to (§3.1 "Outbound targets"), from
+   * `ALLOW_PRIVATE_TARGETS`; `null` connects to any, for a test's bot on loopback. */
+  targetPolicy: TargetPolicy | null;
   /** How long a created leg may take to enter the app before it counts as not placed
    * (`legOriginate.ts`), `STASIS_WAIT_MS`. */
   legStasisWaitMs: number;

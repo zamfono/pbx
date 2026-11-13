@@ -241,8 +241,12 @@ busy ports, Docker's userland proxy or a missing `public` network:
 
 It asks for a media storage limit, the most the stack's recordings, voicemail and uploads may take
 (`MEDIA_STORAGE_MAX`, e.g. `20G`; empty for none, see [Media storage limit](#media-storage-limit)),
-and prints the generated `METRICS_TOKEN` once: the bearer token of `/metrics` and the full
-`/healthz` ([Monitoring](#monitoring)), which `.env` keeps.
+and whether webhooks, voice bots and backup targets may be on private networks
+(`ALLOW_PRIVATE_TARGETS`, `true` unless you answer otherwise; see
+[Private networks](#private-networks)), and prints the generated `METRICS_TOKEN` once: the bearer
+token of `/metrics` and the full `/healthz` ([Monitoring](#monitoring)), which `.env` keeps. It
+also generates `INTERNAL_TOKEN`, which `api`, `core` and the proxy's certificate hook present to
+each other's internal endpoints, and never prints it.
 Asked whether to change the ports, it also takes SIP over UDP and TCP, STUN and the RTP range;
 otherwise each keeps its default. Run as root on a host with apt, it offers a checkbox, ticked, to
 keep the host up to date on its own: it installs `unattended-upgrades` for the distribution's
@@ -286,6 +290,7 @@ printf '1:%s' "$(openssl rand -base64 32)"    # SECRETBOX_KEY
 openssl rand -hex 24                          # ARI_PASSWORD, and again for AMI_PASSWORD
 openssl rand -hex 24                          # BACKUP_PASSWORD, and again for UPDATER_TOKEN (any value turns updates through the API on)
 openssl rand -hex 32                          # METRICS_TOKEN
+openssl rand -hex 32                          # INTERNAL_TOKEN (required)
 ```
 
 **Keep a copy of `.env` outside the host.** `SECRETBOX_KEY` is the only way to read the encrypted
@@ -394,7 +399,8 @@ It refuses to start with less than 3 GB free on the stack directory's filesystem
 release's images need. It downloads the release's bundle, checks it against the release's `SHA256SUMS`, pulls the
 release's images and checks each against the bundle's `DIGESTS`, changing nothing where one differs
 (a stack on `edge` has no bundle, so its images go unchecked), unpacks the bundle over the stack directory (never touching `.env` but to give an empty or
-missing `METRICS_TOKEN` a generated one, which it does not print: read it from `.env`), lists the
+missing `METRICS_TOKEN` or `INTERNAL_TOKEN` a generated one, which it does not print: read it from
+`.env`), lists the
 settings a newer `.env.example` introduced, which keep their defaults until you set them, and
 recreates the stack: on Podman
 through the boot unit of step 7 if there is one, otherwise taking the stack `down` first. It then
@@ -542,6 +548,25 @@ dbs:
 
 The bucket needs server-side encryption: the stream is not encrypted on the client, unlike the
 restic repository. Keep a copy of both files with `.env`, since a restore needs them.
+
+## Private networks
+
+Webhooks, voice bots (`webSocket` forward targets) and backup targets are servers the stack's
+admins name, so the stack checks every address it connects them to, as it connects. It never
+connects them to loopback, link-local addresses (the cloud metadata service at
+`169.254.169.254` among them) or the stack's own Docker network, where its services live; a
+receiver on the Docker host itself is reached at the host's LAN address, not that network's
+gateway. Private networks (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `100.64.0.0/10` and
+`fc00::/7`) are allowed while `ALLOW_PRIVATE_TARGETS` in `.env` is empty or `true`, as on premises,
+where a webhook receiver or a NAS for backups sits on the LAN. Where several customers' stacks
+share a host, those networks are yours, not theirs: set it to `false` and take it in with
+`docker compose up -d`. A refused address shows as `forbidden address` in a webhook's
+`lastError` or a backup run's error, and as `forbiddenAddress` in a voice bot call's trace.
+
+s3, webdav and ftps backup targets are checked before restic or rclone starts, which then resolve
+the name again themselves, so their TLS can check the certificate against it: a name whose DNS
+answer changes in that moment, or a server that redirects, could still lead them elsewhere. sftp
+and plain ftp connect to the address checked.
 
 ## Media storage limit
 

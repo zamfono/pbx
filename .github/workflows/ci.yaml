@@ -269,6 +269,10 @@ jobs:
           # The image runs Docker too. Stopping it proves nothing below falls back to Docker's
           # store; its compose plugin needs no daemon and stays, since it is the provider.
           sudo systemctl stop docker.service docker.socket
+          # Docker leaves its iptables FORWARD policy at DROP, which drops what Podman's netavark
+          # (nftables) forwards: core's connection to the voice bot through the port it publishes on
+          # the `outside` gateway (compose.test.yaml).
+          sudo iptables -P FORWARD ACCEPT
           sudo systemctl enable --now podman.socket
           sudo test -S "${DOCKER_HOST#unix://}"
           if [ "$(sudo podman info --format '{{.Host.Security.Rootless}}')" != false ]; then

@@ -5,14 +5,21 @@
  * its hook's health and logs what changed (`webhookHealth.ts`).
  */
 import { createHmac } from 'node:crypto';
+import { request as httpRequest } from 'node:http';
+import { request as httpsRequest } from 'node:https';
 import { setTimeout as sleep } from 'node:timers/promises';
 
 import {
+  forbiddenAddressError,
+  HTTP_OK,
+  isForbiddenLiteral,
   newId,
   nowIso,
   publicEnvelope,
+  targetLookup,
   type Db,
-  type Envelope
+  type Envelope,
+  type TargetPolicy
 } from '@zamfono/shared';
 
 import { attempt } from './errors.js';
@@ -27,6 +34,8 @@ import { backoffMs, DELIVERY_ATTEMPTS, matchesFilter } from './webhookRules.js';
 
 // §10.6: a 5 s timeout per request.
 const REQUEST_TIMEOUT_MS = 5000;
+// A 2xx is a delivery; a 3xx is not, since no redirect is followed.
+const HTTP_MULTIPLE_CHOICES = 300;
 const SIGNATURE_HEADER = 'X-Zamfono-Signature';
 
 /** A `webhook_deliveries` row: one event's body on its way to one hook. */
@@ -44,10 +53,22 @@ type DeliveryRow = {
  */
 type AttemptOutcome = { failure: string | null; retryable: boolean };
 
+/** One POST of `body` with `headers` to `url`: the receiver's HTTP status, or a rejection when
+ *  it never answered. */
+export type WebhookPost = (
+  url: string,
+  body: string,
+  headers: Record<string, string>
+) => Promise<number>;
+
 export type WebhookDispatcherDeps = {
   db: Db;
   kr: Keyring;
-  fetchImpl?: typeof fetch;
+  /** The addresses a hook may be delivered to (§3.1 "Outbound targets"), from
+   *  `ALLOW_PRIVATE_TARGETS`; `null` delivers to any, for a test's receiver on loopback. */
+  targetPolicy: TargetPolicy | null;
+  /** Overridable in tests; by default `postTo(targetPolicy)`. */
+  post?: WebhookPost;
   delay?: (ms: number) => Promise<void>;
   now?: () => string;
 };
@@ -55,10 +76,43 @@ export type WebhookDispatcherDeps = {
 type ResolvedDeps = {
   db: Db;
   kr: Keyring;
-  fetchImpl: typeof fetch;
+  post: WebhookPost;
   delay: (ms: number) => Promise<void>;
   now: () => string;
 };
+
+/**
+ * POSTs over `node:http(s)` rather than `fetch`, whose socket takes no `lookup`: the host's
+ * addresses are checked against `policy` as the socket connects (`targetLookup`), an address
+ * literal before, and a refused one fails with `forbiddenAddressError`. A redirect is not
+ * followed, so it cannot lead where the check did not look: its 3xx is the answer.
+ */
+export function postTo(policy: TargetPolicy | null): WebhookPost {
+  return (url, body, headers) =>
+    new Promise((resolve, reject) => {
+      const target = new URL(url);
+      if (policy !== null && isForbiddenLiteral(target.hostname, policy)) {
+        reject(forbiddenAddressError());
+        return;
+      }
+      const send = target.protocol === 'https:' ? httpsRequest : httpRequest;
+      send(
+        target,
+        {
+          method: 'POST',
+          headers,
+          signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+          ...(policy === null ? {} : { lookup: targetLookup(policy) })
+        },
+        response => {
+          response.resume();
+          resolve(response.statusCode ?? 0);
+        }
+      )
+        .on('error', reject)
+        .end(body);
+    });
+}
 
 /**
  * Delivers events to the `webhooks` table's active, matching hooks: HMAC-SHA256 of the JSON
@@ -72,7 +126,7 @@ export class WebhookDispatcher {
     this.deps = {
       db: deps.db,
       kr: deps.kr,
-      fetchImpl: deps.fetchImpl ?? fetch,
+      post: deps.post ?? postTo(deps.targetPolicy),
       delay: deps.delay ?? (ms => sleep(ms)),
       now: deps.now ?? nowIso
     };
@@ -212,16 +266,13 @@ export class WebhookDispatcher {
     signature: string
   ): Promise<string | null> {
     try {
-      const response = await this.deps.fetchImpl(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          [SIGNATURE_HEADER]: signature
-        },
-        body,
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
+      const status = await this.deps.post(url, body, {
+        'Content-Type': 'application/json',
+        [SIGNATURE_HEADER]: signature
       });
-      return response.ok ? null : httpReason(response.status);
+      return status >= HTTP_OK && status < HTTP_MULTIPLE_CHOICES
+        ? null
+        : httpReason(status);
     } catch (error) {
       return errorReason(error);
     }

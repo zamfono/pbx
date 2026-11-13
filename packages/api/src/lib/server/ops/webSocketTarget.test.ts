@@ -120,7 +120,17 @@ describe('webSocket forward targets', () => {
     [
       'a URL over 2048 characters',
       { protocol: 'vonage', url: `wss://${'a'.repeat(2043)}` }
-    ]
+    ],
+    // §3.1 "Outbound targets": never connected to, so refused at once.
+    [
+      'a loopback address',
+      { protocol: 'vonage', url: 'ws://127.0.0.1:8080/bot' }
+    ],
+    [
+      'a link-local address',
+      { protocol: 'vonage', url: 'ws://169.254.169.254/bot' }
+    ],
+    ['the unspecified address', { protocol: 'vonage', url: 'ws://0.0.0.0/bot' }]
   ])('refuses %s', async (label, fields) => {
     const db = await makeTestDb();
     await seedSettings(db);

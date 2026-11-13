@@ -470,6 +470,7 @@ install_units() {
   [[ $runtime == docker || $runtime == podman ]] || fail "unknown runtime $runtime"
   (($(id -u) == 0)) || fail "install the host agent as root"
   command -v systemctl >/dev/null || fail "the host agent needs systemd"
+  generated_tokens
   [[ $PWD =~ ^/[A-Za-z0-9._/-]+$ ]] ||
     fail "the host agent's units cannot name $PWD; move the stack to a path of letters, digits, . _ - and /"
   base=$(stack_unit_base)-agent
@@ -516,6 +517,9 @@ install_units() {
 # are, or where they serve another stack directory.
 refresh_units() {
   local runtime=${1:-${ZAMFONO_RUNTIME:-docker}} base
+  # Before the units: an update.sh of an earlier release runs this from the new bundle before it
+  # recreates the stack, so the new release finds the tokens it requires.
+  (($(id -u) != 0)) || generated_tokens
   base=$UNIT_DIR/$(stack_unit_base)-agent
   [[ -e $base.path && $(units_directory) == "$PWD" ]] || return 0
   [[ $(launcher_text) == "$(cat "$LIBEXEC_DIR/zamfono-agent" 2>/dev/null)" &&

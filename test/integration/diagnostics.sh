@@ -1,6 +1,7 @@
 # Sourced by `run.sh`: on a failure, everything needed to diagnose it after the stack is gone,
-# written before `cleanup` tears the stack down. Reads `run.sh`'s own `compose`, and
-# runs with its working directory, the stack directory.
+# written before `cleanup` tears the stack down. Reads `run.sh`'s `COMPOSE` and `compose_args`,
+# which no function shadows as `stack_recreate` does `compose` (run.sh's `cleanup`), and runs with
+# its working directory, the stack directory.
 #
 # The directory is `DIAG_DIR` when set (CI points it at an artifact path), else a fresh temporary
 # one; `run.sh` prints where it went. Every step is best effort, as `fail` runs this without
@@ -25,7 +26,8 @@ for (const row of rows) console.log(JSON.stringify(row));
 "
 
 diag_compose() {
-  dc "$@"
+  # shellcheck disable=SC2086 # `COMPOSE` is split into its words by design
+  $COMPOSE "${compose_args[@]}" "$@"
 }
 
 # `run.sh`'s `fail`: the stack's state and a log tail on stderr, so a CI job's own output stays

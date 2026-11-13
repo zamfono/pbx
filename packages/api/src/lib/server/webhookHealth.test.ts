@@ -13,7 +13,7 @@ import { testKeyring } from '#testing/fixtures.js';
 
 import { encrypt, type Keyring } from './secretbox.js';
 import { errorReason, SECRET_UNREADABLE } from './webhookFailure.js';
-import { WebhookDispatcher } from './webhooks.js';
+import { WebhookDispatcher, type WebhookPost } from './webhooks.js';
 
 type Logged = { level: string; fields: Record<string, unknown>; msg: string };
 
@@ -76,17 +76,16 @@ async function setUp(secretKeyring?: Keyring): Promise<{
   const answer: { next: number | Error } = { next: 200 };
   const clock = { ms: Date.parse('2026-10-01T09:00:00.000Z') };
   const posts = { count: 0 };
-  const fetchImpl: typeof fetch = () => {
+  const post: WebhookPost = () => {
     posts.count += 1;
     const { next } = answer;
-    return next instanceof Error
-      ? Promise.reject(next)
-      : Promise.resolve(new Response(null, { status: next }));
+    return next instanceof Error ? Promise.reject(next) : Promise.resolve(next);
   };
   const dispatcher = new WebhookDispatcher({
     db,
     kr,
-    fetchImpl,
+    targetPolicy: null,
+    post,
     delay: noDelay,
     now: () => new Date(clock.ms).toISOString()
   });

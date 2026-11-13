@@ -2,17 +2,20 @@
  * Restic repository string and backend env per `backup_targets.kind` (§6.5 "Target kinds"):
  * `local`, `s3` and `sftp` use restic's native backends; `ftp`, `ftps` and `webdav` go through
  * its rclone backend. `backup.ts` holds the run lifecycle; this file holds the per-kind
- * repository string and backend env.
+ * repository string and backend env, and the check of a remote target's server against
+ * `ALLOW_PRIVATE_TARGETS` and the stack's own network before any tool runs (§3.1 "Outbound
+ * targets").
  */
 import path from 'node:path';
 import process from 'node:process';
 import * as privateEnv from '$app/env/private';
 
-import { backupParamsColumn } from '@zamfono/shared';
+import { backupParamsColumn, resolveTarget } from '@zamfono/shared';
 
 import type { BackupSecret } from '../ops/backups/_secret.js';
 import {
   assertLocalPath,
+  serverOf,
   type BackupTargetRow
 } from '../ops/backups/_shared.js';
 
@@ -98,7 +101,8 @@ async function rcloneRepository(
   kind: 'ftp' | 'ftps' | 'webdav',
   params: Params,
   secret: BackupSecret,
-  exec: ExecFn
+  exec: ExecFn,
+  address: string
 ): Promise<RepositoryAndEnv> {
   const prefix = `RCLONE_CONFIG_${RCLONE_REMOTE_NAME.toUpperCase()}`;
   const env: Record<string, string> = {
@@ -112,11 +116,13 @@ async function rcloneRepository(
   // webdav addresses its endpoint as a URL, not a host (unlike ftp/ftps).
   if (kind === 'webdav') {
     env[`${prefix}_URL`] = str(params, 'url');
+  } else if (kind === 'ftp') {
+    // Plain ftp connects to the address checked; ftps keeps the name its certificate is checked
+    // against.
+    env[`${prefix}_HOST`] = address;
   } else {
     env[`${prefix}_HOST`] = str(params, 'host');
-    if (kind === 'ftps') {
-      env[`${prefix}_EXPLICIT_TLS`] = 'true';
-    }
+    env[`${prefix}_EXPLICIT_TLS`] = 'true';
   }
   return {
     repository: `rclone:${RCLONE_REMOTE_NAME}:${optStr(params, 'path') ?? ''}`,
@@ -148,12 +154,15 @@ function sshWord(value: string): string {
  * password from `secret_enc` (§11.2 "the backend credentials") reaches ssh through `sshpass -e`,
  * which reads it from `SSHPASS` rather than argv. Nothing in the target model carries a host key,
  * and ssh's default (ask) fails without a terminal, so the first contact's key is accepted and
- * pinned in `sshKnownHostsFile()`. Every word is quoted and `--` ends ssh's options before the
- * host, so neither the host nor the username can reach ssh as an option of its own.
+ * pinned in `sshKnownHostsFile()`, under the host's name (`HostKeyAlias`) while ssh connects to
+ * `address`, the one checked (§3.1 "Outbound targets"), so it resolves nothing itself. Every word
+ * is quoted and `--` ends ssh's options before the address, so neither the host nor the username
+ * can reach ssh as an option of its own.
  */
 function sftpRepository(
   params: Params,
-  secret: BackupSecret
+  secret: BackupSecret,
+  address: string
 ): RepositoryAndEnv {
   const host = str(params, 'host');
   const user = credential(secret, 'username', 'sftp');
@@ -165,11 +174,13 @@ function sftpRepository(
     'StrictHostKeyChecking=accept-new',
     '-o',
     `UserKnownHostsFile=${sshKnownHostsFile()}`,
+    '-o',
+    `HostKeyAlias=${host}`,
     '-l',
     user,
     '-s',
     '--',
-    host,
+    address,
     'sftp'
   ]
     .map(sshWord)
@@ -181,19 +192,38 @@ function sftpRepository(
   };
 }
 
-/** The restic repository string and backend env for `target.kind` (§6.5 "Target kinds"). */
+/** Every address `host` resolves to, rejecting with `forbiddenAddressError` when
+ *  `ALLOW_PRIVATE_TARGETS` or the stack's own network refuses any (§3.1 "Outbound targets"). */
+export type ResolveFn = (host: string) => Promise<string[]>;
+
+export const resolveBackupHost: ResolveFn = host =>
+  resolveTarget(host, { allowPrivate: privateEnv.ALLOW_PRIVATE_TARGETS });
+
+/**
+ * The restic repository string and backend env for `target.kind` (§6.5 "Target kinds"). A remote
+ * target's server is resolved and checked first (`resolve`), so no tool runs against a refused
+ * one; sftp and plain ftp then connect to the address checked, while s3, webdav and ftps resolve
+ * the name again in restic or rclone, their TLS checking the certificate against it.
+ */
 export async function repositoryAndEnv(
   target: BackupTargetRow,
   secret: BackupSecret,
-  exec: ExecFn
+  exec: ExecFn,
+  resolve: ResolveFn = resolveBackupHost
 ): Promise<RepositoryAndEnv> {
   const params = loadParams(target);
   const { kind } = target;
+  if (kind === 'local') {
+    // Checked on every write already; checked again for a row written before the rule.
+    assertLocalPath(params.path);
+    return { repository: str(params, 'path'), env: {}, options: [] };
+  }
+  const host = serverOf(kind, params);
+  if (host === null) {
+    throw new Error(`backup: a ${kind} target names no server`);
+  }
+  const [address = ''] = await resolve(host);
   switch (kind) {
-    case 'local':
-      // Checked on every write already; checked again for a row written before the rule.
-      assertLocalPath(params.path);
-      return { repository: str(params, 'path'), env: {}, options: [] };
     case 's3': {
       const prefix = optStr(params, 'path');
       const suffix = prefix === undefined ? '' : `/${prefix}`;
@@ -207,11 +237,11 @@ export async function repositoryAndEnv(
       };
     }
     case 'sftp':
-      return sftpRepository(params, secret);
+      return sftpRepository(params, secret, address);
     case 'ftp':
     case 'ftps':
     case 'webdav':
-      return rcloneRepository(kind, params, secret, exec);
+      return rcloneRepository(kind, params, secret, exec, address);
     default:
       throw new Error(`backup: unknown target kind '${String(kind)}'`);
   }

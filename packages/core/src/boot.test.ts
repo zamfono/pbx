@@ -53,7 +53,8 @@ describe('buildPipeline', () => {
           ARI_PASSWORD: 'secret',
           AMI_PASSWORD: 'secret',
           EXTERNAL_IPV4: '192.0.2.10',
-          FQDN: 'pbx.example.com'
+          FQDN: 'pbx.example.com',
+          INTERNAL_TOKEN: 'internal-token'
         }),
         tz: stackTz
       },

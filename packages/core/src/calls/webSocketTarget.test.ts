@@ -347,6 +347,43 @@ describe('webSocket targets (§9.4 "WebSocket targets")', () => {
     expect(call.hops).toBe(1);
   });
 
+  // §3.1 "Outbound targets": loopback is never connected to, whether the URL names it or a name
+  // resolves to it, and the call goes on as for a socket that does not open.
+  it.each([
+    ['an address literal', (url: string) => url],
+    [
+      'a name resolving to it',
+      (url: string) => url.replace('127.0.0.1', 'localhost')
+    ]
+  ])(
+    'refuses a bot on loopback named by %s, the call taking its fallback',
+    async (_case, urlOf) => {
+      pipeline.deps.targetPolicy = { allowPrivate: true, ownSubnets: [] };
+      const connections: unknown[] = [];
+      bot.server.on('connection', socket => connections.push(socket));
+      const anna = await seedUser(db, { mailboxEnabled: 0 });
+      const call = inboundCall();
+      await enterTarget(
+        pipeline,
+        call,
+        target({
+          url: urlOf(bot.url),
+          fallback: { kind: 'user', userId: anna }
+        }),
+        null
+      );
+      expect(traceEvents(call)).toContainEqual(
+        expect.objectContaining({
+          event: 'fallback',
+          from: 'webSocket',
+          cause: 'forbiddenAddress',
+          to: 'user'
+        })
+      );
+      expect(connections).toEqual([]);
+    }
+  );
+
   it('streams a vonage target as little-endian PCM at its rate', async () => {
     const call = inboundCall();
     await enterTarget(

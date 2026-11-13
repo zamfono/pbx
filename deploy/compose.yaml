@@ -127,6 +127,8 @@ services:
       SIP_TCP_ENABLED: ${SIP_TCP_ENABLED:-}
       CALL_LOG_MAX_BYTES: ${CALL_LOG_MAX_BYTES:-}
       MEDIA_STORAGE_MAX: ${MEDIA_STORAGE_MAX:-} # at or over it, no new recording or voicemail message (§11.6)
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN}         # the bearer token of api's and core's /internal/* (§3.1)
+      ALLOW_PRIVATE_TARGETS: ${ALLOW_PRIVATE_TARGETS:-}   # false: no webSocket target on a private network (§3.1)
       ZAMFONO_VERSION: ${ZAMFONO_VERSION:-latest}   # the tag pulled, reported as the version (§7)
       TZ: ${TZ:-}
     cap_drop: [ALL]
@@ -152,6 +154,7 @@ services:
       XFF_DEPTH: "1"                            # trust exactly one proxy hop (Caddy)
       BODY_SIZE_LIMIT: 50M                      # largest request body, sized for audio uploads (§10.2)
       JWT_SECRET: ${JWT_SECRET}
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN}         # the bearer token of api's and core's /internal/* (§3.1)
       SECRETBOX_KEY: ${SECRETBOX_KEY}           # encryption key for every *_enc column (§5.4)
       SECRETBOX_KEY_PREVIOUS: ${SECRETBOX_KEY_PREVIOUS:-}   # set only during a key rotation (§5.4)
       BACKUP_PASSWORD: ${BACKUP_PASSWORD:-}     # restic password of the default local backup target; empty = none (§6.5)
@@ -164,6 +167,7 @@ services:
       TLS_RELOAD_HOUR: ${TLS_RELOAD_HOUR:-}     # certificate swap hour when settings.tls_reload_hour is NULL (§6.4)
       METRICS_TOKEN: ${METRICS_TOKEN:-}         # empty = GET /metrics answers 404 (§7)
       MEDIA_STORAGE_MAX: ${MEDIA_STORAGE_MAX:-} # at or over it, uploads answer 507; empty = no limit (§11.6)
+      ALLOW_PRIVATE_TARGETS: ${ALLOW_PRIVATE_TARGETS:-}   # false: no webhook or backup target on a private network (§3.1)
       ZAMFONO_VERSION: ${ZAMFONO_VERSION:-latest}   # the tag pulled, reported as the version (§7)
       TZ: ${TZ:-}
       # first-boot seed, read only while the database holds no user (§6.3 "First boot")
@@ -206,6 +210,7 @@ services:
     environment:
       FQDN: ${FQDN}                             # Caddyfile site address, Let's Encrypt; also read by the cert_obtained hook (§6.4)
       METRICS_TOKEN: ${METRICS_TOKEN:-}         # Caddyfile refuses /metrics while unset (§7)
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN}         # the cert_obtained hook's notification of api (§3.1, §6.4)
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
     read_only: true

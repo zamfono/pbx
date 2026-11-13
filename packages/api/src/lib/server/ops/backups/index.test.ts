@@ -152,6 +152,20 @@ describe('backups', () => {
       create('webdav', { url: 'file:///etc/passwd' })
     ).rejects.toMatchObject({ status: 422 });
     await expect(create('ftp', { host: '192.0.2.10' })).resolves.toBeDefined();
+    // §3.1 "Outbound targets": a server no run could reach is refused at once.
+    const refused = [
+      ['ftp', { host: '127.0.0.1' }],
+      ['sftp', { host: '169.254.169.254', path: '/srv' }],
+      ['webdav', { url: 'http://127.0.0.1:3000/' }],
+      ['webdav', { url: 'http://[::1]/' }],
+      ['s3', { endpoint: '169.254.169.254', bucket: 'b' }],
+      ['s3', { endpoint: 'http://127.0.0.1:9000', bucket: 'b' }]
+    ] as const;
+    await Promise.all(
+      refused.map(async ([kind, params]) =>
+        expect(create(kind, params)).rejects.toMatchObject({ status: 422 })
+      )
+    );
     await expect(
       create('webdav', { url: 'https://dav.example.net/remote.php/dav' })
     ).resolves.toBeDefined();

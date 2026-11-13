@@ -1,12 +1,13 @@
 /**
- * Subscribes to `core`'s internal `/internal/events` WebSocket (§3, §3.1 "Events"): the socket
- * carries unauthenticated `CoreStreamFrame` JSON frames, since the internal Docker network is the
- * trust boundary, and a dropped connection reconnects.
+ * Subscribes to `core`'s internal `/internal/events` WebSocket (§3, §3.1 "Events"), its handshake
+ * carrying `INTERNAL_TOKEN` as its bearer token: the socket carries `CoreStreamFrame` JSON frames,
+ * and a dropped connection reconnects.
  */
 import pino from 'pino';
 import { WebSocket } from 'ws';
 
 import {
+  internalAuthorization,
   isRecord,
   rawDataToString,
   type CoreStreamFrame,
@@ -23,6 +24,8 @@ const logger = pino({ name: 'coreEvents' });
 
 export type CoreEventsDeps = {
   url: string;
+  /** `INTERNAL_TOKEN` (§3.1). */
+  token: string;
   /** Every event `core` emits, for `/events` subscribers and webhooks. */
   onEvent: (envelope: Envelope) => void;
   /** `core`'s `asterisk.started` frame, `api`'s alone and never relayed (§10.4 "After a restart"). */
@@ -57,7 +60,9 @@ export function connectCoreEvents(deps: CoreEventsDeps): { close: () => void } {
     if (closed) {
       return;
     }
-    const ws = new WebSocket(deps.url);
+    const ws = new WebSocket(deps.url, {
+      headers: internalAuthorization(deps.token)
+    });
     socket = ws;
     ws.on('open', () => {
       if (down) {

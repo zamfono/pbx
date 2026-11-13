@@ -20,6 +20,15 @@ why the specified behaviour changed; the commit history, how.
   `docker compose pull && docker compose up -d` (Podman: `podman compose pull`, then restart the
   boot unit, or `podman compose down && podman compose up -d` without one). Updates from this
   release on take the new images.
+- On a host shared by several customers' stacks, set `ALLOW_PRIVATE_TARGETS=false` in each
+  stack's `.env` and take it in with `docker compose up -d`, so no customer's admin reaches your
+  network through a webhook, voice bot or backup target. On premises, leave it unset.
+- A webhook receiver, voice bot or backup server on the Docker host itself, named by the stack
+  network's gateway address, or on `localhost`, is no longer connected to: name it by the host's
+  LAN address instead.
+- Only for a test stack that follows `edge`: its update keeps its files, so replace `compose.yaml`
+  with main's and add `INTERNAL_TOKEN` to `.env` (`openssl rand -hex 32`); until then `api` and
+  `core` do not start.
 
 ### Added
 
@@ -46,7 +55,8 @@ why the specified behaviour changed; the commit history, how.
 
 - `setup.sh` generates a random 256-bit `METRICS_TOKEN`, which turns `/metrics` and the full
   `/healthz` on behind it, and prints it once; `update.sh` gives a stack whose `.env` has none, or
-  an empty one, a generated token, written only to `.env`, and never replaces one that is set.
+  an empty one, a generated token, written only to `.env`, and never replaces one that is set;
+  so does the update to this release, through the host agent.
 - `proxy` runs Caddy 2.11.9, and `api` and `core` take the current releases of their
   dependencies, among them zod 4.6.7 and nodemailer 10.3.1, past the advisories against zod 4.6.5
   (GHSA-mrhx-c7xc-m3w5) and nodemailer's address parser up to 10.1.3.
@@ -146,6 +156,29 @@ why the specified behaviour changed; the commit history, how.
   invalid array elements drew a 422 of some 23 MB listing every issue, over REST and MCP alike. A
   problem's `errors` now stop at a quarter of the request limit, and `errorsOmitted` counts the
   issues left out; the MCP SDK's own refusal of invalid tool arguments is bounded the same way.
+- Code running in the `asterisk`, `stun` or `proxy` container, which share a network namespace
+  on the stack's `internal` network, could call `api`'s and `core`'s process-to-process
+  `/internal/*` endpoints, among them having `api` mail any user's voicemail or missed-call notice
+  with a caller name of its choosing from the stack's own sender. Every such request now carries
+  the stack's `INTERNAL_TOKEN` and is refused with 401 without it. `setup.sh` generates it, and
+  `update.sh` and the host agent's `setup/agent.sh` add it to an existing stack's `.env`, the
+  update to this release included, none of them printing it; `api` and `core` refuse to start
+  without it.
+- An admin could point a webhook, a voice bot (`webSocket` target) or a backup target at the
+  stack's own services (`core:3000/internal/*`, `api`, Asterisk's ARI), at `127.0.0.1`, at the
+  cloud metadata address `169.254.169.254` or at the provider's network, and read what answered
+  from a webhook's `lastError`. These connections now go only to allowed addresses, checked as
+  each connects: never loopback, link-local or the stack's own network, and private networks
+  (10/8, 172.16/12, 192.168/16, 100.64/10, fc00::/7) only while the new `ALLOW_PRIVATE_TARGETS`
+  in `.env` is not `false`. It defaults to `true`, for an on-premises install whose receivers sit
+  on the LAN; set it to `false` on a host shared by several customers. `setup.sh` asks for it, and
+  `update.sh` lists it as a new setting, unset, which is `true`. A refused address shows as a
+  webhook's `lastError` `forbidden address`, a voice bot's call trace cause `forbiddenAddress` (its
+  fallback takes the call) or a backup run's error `forbidden address`; a URL or host that is a
+  loopback, link-local or unspecified address is refused with 422 when it is saved. A webhook
+  delivery no longer follows a redirect: a 3xx answer is a failed attempt. A webhook receiver or
+  voice bot on the Docker host itself must be named by an address outside the stack's network,
+  such as the host's LAN address, not the network's gateway.
   The SDK's refusals of a request before any tool or prompt runs, such as 30,000 prompt arguments
   that are not strings, which drew 6.9 MB from a 320 KB request, are cut to a quarter of the
   limit too, their message saying how many characters it left out. A refusal is cut further where

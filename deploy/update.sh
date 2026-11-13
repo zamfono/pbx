@@ -177,28 +177,20 @@ tag_release_images() {
   done
 }
 
-# ZAMFONO_VERSION follows the update (next_tag). An empty or missing METRICS_TOKEN gets a
-# generated one, which only .env holds: this output reaches the host agent's records. The other
-# settings a newer .env.example added are listed, for the operator to set.
+# ZAMFONO_VERSION follows the update (next_tag). An empty or missing METRICS_TOKEN or
+# INTERNAL_TOKEN gets a generated one, which only .env holds: this output reaches the host agent's
+# records. The other settings a newer .env.example added are listed, for the operator to set.
 update_env() {
-  local name tag new token
+  local name tag new
   tag=$(env_tag)
   new=$(next_tag)
   if [[ $new != "$tag" ]]; then
     set_env_line .env ZAMFONO_VERSION "$new"
     echo "  .env: ZAMFONO_VERSION $tag -> $new"
   fi
-  if [[ -z $(env_value METRICS_TOKEN) ]]; then
-    token=$(random_hex 32)
-    if ! set_env_line .env METRICS_TOKEN "$token"; then
-      # On a line of its own, whether or not .env ends in one.
-      [[ -z $(tail -c 1 .env) ]] || echo >>.env
-      echo "METRICS_TOKEN=$(dotenv_quote "$token")" >>.env
-    fi
-    echo "  .env: METRICS_TOKEN generated, the bearer token of /metrics and the full /healthz (see .env)"
-  fi
+  generated_tokens
   sed -nE 's/^([A-Z_][A-Z0-9_]*)=.*/\1/p' .env.example | while read -r name; do
-    grep -qE "^$name=" .env || echo "  .env: new setting $name, unset (see .env.example)"
+    grep -qE "$(env_lhs "$name")" .env || echo "  .env: new setting $name, unset (see .env.example)"
   done
 }
 
@@ -296,7 +288,7 @@ offer_host_control() {
   [[ $(readlink compose.override.yaml 2>/dev/null) != compose.ports.yaml ]] || default=y
   ! ask_yes "Let this stack's owners switch the host's upgrades and reboot it through the API? Only where the stack has the host to itself." "$default" ||
     answer=true
-  if grep -q '^HOST_CONTROL=' .env; then
+  if grep -qE "$(env_lhs HOST_CONTROL)" .env; then
     set_env_line .env HOST_CONTROL "$answer"
   else
     # On a line of its own, whether or not .env ends in one.
@@ -334,6 +326,7 @@ main() {
         echo "Already on $from."
         [[ -z $check_only ]] || exit "$CHECK_NOT_NEWER"
         prepare_run
+        generated_tokens
         offer_host_control || true
         agent_upkeep
         # What changed without a new release: HOST_CONTROL's answer, or the updater of a release
@@ -348,6 +341,7 @@ main() {
       [[ -z $check_only ]] || exit "$CHECK_UPDATE"
       prepare_run
       outcome_start '' "$from"
+      generated_tokens
       offer_host_control || true
       agent_upkeep
       recreate_stack

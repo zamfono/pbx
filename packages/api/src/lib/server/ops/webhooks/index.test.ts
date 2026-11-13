@@ -157,4 +157,29 @@ describe('webhooks', () => {
       )
     ).rejects.toMatchObject({ status: 422 });
   });
+
+  // §3.1 "Outbound targets": an address literal no delivery could reach is refused at once; a
+  // private one is the delivery's to check against ALLOW_PRIVATE_TARGETS.
+  it.each([
+    'http://127.0.0.1:3000/internal/mail',
+    'http://[::1]/hook',
+    'http://169.254.169.254/latest/meta-data',
+    'http://[fe80::1]/hook',
+    'http://0.0.0.0/hook'
+  ])('refuses %s', async url => {
+    const db = await makeTestDb();
+    await expect(
+      runOperation(db, 'webhooks.create', { url, secret: 's' }, asRun())
+    ).rejects.toMatchObject({ status: 422 });
+  });
+
+  it.each(['http://192.168.1.20/hook', 'http://core:3000/x'])(
+    'takes %s, a private address or a name, which the delivery checks',
+    async url => {
+      const db = await makeTestDb();
+      await expect(
+        runOperation(db, 'webhooks.create', { url, secret: 's' }, asRun())
+      ).resolves.toBeDefined();
+    }
+  );
 });

@@ -2,8 +2,10 @@ import type { Selectable } from 'kysely';
 import { z } from 'zod';
 
 import {
+  ALWAYS_FORBIDDEN_REASON,
   eventTypesColumn,
   eventTypesSchema,
+  isAlwaysForbiddenLiteral,
   WEBHOOK_STATUSES,
   type Db,
   type DB,
@@ -30,9 +32,13 @@ export const eventTypesField = eventTypesSchema
     'The event types to deliver, such as ["call.state", "voicemail.new"]; null delivers every event.'
   );
 
-/** A webhook's `url`: `http(s)` only, since it names an HTTP POST endpoint (§10.6). */
+/** A webhook's `url`: `http(s)` only, since it names an HTTP POST endpoint (§10.6), and never an
+ *  address literal no delivery could reach (§3.1 "Outbound targets"). */
 export const httpUrlSchema = z
   .url({ protocol: /^https?$/u })
+  .refine(url => !isAlwaysForbiddenLiteral(URL.parse(url)?.hostname ?? ''), {
+    message: ALWAYS_FORBIDDEN_REASON
+  })
   .describe('The http(s) endpoint every event is POSTed to as JSON.');
 
 /** `event_types_json` as the wire shape: `null` unfiltered, else the types delivered. */

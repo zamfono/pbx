@@ -11,6 +11,8 @@ import {
   HTTP_NO_CONTENT,
   HTTP_OK,
   HTTP_SERVICE_UNAVAILABLE,
+  HTTP_UNAUTHORIZED,
+  internalAuthorization,
   newId,
   nowIso,
   rawDataToString,
@@ -26,6 +28,10 @@ import type { Logger } from '../ari/types.js';
 import { ActionError } from '../calls/actionError.js';
 import { newCall } from '../calls/call.js';
 import { FakeAri } from '../testing/ari/fake.js';
+import {
+  internalFetch,
+  TEST_INTERNAL_TOKEN
+} from '../testing/internalFetch.js';
 import {
   idleMedia,
   idlePresence,
@@ -94,6 +100,7 @@ describe('startInternalServer', () => {
     reregistered = [];
     const started = await startInternalServer(
       {
+        token: TEST_INTERNAL_TOKEN,
         db,
         ari,
         log: serverLogger,
@@ -201,10 +208,61 @@ describe('startInternalServer', () => {
     expect(response.status).toBe(HTTP_SERVICE_UNAVAILABLE);
   });
 
+  // §3.1: /internal/* answers only a request carrying INTERNAL_TOKEN; /healthz and /readyz,
+  // which the compose healthcheck asks from inside the container, need none.
+  it.each([
+    ['no token', undefined],
+    ['a wrong token', 'Bearer wrong-token'],
+    ['the token without its scheme', TEST_INTERNAL_TOKEN],
+    ['a longer token', `Bearer ${TEST_INTERNAL_TOKEN}x`]
+  ])('refuses /internal/* with 401 for %s', async (_case, authorization) => {
+    const headers: Record<string, string> =
+      authorization === undefined ? {} : { authorization };
+    const read = await fetch(`http://127.0.0.1:${port}/internal/state`, {
+      headers
+    });
+    const reload = await fetch(
+      `http://127.0.0.1:${port}/internal/configChanged`,
+      {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reload: [] })
+      }
+    );
+    expect([read.status, reload.status]).toEqual([
+      HTTP_UNAUTHORIZED,
+      HTTP_UNAUTHORIZED
+    ]);
+  });
+
+  it('answers /internal/* with the token, and /healthz and /readyz without one', async () => {
+    const read = await internalFetch(`http://127.0.0.1:${port}/internal/state`);
+    const health = await fetch(`http://127.0.0.1:${port}/healthz`);
+    const ready = await fetch(`http://127.0.0.1:${port}/readyz`);
+    expect([read.status, health.status, ready.status]).toEqual([
+      HTTP_OK,
+      HTTP_OK,
+      HTTP_OK
+    ]);
+  });
+
+  it('refuses the /internal/events handshake without the token', async () => {
+    const socket = new WebSocket(`ws://127.0.0.1:${port}/internal/events`, {
+      headers: { authorization: 'Bearer wrong-token' }
+    });
+    const [, response] = (await once(socket, 'unexpected-response')) as [
+      unknown,
+      { statusCode: number }
+    ];
+    expect(response.statusCode).toBe(HTTP_UNAUTHORIZED);
+  });
+
   it('answers 503 for a request whose route failed, and logs the failure with the request', async () => {
     presence.registeredDevices = () => Promise.reject(new Error('boom'));
 
-    const response = await fetch(`http://127.0.0.1:${port}/internal/state`);
+    const response = await internalFetch(
+      `http://127.0.0.1:${port}/internal/state`
+    );
 
     expect(response.status).toBe(HTTP_SERVICE_UNAVAILABLE);
     expect(errorsLogged).toEqual([
@@ -257,7 +315,9 @@ describe('startInternalServer', () => {
       fakeAri.addChannel({});
     }
 
-    const response = await fetch(`http://127.0.0.1:${port}/internal/state`);
+    const response = await internalFetch(
+      `http://127.0.0.1:${port}/internal/state`
+    );
     expect(response.status).toBe(HTTP_OK);
     await expect(response.json()).resolves.toEqual({
       calls: [
@@ -286,7 +346,9 @@ describe('startInternalServer', () => {
   });
 
   it('answers /internal/version with the version and commit this core runs, and since when', async () => {
-    const response = await fetch(`http://127.0.0.1:${port}/internal/version`);
+    const response = await internalFetch(
+      `http://127.0.0.1:${port}/internal/version`
+    );
     expect(response.status).toBe(HTTP_OK);
     const body = (await response.json()) as Record<string, unknown>;
     expect(body).toEqual({
@@ -307,7 +369,7 @@ describe('startInternalServer', () => {
     const second = await cache.get();
     expect(second).toBe(first);
 
-    const response = await fetch(
+    const response = await internalFetch(
       `http://127.0.0.1:${port}/internal/configChanged`,
       {
         method: 'POST',
@@ -328,13 +390,13 @@ describe('startInternalServer', () => {
   });
 
   it('has a trunk re-register on POST /internal/trunks/{id}/reregister, 204, and answers its refusal as a problem', async () => {
-    const accepted = await fetch(
+    const accepted = await internalFetch(
       `http://127.0.0.1:${port}/internal/trunks/regTrunk/reregister`,
       { method: 'POST' }
     );
     expect(accepted.status).toBe(HTTP_NO_CONTENT);
 
-    const refused = await fetch(
+    const refused = await internalFetch(
       `http://127.0.0.1:${port}/internal/trunks/ipTrunk/reregister`,
       { method: 'POST' }
     );
@@ -346,7 +408,7 @@ describe('startInternalServer', () => {
   });
 
   it('answers 400 for a malformed configChanged body without crashing the server', async () => {
-    const response = await fetch(
+    const response = await internalFetch(
       `http://127.0.0.1:${port}/internal/configChanged`,
       {
         method: 'POST',
@@ -361,7 +423,7 @@ describe('startInternalServer', () => {
   });
 
   it('answers 400 for an unknown reload kind', async () => {
-    const response = await fetch(
+    const response = await internalFetch(
       `http://127.0.0.1:${port}/internal/configChanged`,
       {
         method: 'POST',
@@ -384,11 +446,14 @@ describe('startInternalServer', () => {
     ['calls/c1/hold', []],
     ['calls', { userId: 'u1', target: '102', actorUserId: 'u1' }]
   ])('answers 400 for a %s body its schema refuses', async (path, body) => {
-    const response = await fetch(`http://127.0.0.1:${port}/internal/${path}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
+    const response = await internalFetch(
+      `http://127.0.0.1:${port}/internal/${path}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      }
+    );
     expect(response.status).toBe(HTTP_BAD_REQUEST);
   });
 
@@ -402,6 +467,7 @@ describe('startInternalServer', () => {
     const bus = new EventBus();
     const started = await startInternalServer(
       {
+        token: TEST_INTERNAL_TOKEN,
         db,
         ari,
         log: noopLogger,
@@ -420,7 +486,8 @@ describe('startInternalServer', () => {
     );
     try {
       const socket = new WebSocket(
-        `ws://127.0.0.1:${started.port}/internal/events`
+        `ws://127.0.0.1:${started.port}/internal/events`,
+        { headers: internalAuthorization(TEST_INTERNAL_TOKEN) }
       );
       await new Promise<void>((resolve, reject) => {
         socket.once('open', () => {
@@ -453,6 +520,7 @@ describe('startInternalServer', () => {
   it('closes an /internal/events socket that sends a large frame, with 1009', async () => {
     const started = await startInternalServer(
       {
+        token: TEST_INTERNAL_TOKEN,
         db,
         ari,
         log: noopLogger,
@@ -471,7 +539,8 @@ describe('startInternalServer', () => {
     );
     try {
       const socket = new WebSocket(
-        `ws://127.0.0.1:${started.port}/internal/events`
+        `ws://127.0.0.1:${started.port}/internal/events`,
+        { headers: internalAuthorization(TEST_INTERNAL_TOKEN) }
       );
       await new Promise<void>((resolve, reject) => {
         socket.once('open', () => {
@@ -495,6 +564,7 @@ describe('startInternalServer', () => {
   it('closes while an /internal/events subscriber is still connected, ending its socket', async () => {
     const started = await startInternalServer(
       {
+        token: TEST_INTERNAL_TOKEN,
         db,
         ari,
         log: noopLogger,
@@ -512,7 +582,8 @@ describe('startInternalServer', () => {
       ANY_FREE_PORT
     );
     const socket = new WebSocket(
-      `ws://127.0.0.1:${started.port}/internal/events`
+      `ws://127.0.0.1:${started.port}/internal/events`,
+      { headers: internalAuthorization(TEST_INTERNAL_TOKEN) }
     );
     await new Promise<void>((resolve, reject) => {
       socket.once('open', () => {
@@ -531,7 +602,7 @@ describe('startInternalServer', () => {
   });
 
   it('answers 413 for a configChanged body over the size cap', async () => {
-    const response = await fetch(
+    const response = await internalFetch(
       `http://127.0.0.1:${port}/internal/configChanged`,
       {
         method: 'POST',
@@ -546,6 +617,7 @@ describe('startInternalServer', () => {
     const bus = new EventBus();
     const started = await startInternalServer(
       {
+        token: TEST_INTERNAL_TOKEN,
         db,
         ari,
         log: noopLogger,
@@ -580,7 +652,8 @@ describe('startInternalServer', () => {
           'Upgrade: websocket\r\n' +
           'Connection: Upgrade\r\n' +
           'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n' +
-          'Sec-WebSocket-Version: 13\r\n\r\n'
+          'Sec-WebSocket-Version: 13\r\n' +
+          `Authorization: Bearer ${TEST_INTERNAL_TOKEN}\r\n\r\n`
       );
       await new Promise<void>(resolve => {
         socket.once('data', () => {

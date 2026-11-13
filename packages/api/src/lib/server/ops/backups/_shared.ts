@@ -3,11 +3,13 @@ import type { Selectable } from 'kysely';
 import { z } from 'zod';
 
 import {
+  ALWAYS_FORBIDDEN_REASON,
   BACKUP_RUN_STATUSES,
   BACKUP_TARGET_KINDS,
   backupParamsColumn,
   backupParamsSchema,
   HTTP_UNPROCESSABLE_CONTENT,
+  isAlwaysForbiddenLiteral,
   type Db,
   type DB
 } from '@zamfono/shared';
@@ -79,11 +81,36 @@ export function assertLocalPath(path: unknown): void {
   }
 }
 
+/** The param naming a remote target's server, by kind; `host` for sftp, ftp and ftps. */
+const SERVER_PARAM: Partial<Record<string, string>> = {
+  s3: 'endpoint',
+  webdav: 'url'
+};
+
+/** The host a remote target names as written, `null` where it names none: an s3 `endpoint`'s, with
+ *  or without a scheme, a webdav `url`'s, an sftp, ftp or ftps `host`. Its addresses are checked
+ *  as a run starts (§3.1 "Outbound targets"). */
+export function serverOf(
+  kind: string,
+  params: Record<string, unknown>
+): string | null {
+  const value = params[SERVER_PARAM[kind] ?? 'host'];
+  if (kind === 'local' || typeof value !== 'string') {
+    return null;
+  }
+  const withScheme =
+    kind === 'webdav' || /^https?:\/\//iu.test(value)
+      ? value
+      : `https://${value}`;
+  return URL.parse(withScheme)?.hostname ?? null;
+}
+
 /**
  * Throws 422 unless a `kind` target's `params` name its server as the backend can take it
  * (§6.5 "Target kinds"): an sftp, ftp or ftps `host` is an FQDN or an IPv4 address, so it can
- * never reach ssh as an option, a webdav `url` is an `http` or `https` URL, and a local `path`
- * lies under `/backups` (`assertLocalPath`).
+ * never reach ssh as an option, a webdav `url` is an `http` or `https` URL, a local `path`
+ * lies under `/backups` (`assertLocalPath`), and no server is named by a loopback, link-local or
+ * unspecified address literal (§3.1 "Outbound targets").
  */
 export function assertParamsFitKind(
   kind: string,
@@ -103,6 +130,13 @@ export function assertParamsFitKind(
         'backups: a webdav target needs an http or https url'
       );
     }
+  }
+  const server = serverOf(kind, params);
+  if (server !== null && isAlwaysForbiddenLiteral(server)) {
+    throw new OpError(
+      HTTP_UNPROCESSABLE_CONTENT,
+      `backups: ${ALWAYS_FORBIDDEN_REASON}`
+    );
   }
 }
 

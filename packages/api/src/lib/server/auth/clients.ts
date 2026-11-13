@@ -7,17 +7,19 @@ import {
   addressKey,
   HTTP_OK,
   HTTP_TOO_MANY_REQUESTS,
+  isForbiddenLiteral,
   isRecord,
   MS_PER_DAY,
   MS_PER_SECOND,
+  targetLookup,
   type Db,
-  type OAuthClientKind
+  type OAuthClientKind,
+  type TargetPolicy
 } from '@zamfono/shared';
 
 import { attempt } from '../errors.js';
 import { cappedJson } from '../json.js';
 import { limiter } from '../limiter.js';
-import { isNonPublicLiteral, publicLookup } from '../publicHost.js';
 import { decrypt, encrypt, type Keyring } from '../secretbox.js';
 import { TtlMap } from '../ttlMap.js';
 import { redirectUriAcceptable } from './redirectUris.js';
@@ -157,14 +159,18 @@ function parseCimdDocument(
   };
 }
 
+// A document anyone can name is fetched from a public address alone (§5.2), whatever
+// `ALLOW_PRIVATE_TARGETS` says of the admins' own targets.
+const PUBLIC_ONLY: TargetPolicy = { allowPrivate: false };
+
 /** The response to a GET of `url`, its host resolved only as the socket connects, through
- *  `publicLookup`; rejects on a refused address, a failed connection or the deadline. */
+ *  `targetLookup`; rejects on a refused address, a failed connection or the deadline. */
 function getDocument(url: URL): Promise<IncomingMessage> {
   return new Promise((resolve, reject) => {
     request(
       url,
       {
-        lookup: publicLookup,
+        lookup: targetLookup(PUBLIC_ONLY),
         signal: AbortSignal.timeout(CIMD_FETCH_TIMEOUT_MS)
       },
       resolve
@@ -191,7 +197,7 @@ export async function fetchCimd(
     return cached;
   }
   const url = URL.parse(clientIdUrl);
-  if (url === null || isNonPublicLiteral(url)) {
+  if (url === null || isForbiddenLiteral(url.hostname, PUBLIC_ONLY)) {
     return null;
   }
   if (!limiter.check('clientMetadata', addressKey(clientAddress)).ok) {

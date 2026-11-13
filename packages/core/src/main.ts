@@ -196,6 +196,7 @@ export async function main(): Promise<{ close: () => Promise<void> }> {
     await resyncCalls({ db, ari, pipeline, log, connectingSince });
     const server = await startInternalServer(
       {
+        token: env.internalToken,
         db,
         ari,
         log,

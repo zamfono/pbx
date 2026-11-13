@@ -8,8 +8,11 @@ import { ApiClient } from './apiClient.js';
 type StubRequest = {
   path: string;
   contentType: string | undefined;
+  authorization: string | undefined;
   body: string;
 };
+
+const TOKEN = 'internal-token';
 
 /** A local HTTP receiver that records every POST and answers with `status`. */
 function startStub(status: number): Promise<{
@@ -28,6 +31,7 @@ function startStub(status: number): Promise<{
         requests.push({
           path: req.url ?? '',
           contentType: req.headers['content-type'],
+          authorization: req.headers.authorization,
           body: Buffer.concat(chunks).toString('utf8')
         });
         res.writeHead(status);
@@ -67,10 +71,11 @@ describe('ApiClient', () => {
   it('POSTs the mail request as JSON to /internal/mail', async () => {
     const stub = await startStub(202);
     try {
-      await new ApiClient(stub.url).mail(sampleRequest);
+      await new ApiClient(stub.url, TOKEN).mail(sampleRequest);
       expect(stub.requests).toHaveLength(1);
       expect(stub.requests[0]?.path).toBe('/internal/mail');
       expect(stub.requests[0]?.contentType).toBe('application/json');
+      expect(stub.requests[0]?.authorization).toBe(`Bearer ${TOKEN}`);
       expect(JSON.parse(stub.requests[0]?.body ?? '')).toEqual(sampleRequest);
     } finally {
       await stub.close();
@@ -81,7 +86,7 @@ describe('ApiClient', () => {
     const stub = await startStub(500);
     try {
       await expect(
-        new ApiClient(stub.url).mail(sampleRequest)
+        new ApiClient(stub.url, TOKEN).mail(sampleRequest)
       ).rejects.toThrow();
     } finally {
       await stub.close();
@@ -91,12 +96,13 @@ describe('ApiClient', () => {
   it('POSTs a SIP ban report as JSON to /internal/sipBan', async () => {
     const stub = await startStub(204);
     try {
-      await new ApiClient(stub.url).sipBan({
+      await new ApiClient(stub.url, TOKEN).sipBan({
         address: '203.0.113.7',
         protocol: 'udp',
         failures: 10
       });
       expect(stub.requests[0]?.path).toBe('/internal/sipBan');
+      expect(stub.requests[0]?.authorization).toBe(`Bearer ${TOKEN}`);
       expect(JSON.parse(stub.requests[0]?.body ?? '')).toEqual({
         address: '203.0.113.7',
         protocol: 'udp',
@@ -111,7 +117,7 @@ describe('ApiClient', () => {
     const stub = await startStub(400);
     try {
       await expect(
-        new ApiClient(stub.url).sipBan({
+        new ApiClient(stub.url, TOKEN).sipBan({
           address: 'x',
           protocol: 'udp',
           failures: 1

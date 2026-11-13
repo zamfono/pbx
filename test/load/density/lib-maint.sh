@@ -193,8 +193,10 @@ maint_tls() {
     && cp /tmp/placeholder-key.pem $CERT_SYNC_TLS_DIR/privkey.pem \
     && chown asterisk:asterisk $CERT_SYNC_TLS_DIR/cert.pem $CERT_SYNC_TLS_DIR/privkey.pem" >&2 \
     || return 1
-  dc exec -T proxy wget -q -T 5 -O /dev/null --post-data='' http://api:3000/internal/certificate \
-    >&2 || return 1
+  # With the INTERNAL_TOKEN proxy has, as its cert_obtained hook sends it (§3.1).
+  # shellcheck disable=SC2016 # expanded in the proxy container
+  dc exec -T proxy sh -c 'wget -q -T 5 -O /dev/null --header "Authorization: Bearer $INTERNAL_TOKEN" \
+    --post-data= http://api:3000/internal/certificate' >&2 || return 1
   # shellcheck disable=SC2317 # called through poll
   presented_new() { [ "$(cert_sync_presented_fingerprint)" = "$new" ]; }
   if poll 120 0.5 presented_new; then echo "tls=reloaded"; else echo "tls=not-presented"; return 1; fi

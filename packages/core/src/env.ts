@@ -51,6 +51,12 @@ export type CoreEnv = {
   fqdn: string;
   /** `api`'s internal HTTP API, where `core` posts its mail requests (§3.1 "Mail"). */
   apiInternalUrl: string;
+  /** `INTERNAL_TOKEN`, the bearer token of every request to `api`'s and `core`'s `/internal/*`
+   * (§3.1). */
+  internalToken: string;
+  /** `ALLOW_PRIVATE_TARGETS`: whether a `webSocket` target may be on a private network (§3.1
+   * "Outbound targets"). */
+  allowPrivateTargets: boolean;
   /** `ZAMFONO_VERSION` and `ZAMFONO_REVISION` (§7 "Version"). */
   version: ZamfonoVersion;
 };
@@ -105,7 +111,7 @@ function parseCallLogMaxBytes(raw: string | undefined): number {
 // amiHost's port, callLogMaxBytes and tz are validated here and carried on `CoreEnv` for the
 // call pipeline, the OOO/hours sweep and the HEP listener; tz is the tenant clock while
 // `settings.timezone` is NULL (§11.4). hepEnabled accepts any value other than the literal
-// string 'false' as true, as do sipUdpEnabled and sipTcpEnabled.
+// string 'false' as true, as do sipUdpEnabled, sipTcpEnabled and allowPrivateTargets.
 export function readEnv(env: NodeJS.ProcessEnv): CoreEnv {
   const ami = parseHostPort(optionalEnv(env, 'AMI_HOST') ?? DEFAULT_AMI_HOST);
   const stackIpv4 = optionalEnv(env, 'STACK_IPV4') ?? null;
@@ -139,6 +145,8 @@ export function readEnv(env: NodeJS.ProcessEnv): CoreEnv {
     fqdn: requireEnv(env, 'FQDN').toLowerCase(),
     apiInternalUrl:
       optionalEnv(env, 'API_INTERNAL_URL') ?? DEFAULT_API_INTERNAL_URL,
+    internalToken: requireEnv(env, 'INTERNAL_TOKEN'),
+    allowPrivateTargets: env.ALLOW_PRIVATE_TARGETS !== 'false',
     version: resolveVersion(env)
   };
 }

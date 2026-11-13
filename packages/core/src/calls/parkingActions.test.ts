@@ -13,6 +13,7 @@ import { seedUser } from '@zamfono/shared/testDb.js';
 import { type FakeAri } from '../testing/ari/fake.js';
 import { isPlacement, placedCallerId } from '../testing/ari/fakeDial.js';
 import { eventually } from '../testing/eventually.js';
+import { internalFetch } from '../testing/internalFetch.js';
 import {
   answeredCall,
   legOf,
@@ -298,7 +299,7 @@ describe('CallActions: parking, voicemail deposit and per-call CLIR', () => {
     const call = await answeredCall(rig, anna);
     const baseUrl = await rig.startServer(actions);
     const post = (path: string, body: unknown): Promise<Response> =>
-      fetch(`${baseUrl}${path}`, {
+      internalFetch(`${baseUrl}${path}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
@@ -316,7 +317,7 @@ describe('CallActions: parking, voicemail deposit and per-call CLIR', () => {
     });
     expect(parkedResponse.status).toBe(HTTP_OK);
     expect(await parkedResponse.json()).toEqual({ slot: '701' });
-    const list = await fetch(`${baseUrl}/internal/parking`);
+    const list = await internalFetch(`${baseUrl}/internal/parking`);
     expect(list.status).toBe(HTTP_OK);
     const body = (await list.json()) as { parked: { callId: string }[] };
     expect(body.parked.map(entry => entry.callId)).toEqual([call.id]);

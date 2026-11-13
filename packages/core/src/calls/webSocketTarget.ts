@@ -5,12 +5,19 @@
  * own; the channel is the bot's leg, claimed and bridged with the caller as any answer is
  * (`answer.ts`), so recording, the live calls and the history treat it as an answered leg, and
  * the stream starts (`botSession.ts`). A socket that does not open, or media that cannot be set
- * up, releases the call with 503 as a `sip` target that cannot be dialled does.
+ * up, releases the call with 503 as a `sip` target that cannot be dialled does, as does a host on
+ * a refused address (§3.1 "Outbound targets"), checked as the socket connects.
  */
 import net from 'node:net';
 import WebSocket from 'ws';
 
-import { newId } from '@zamfono/shared';
+import {
+  isForbiddenAddressError,
+  isForbiddenLiteral,
+  newId,
+  targetLookup,
+  type TargetPolicy
+} from '@zamfono/shared';
 
 import { logUnlessGone } from '../ari/failures.js';
 import type { ForwardTarget } from '../routing/targets.js';
@@ -41,21 +48,31 @@ const MEDIA_WAIT_MS = 5000;
 // The largest frame a bot may send: well above a second of 24 kHz linear audio as base64.
 const MAX_FRAME_BYTES = 1_048_576;
 
-/** Opens `url`, resolving with the open socket, or `null` once it fails or times out. */
-function connect(url: string): Promise<WebSocket | null> {
+/** Opens `url`, its host's addresses checked against `policy` (none with `null`): the open
+ *  socket, or why not once it fails or times out (§9.4 "WebSocket targets"). */
+function connect(
+  url: string,
+  policy: TargetPolicy | null
+): Promise<WebSocket | 'connectFailed' | 'forbiddenAddress'> {
+  if (policy !== null && isForbiddenLiteral(new URL(url).hostname, policy)) {
+    return Promise.resolve('forbiddenAddress');
+  }
   const socket = new WebSocket(url, {
     handshakeTimeout: CONNECT_TIMEOUT_MS,
-    maxPayload: MAX_FRAME_BYTES
+    maxPayload: MAX_FRAME_BYTES,
+    ...(policy === null ? {} : { lookup: targetLookup(policy) })
   });
   return new Promise(resolve => {
     socket.once('open', () => {
       resolve(socket);
     });
-    socket.once('error', () => {
-      resolve(null);
+    socket.once('error', error => {
+      resolve(
+        isForbiddenAddressError(error) ? 'forbiddenAddress' : 'connectFailed'
+      );
     });
     socket.once('close', () => {
-      resolve(null);
+      resolve('connectFailed');
     });
   });
 }
@@ -217,10 +234,11 @@ export async function dialWebSocketTarget(
 ): Promise<void> {
   const encoding = mediaEncoding(target.sampleRate);
   // Ready before the media connects, so its session starts sending at once (`botPlayout.ts`).
-  const [socket, parameters] = await Promise.all([
-    connect(target.url),
+  const [opened, parameters] = await Promise.all([
+    connect(target.url, pipeline.deps.targetPolicy),
     metadata(pipeline, call)
   ]);
+  const socket = typeof opened === 'string' ? null : opened;
   const media =
     socket === null || call.callerEnded === true
       ? null
@@ -230,13 +248,9 @@ export async function dialWebSocketTarget(
     return;
   }
   if (socket === null || media === null) {
-    call.log.event({
-      event: 'webSocket',
-      protocol: target.protocol,
-      cause: socket === null ? 'connectFailed' : 'mediaFailed'
-    });
+    const cause = typeof opened === 'string' ? opened : 'mediaFailed';
+    call.log.event({ event: 'webSocket', protocol: target.protocol, cause });
     await abandon(pipeline, call, socket, media);
-    const cause = socket === null ? 'connectFailed' : 'mediaFailed';
     if (!(await failOver(pipeline, call, target, forwarder, cause))) {
       await release(pipeline, call, SIP_SERVICE_UNAVAILABLE, 'failed');
     }

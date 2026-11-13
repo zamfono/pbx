@@ -4,10 +4,10 @@ import * as env from '$app/env/private';
 import {
   HEALTH_CONTENT_TYPE,
   healthHttpStatus,
+  isValidBearer,
   type HealthDocument
 } from '@zamfono/shared';
 
-import { isValidBearer } from '#lib/server/auth/bearer.js';
 import { getDb } from '#lib/server/db.js';
 import { currentHealth } from '#lib/server/health.js';
 

@@ -7,7 +7,8 @@ const REQUIRED = {
   ARI_PASSWORD: 'ari',
   AMI_PASSWORD: 'ami',
   EXTERNAL_IPV4: '192.0.2.10',
-  FQDN: 'pbx.example.com'
+  FQDN: 'pbx.example.com',
+  INTERNAL_TOKEN: 'internal-token'
 };
 
 // §9.4 "Caller-ID": the From host of a trunk leg not on a `pai` trunk, and the host its
@@ -61,8 +62,17 @@ describe('readEnv defaults', () => {
       callLogMaxBytes: 1048576,
       tz: 'UTC',
       timeZoneError: undefined,
-      apiInternalUrl: 'http://api:3000'
+      apiInternalUrl: 'http://api:3000',
+      internalToken: 'internal-token',
+      allowPrivateTargets: true
     });
+  });
+
+  it('reads ALLOW_PRIVATE_TARGETS as on unless false (§3.1)', () => {
+    expect(
+      readEnv({ ...REQUIRED, ALLOW_PRIVATE_TARGETS: 'false' })
+        .allowPrivateTargets
+    ).toBe(false);
   });
 
   it('reads SIP_UDP_ENABLED and SIP_TCP_ENABLED as on unless false (§9.1)', () => {
@@ -83,6 +93,9 @@ describe('readEnv defaults', () => {
   it('refuses an empty secret', () => {
     expect(() => readEnv({ ...REQUIRED, ARI_PASSWORD: '' })).toThrow(
       'missing required environment variable ARI_PASSWORD'
+    );
+    expect(() => readEnv({ ...REQUIRED, INTERNAL_TOKEN: '' })).toThrow(
+      'missing required environment variable INTERNAL_TOKEN'
     );
   });
 

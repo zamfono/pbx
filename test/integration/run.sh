@@ -109,7 +109,9 @@ fail() {
 # `REUSE` run that actually reused a stack (`$reused`, set below) leaves it up the same way,
 # whether or not `KEEP=1` was also given: it is reusing a stack some other run owns tearing down,
 # same as the run that left it up in the first place did under `KEEP=1`. Otherwise the run removes
-# what it made: its project's containers and volumes, and its directory.
+# what it made: its project's containers and volumes, and its directory. Through `compose_args`,
+# not `dc`: a `fail` in a function that holds a `compose` of its own, such as `stack_recreate`'s
+# array (test/stack.sh), runs this trap in that function's scope.
 cleanup() {
   [ -n "${run_dir:-}" ] || return 0
   if [ "${KEEP:-0}" = "1" ] || [ "${reused:-false}" = true ]; then
@@ -117,7 +119,8 @@ cleanup() {
       "\`$COMPOSE -p $(stack_project "$run_dir") down -v && rm -rf $run_dir\`" >&2
     return
   fi
-  dc down -v --remove-orphans >/dev/null 2>&1 || true
+  # shellcheck disable=SC2086 # `COMPOSE` is split into its words by design
+  $COMPOSE "${compose_args[@]}" down -v --remove-orphans >/dev/null 2>&1 || true
   rm -rf "$run_dir"
 }
 trap cleanup EXIT

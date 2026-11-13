@@ -8,7 +8,8 @@ import {
   nowIso,
   type BackupTargetKind,
   type Db,
-  type Envelope
+  type Envelope,
+  type TargetPolicy
 } from '@zamfono/shared';
 import { migratedTestDb } from '@zamfono/shared/testDb.js';
 
@@ -36,6 +37,27 @@ vi.mock('pino', () => ({
       ])
     )
 }));
+
+// The targets' servers as DNS answers them, so the check before a tool runs (§3.1 "Outbound
+// targets") sees an address; the check itself is `resolveTarget`'s own, run on that literal.
+const DNS: Record<string, string> = {
+  'backup.example.net': '203.0.113.21',
+  'ftp.example.net': '203.0.113.22',
+  'sftp.example.net': '203.0.113.23',
+  'dav.example.net': '203.0.113.24',
+  's3.eu-central-1.amazonaws.com': '203.0.113.25',
+  'nas.lan.example': '192.168.1.5',
+  'metadata.example': '169.254.169.254',
+  'core.example': '127.0.0.1'
+};
+vi.mock('@zamfono/shared', async importOriginal => {
+  const actual = await importOriginal<typeof import('@zamfono/shared')>();
+  return {
+    ...actual,
+    resolveTarget: (host: string, policy: TargetPolicy) =>
+      actual.resolveTarget(DNS[host] ?? host, { ...policy, ownSubnets: [] })
+  };
+});
 
 const SNAPSHOT_BYTES = 12345;
 const SNAPSHOT_TOTAL_BYTES = 27_000_000;
@@ -245,8 +267,8 @@ describe('runBackup: command lines per target kind', () => {
     expect(run.status).toBe('ok');
     const sftpCommand =
       'sftp.command="sshpass" "-e" "ssh" "-o" "StrictHostKeyChecking=accept-new" ' +
-      '"-o" "UserKnownHostsFile=/data/ssh_known_hosts" "-l" "zamfono" "-s" "--" ' +
-      '"backup.example.net" "sftp"';
+      '"-o" "UserKnownHostsFile=/data/ssh_known_hosts" "-o" "HostKeyAlias=backup.example.net" ' +
+      '"-l" "zamfono" "-s" "--" "203.0.113.21" "sftp"';
     const backupCall = calls.find(call => call.args[0] === 'backup');
     expect(backupCall?.env.RESTIC_REPOSITORY).toBe(
       'sftp:zamfono@backup.example.net:/srv/restic'
@@ -308,7 +330,8 @@ describe('runBackup: command lines per target kind', () => {
     const backupCall = calls.find(call => call.args[0] === 'backup');
     expect(backupCall?.env.RESTIC_REPOSITORY).toBe('rclone:zamfono:restic');
     expect(backupCall?.env.RCLONE_CONFIG_ZAMFONO_TYPE).toBe('ftp');
-    expect(backupCall?.env.RCLONE_CONFIG_ZAMFONO_HOST).toBe('ftp.example.net');
+    // Plain ftp connects to the address checked (§3.1 "Outbound targets").
+    expect(backupCall?.env.RCLONE_CONFIG_ZAMFONO_HOST).toBe('203.0.113.22');
     expect(backupCall?.env.RCLONE_CONFIG_ZAMFONO_USER).toBe('user1');
     // rclone treats a backend password as obscured; the job runs it through `rclone obscure`
     // rather than exporting the plain credential.
@@ -426,6 +449,73 @@ describe('runBackup: what reaches restic and rclone (§6.5)', () => {
     } finally {
       vi.unstubAllEnvs();
     }
+  });
+});
+
+// §3.1 "Outbound targets": a remote target's server is resolved and checked before restic or
+// rclone runs, so a refused one runs no tool and the run's error names the refusal alone.
+describe('runBackup: the target server check', () => {
+  const secret = {
+    resticPassword: 'pw',
+    username: 'u',
+    password: 'p',
+    accessKeyId: 'AKID',
+    secretAccessKey: 'SECRET'
+  };
+
+  it.each([
+    ['sftp', { host: 'core.example', path: '/srv' }, 'true'],
+    ['ftp', { host: '127.0.0.1' }, 'true'],
+    ['ftps', { host: 'metadata.example' }, 'true'],
+    ['webdav', { url: 'http://169.254.169.254/latest' }, 'true'],
+    ['webdav', { url: 'http://[::1]:8080/dav' }, 'true'],
+    ['s3', { endpoint: 'http://core.example:9000', bucket: 'b' }, 'true'],
+    ['s3', { endpoint: 'core.example:9000', bucket: 'b' }, 'true'],
+    ['sftp', { host: 'nas.lan.example', path: '/srv' }, 'false'],
+    ['s3', { endpoint: 'https://192.168.1.5', bucket: 'b' }, 'false']
+  ] as const)(
+    'refuses %s %j with ALLOW_PRIVATE_TARGETS=%s, spawning nothing',
+    async (kind, params, allowPrivate) => {
+      vi.stubEnv('ALLOW_PRIVATE_TARGETS', allowPrivate);
+      try {
+        const db = await migratedTestDb();
+        const kr = testKeyring();
+        const targetId = await insertTarget(db, kr, kind, params, secret);
+        const { exec, calls } = recordingExec('snap', SNAPSHOT_BYTES);
+        const run = await runBackup(db, kr, targetId, {
+          exec,
+          mediaDir: '/media',
+          bus: fakeBus().bus
+        });
+        expect(run.status).toBe('failed');
+        expect(run.error).toBe('forbidden address');
+        expect(calls).toEqual([]);
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    }
+  );
+
+  it('backs up to a server on a private network unless ALLOW_PRIVATE_TARGETS=false', async () => {
+    const db = await migratedTestDb();
+    const kr = testKeyring();
+    const targetId = await insertTarget(
+      db,
+      kr,
+      'sftp',
+      { host: 'nas.lan.example', path: '/srv' },
+      secret
+    );
+    const { exec, calls } = recordingExec('snap', SNAPSHOT_BYTES);
+    const run = await runBackup(db, kr, targetId, {
+      exec,
+      mediaDir: '/media',
+      bus: fakeBus().bus
+    });
+    expect(run.status).toBe('ok');
+    expect(
+      calls.find(call => call.args[0] === 'backup')?.args.at(-1)
+    ).toContain('"--" "192.168.1.5" "sftp"');
   });
 });
 

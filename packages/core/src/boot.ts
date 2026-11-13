@@ -74,12 +74,13 @@ export function buildPipeline(deps: {
     now: nowIso,
     stackTz: env.tz,
     stackFqdn: env.fqdn,
+    targetPolicy: { allowPrivate: env.allowPrivateTargets },
     legStasisWaitMs: STASIS_WAIT_MS,
     callLogMaxBytes: env.callLogMaxBytes,
     mediaDir: env.mediaDir,
     mediaFull: media.full,
     db,
-    apiClient: new ApiClient(env.apiInternalUrl),
+    apiClient: new ApiClient(env.apiInternalUrl, env.internalToken),
     logger: log,
     trunkChannels: new TrunkChannels({ ari, state }),
     presence: deps.presence,
@@ -117,7 +118,7 @@ export function startBackgroundJobs(deps: {
   const sipBanCount = startSipBanCount({
     ami: deps.ami,
     cache: deps.cache,
-    api: new ApiClient(deps.env.apiInternalUrl),
+    api: new ApiClient(deps.env.apiInternalUrl, deps.env.internalToken),
     own: ownAddresses(deps.env),
     log: deps.log
   });

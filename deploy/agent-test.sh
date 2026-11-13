@@ -198,9 +198,23 @@ echo "  - the host agent's units: installed by root alone"
 if (($(id -u) == 0)); then
   # update-test.sh's stacks belong to whoever runs it; root's own copy, writable by no one else.
   chmod -R go-w "$work/stack"
+  # tokens_generated — .env holds a 64-hex METRICS_TOKEN and INTERNAL_TOKEN, neither in $work/out.
+  tokens_generated() {
+    local name token
+    for name in METRICS_TOKEN INTERNAL_TOKEN; do
+      token=$(sed -nE "s/^$name='?([0-9a-f]{64})'?\$/\\1/p" "$work/stack/.env")
+      [[ -n $token && $(grep -c "^$name=" "$work/stack/.env") == 1 ]] ||
+        fail "$1 left $name unset: $(grep "^$name=" "$work/stack/.env" | cut -c1-20)"
+      grep -qF "$token" "$work/out" && fail "$1 printed $name"
+    done
+    return 0
+  }
+  # As 0.9.1's .env: no INTERNAL_TOKEN, and here an empty METRICS_TOKEN.
+  sed -i '/^INTERNAL_TOKEN=/d;s/^METRICS_TOKEN=.*/METRICS_TOKEN=/' "$work/stack/.env"
   (cd "$work/stack" && PATH="$work/bin:$PATH" STUB_LOG="$work/runtime.log" ZAMFONO_UNIT_DIR="$work/units" \
-    ZAMFONO_LIBEXEC_DIR="$work/libexec" ZAMFONO_AGENT_TEST_TREE=1 setup/agent.sh install podman >/dev/null) ||
-    fail "the agent's units were not installed"
+    ZAMFONO_LIBEXEC_DIR="$work/libexec" ZAMFONO_AGENT_TEST_TREE=1 setup/agent.sh install podman >"$work/out" 2>&1) ||
+    fail "the agent's units were not installed: $(cat "$work/out")"
+  tokens_generated "the agent's install"
   base=zamfono-stack-agent
   # systemd runs the launcher, outside the stack directory, which checks it before it runs.
   grep -qx "ExecStart=$work/libexec/zamfono-agent $work/stack" "$work/units/$base.service" ||
@@ -238,6 +252,17 @@ if (($(id -u) == 0)); then
       ./update.sh "$(<"$work/stack/VERSION")" </dev/null \
       >"$work/out" 2>&1) || fail "update.sh on the installed agent failed: $(cat "$work/out")"
   }
+  # The refresh an earlier release's update.sh runs from the new bundle before it recreates the
+  # stack: it fills in a missing token and keeps a set one.
+  metrics_token=$(grep '^METRICS_TOKEN=' "$work/stack/.env")
+  sed -i '/^INTERNAL_TOKEN=/d' "$work/stack/.env"
+  (cd "$work/stack" && PATH="$work/bin:$PATH" STUB_LOG="$work/runtime.log" ZAMFONO_UNIT_DIR="$work/units" \
+    ZAMFONO_LIBEXEC_DIR="$work/libexec" ZAMFONO_AGENT_TEST_TREE=1 setup/agent.sh refresh podman >"$work/out" 2>&1) ||
+    fail "the agent's refresh failed: $(cat "$work/out")"
+  tokens_generated "the agent's refresh"
+  [[ $(grep '^METRICS_TOKEN=' "$work/stack/.env") == "$metrics_token" ]] ||
+    fail "the refresh replaced a set METRICS_TOKEN"
+  : >"$work/runtime.log"
   agent_refresh
   grep -q 'daemon-reload' "$work/runtime.log" && fail "update.sh rewrote units no release changed"
   echo '# an older release' >>"$work/units/$base.service"

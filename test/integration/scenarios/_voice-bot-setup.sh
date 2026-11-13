@@ -23,7 +23,9 @@ dc exec -T -d -e "PROTOCOL=$protocol" -e "RATE=$rate" voice-bot sh -c \
 poll 30 1 dc exec -T voice-bot test -e /tmp/voice-bot/listening \
   || { echo "the voice bot never listened" >&2; exit 1; }
 
-target="{\"kind\":\"webSocket\",\"protocol\":\"$protocol\",\"url\":\"ws://voice-bot:8765/calls?token=ci\",${rate:+\"sampleRate\":$rate,}\"record\":true}"
+# Through the port compose.test.yaml publishes on the `outside` network's gateway, a host address:
+# core never connects to the stack's own `internal` network, the bot's (§3.1 "Outbound targets").
+target="{\"kind\":\"webSocket\",\"protocol\":\"$protocol\",\"url\":\"ws://10.213.48.1:8765/calls?token=ci\",${rate:+\"sampleRate\":$rate,}\"record\":true}"
 api POST /dids "{\"number\":\"+15551090\",\"target\":$target}" | jsonfield id \
   > "$(state_file inbound-forward-web-socket)"
 newest_call_id > "$(state_file recording-before)"

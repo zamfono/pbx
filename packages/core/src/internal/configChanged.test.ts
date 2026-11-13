@@ -20,6 +20,10 @@ import { peerStatusChange } from '../testing/ari/fakeChannel.js';
 import { onEvents } from '../testing/busEvents.js';
 import { eventually } from '../testing/eventually.js';
 import {
+  internalFetch,
+  TEST_INTERNAL_TOKEN
+} from '../testing/internalFetch.js';
+import {
   idleMedia,
   idlePresence,
   idleRecorder,
@@ -91,6 +95,7 @@ describe('POST /internal/configChanged and presence (§3.1, §10.2)', () => {
     });
     const started = await startInternalServer(
       {
+        token: TEST_INTERNAL_TOKEN,
         db,
         ari,
         log: noopLogger,
@@ -117,7 +122,7 @@ describe('POST /internal/configChanged and presence (§3.1, §10.2)', () => {
       .set({ dnd: 1 })
       .where('id', '=', userId)
       .execute();
-    const response = await fetch(
+    const response = await internalFetch(
       `http://127.0.0.1:${started.port}/internal/configChanged`,
       {
         method: 'POST',
@@ -161,6 +166,7 @@ describe('POST /internal/configChanged and presence (§3.1, §10.2)', () => {
     };
     const started = await startInternalServer(
       {
+        token: TEST_INTERNAL_TOKEN,
         db,
         ari,
         log: noopLogger,
@@ -185,7 +191,7 @@ describe('POST /internal/configChanged and presence (§3.1, §10.2)', () => {
     );
     close = started.close;
 
-    const response = await fetch(
+    const response = await internalFetch(
       `http://127.0.0.1:${started.port}/internal/configChanged`,
       {
         method: 'POST',

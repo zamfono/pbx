@@ -31,7 +31,8 @@ import {
   loadParams,
   repositoryAndEnv,
   toolEnv,
-  type ExecFn
+  type ExecFn,
+  type ResolveFn
 } from './backupBackends.js';
 import {
   ensureRepository,
@@ -52,6 +53,9 @@ export type Bus = {
 
 export type BackupJobDeps = {
   exec: ExecFn;
+  /** A remote target's server, checked (§3.1 "Outbound targets"); by default
+   *  `resolveBackupHost`. */
+  resolve?: ResolveFn;
   mediaDir: string;
   bus: Bus;
   now?: () => string;
@@ -122,7 +126,8 @@ export async function performBackup(
     const { repository, env, options } = await repositoryAndEnv(
       target,
       secret,
-      deps.exec
+      deps.exec,
+      deps.resolve
     );
     const fullEnv = toolEnv({
       ...env,

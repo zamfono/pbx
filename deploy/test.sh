@@ -142,9 +142,11 @@ if run_setup BOOTSTRAP_OWNER_PASSWORD_HASH= OWNER_PASSWORD=short || [ -e "$bundl
   echo "setup.sh took an OWNER_PASSWORD under 8 characters" >&2
   exit 1
 fi
-# An UNATTENDED_UPGRADES or HOST_CONTROL that is neither true nor false, and a MEDIA_STORAGE_MAX
-# api and core would refuse to start on, are refused; the apt file the first writes parses.
-for answer in UNATTENDED_UPGRADES=yes HOST_CONTROL=yes MEDIA_STORAGE_MAX=20GB MEDIA_STORAGE_MAX=0G; do
+# An UNATTENDED_UPGRADES, HOST_CONTROL or ALLOW_PRIVATE_TARGETS that is neither true nor false,
+# and a MEDIA_STORAGE_MAX api and core would refuse to start on, are refused; the apt file the
+# first writes parses.
+for answer in UNATTENDED_UPGRADES=yes HOST_CONTROL=yes MEDIA_STORAGE_MAX=20GB MEDIA_STORAGE_MAX=0G \
+  ALLOW_PRIVATE_TARGETS=no; do
   if run_setup "$answer" || [ -e "$bundle_dir/x/.env" ]; then
     echo "setup.sh took $answer" >&2
     exit 1
@@ -206,6 +208,21 @@ metrics_token=$(echo "$setup_config" | sed -nE 's/^ *METRICS_TOKEN: "?([0-9a-f]{
 }
 [ "$(grep -cF "$metrics_token" "$bundle_dir/setup.out")" = 1 ] || {
   echo "setup.sh did not print METRICS_TOKEN once" >&2
+  exit 1
+}
+# A generated 256-bit INTERNAL_TOKEN reaches api, core and proxy (§3.1), and is never printed.
+internal_token=$(echo "$setup_config" | sed -nE 's/^ *INTERNAL_TOKEN: "?([0-9a-f]{64})"?$/\1/p' | sort -u)
+[ -n "$internal_token" ] && [ "$(echo "$setup_config" | grep -cE "INTERNAL_TOKEN: \"?$internal_token")" = 3 ] || {
+  echo "setup.sh generated no 256-bit INTERNAL_TOKEN for api, core and proxy" >&2
+  exit 1
+}
+if grep -qF "$internal_token" "$bundle_dir/setup.out"; then
+  echo "setup.sh printed INTERNAL_TOKEN" >&2
+  exit 1
+fi
+# Unasked, private targets are allowed, in api and core alike (§3.1).
+[ "$(echo "$setup_config" | grep -cF 'ALLOW_PRIVATE_TARGETS: "true"')" = 2 ] || {
+  echo "setup.sh did not write ALLOW_PRIVATE_TARGETS=true for api and core" >&2
   exit 1
 }
 # A second run must refuse: the .env it would replace holds the only SECRETBOX_KEY.

@@ -30,3 +30,5 @@ export * from './ports.js';
 export * from './mfa.js';
 export * from './credentials.js';
 export * from './mediaStorage.js';
+export * from './bearer.js';
+export * from './outboundTargets.js';

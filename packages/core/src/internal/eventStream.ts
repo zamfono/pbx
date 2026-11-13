@@ -1,9 +1,12 @@
 /**
  * The internal event stream, `GET /internal/events` upgraded to a WebSocket (§3.1): every frame
- * the `EventBus` publishes, to every connected `api`.
+ * the `EventBus` publishes, to every connected `api` whose handshake carries `INTERNAL_TOKEN` as
+ * its bearer token.
  */
 import type http from 'node:http';
 import { WebSocket, WebSocketServer } from 'ws';
+
+import { isValidBearer } from '@zamfono/shared';
 
 import type { Logger } from '../ari/types.js';
 import type { EventBus } from './eventBus.js';
@@ -20,7 +23,7 @@ const MAX_FRAME_BYTES = 1024;
  */
 export function attachEventStream(
   server: http.Server,
-  deps: { bus: EventBus; log: Logger }
+  deps: { bus: EventBus; log: Logger; token: string }
 ): WebSocketServer {
   const { bus, log } = deps;
   const wss = new WebSocketServer({
@@ -51,10 +54,15 @@ export function attachEventStream(
     });
   });
   server.on('upgrade', (request, socket, head) => {
-    if (request.url === '/internal/events') {
+    if (
+      request.url === '/internal/events' &&
+      isValidBearer(request.headers.authorization, deps.token)
+    ) {
       wss.handleUpgrade(request, socket, head, upgraded => {
         wss.emit('connection', upgraded);
       });
+    } else if (request.url === '/internal/events') {
+      socket.end('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n');
     } else {
       socket.destroy();
     }

@@ -10,9 +10,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, vi } from 'vitest';
 
-// `FQDN`, `SECRETBOX_KEY` (a fixed 32-byte test key) and the ports mode's public address, a
-// documentation-range one, which `api` requires and `.env` always has (§6.3 "Environment").
+// `FQDN`, `SECRETBOX_KEY` (a fixed 32-byte test key), `INTERNAL_TOKEN` and the ports mode's
+// public address, a documentation-range one, which `api` requires and `.env` always has (§6.3
+// "Environment").
 process.env.FQDN ??= 'pbx.test';
+process.env.INTERNAL_TOKEN ??= 'test-internal-token';
 process.env.SECRETBOX_KEY ??= '1:BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=';
 process.env.EXTERNAL_IPV4 ??= '192.0.2.10';
 

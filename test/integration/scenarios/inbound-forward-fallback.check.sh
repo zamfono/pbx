@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# §10.1 step 7 "Fallback and ring timeout": the bot's socket did not open
-# (inbound-forward-fallback.setup.sh), so the call went to the target's fallback, the external
+# §10.1 step 7 "Fallback and ring timeout": the bot's socket was refused, its address loopback
+# (inbound-forward-fallback.setup.sh, §3.1 "Outbound targets"), so the call went to the target's fallback, the external
 # number, and was answered over the trunk: the trunk side received one INVITE to it, and the trace
 # names the bot's failure and the fallback taken, with no 503 release.
 set -euo pipefail
@@ -30,10 +30,10 @@ lines = trace(call)
 problems = []
 if call["status"] != "answered":
     problems.append("the call ended " + call["status"] + ", not answered")
-if not [l for l in lines if l.get("event") == "webSocket" and l.get("cause") == "connectFailed"]:
-    problems.append("no webSocket connectFailed line")
+if not [l for l in lines if l.get("event") == "webSocket" and l.get("cause") == "forbiddenAddress"]:
+    problems.append("no webSocket forbiddenAddress line")
 if not [l for l in lines if l.get("event") == "fallback" and l.get("from") == "webSocket"
-        and l.get("cause") == "connectFailed" and l.get("to") == "external"]:
+        and l.get("cause") == "forbiddenAddress" and l.get("to") == "external"]:
     problems.append("no fallback line from the bot to the external number")
 if [l for l in lines if l.get("event") == "release" and l.get("code") == 503]:
     problems.append("the call was released with 503")
