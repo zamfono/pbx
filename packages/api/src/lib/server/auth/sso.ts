@@ -27,7 +27,8 @@ type FinishLoginFailure =
   | 'domain'
   | 'noUser'
   | 'subMismatch'
-  | 'noPassword';
+  | 'noPassword'
+  | 'ownerUnbound';
 
 type FinishLoginResult =
   { ok: true; userId: string } | { ok: false; reason: FinishLoginFailure };

@@ -79,6 +79,7 @@
     "expired": "Ten link wygasł. Spróbuj ponownie.",
     "noUser": "Nie znaleziono konta pasującego do tych danych logowania.",
     "noPassword": "Najpierw ustaw hasło przez otrzymany link, a potem się zaloguj.",
+    "ownerUnbound": "To konto nie jest powiązane z pojedynczym logowaniem (SSO). Zaloguj się hasłem.",
     "domain": "Logowanie z Twojej domeny e-mail nie jest tutaj dozwolone.",
     "unverifiedEmail": "Twój dostawca tożsamości nie zweryfikował tego adresu e-mail.",
     "issuer": "Dane logowania pochodzą od niewłaściwego dostawcy tożsamości.",

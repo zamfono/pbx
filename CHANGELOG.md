@@ -66,6 +66,13 @@ why the specified behaviour changed; the commit history, how.
 
 ### Security
 
+- An SSO login no longer binds to an owner by e-mail, for any provider: the customer's identity
+  provider administrator could create an account with an owner's address and, on its first SSO
+  login, take the owner's account over without the owner's second factor. Such a login is now
+  refused and logged, and the error page tells the owner to sign in with their password. An
+  owner whose SSO login is already bound keeps signing in by SSO until a change of provider,
+  issuer or tenant clears the binding; admins and users bind by e-mail as before.
+
 - A user who took part in a call no longer reads its SIP messages' secrets in `GET /calls/{id}`'s
   `log`: the values of `X-` headers (such as an API key set on a `sip` target), `Authorization`
   and `Proxy-Authorization` headers (a trunk's digest response) and the SDP `a=crypto` lines (the

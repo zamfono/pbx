@@ -31,4 +31,8 @@ describe('the error page (§5.2 "Authentication pages")', () => {
   it('tells an owner refused at SSO login to set their password first', () => {
     expect(bodyFor('?reason=noPassword')).toContain(dict.error.noPassword);
   });
+
+  it('tells an owner refused an SSO binding by e-mail to sign in with their password', () => {
+    expect(bodyFor('?reason=ownerUnbound')).toContain(dict.error.ownerUnbound);
+  });
 });

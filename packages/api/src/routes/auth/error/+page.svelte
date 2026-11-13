@@ -17,6 +17,7 @@
       expired: dict.expired,
       noUser: dict.noUser,
       noPassword: dict.noPassword,
+      ownerUnbound: dict.ownerUnbound,
       domain: dict.domain,
       unverifiedEmail: dict.unverifiedEmail,
       issuer: dict.issuer,

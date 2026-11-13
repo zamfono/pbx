@@ -219,6 +219,35 @@ describe('GET /oauth/callback', () => {
     expect(securitySession(cookie)).toMatchObject({ userId: 'user-1' });
   });
 
+  it('sends an owner refused an SSO binding by e-mail to the error page that names it (§5.2 "SSO rules")', async () => {
+    ssoConfigFromSettingsMock.mockResolvedValue({
+      provider: 'microsoft',
+      issuer: 'https://login.microsoftonline.com/tenant-a/v2.0',
+      clientId: 'idp-client',
+      clientSecret: null,
+      tenantId: 'tenant-a',
+      allowedDomain: null,
+      label: 'Microsoft'
+    });
+    discoverMock.mockResolvedValue({
+      authorizationEndpoint: 'https://idp.example.com/authorize',
+      tokenEndpoint: 'https://idp.example.com/token',
+      jwksUri: 'https://idp.example.com/jwks',
+      issuer: 'https://login.microsoftonline.com/tenant-a/v2.0'
+    });
+    finishLoginMock.mockResolvedValue({ ok: false, reason: 'ownerUnbound' });
+    const cookie = sealedLogin({
+      state: 'state-1',
+      nonce: 'nonce-1',
+      codeVerifier: 'verifier-1',
+      authorizeParams: null
+    });
+    const err = await GET(
+      eventFor('state=state-1&code=auth-code', cookie)
+    ).catch((caught: unknown) => caught);
+    expect(errorReasonOf(err)).toBe('ownerUnbound');
+  });
+
   it('fails as a server error, not as an expired link, while SECRETBOX_KEY is malformed', async () => {
     const cookie = sealedLogin({
       state: 'state-1',

@@ -13,7 +13,12 @@ export type SsoAccountResult =
   | { ok: true; userId: string }
   | {
       ok: false;
-      reason: 'noUser' | 'unverifiedEmail' | 'subMismatch' | 'noPassword';
+      reason:
+        | 'noUser'
+        | 'unverifiedEmail'
+        | 'subMismatch'
+        | 'noPassword'
+        | 'ownerUnbound';
     };
 
 /** A matched user `mayLogIn` refuses: an owner who has not set their password yet (§5.2). */
@@ -32,6 +37,10 @@ export type SsoClaims = {
  * whatever the e-mail; otherwise only a vouched e-mail counts, and an unbound live user with that
  * e-mail is bound to `sub` on first login; an e-mail already bound to a different `sub` is refused
  * and logged, never silently re-bound. A matched user `mayLogIn` refuses is `noPassword`, unbound.
+ * An e-mail never binds an owner, whatever the provider: the customer's IdP admin, an admin here,
+ * could otherwise create an account with an owner's address and take the owner over past the
+ * second factor (§5.2). An unbound owner is refused as `ownerUnbound`, logged, and signs in with
+ * their password; one already bound by `sub` keeps signing in by SSO.
  *
  * The select-then-bind runs in one transaction, and the bind's own `WHERE` re-checks
  * `sso_subject IS NULL` rather than trusting the `SELECT` above it: `users_sso_subject` is a
@@ -71,6 +80,13 @@ export async function matchSsoAccount(
     if (unbound) {
       if (!mayLogIn(unbound)) {
         return NO_PASSWORD;
+      }
+      if (unbound.role === 'owner') {
+        logger.warn(
+          { userId: unbound.id, sub },
+          'sso: owner not bound by e-mail'
+        );
+        return { ok: false, reason: 'ownerUnbound' };
       }
       const { numUpdatedRows } = await trx
         .updateTable('users')

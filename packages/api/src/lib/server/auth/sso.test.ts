@@ -128,7 +128,12 @@ function oidcConfig(overrides: Partial<SsoConfig> = {}): SsoConfig {
 
 async function insertUser(
   db: Db,
-  fields: { id: string; email: string; ssoSubject?: string | null }
+  fields: {
+    id: string;
+    email: string;
+    ssoSubject?: string | null;
+    role?: 'owner' | 'admin' | 'user';
+  }
 ): Promise<void> {
   await db
     .insertInto('users')
@@ -137,6 +142,9 @@ async function insertUser(
       name: fields.id,
       email: fields.email,
       ssoSubject: fields.ssoSubject ?? null,
+      role: fields.role ?? 'user',
+      // An owner without a password is refused as `noPassword` before anything else (§5.2).
+      passwordHash: fields.role === 'owner' ? 'hash' : null,
       createdAt: nowIso()
     })
     .execute();
@@ -450,6 +458,104 @@ describe('finishLogin', () => {
     );
     expect(result).toEqual({ ok: true, userId: 'carol' });
   });
+
+  // §5.2 "SSO rules": an e-mail never binds an owner, whatever the provider; the customer's IdP
+  // admin could otherwise mint an account with an owner's address.
+  const MICROSOFT = {
+    provider: 'microsoft',
+    issuer: 'https://login.microsoftonline.com/tenant-a/v2.0',
+    tenantId: 'tenant-a',
+    allowedDomain: 'customer.example'
+  } as const;
+  const PROVIDERS: [string, SsoConfig, TestClaims][] = [
+    [
+      'microsoft',
+      oidcConfig(MICROSOFT),
+      { sub: 'sub-1', preferredUsername: 'olga@customer.example' }
+    ],
+    [
+      'google',
+      oidcConfig(GOOGLE),
+      {
+        sub: 'sub-1',
+        email: 'olga@customer.example',
+        emailVerified: true,
+        hd: 'customer.example'
+      }
+    ],
+    [
+      'oidc',
+      oidcConfig(),
+      { sub: 'sub-1', email: 'olga@customer.example', emailVerified: true }
+    ]
+  ];
+
+  it.each(PROVIDERS)(
+    'refuses an unbound owner matched by e-mail (%s), binding nothing',
+    async (_name, cfg, claims) => {
+      const db = await makeTestDb();
+      await insertUser(db, {
+        id: 'olga',
+        email: 'olga@customer.example',
+        role: 'owner'
+      });
+      expect(await loginWith(db, cfg, claims)).toEqual({
+        ok: false,
+        reason: 'ownerUnbound'
+      });
+      const row = await db
+        .selectFrom('users')
+        .select('ssoSubject')
+        .where('id', '=', 'olga')
+        .executeTakeFirstOrThrow();
+      expect(row.ssoSubject).toBeNull();
+    }
+  );
+
+  it.each(PROVIDERS)(
+    'signs in an owner already bound by sub (%s)',
+    async (_name, cfg, claims) => {
+      const db = await makeTestDb();
+      await insertUser(db, {
+        id: 'olga',
+        email: 'olga@customer.example',
+        role: 'owner',
+        ssoSubject: 'sub-1'
+      });
+      expect(await loginWith(db, cfg, claims)).toEqual({
+        ok: true,
+        userId: 'olga'
+      });
+    }
+  );
+
+  it.each(
+    PROVIDERS.flatMap(([name, cfg, claims]) =>
+      (['admin', 'user'] as const).map(
+        role => [name, role, cfg, claims] as const
+      )
+    )
+  )(
+    'binds an unbound %s %s by a vouched e-mail on first login',
+    async (_name, role, cfg, claims) => {
+      const db = await makeTestDb();
+      await insertUser(db, {
+        id: 'olga',
+        email: 'olga@customer.example',
+        role
+      });
+      expect(await loginWith(db, cfg, claims)).toEqual({
+        ok: true,
+        userId: 'olga'
+      });
+      const row = await db
+        .selectFrom('users')
+        .select('ssoSubject')
+        .where('id', '=', 'olga')
+        .executeTakeFirstOrThrow();
+      expect(row.ssoSubject).toBe('sub-1');
+    }
+  );
 
   it('reports "audience" for an id_token issued for a different client', async () => {
     const db = await makeTestDb();
