@@ -66,6 +66,11 @@ why the specified behaviour changed; the commit history, how.
 
 ### Security
 
+- A user who took part in a call no longer reads its SIP messages' secrets in `GET /calls/{id}`'s
+  `log`: the values of `X-` headers (such as an API key set on a `sip` target), `Authorization`
+  and `Proxy-Authorization` headers (a trunk's digest response) and the SDP `a=crypto` lines (the
+  SRTP keys) read `***` for a user; admins and owners still see the full log.
+
 - Anyone could make `api` hold 50 MB in memory per request, without a token, through the
   upload page's form, which `api` read whole before it checked the link inside it; many such
   requests at once could take `api`, or the host, down. A submission of that form is now refused

@@ -59,8 +59,9 @@ arguments:
    `jitterMs` and `lossPct` null for a leg that received nothing and whose far end never
    reported, as one-way audio can leave it, and the packets the leg received from its far end and
    sent to it, `rxPackets` and `txPackets`) or
-   `sip` (adds the SIP messages themselves, HEP-mirrored from Asterisk) rather than raising it
-   tenant-wide. An override without an explicit expiry lapses automatically after 7 days.
+   `sip` (adds the SIP messages themselves, HEP-mirrored from Asterisk; a `user` reads the values
+   of their `X-`, `Authorization` and `Proxy-Authorization` headers and their `a=crypto` lines as
+   `***`) rather than raising it tenant-wide. An override without an explicit expiry lapses automatically after 7 days.
    - `rxPackets: 0` on a leg of an answered call means no audio ever arrived from that side: its
      RTP was dropped on the way, usually by NAT or a firewall on the device's side, or it was sent
      to a wrong address. At level `sip`, check the `c=` line of the SDP that side sent: a private

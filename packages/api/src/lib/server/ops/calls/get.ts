@@ -10,6 +10,7 @@ import {
   toCallOut,
   type CallRow
 } from './_shared.js';
+import { redactLog } from './redactLog.js';
 
 /** One `call_qos` row, the per-leg RTCP summary of a call at diagnostics level `qos` (§7, §11.2).
  * `rxPackets` and `txPackets` are the packets the leg's RTP instance received from the peer and
@@ -52,7 +53,8 @@ async function endedCall(ctx: Context, id: string): Promise<CallRow> {
 
 /**
  * The §7 diagnostics of call `row`, the `calls.log` JSON lines written at call end and the
- * `call_qos` rows of its legs, and its ended direct children, for a `user` only their own.
+ * `call_qos` rows of its legs, and its ended direct children, for a `user` only their own and
+ * the log's SIP secrets redacted (`redactLog`).
  */
 async function callDetail(
   ctx: Context,
@@ -84,7 +86,10 @@ async function callDetail(
   const childRows = await children.orderBy('startedAt').orderBy('id').execute();
   return {
     ...toCallOut(row),
-    log: row.log,
+    log:
+      ctx.actor.role === 'user' && row.log !== null
+        ? redactLog(row.log)
+        : row.log,
     qos,
     childCallIds: childRows.map(child => child.id)
   };

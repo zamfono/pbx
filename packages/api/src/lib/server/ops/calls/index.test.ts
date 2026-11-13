@@ -430,6 +430,61 @@ describe('calls', () => {
     ]);
   });
 
+  it('GET /calls/{id} redacts the SIP secrets for a user who took part, not for an admin (§10.3 "Call history")', async () => {
+    const db = await makeTestDb();
+    await seedUser(db, { id: anna.id, name: anna.id });
+    await seedUser(db, { id: 'a1', name: 'a1', role: 'admin' });
+    const callId = await seedCall(db, { callerUserId: anna.id });
+    const invite = [
+      'INVITE sip:agent@ai.example SIP/2.0',
+      'X-API-Key: sk-live-123',
+      'Proxy-Authorization: Digest username="wholesale", response="d1g3st"',
+      'Content-Type: application/sdp',
+      '',
+      'v=0',
+      'a=crypto:1 AES_CM_128_HMAC_SHA1_80 inline:SRTPKEY0123456789',
+      ''
+    ].join('\r\n');
+    const log = [
+      JSON.stringify({ callId, event: 'entry' }),
+      JSON.stringify({ callId, at: nowIso(), direction: 'out', raw: invite })
+    ].join('\n');
+    await db
+      .updateTable('calls')
+      .set({ log })
+      .where('id', '=', callId)
+      .execute();
+    const read = async (actor: Actor): Promise<string> => {
+      const response = await handleRest(
+        new Request(`http://pbx.test/api/v1/calls/${callId}`),
+        actor,
+        { db, requestId: 'req-1' }
+      );
+      expect(response.status).toBe(200);
+      return ((await response.json()) as { log: string }).log;
+    };
+
+    const asUser = await read(anna);
+    for (const secret of ['sk-live-123', 'wholesale', 'd1g3st', 'SRTPKEY']) {
+      expect(asUser).not.toContain(secret);
+    }
+    const [entry, sip] = asUser.split('\n');
+    expect(entry).toBe(JSON.stringify({ callId, event: 'entry' }));
+    expect((JSON.parse(sip ?? '') as { raw: string }).raw).toBe(
+      [
+        'INVITE sip:agent@ai.example SIP/2.0',
+        'X-API-Key: ***',
+        'Proxy-Authorization: ***',
+        'Content-Type: application/sdp',
+        '',
+        'v=0',
+        'a=crypto:***',
+        ''
+      ].join('\r\n')
+    );
+    expect(await read({ id: 'a1', name: 'a1', role: 'admin' })).toBe(log);
+  });
+
   it("calls.get refuses a user another user's call, with 403", async () => {
     const db = await makeTestDb();
     await seedUser(db, { id: anna.id, name: anna.id });
