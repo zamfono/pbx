@@ -75,6 +75,7 @@ function stubCore(): StubCoreClient {
           presence: {},
           registeredDevices: 0,
           recordingMixFailures: 0,
+          recordingsRefused: 0,
           asteriskChannels: client.liveCalls.length,
           recordingsInProgress: 0
         })

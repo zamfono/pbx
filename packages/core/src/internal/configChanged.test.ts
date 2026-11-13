@@ -20,6 +20,7 @@ import { peerStatusChange } from '../testing/ari/fakeChannel.js';
 import { onEvents } from '../testing/busEvents.js';
 import { eventually } from '../testing/eventually.js';
 import {
+  idleMedia,
   idlePresence,
   idleRecorder,
   idleTrunks,
@@ -99,6 +100,7 @@ describe('POST /internal/configChanged and presence (§3.1, §10.2)', () => {
         actions: testActions(ari, db),
         presence,
         recorder: idleRecorder,
+        media: idleMedia,
         trunks: idleTrunks,
         version: resolveVersion({}),
         sessions: { resolve: () => null }
@@ -168,6 +170,7 @@ describe('POST /internal/configChanged and presence (§3.1, §10.2)', () => {
         actions: testActions(ari, db),
         presence: idlePresence(),
         recorder: idleRecorder,
+        media: idleMedia,
         trunks: {
           ...idleTrunks,
           refreshMonitoring: () => {

@@ -11,8 +11,29 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+### Added
+
+- `MEDIA_STORAGE_MAX` in `.env` limits the media volume, so that on a host running several stacks
+  one customer cannot fill the disk: bytes with an optional `K`, `M`, `G` or `T`, e.g. `20G`;
+  empty, the default, is no limit, and a malformed value stops `api` and `core` at start. It counts
+  the space the volume's files take on disk, not their lengths. At or over it uploads (`POST /audio`, `PUT /users/{id}/voicemailGreeting`, upload links) answer 507,
+  an upload that would take the volume over it is refused with 507 after transcoding and its
+  files deleted, no new call recording starts (the call goes on unrecorded, logged and counted in
+  `zamfono_recordings_refused_total`) and no voicemail message is taken (the caller hears the
+  mailbox is full; the call is missed). No greeting is recorded on the phone: the
+  caller hears that the mailbox is full, and the greeting stays. A recording, message or greeting
+  in progress finishes. `/metrics`
+  reports `zamfono_media_bytes` and, with a limit, `zamfono_media_limit_bytes`; the full
+  `/healthz` warns with `media:storage` while the volume is at or over it. Deleting voicemail or
+  recordings frees space at once; deleted uploaded audio keeps its files until the purge
+  `settings.soft_delete_retention_days` later. `setup.sh` asks for it; on an existing stack
+  `update.sh` lists it as a new setting, unset, which is no limit.
+
 ### Changed
 
+- `setup.sh` generates a random 256-bit `METRICS_TOKEN`, which turns `/metrics` and the full
+  `/healthz` on behind it, and prints it once; `update.sh` gives a stack whose `.env` has none, or
+  an empty one, a generated token, written only to `.env`, and never replaces one that is set.
 - The operator's own Compose overlay, for continuous replication, a backup disk or anything else
   added to the stack, is `compose.local.yaml`; `update.sh`, the Podman boot unit and
   `setup/compose.sh` no longer read `compose.dr.yaml`.

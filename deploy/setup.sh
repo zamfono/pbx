@@ -52,6 +52,8 @@ v_port() { [[ $1 =~ ^[0-9]+$ ]] && (($1 >= 1 && $1 <= 65535)); }
 v_mode() { [[ $1 == ports || $1 == macvlan ]]; }
 v_security() { [[ $1 == tls || $1 == starttls ]]; }
 v_bool() { [[ $1 == true || $1 == false ]]; }
+# MEDIA_STORAGE_MAX as api and core read it (§11.6): empty, or a positive size with K, M, G or T.
+v_size() { [[ -z $1 ]] || { [[ $1 =~ ^[0-9]+[KMGT]?$ ]] && [[ ${1%[KMGT]} =~ [1-9] ]]; }; }
 v_rtp_start() { v_port "$1" && (($1 >= 1024)); }
 # Above the start (RTP_PORT_START, or the second argument), and clear of the other UDP ports in
 # the stack's namespace: STUN and SIP.
@@ -269,6 +271,7 @@ main() {
   COUNTRY=${COUNTRY^^}
   ask EXT_LENGTH v_extlen "Extension length" "Digits per internal extension (at least 2)." 3
   ask TZ v_tz "Time zone" "The stack's IANA time zone, e.g. Europe/Berlin." "$(detect_tz)"
+  ask MEDIA_STORAGE_MAX v_size "Media storage limit" "The most the stack's recordings, voicemail and uploads may take, e.g. 20G; empty for none."
   ask BOOTSTRAP_OWNER_NAME v_nonempty "Owner name" "The first owner's full name."
   ask BOOTSTRAP_OWNER_EMAIL v_email "Owner email" "The first owner's email address, also the login."
   ask_mail
@@ -282,9 +285,10 @@ main() {
   : "${AMI_PASSWORD:=$(random_hex)}"
   : "${BACKUP_PASSWORD:=$(random_hex)}"
   : "${UPDATER_TOKEN:=$(random_hex)}"
+  : "${METRICS_TOKEN:=$(random_hex 32)}"
 
   if [[ -n $interactive ]]; then
-    ui_yesno "Write .env with these values?\n\nMode: $ZAMFONO_MODE ($address)\nHost name: $FQDN\nCompany: $COMPANY_NAME\nMain number: $MAIN_DID ($COUNTRY)\nOwner: $BOOTSTRAP_OWNER_NAME <$BOOTSTRAP_OWNER_EMAIL>\nMail relay: ${SMTP_HOST:-none}\nSIP over UDP: ${SIP_UDP_ENABLED:-true}, over TCP: ${SIP_TCP_ENABLED:-true}, STUN: ${STUN_ENABLED:-true}\nRTP: ${RTP_PORT_START:-10000}-${RTP_PORT_END:-10200}/udp\nHost upgrades: $UNATTENDED_UPGRADES, owners control the host: $HOST_CONTROL" Write Abort ||
+    ui_yesno "Write .env with these values?\n\nMode: $ZAMFONO_MODE ($address)\nHost name: $FQDN\nCompany: $COMPANY_NAME\nMain number: $MAIN_DID ($COUNTRY)\nOwner: $BOOTSTRAP_OWNER_NAME <$BOOTSTRAP_OWNER_EMAIL>\nMail relay: ${SMTP_HOST:-none}\nSIP over UDP: ${SIP_UDP_ENABLED:-true}, over TCP: ${SIP_TCP_ENABLED:-true}, STUN: ${STUN_ENABLED:-true}\nRTP: ${RTP_PORT_START:-10000}-${RTP_PORT_END:-10200}/udp\nMedia storage limit: ${MEDIA_STORAGE_MAX:-none}\nHost upgrades: $UNATTENDED_UPGRADES, owners control the host: $HOST_CONTROL" Write Abort ||
       { echo "Setup aborted; nothing was written." >&2; exit 1; }
   fi
 
@@ -292,12 +296,14 @@ main() {
     BACKUP_PASSWORD UPDATER_TOKEN SMTP_HOST SMTP_PORT SMTP_SECURITY SMTP_USER \
     SMTP_PASSWORD MAIL_FROM BOOTSTRAP_OWNER_EMAIL BOOTSTRAP_OWNER_NAME BOOTSTRAP_OWNER_PASSWORD_HASH \
     COMPANY_NAME MAIN_DID COUNTRY EXT_LENGTH TZ SIP_UDP_ENABLED SIP_TCP_ENABLED STUN_ENABLED \
-    RTP_PORT_START RTP_PORT_END HOST_CONTROL
+    RTP_PORT_START RTP_PORT_END HOST_CONTROL METRICS_TOKEN MEDIA_STORAGE_MAX
   ln -sfn "$overlay" compose.override.yaml
 
   echo "Wrote $PWD/.env (readable by root only), and linked compose.override.yaml to $overlay."
   echo "Keep a copy of it off this host: SECRETBOX_KEY is the only way to read the encrypted data,"
   echo "and BACKUP_PASSWORD the only way to open the local backups."
+  echo "METRICS_TOKEN, the bearer token of https://$FQDN/metrics and the full /healthz, is"
+  echo "  $METRICS_TOKEN"
   check_dns "$FQDN" "$address"
   if [[ $ZAMFONO_MODE == ports ]]; then
     check_ports_free

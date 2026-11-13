@@ -12,7 +12,7 @@ import { handleRest } from '#lib/server/rest.js';
 import { makeTestDb } from '#testing/testDb.js';
 
 import { runOperation, type RunInput } from '../runner.js';
-import { type Actor } from '../types.js';
+import { OpError, type Actor } from '../types.js';
 
 import './index.js';
 
@@ -169,6 +169,23 @@ describe('users.setVoicemailGreeting and users.clearVoicemailGreeting', () => {
       )
     ).rejects.toMatchObject({ status: 422 });
     expect(storeAudio).not.toHaveBeenCalled();
+  });
+
+  it('answers 507 while the media volume is at its limit, keeping the greeting it had (§11.6)', async () => {
+    const db = await makeTestDb();
+    await seedUsers(db);
+    vi.mocked(storeAudio).mockRejectedValueOnce(
+      new OpError(507, 'upload: the media volume is at its limit')
+    );
+    await expect(
+      runOperation(
+        db,
+        'users.setVoicemailGreeting',
+        { id: 'anna', upload },
+        as(anna)
+      )
+    ).rejects.toMatchObject({ status: 507 });
+    await expect(greetingOf(db, 'anna')).resolves.toBeNull();
   });
 
   it('clears back to the default prompt only once confirmed, deleting the greeting and its files', async () => {

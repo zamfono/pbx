@@ -1,6 +1,10 @@
 import { z } from 'zod';
 
-import { HTTP_NOT_FOUND, retireGreeting } from '@zamfono/shared';
+import {
+  HTTP_INSUFFICIENT_STORAGE,
+  HTTP_NOT_FOUND,
+  retireGreeting
+} from '@zamfono/shared';
 
 import { storeUpload } from '../audio/_shared.js';
 import { uploadSchema } from '../audio/create.js';
@@ -31,7 +35,7 @@ export const setVoicemailGreeting = defineOperation({
     })
     .strict(),
   output: z.object({ id: z.string(), mailboxAudioId: z.string() }),
-  problems: [HTTP_NOT_FOUND],
+  problems: [HTTP_NOT_FOUND, HTTP_INSUFFICIENT_STORAGE],
   minRole: 'user',
   scope: ownUserId,
   audit: false,

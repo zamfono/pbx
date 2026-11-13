@@ -53,4 +53,12 @@ describe('src/env.ts', () => {
     expect(read('TLS_RELOAD_HOUR', '24')).toBeUndefined();
     expect(read('TLS_RELOAD_HOUR', 'x')).toBeUndefined();
   });
+
+  it('reads MEDIA_STORAGE_MAX in bytes, unset as no limit, and refuses a malformed one (§6.3)', () => {
+    expect(read('MEDIA_STORAGE_MAX', '')).toBeNull();
+    expect(read('MEDIA_STORAGE_MAX', '20G')).toBe(20 * 1024 ** 3);
+    expect(() => read('MEDIA_STORAGE_MAX', '20 GB')).toThrow(
+      /MEDIA_STORAGE_MAX/u
+    );
+  });
 });

@@ -1,12 +1,13 @@
 /**
  * `GET /metrics` (§7 "Metrics"): Prometheus text exposition of active calls, registered
  * devices, trunk registration and capacity, ARI connection state, API request latency,
- * database size, backup freshness, recording-mix failures, certificate-sync status, config
+ * database size, media volume usage and limit, backup freshness, recording-mix failures, certificate-sync status, config
  * propagation, SIP bans and what is known of updates.
  */
 import { stat } from 'node:fs/promises';
 
 import {
+  mediaUsageBytes,
   MS_PER_SECOND,
   SIP_BAN_PROTOCOLS,
   type Db,
@@ -29,6 +30,9 @@ import { countSipBansInForce, sipBanHelperState } from './sipBanList.js';
 export type MetricsDeps = {
   db: Db;
   dbFile: string;
+  mediaDir: string;
+  /** `MEDIA_STORAGE_MAX` in bytes, `null` without a limit (§11.6). */
+  mediaStorageMax: number | null;
   checkAri: () => Promise<boolean>;
   coreState: () => Promise<StateResponse>;
   certSyncStatus: () => CertSyncStatus;
@@ -102,6 +106,28 @@ async function sipBanLines(db: Db): Promise<string[]> {
             ))
       ];
     })
+  ];
+}
+
+/**
+ * §11.6 "Media storage limit": the bytes on the media volume, and the limit while there is one;
+ * without one `zamfono_media_limit_bytes` is left out, not 0, which an alert comparing the two
+ * would read as a volume always over it. Then the recordings `core` refused at the limit, left out
+ * without a reading from `core` like a mix failure.
+ */
+async function mediaLines(
+  deps: MetricsDeps,
+  state: StateResponse | null
+): Promise<string[]> {
+  return [
+    ...gaugeLines('zamfono_media_bytes', await mediaUsageBytes(deps.mediaDir)),
+    ...(deps.mediaStorageMax === null
+      ? []
+      : gaugeLines('zamfono_media_limit_bytes', deps.mediaStorageMax)),
+    '# TYPE zamfono_recordings_refused_total counter',
+    ...(state === null
+      ? []
+      : [`zamfono_recordings_refused_total ${state.recordingsRefused}`])
   ];
 }
 
@@ -239,6 +265,7 @@ export async function renderMetrics(deps: MetricsDeps): Promise<string> {
     ...gaugeLines('zamfono_ari_connected', ariConnected ? 1 : 0),
     ...apiRequestHistogramLines(),
     ...gaugeLines('zamfono_db_bytes', await dbSizeBytes(deps.dbFile)),
+    ...(await mediaLines(deps, state)),
     ...(await backupAgeLines(deps.db, now)),
     ...gaugeLines(
       'zamfono_certificate_sync_ok',

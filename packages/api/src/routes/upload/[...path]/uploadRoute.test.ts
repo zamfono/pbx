@@ -7,8 +7,10 @@ import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { epochSeconds, newId, nowIso } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
+import { storeAudio } from '#lib/server/audio/store.js';
 import { encodeLinkToken } from '#lib/server/auth/jwt.js';
 import { getDb } from '#lib/server/db.js';
+import { OpError } from '#lib/server/ops/types.js';
 import { requestEvent } from '#testing/requestEvent.js';
 
 import { POST } from './+server.js';
@@ -144,6 +146,17 @@ describe('POST <upload link> (§10.5 "Uploads")', () => {
     expect(response.status).toBe(200);
     expect(response.headers.get('cache-control')).toBe('private');
     expect(await response.json()).toMatchObject({ kind: 'moh', label: 'Hold' });
+  });
+
+  it('answers 507 while the media volume is at its limit (§11.6)', async () => {
+    vi.mocked(storeAudio).mockRejectedValueOnce(
+      new OpError(507, 'upload: the media volume is at its limit')
+    );
+    const response = await post(await uploadUrl('/api/v1/audio'));
+    expect(response.status).toBe(507);
+    expect(response.headers.get('content-type')).toBe(
+      'application/problem+json'
+    );
   });
 
   it('answers a token signed for another path with 401', async () => {

@@ -38,17 +38,23 @@ function folderCounts(session: MailboxSession): {
   return { newCount, oldCount: session.messages.length - newCount };
 }
 
-/** `0`: the greeting's instructions and tone, the recording, and "your message has been saved". */
+/** `0`: the greeting's instructions and tone, the recording, and "your message has been saved";
+ * at `MEDIA_STORAGE_MAX` the mailbox-full prompt `recordGreeting` plays instead (§11.6). */
 async function recordGreetingStep(session: MailboxSession): Promise<void> {
   const { pipeline, call, owner } = session;
-  const saved = await recordGreeting(
+  const outcome = await recordGreeting(
     pipeline,
     call,
     owner,
     promptMedia('recordGreeting')
   );
-  call.log.event({ event: 'mailboxGreeting', saved });
-  if (!sessionOver(session)) {
+  const saved = outcome === 'saved';
+  call.log.event(
+    outcome === 'mediaFull'
+      ? { event: 'mailboxGreeting', saved, reason: 'mediaFull' }
+      : { event: 'mailboxGreeting', saved }
+  );
+  if (outcome !== 'mediaFull' && !sessionOver(session)) {
     await sayPrompt(session, saved ? 'saved' : 'sorry');
   }
 }

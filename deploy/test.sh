@@ -107,7 +107,7 @@ run_setup() {
     FQDN=pbx.example.com COMPANY_NAME="O'Brien & \$ons" MAIN_DID=+4930123456 COUNTRY=de \
     BOOTSTRAP_OWNER_NAME=Owner BOOTSTRAP_OWNER_EMAIL=owner@example.com \
     BOOTSTRAP_OWNER_PASSWORD_HASH='$argon2id$v=19$m=65536,p=4,t=3$c2FsdA$aGFzaA' \
-    "$@" ./setup.sh </dev/null >/dev/null 2>&1)
+    "$@" ./setup.sh </dev/null >"$bundle_dir/setup.out" 2>&1)
 }
 # Without the owner's password or its hash, a relay notwithstanding, nothing is written.
 if run_setup BOOTSTRAP_OWNER_PASSWORD_HASH= SMTP_HOST=smtp.example.com MAIL_FROM=pbx@example.com \
@@ -142,9 +142,9 @@ if run_setup BOOTSTRAP_OWNER_PASSWORD_HASH= OWNER_PASSWORD=short || [ -e "$bundl
   echo "setup.sh took an OWNER_PASSWORD under 8 characters" >&2
   exit 1
 fi
-# An UNATTENDED_UPGRADES or HOST_CONTROL that is neither true nor false is refused; the apt file
-# the first writes parses.
-for answer in UNATTENDED_UPGRADES=yes HOST_CONTROL=yes; do
+# An UNATTENDED_UPGRADES or HOST_CONTROL that is neither true nor false, and a MEDIA_STORAGE_MAX
+# api and core would refuse to start on, are refused; the apt file the first writes parses.
+for answer in UNATTENDED_UPGRADES=yes HOST_CONTROL=yes MEDIA_STORAGE_MAX=20GB MEDIA_STORAGE_MAX=0G; do
   if run_setup "$answer" || [ -e "$bundle_dir/x/.env" ]; then
     echo "setup.sh took $answer" >&2
     exit 1
@@ -181,7 +181,7 @@ for line in 'SIP_UDP_ENABLED: "false"' 'SIP_TCP_ENABLED: "true"' 'STUN_ENABLED: 
   }
 done
 rm -f "$bundle_dir/x/.env" "$bundle_dir/x/compose.override.yaml"
-run_setup TZ=Europe/Vienna
+run_setup TZ=Europe/Vienna MEDIA_STORAGE_MAX=20G
 [ "$(stat -c %a "$bundle_dir/x/.env")" = 600 ]
 # The mode's overlay is linked as compose.override.yaml, which a plain `compose` reads.
 [ "$(readlink "$bundle_dir/x/compose.override.yaml")" = compose.ports.yaml ]
@@ -196,6 +196,18 @@ echo "$setup_config" | grep -qF 'TZ: Europe/Vienna'
 echo "$setup_config" | grep -qE 'SECRETBOX_KEY: "?1:'
 echo "$setup_config" | grep -qE 'BACKUP_PASSWORD: "?[0-9a-f]{48}'
 echo "$setup_config" | grep -qF 'source: backups'
+# The media storage limit reaches api and core (§11.6).
+[ "$(echo "$setup_config" | grep -cF 'MEDIA_STORAGE_MAX: 20G')" = 2 ]
+# A generated 256-bit METRICS_TOKEN reaches api and proxy, and setup.sh printed it once.
+metrics_token=$(echo "$setup_config" | sed -nE 's/^ *METRICS_TOKEN: "?([0-9a-f]{64})"?$/\1/p' | sort -u)
+[ -n "$metrics_token" ] && [ "$(echo "$setup_config" | grep -cE "METRICS_TOKEN: \"?$metrics_token")" = 2 ] || {
+  echo "setup.sh generated no 256-bit METRICS_TOKEN for api and proxy" >&2
+  exit 1
+}
+[ "$(grep -cF "$metrics_token" "$bundle_dir/setup.out")" = 1 ] || {
+  echo "setup.sh did not print METRICS_TOKEN once" >&2
+  exit 1
+}
 # A second run must refuse: the .env it would replace holds the only SECRETBOX_KEY.
 if (cd "$bundle_dir/x" && ./setup.sh </dev/null >/dev/null 2>&1); then
   echo "setup.sh overwrote an existing .env" >&2

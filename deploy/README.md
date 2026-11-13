@@ -239,6 +239,10 @@ busy ports, Docker's userland proxy or a missing `public` network:
 ./setup.sh
 ```
 
+It asks for a media storage limit, the most the stack's recordings, voicemail and uploads may take
+(`MEDIA_STORAGE_MAX`, e.g. `20G`; empty for none, see [Media storage limit](#media-storage-limit)),
+and prints the generated `METRICS_TOKEN` once: the bearer token of `/metrics` and the full
+`/healthz` ([Monitoring](#monitoring)), which `.env` keeps.
 Asked whether to change the ports, it also takes SIP over UDP and TCP, STUN and the RTP range;
 otherwise each keeps its default. Run as root on a host with apt, it offers a checkbox, ticked, to
 keep the host up to date on its own: it installs `unattended-upgrades` for the distribution's
@@ -281,6 +285,7 @@ openssl rand -base64 32                       # JWT_SECRET
 printf '1:%s' "$(openssl rand -base64 32)"    # SECRETBOX_KEY
 openssl rand -hex 24                          # ARI_PASSWORD, and again for AMI_PASSWORD
 openssl rand -hex 24                          # BACKUP_PASSWORD, and again for UPDATER_TOKEN (any value turns updates through the API on)
+openssl rand -hex 32                          # METRICS_TOKEN
 ```
 
 **Keep a copy of `.env` outside the host.** `SECRETBOX_KEY` is the only way to read the encrypted
@@ -388,8 +393,10 @@ cd /srv/zamfono
 It refuses to start with less than 3 GB free on the stack directory's filesystem, which a
 release's images need. It downloads the release's bundle, checks it against the release's `SHA256SUMS`, pulls the
 release's images and checks each against the bundle's `DIGESTS`, changing nothing where one differs
-(a stack on `edge` has no bundle, so its images go unchecked), unpacks the bundle over the stack directory (never touching `.env`), lists the settings a newer
-`.env.example` introduced and recreates the stack: on Podman
+(a stack on `edge` has no bundle, so its images go unchecked), unpacks the bundle over the stack directory (never touching `.env` but to give an empty or
+missing `METRICS_TOKEN` a generated one, which it does not print: read it from `.env`), lists the
+settings a newer `.env.example` introduced, which keep their defaults until you set them, and
+recreates the stack: on Podman
 through the boot unit of step 7 if there is one, otherwise taking the stack `down` first. It then
 waits up to three minutes for every service to report healthy; an update that stopped before
 that, a failed `up` or an unhealthy service, is finished by running `update.sh` again once the
@@ -536,6 +543,26 @@ dbs:
 The bucket needs server-side encryption: the stream is not encrypted on the client, unlike the
 restic repository. Keep a copy of both files with `.env`, since a restore needs them.
 
+## Media storage limit
+
+`MEDIA_STORAGE_MAX` in `.env` bounds the stack's `media` volume, all of it: greetings, hold music
+and other uploaded audio, voicemail and call recordings. Set it where several stacks share a host,
+so that one customer's recordings or uploads cannot fill the disk for the others: bytes with an
+optional `K`, `M`, `G` or `T` (powers of 1024), e.g. `20G`; empty, the default, is no limit. It is
+counted against the space the volume's files take on disk, not their lengths, so many small files
+count a whole block each. A malformed value stops `api` and `core` at start with a message naming
+it. Take it in with `docker compose up -d`.
+
+At or over the limit the stack takes no new data: uploads answer 507, no new call recording
+starts (the call goes on unrecorded, and `core` logs a warning), and a caller to voicemail hears
+that the mailbox is full and is counted as missed, and no greeting is recorded by phone. A
+recording, message or greeting already running finishes, so the volume can pass the limit a little. `zamfono_media_bytes` against
+`zamfono_media_limit_bytes` in `/metrics`, and the warning `media:storage` in the full
+`/healthz` and `system.health`, show where it stands. Deleting voicemail or recordings
+(`voicemails.delete`, `recordings.delete`, or a shorter `recording_retention_days`) frees space at
+once; deleted uploaded audio only once the daily purge removes it,
+`soft_delete_retention_days` later, since it can be restored until then.
+
 ## Logs
 
 `compose logs <service>` reads the running container's own log, and an upgrade recreates every
@@ -594,14 +621,14 @@ tells anyone which protection or job is down; owners and admins read them with `
 `fail` (a closed or unmigrated database, `core` or its Asterisk down, no emergency
 trunk, no usable certificate, a stopped SIP ban helper) answers 503; `warn` (an owed config
 propagation or Ringotel push, configuration rows left out of the render, which `system.info`
-names, a failed automatic update, an expiring certificate, secrets left under a retired key)
-answers 200 and is worth an alert of its own.
+names, a failed automatic update, an expiring certificate, secrets left under a retired key, a
+media volume at its limit) answers 200 and is worth an alert of its own.
 
 ```bash
 curl -sS https://pbx.example.com/healthz | jq -e '.status == "pass"'
 ```
 
-For Prometheus, set `METRICS_TOKEN` in `.env` and scrape `https://<FQDN>/metrics` with
+For Prometheus, take `METRICS_TOKEN` from `.env`, where `setup.sh` and `update.sh` put one, and scrape `https://<FQDN>/metrics` with
 `Authorization: Bearer <METRICS_TOKEN>`; without the variable `/metrics` answers 404. The
 Litestream overlay adds `/metrics/litestream` under the same token.
 
@@ -625,6 +652,8 @@ scrape_configs:
 | `zamfono_auto_update_failed`, `zamfono_auto_update_failed_attempts`               | 1                                                                          |
 | `zamfono_breaking_update_available`                                               | 1: a breaking release waits for an owner                                   |
 | `zamfono_recording_mix_failures_total`                                            | it increases: raw recording files await salvage                            |
+| `zamfono_media_bytes` / `zamfono_media_limit_bytes`                               | above 90 %: soon no uploads, recordings or voicemail are taken             |
+| `zamfono_recordings_refused_total`                                                | it increases: calls go unrecorded at the media storage limit               |
 | `zamfono_active_calls`, `zamfono_registered_devices`, `zamfono_db_bytes`          | for dashboards                                                             |
 | `zamfono_api_request_seconds`, `zamfono_build_info{version, revision}`            | for dashboards                                                             |
 

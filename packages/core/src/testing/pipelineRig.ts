@@ -18,6 +18,7 @@ import { Presence } from '../presence.js';
 import { FakeContacts } from './ami/contacts.js';
 import { FakeAri } from './ari/fake.js';
 import {
+  idleMedia,
   idleRecorder,
   noopLogger,
   testPipelineDeps,
@@ -118,6 +119,7 @@ export async function startRig(
           actions,
           presence,
           recorder: idleRecorder,
+          media: idleMedia,
           trunks: trunkStateFor(ari, db, { cache, state, bus }),
           version: resolveVersion({}),
           sessions: pipeline.deps.bots

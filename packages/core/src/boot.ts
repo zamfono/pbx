@@ -19,6 +19,7 @@ import { asteriskAddresses, startHepListener } from './hep.js';
 import type { EventBus } from './internal/eventBus.js';
 import type { ConfigCache } from './internal/snapshot.js';
 import type { StateStore } from './internal/stateStore.js';
+import { mediaLimit, type MediaLimit } from './mediaLimit.js';
 import type { Presence } from './presence.js';
 import { startRetention } from './retention.js';
 import { ownAddresses } from './sipBan/exempt.js';
@@ -43,14 +44,22 @@ export function buildPipeline(deps: {
   log: Logger;
   env: CoreEnv;
   presence: Presence;
-}): { pipeline: Pipeline; cdr: CdrWriter; recorder: Recorder } {
+}): {
+  pipeline: Pipeline;
+  cdr: CdrWriter;
+  recorder: Recorder;
+  media: MediaLimit;
+} {
   const { db, ari, ami, cache, state, bus, log, env } = deps;
   const cdr = new CdrWriter({ db, ari, cache, bus, state, log, now: nowIso });
+  // One measurement of the media volume serves the recorder and the deposits alike (§11.6).
+  const media = mediaLimit(env.mediaDir, env.mediaStorageMax, log);
   const recorder = new Recorder({
     ari,
     cache,
     db,
     mediaDir: env.mediaDir,
+    media,
     log,
     now: nowIso
   });
@@ -68,6 +77,7 @@ export function buildPipeline(deps: {
     legStasisWaitMs: STASIS_WAIT_MS,
     callLogMaxBytes: env.callLogMaxBytes,
     mediaDir: env.mediaDir,
+    mediaFull: media.full,
     db,
     apiClient: new ApiClient(env.apiInternalUrl),
     logger: log,
@@ -75,7 +85,7 @@ export function buildPipeline(deps: {
     presence: deps.presence,
     bots: new BotSessions(ari, new URL(env.ariUrl).hostname)
   });
-  return { pipeline, cdr, recorder };
+  return { pipeline, cdr, recorder, media };
 }
 
 /**

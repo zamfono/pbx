@@ -90,6 +90,8 @@ export type StateResponse = {
   registeredDevices: number;
   /** Recording mixes failed since `core` started (§10.2 "Best effort", §7). */
   recordingMixFailures: number;
+  /** Recordings not started at `MEDIA_STORAGE_MAX` since `core` started (§11.6, §7). */
+  recordingsRefused: number;
   /**
    * Channels Asterisk holds right now, read from ARI when served: every leg, a parked party, a
    * voicemail deposit, a menu and a recording's snoop channels alike; `null` while ARI does not

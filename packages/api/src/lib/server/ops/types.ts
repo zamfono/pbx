@@ -129,7 +129,7 @@ export function defineOperation<In, Out, Prepared = void>(
 
 /** The RFC 9457 problem statuses an operation, or the transport in front of it, answers with. */
 // eslint-disable-next-line no-magic-numbers -- the statuses themselves
-export type ProblemStatus = 400 | 401 | 403 | 404 | 409 | 422 | 502 | 503;
+export type ProblemStatus = 400 | 401 | 403 | 404 | 409 | 422 | 502 | 503 | 507;
 
 /** Thrown by an operation's `run`, or by the runner itself, to answer with an RFC 9457 problem. */
 export class OpError extends Error {

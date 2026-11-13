@@ -1,5 +1,6 @@
 import { execFile, execFileSync } from 'node:child_process';
 import {
+  mkdir,
   mkdtemp,
   readdir,
   readFile,
@@ -9,7 +10,18 @@ import {
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi
+} from 'vitest';
+
+import { mediaUsageBytes } from '@zamfono/shared';
 
 import { deleteAudioFile, inTranscodeSlot, storeAudio } from './store.js';
 
@@ -359,6 +371,130 @@ describe('storeAudio', () => {
     ]);
     expect(started).toEqual([0, 1, 2, 3, 4]);
     expect(peak).toBe(2);
+  });
+
+  describe('with MEDIA_STORAGE_MAX (§11.6)', () => {
+    const upload = (): {
+      filename: string;
+      mimeType: string;
+      data: Buffer;
+    } => ({
+      filename: 'track.mp3',
+      mimeType: 'audio/mpeg',
+      data: sineMp3
+    });
+    let limitedDir: string;
+
+    beforeEach(async () => {
+      limitedDir = await mkdtemp(path.join(tmpdir(), 'zamfono-audio-limit-'));
+      // Something already on the volume: a voicemail message of 1000 bytes.
+      await mkdir(path.join(limitedDir, 'voicemail'));
+      await writeFile(
+        path.join(limitedDir, 'voicemail', 'm.wav'),
+        Buffer.alloc(1000)
+      );
+    });
+
+    afterEach(async () => {
+      await rm(limitedDir, { recursive: true, force: true });
+    });
+
+    it('refuses with 507 before ffmpeg runs while the volume is at the limit', async () => {
+      vi.mocked(execFile).mockClear();
+      await expect(
+        storeAudio(
+          'greeting',
+          upload(),
+          limitedDir,
+          await mediaUsageBytes(limitedDir)
+        )
+      ).rejects.toMatchObject({ status: 507 });
+      expect(vi.mocked(execFile)).not.toHaveBeenCalled();
+      expect(await readdir(path.join(limitedDir, 'prompts'))).toEqual([]);
+    });
+
+    it('refuses with 507 and deletes the master, WAV and MoH copy once the volume with them is over the limit', async () => {
+      await expect(
+        storeAudio(
+          'moh',
+          upload(),
+          limitedDir,
+          (await mediaUsageBytes(limitedDir)) + 1
+        )
+      ).rejects.toMatchObject({ status: 507 });
+      expect(vi.mocked(execFile)).toHaveBeenCalled();
+      expect(await readdir(path.join(limitedDir, 'prompts'))).toEqual(['moh']);
+      expect(await readdir(path.join(limitedDir, 'prompts', 'moh'))).toEqual(
+        []
+      );
+    });
+
+    it('counts the space files take, not their lengths: tiny uploads reach the limit by their blocks', async () => {
+      // A valid WAV of a millisecond's silence: some 60 bytes, a whole block on disk, as is its
+      // playback WAV.
+      const tinyPath = path.join(fixturesDir, 'tiny.wav');
+      execFileSync('ffmpeg', [
+        '-hide_banner',
+        '-loglevel',
+        'error',
+        '-y',
+        '-f',
+        'lavfi',
+        '-i',
+        'anullsrc=r=8000:cl=mono',
+        '-t',
+        '0.001',
+        '-c:a',
+        'pcm_s16le',
+        tinyPath
+      ]);
+      const tiny = {
+        filename: 'tiny.wav',
+        mimeType: 'audio/wav',
+        data: await readFile(tinyPath)
+      };
+      const emptyDir = await mkdtemp(
+        path.join(tmpdir(), 'zamfono-audio-tiny-')
+      );
+      const limit = 8192;
+      const outcomes = [];
+      try {
+        for (let attempt = 0; attempt < 4; attempt += 1) {
+          outcomes.push(
+            // eslint-disable-next-line no-await-in-loop -- one upload after the other, each checked against what the ones before it left
+            await storeAudio('greeting', tiny, emptyDir, limit).then(
+              () => 'stored',
+              (error: unknown) => (error as { status?: number }).status
+            )
+          );
+        }
+        const promptsDir = path.join(emptyDir, 'prompts');
+        const lengths = await Promise.all(
+          (await readdir(promptsDir)).map(
+            async name => (await stat(path.join(promptsDir, name))).size
+          )
+        );
+        // What was stored is far below the limit by its lengths; by its blocks it reached it.
+        expect(lengths.reduce((total, size) => total + size, 0)).toBeLessThan(
+          limit / 4
+        );
+        expect(outcomes).toContain(507);
+      } finally {
+        await rm(emptyDir, { recursive: true, force: true });
+      }
+    });
+
+    it('stores an upload that leaves the volume within the limit', async () => {
+      const stored = await storeAudio(
+        'greeting',
+        upload(),
+        limitedDir,
+        1024 ** 2
+      );
+      await expect(
+        stat(path.join(limitedDir, 'prompts', stored.filename))
+      ).resolves.toBeDefined();
+    });
   });
 
   it('deleteAudioFile removes the WAV, master and MoH class directory', async () => {

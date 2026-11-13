@@ -140,4 +140,56 @@ describe('deposit into a mailbox with a message limit', () => {
     });
     await started;
   });
+
+  it('plays the mailbox-full prompt and takes no message while the media volume is at MEDIA_STORAGE_MAX (§11.6)', async () => {
+    pipeline.deps.mediaFull = () => Promise.resolve(true);
+    const userId = await seedUser(db, { notifyMissedCalls: 1 });
+    const channel = fakeAri.addChannel({});
+    const call = inboundCall(channel.id, userId);
+
+    await deposit(pipeline, call, { userId });
+
+    const play = fakeAri.calls.find(
+      entry =>
+        entry.method === 'POST' && entry.path === `channels/${channel.id}/play`
+    );
+    expect(play?.body).toMatchObject({ media: 'sound:vm-mailboxfull' });
+    expect(fakeAri.calls.some(entry => entry.path.endsWith('/record'))).toBe(
+      false
+    );
+    expect(call.status).toBe('missed');
+    expect(apiClient.sent.map(request => request.kind)).toEqual(['missedCall']);
+    expect(call.log.finish().log).toContain(
+      `"event":"voicemailFailed","mailbox":{"userId":"${userId}"},"reason":"mediaFull"`
+    );
+  });
+
+  it('finishes a message whose recording started below the limit, though the volume reached it meanwhile', async () => {
+    let full = false;
+    pipeline.deps.mediaFull = () => Promise.resolve(full);
+    const userId = await seedUser(db, {});
+    const channel = fakeAri.addChannel({});
+    const call = inboundCall(channel.id, userId);
+
+    const started = deposit(pipeline, call, { userId });
+    const record = await requestTo(
+      fakeAri,
+      'POST',
+      `channels/${channel.id}/record`
+    );
+    full = true;
+    fakeAri.emit({
+      type: 'RecordingFinished',
+      timestamp: nowIso(),
+      application: 'zamfono',
+      recording: { name: (record.body as { name: string }).name, duration: 4 }
+    });
+    await started;
+
+    const rows = await db
+      .selectFrom('voicemails')
+      .select('durationS')
+      .execute();
+    expect(rows).toEqual([{ durationS: 4 }]);
+  });
 });

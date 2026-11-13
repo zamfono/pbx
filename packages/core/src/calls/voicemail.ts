@@ -66,14 +66,16 @@ function findOwner(
   return row;
 }
 
-/** A full mailbox takes no message (§11.5): the caller hears so, and the call is missed. */
+/** A full mailbox (§11.5), or a media volume at `MEDIA_STORAGE_MAX` (§11.6), takes no message:
+ * the caller hears the mailbox is full, and the call is missed. */
 async function refuseMessage(
   pipeline: Pipeline,
   call: Call,
-  mailbox: Owner
+  mailbox: Owner,
+  reason: 'mailboxFull' | 'mediaFull'
 ): Promise<void> {
   const channelId = callerChannel(call);
-  call.log.event({ event: 'voicemailFailed', mailbox, reason: 'mailboxFull' });
+  call.log.event({ event: 'voicemailFailed', mailbox, reason });
   await playAndWait(
     pipeline.deps.ari,
     channelId,
@@ -81,6 +83,28 @@ async function refuseMessage(
     `${channelId}:vmMailboxFull`
   );
   await endCall(pipeline, call, 'missed');
+}
+
+/** Why `mailbox` takes no message now, `null` while it takes one: it holds its
+ * `mailbox_max_messages` (§11.5), or the media volume is at `MEDIA_STORAGE_MAX` (§11.6). */
+async function refusal(
+  pipeline: Pipeline,
+  call: Call,
+  mailbox: Owner,
+  owner: { mailboxMaxMessages: number | null }
+): Promise<'mailboxFull' | 'mediaFull' | null> {
+  const { db, logger, mediaFull } = pipeline.deps;
+  if (await mailboxFull(db, mailbox, owner.mailboxMaxMessages)) {
+    return 'mailboxFull';
+  }
+  if (!(await mediaFull())) {
+    return null;
+  }
+  logger.warn(
+    { callId: call.id, mailbox },
+    'voicemail message not taken: the media volume is at MEDIA_STORAGE_MAX'
+  );
+  return 'mediaFull';
 }
 
 /** `deposit`'s own steps, from the answer to the row the outcome leaves. */
@@ -105,8 +129,9 @@ async function recordMessage(
   call.log.event({ event: 'voicemail', mailbox, reason });
   const channelId = callerChannel(call);
   await pipeline.deps.ari.channels.answer(channelId).catch(ignoreGone);
-  if (await mailboxFull(db, mailbox, owner.mailboxMaxMessages)) {
-    await refuseMessage(pipeline, call, mailbox);
+  const refused = await refusal(pipeline, call, mailbox, owner);
+  if (refused !== null) {
+    await refuseMessage(pipeline, call, mailbox, refused);
     return;
   }
   const greetingEnd = await playAndWait(
@@ -165,8 +190,9 @@ async function recordMessage(
 /**
  * Deposits the caller in `mailbox` (§10.2 "Voicemail"): answer, greeting, record capped at
  * `settings.voicemail_max_s`, then the `voicemails` row, MWI, `voicemail.new` and the mail
- * request, before hanging up. A mailbox holding its `mailbox_max_messages` already plays the
- * mailbox-full prompt and ends the call as missed (§11.5). A recording that failed releases the caller without any of that
+ * request, before hanging up. A mailbox holding its `mailbox_max_messages` already, or a media
+ * volume at `MEDIA_STORAGE_MAX`, plays the mailbox-full prompt and ends the call as missed
+ * (§11.5, §11.6). A recording that failed releases the caller without any of that
  * (§10.2 "Voicemail"); a caller who hung up before leaving a message was missed.
  *
  * The deposit owns the call's row from here on (`call.depositing`): the caller hanging up is the

@@ -144,7 +144,9 @@ describe('mail:relay and system.info mail', () => {
       certificateSync: { state: 'ok', at: null },
       sipBanHelper: { running: true, heartbeat: null, dropped: null },
       mailRelay: relayState(),
-      skippedConfigRows: 0
+      skippedConfigRows: 0,
+      mediaDir: '/nonexistent/media',
+      mediaStorageMax: null
     });
   const info = async (db: Db): Promise<unknown> =>
     ((await runOperation(db, 'system.info', {}, asRun())) as { mail: unknown })

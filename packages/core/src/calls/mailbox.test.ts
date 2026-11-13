@@ -10,8 +10,9 @@ import type { FakeAri } from '../testing/ari/fake.js';
 import { defaultChannel } from '../testing/ari/fakeChannel.js';
 import { eventually, requestTo } from '../testing/eventually.js';
 import { startRig, type Rig } from '../testing/pipelineRig.js';
+import { seedExtension } from '../testing/seedRows.js';
 import { callerChannel, newCall, type Call } from './call.js';
-import { ownVoicemail } from './mailbox.js';
+import { mailboxAccess, ownVoicemail } from './mailbox.js';
 import { introMedia } from './mailboxGrammar.js';
 import { mainMenuMedia } from './mailboxPrompts.js';
 import type { Pipeline } from './pipeline.js';
@@ -355,6 +356,133 @@ describe('mailbox menu (§10.2 "Mailbox access")', () => {
       .executeTakeFirst();
     expect(replaced).toBeUndefined();
     await expect(readdir(promptsDir)).resolves.not.toContain(`${previous}.wav`);
+  });
+
+  it('0 records no greeting while the media volume is at MEDIA_STORAGE_MAX: the mailbox-full prompt, the greeting kept (§11.6)', async () => {
+    pipeline.deps.mediaFull = () => Promise.resolve(true);
+    const done = ownVoicemail(pipeline, call);
+    await nextPlay();
+    press('0');
+    finish(await nextPlay());
+    const refused = await nextPlay();
+    expect(refused.media).toBe('sound:vm-mailboxfull');
+    finish(refused);
+    await nextPlay();
+    press('#');
+    finish(await nextPlay());
+    await done;
+    expect(fakeAri.calls.some(entry => entry.path.endsWith('/record'))).toBe(
+      false
+    );
+    const user = await db
+      .selectFrom('users')
+      .select('mailboxAudioId')
+      .where('id', '=', ownerId)
+      .executeTakeFirstOrThrow();
+    expect(user.mailboxAudioId).toBeNull();
+    expect(call.log.finish().log).toContain(
+      '"event":"mailboxGreeting","saved":false,"reason":"mediaFull"'
+    );
+  });
+
+  it.each([
+    ['refuses', true],
+    ['records', false]
+  ])(
+    '*95<ext> 0 %s a ring group mailbox greeting with the media volume at MEDIA_STORAGE_MAX: %s (§11.6)',
+    async (_label, full) => {
+      pipeline.deps.mediaFull = () => Promise.resolve(full);
+      const groupId = newId();
+      await db
+        .insertInto('ringGroups')
+        .values({
+          id: groupId,
+          name: 'Support',
+          strategy: 'simultaneous',
+          createdAt: nowIso()
+        })
+        .execute();
+      await seedExtension(db, '400', { ringGroupId: groupId });
+      await db
+        .insertInto('ringGroupMembers')
+        .values({ groupId, position: 0, userGroupId: null, userId: ownerId })
+        .execute();
+      const done = mailboxAccess(pipeline, call, '400');
+      await nextPlay();
+      press('0');
+      finish(await nextPlay());
+      let after: Play;
+      if (full) {
+        after = await nextPlay();
+        expect(after.media).toBe('sound:vm-mailboxfull');
+      } else {
+        const record = await requestTo(
+          fakeAri,
+          'POST',
+          `channels/${call.callerChannelId}/record`
+        );
+        fakeAri.emit({
+          type: 'RecordingFinished',
+          timestamp: nowIso(),
+          application: 'zamfono',
+          recording: {
+            name: (record.body as { name: string }).name,
+            duration: 4
+          }
+        });
+        after = await nextPlay();
+        expect(after.media).toBe('sound:vm-msgsaved');
+      }
+      finish(after);
+      await nextPlay();
+      press('#');
+      finish(await nextPlay());
+      await done;
+      expect(fakeAri.calls.some(entry => entry.path.endsWith('/record'))).toBe(
+        !full
+      );
+      const group = await db
+        .selectFrom('ringGroups')
+        .select('mailboxAudioId')
+        .where('id', '=', groupId)
+        .executeTakeFirstOrThrow();
+      expect(group.mailboxAudioId === null).toBe(full);
+    }
+  );
+
+  it('0 finishes a greeting whose recording started below the limit, though the volume reached it meanwhile', async () => {
+    let full = false;
+    pipeline.deps.mediaFull = () => Promise.resolve(full);
+    const done = ownVoicemail(pipeline, call);
+    await nextPlay();
+    press('0');
+    finish(await nextPlay());
+    const record = await requestTo(
+      fakeAri,
+      'POST',
+      `channels/${call.callerChannelId}/record`
+    );
+    full = true;
+    const { name } = record.body as { name: string };
+    fakeAri.emit({
+      type: 'RecordingFinished',
+      timestamp: nowIso(),
+      application: 'zamfono',
+      recording: { name, duration: 4 }
+    });
+    const saved = await nextPlay();
+    expect(saved.media).toBe('sound:vm-msgsaved');
+    finish(saved);
+    await nextPlay();
+    press('#');
+    finish(await nextPlay());
+    await done;
+    const user = await db
+      .selectFrom('users')
+      .select('mailboxAudioId')
+      .where('id', '=', ownerId)
+      .executeTakeFirstOrThrow();
+    expect(user.mailboxAudioId).toBe(name.replace('prompts/', ''));
   });
 
   it('a caller who hangs up to leave the menu is in the history as answered, not missed', async () => {

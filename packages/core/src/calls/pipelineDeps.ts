@@ -8,6 +8,7 @@ import type { Channel, Logger } from '../ari/types.js';
 import type { EventBus } from '../internal/eventBus.js';
 import type { ConfigCache } from '../internal/snapshot.js';
 import type { StateStore } from '../internal/stateStore.js';
+import type { MediaLimit } from '../mediaLimit.js';
 import type { Presence } from '../presence.js';
 import type { BotSessions } from './botSessions.js';
 import type { Call } from './call.js';
@@ -56,6 +57,8 @@ export type PipelineDeps = {
   callLogMaxBytes: number;
   /** `core`'s own mount of the media volume, `CoreEnv.mediaDir` (§11.6). */
   mediaDir: string;
+  /** `MEDIA_STORAGE_MAX` (§11.6): at or over it a deposit takes no message. */
+  mediaFull: MediaLimit['full'];
   // Voicemail deposit's own collaborators (§3.1).
   db: Db;
   apiClient: MailSender;

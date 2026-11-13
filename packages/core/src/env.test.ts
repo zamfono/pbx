@@ -54,6 +54,7 @@ describe('readEnv defaults', () => {
       amiPort: 5038,
       dbFile: '/data/zamfono.sqlite3',
       mediaDir: '/media',
+      mediaStorageMax: null,
       hepEnabled: true,
       sipUdpEnabled: true,
       sipTcpEnabled: true,
@@ -68,6 +69,15 @@ describe('readEnv defaults', () => {
     expect(
       readEnv({ ...REQUIRED, SIP_UDP_ENABLED: 'false', SIP_TCP_ENABLED: 'yes' })
     ).toMatchObject({ sipUdpEnabled: false, sipTcpEnabled: true });
+  });
+
+  it('reads MEDIA_STORAGE_MAX in bytes and refuses to start on a malformed one (§6.3)', () => {
+    expect(
+      readEnv({ ...REQUIRED, MEDIA_STORAGE_MAX: '2M' }).mediaStorageMax
+    ).toBe(2 * 1024 ** 2);
+    expect(() => readEnv({ ...REQUIRED, MEDIA_STORAGE_MAX: '2MB' })).toThrow(
+      /^MEDIA_STORAGE_MAX: /u
+    );
   });
 
   it('refuses an empty secret', () => {

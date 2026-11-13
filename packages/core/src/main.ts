@@ -181,7 +181,7 @@ export async function main(): Promise<{ close: () => Promise<void> }> {
       log,
       env
     });
-    const { pipeline, cdr, recorder } = buildPipeline({
+    const { pipeline, cdr, recorder, media } = buildPipeline({
       db,
       ari,
       ami,
@@ -205,6 +205,7 @@ export async function main(): Promise<{ close: () => Promise<void> }> {
         actions,
         presence,
         recorder,
+        media,
         trunks: trunkState,
         version: env.version,
         sessions: pipeline.deps.bots

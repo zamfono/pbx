@@ -58,6 +58,7 @@ function core(): string[] {
     presence: {},
     registeredDevices: 0,
     recordingMixFailures: 0,
+    recordingsRefused: 0,
     asteriskChannels: 0,
     recordingsInProgress: 0
   };

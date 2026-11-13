@@ -425,6 +425,51 @@ describe('Recorder', () => {
     expect(rows[0]?.durationS).toBe(7);
   });
 
+  it('starts no recording while the media limit refuses it, and finishes one already in progress (§11.6)', async () => {
+    const userId = await seedUser(db, { recordCalls: 1 });
+    const targetId = await seedForwardTarget(db, { userId });
+    const didId = await seedDid(db, '+15551000', targetId);
+    await seedSettings(db, { mainDidId: didId });
+    let full = false;
+    const recorder = new Recorder({
+      ari,
+      cache,
+      db,
+      mediaDir: MEDIA_DIR,
+      mix: () => Promise.resolve(4),
+      media: { admitsRecording: () => Promise.resolve(!full) },
+      log: fakeLogger(),
+      now: () => NOW
+    });
+    // Below the limit: the first call records.
+    const first = buildCall(null);
+    await cdr.open(first);
+    fakeAri.addChannel({ id: 'first-leg' });
+    const firstLeg = buildLeg({ channelId: 'first-leg', userId });
+    await recorder.onLegUp(first, firstLeg);
+    const [leftName, rightName] = recordCalls().map(body => body.name);
+    expect(snoopCalls()).toHaveLength(2);
+
+    // The limit is reached meanwhile: a second call goes on unrecorded.
+    full = true;
+    const second = buildCall(null);
+    fakeAri.addChannel({ id: 'second-leg' });
+    await recorder.onLegUp(
+      second,
+      buildLeg({ channelId: 'second-leg', userId })
+    );
+    expect(snoopCalls()).toHaveLength(2);
+    expect(recorder.inProgressCount).toBe(1);
+
+    // The first participation, in progress all along, still finishes and is stored.
+    const ended = recorder.onLegEnded(first, firstLeg);
+    emitRecordingFinished(leftName, 4);
+    emitRecordingFinished(rightName, 4);
+    await ended;
+    const rows = await db.selectFrom('recordings').select('callId').execute();
+    expect(rows).toEqual([{ callId: first.id }]);
+  });
+
   it('carries a participation over to the call its leg moved to, whose row then names it (§10.2 "Call parking")', async () => {
     const userId = await seedUser(db, { recordCalls: 1 });
     const targetId = await seedForwardTarget(db, { userId });

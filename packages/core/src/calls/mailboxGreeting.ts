@@ -11,6 +11,7 @@ import {
 } from '@zamfono/shared';
 
 import { ignoreGone } from '../ari/failures.js';
+import { defaultPrompt } from '../prompts.js';
 import { waitForRecording } from './ariWaits.js';
 import { callerChannel, type Call } from './call.js';
 import type { Pipeline } from './pipeline.js';
@@ -73,16 +74,18 @@ async function storeGreeting(
 /** Digit `0`: plays `instructions`, then records a new greeting after a tone into `audio_assets`
  * kind `vmGreeting` and sets it as `mailbox_audio_id`, replacing the previous one, whose row is
  * deleted in the same transaction and its files once it committed (§10.2 "Mailbox access",
- * §5.9). Whether a greeting was stored. */
+ * §5.9). While the media volume is at `MEDIA_STORAGE_MAX` (§11.6) nothing is recorded and the
+ * greeting stays: the caller hears the mailbox-full prompt, as a refused voicemail's caller does.
+ * Whether a greeting was stored, or `mediaFull`. */
 export async function recordGreeting(
   pipeline: Pipeline,
   call: Call,
   owner: Owner,
   instructions: string
-): Promise<boolean> {
+): Promise<'saved' | 'failed' | 'mediaFull'> {
   const db = pipeline.deps.db;
   if (call.callerUserId === null) {
-    return false;
+    return 'failed';
   }
   const channelId = callerChannel(call);
   const ari = pipeline.deps.ari;
@@ -94,7 +97,22 @@ export async function recordGreeting(
     `${channelId}:greetingInstructions:${id}`
   );
   if (played === 'hangup') {
-    return false;
+    return 'failed';
+  }
+  // Checked as the recording would start; one already recording when the limit is reached
+  // finishes, as a message does.
+  if (await pipeline.deps.mediaFull()) {
+    pipeline.deps.logger.warn(
+      { callId: call.id, mailbox: owner },
+      'mailbox greeting not recorded: the media volume is at MEDIA_STORAGE_MAX'
+    );
+    await playAndWait(
+      ari,
+      channelId,
+      defaultPrompt('vmMailboxFull'),
+      `${channelId}:greetingMediaFull:${id}`
+    );
+    return 'mediaFull';
   }
   // The recording's name in Asterisk's spool (§11.6), where `assetMedia` finds an asset.
   const name = `${PROMPTS_SUBDIR}/${id}`;
@@ -115,7 +133,7 @@ export async function recordGreeting(
     .catch(ignoreGone);
   const durationS = await finished;
   if (durationS === null) {
-    return false;
+    return 'failed';
   }
   const retired = await storeGreeting(db, owner, {
     id,
@@ -137,5 +155,5 @@ export async function recordGreeting(
       }
     );
   }
-  return true;
+  return 'saved';
 }

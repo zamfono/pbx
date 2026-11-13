@@ -27,6 +27,7 @@ import { ActionError } from '../calls/actionError.js';
 import { newCall } from '../calls/call.js';
 import { FakeAri } from '../testing/ari/fake.js';
 import {
+  idleMedia,
   idlePresence,
   idleRecorder,
   idleTrunks,
@@ -65,6 +66,7 @@ describe('startInternalServer', () => {
   let state: StateStore;
   let presence: ReturnType<typeof idlePresence>;
   let recorder: typeof idleRecorder;
+  let media: typeof idleMedia;
   let close: () => Promise<void>;
   let port: number;
   // The trunks the server had re-register, in order.
@@ -87,6 +89,7 @@ describe('startInternalServer', () => {
     state = new StateStore();
     presence = idlePresence();
     recorder = { ...idleRecorder };
+    media = { ...idleMedia };
     errorsLogged.length = 0;
     reregistered = [];
     const started = await startInternalServer(
@@ -100,6 +103,7 @@ describe('startInternalServer', () => {
         actions: testActions(ari, db),
         presence,
         recorder,
+        media,
         trunks: {
           ...idleTrunks,
           reregister: trunkId => {
@@ -248,6 +252,7 @@ describe('startInternalServer', () => {
     presence.registeredDevices = () => Promise.resolve(3);
     recorder.mixFailureCount = 1;
     recorder.inProgressCount = 2;
+    media.refusedRecordings = 5;
     for (let index = 0; index < 4; index += 1) {
       fakeAri.addChannel({});
     }
@@ -274,6 +279,7 @@ describe('startInternalServer', () => {
       presence: { user1: available },
       registeredDevices: 3,
       recordingMixFailures: 1,
+      recordingsRefused: 5,
       asteriskChannels: 4,
       recordingsInProgress: 2
     });
@@ -405,6 +411,7 @@ describe('startInternalServer', () => {
         actions: testActions(ari, db),
         presence: idlePresence(),
         recorder: idleRecorder,
+        media: idleMedia,
         trunks: idleTrunks,
         version: VERSION,
         sessions: { resolve: () => null }
@@ -455,6 +462,7 @@ describe('startInternalServer', () => {
         actions: testActions(ari, db),
         presence: idlePresence(),
         recorder: idleRecorder,
+        media: idleMedia,
         trunks: idleTrunks,
         version: VERSION,
         sessions: { resolve: () => null }
@@ -496,6 +504,7 @@ describe('startInternalServer', () => {
         actions: testActions(ari, db),
         presence: idlePresence(),
         recorder: idleRecorder,
+        media: idleMedia,
         trunks: idleTrunks,
         version: VERSION,
         sessions: { resolve: () => null }
@@ -546,6 +555,7 @@ describe('startInternalServer', () => {
         actions: testActions(ari, db),
         presence: idlePresence(),
         recorder: idleRecorder,
+        media: idleMedia,
         trunks: idleTrunks,
         version: VERSION,
         sessions: { resolve: () => null }

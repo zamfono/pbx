@@ -7,7 +7,9 @@ import * as env from '$app/env/private';
 
 import {
   deletePromptFiles,
+  HTTP_INSUFFICIENT_STORAGE,
   HTTP_UNPROCESSABLE_CONTENT,
+  mediaUsageBytes,
   newId,
   PROMPTS_SUBDIR,
   type AudioKind
@@ -145,44 +147,6 @@ async function transcodeToPlaybackWav(
 }
 
 /**
- * Stores `upload` on the media volume and transcodes it to 16-bit signed linear WAV for Asterisk
- * playback (§10.2 "Greetings and audio", §11.6 "Audio formats"). The master is kept as uploaded
- * next to the playback file under `<mediaDir>/prompts/`; for `moh`, the playback WAV is copied
- * again under `<mediaDir>/prompts/moh/<id>/`, the per-class directory `musiconhold.conf` names
- * (§10.2 "Hold music", `mohLayout.ts`).
- */
-export async function storeAudio(
-  kind: AudioKind,
-  upload: AudioUpload,
-  mediaDir: string = env.MEDIA_DIR
-): Promise<StoredAudio> {
-  const extension = masterExtension(upload);
-  const id = newId();
-  const promptsDir = path.join(mediaDir, PROMPTS_SUBDIR);
-  const masterPath = path.join(promptsDir, `${id}.master${extension}`);
-  const wavFilename = `${id}${PLAYBACK_EXTENSION}`;
-  const wavPath = path.join(promptsDir, wavFilename);
-  await mkdir(promptsDir, { recursive: true });
-  await inTranscodeSlot(async () => {
-    try {
-      await writeFile(masterPath, upload.data);
-      // The extension is the demuxer's name: `.mp3` → `mp3`, `.wav` → `wav`.
-      await transcodeToPlaybackWav(masterPath, extension.slice(1), wavPath);
-    } catch (error) {
-      await rm(masterPath, { force: true });
-      await rm(wavPath, { force: true });
-      throw error;
-    }
-  });
-  if (kind === 'moh') {
-    const classDir = mohClassDir(mediaDir, id);
-    await mkdir(classDir, { recursive: true });
-    await copyFile(wavPath, path.join(classDir, wavFilename));
-  }
-  return { id, filename: wavFilename };
-}
-
-/**
  * Removes a stored audio file's playback WAV, master and (for `moh`) per-class directory from
  * the media volume; called by the daily purge job once an asset's undo window has passed, and
  * once a replaced or removed mailbox greeting's row is deleted (`retireGreeting`).
@@ -194,4 +158,66 @@ export async function deleteAudioFile(
   const id = path.basename(filename, path.extname(filename));
   await deletePromptFiles(mediaDir, id);
   await rm(mohClassDir(mediaDir, id), { recursive: true, force: true });
+}
+
+/** Refuses the upload with 507 while the media volume holds more than `limit` bytes, or, with
+ * `atLimit`, as much (§11.6 `MEDIA_STORAGE_MAX`); never without a limit. */
+async function checkMediaLimit(
+  mediaDir: string,
+  limit: number | null,
+  atLimit: boolean
+): Promise<void> {
+  if (limit === null) {
+    return;
+  }
+  const usage = await mediaUsageBytes(mediaDir);
+  if (atLimit ? usage >= limit : usage > limit) {
+    throw new OpError(
+      HTTP_INSUFFICIENT_STORAGE,
+      'upload: the media volume is at its limit'
+    );
+  }
+}
+
+/**
+ * Stores `upload` on the media volume and transcodes it to 16-bit signed linear WAV for Asterisk
+ * playback (§10.2 "Greetings and audio", §11.6 "Audio formats"). The master is kept as uploaded
+ * next to the playback file under `<mediaDir>/prompts/`; for `moh`, the playback WAV is copied
+ * again under `<mediaDir>/prompts/moh/<id>/`, the per-class directory `musiconhold.conf` names
+ * (§10.2 "Hold music", `mohLayout.ts`). With a `limit` (`MEDIA_STORAGE_MAX`, §11.6), the upload
+ * is refused with 507 while the media volume is at or over it before ffmpeg runs, and, its files
+ * deleted again, when the volume with them is over it after; both checks inside the ffmpeg slot,
+ * so concurrent uploads overshoot by at most the ones transcoding at once.
+ */
+export async function storeAudio(
+  kind: AudioKind,
+  upload: AudioUpload,
+  mediaDir: string = env.MEDIA_DIR,
+  limit: number | null = env.MEDIA_STORAGE_MAX
+): Promise<StoredAudio> {
+  const extension = masterExtension(upload);
+  const id = newId();
+  const promptsDir = path.join(mediaDir, PROMPTS_SUBDIR);
+  const masterPath = path.join(promptsDir, `${id}.master${extension}`);
+  const wavFilename = `${id}${PLAYBACK_EXTENSION}`;
+  const wavPath = path.join(promptsDir, wavFilename);
+  await mkdir(promptsDir, { recursive: true });
+  await inTranscodeSlot(async () => {
+    await checkMediaLimit(mediaDir, limit, true);
+    try {
+      await writeFile(masterPath, upload.data);
+      // The extension is the demuxer's name: `.mp3` → `mp3`, `.wav` → `wav`.
+      await transcodeToPlaybackWav(masterPath, extension.slice(1), wavPath);
+      if (kind === 'moh') {
+        const classDir = mohClassDir(mediaDir, id);
+        await mkdir(classDir, { recursive: true });
+        await copyFile(wavPath, path.join(classDir, wavFilename));
+      }
+      await checkMediaLimit(mediaDir, limit, false);
+    } catch (error) {
+      await deleteAudioFile(wavFilename, mediaDir);
+      throw error;
+    }
+  });
+  return { id, filename: wavFilename };
 }

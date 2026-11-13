@@ -1,10 +1,14 @@
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { sql } from 'kysely';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 
 import {
   healthHttpStatus,
   HTTP_OK,
   HTTP_SERVICE_UNAVAILABLE,
+  mediaUsageBytes,
   nowIso,
   openDb,
   type Db,
@@ -59,6 +63,8 @@ async function healthOf(
     },
     mailRelay: null,
     skippedConfigRows: 0,
+    mediaDir: '/nonexistent/media',
+    mediaStorageMax: null,
     ...deps
   });
 }
@@ -229,6 +235,34 @@ describe('apiHealth (§6.3 "Health", §10.3 "Health")', () => {
       { status: 'warn', observedValue: 2, output: 'skipped' }
     ]);
     expect(health.status).toBe('warn');
+  });
+});
+
+describe('apiHealth media:storage (§11.6)', () => {
+  it('warns while the media volume is at or over MEDIA_STORAGE_MAX, passes below it, and has no check without one', async () => {
+    const db = await makeTestDb();
+    await seedSettings(db);
+    await seedTrunk(db, 'local', 1, 1);
+    const mediaDir = await mkdtemp(
+      path.join(tmpdir(), 'zamfono-health-media-')
+    );
+    onTestFinished(() => rm(mediaDir, { recursive: true, force: true }));
+    await writeFile(path.join(mediaDir, 'a.wav'), Buffer.alloc(100));
+    // The space the file takes on disk, a block or more (§11.6).
+    const used = await mediaUsageBytes(mediaDir);
+
+    const at = await healthOf(db, { mediaDir, mediaStorageMax: used });
+    expect(at.checks['media:storage']).toStrictEqual([
+      { status: 'warn', observedValue: used }
+    ]);
+    expect(at.status).toBe('warn');
+    expect(healthHttpStatus(at)).toBe(HTTP_OK);
+    const below = await healthOf(db, { mediaDir, mediaStorageMax: used + 1 });
+    expect(below.checks['media:storage']).toStrictEqual([
+      { status: 'pass', observedValue: used }
+    ]);
+    const none = await healthOf(db, { mediaDir });
+    expect(none.checks['media:storage']).toBeUndefined();
   });
 });
 

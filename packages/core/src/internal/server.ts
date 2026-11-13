@@ -28,6 +28,7 @@ import type { Logger } from '../ari/types.js';
 import type { CallActions } from '../calls/actions.js';
 import type { BotSessions } from '../calls/botSessions.js';
 import type { Recorder } from '../calls/recording.js';
+import type { MediaLimit } from '../mediaLimit.js';
 import type { Presence } from '../presence.js';
 import { handleActionRoute, handleParkingRead } from './actionRoutes.js';
 import { handleCallSessionRoute } from './callSessionRoute.js';
@@ -62,6 +63,8 @@ type InternalDeps = {
   presence: PresenceRefresh & Pick<Presence, 'registeredDevices'>;
   /** The recordings in progress and the failed mixes `/internal/state` serves (§6.4, §10.2). */
   recorder: Pick<Recorder, 'inProgressCount' | 'mixFailureCount'>;
+  /** The recordings refused at `MEDIA_STORAGE_MAX` that `/internal/state` serves (§11.6). */
+  media: Pick<MediaLimit, 'refusedRecordings'>;
   /** The `unmonitored` trunk statuses, likewise, and a trunk's re-registration. */
   trunks: TrunkMonitoringRefresh & TrunkReregister;
   /** The version `/internal/version` reports (§7 "Version"), `CoreEnv.version`. */
@@ -145,6 +148,7 @@ async function handleState(
     ...deps.state.snapshot(),
     registeredDevices: await deps.presence.registeredDevices(),
     recordingMixFailures: deps.recorder.mixFailureCount,
+    recordingsRefused: deps.media.refusedRecordings,
     asteriskChannels: deps.ari.connected
       ? ((await deps.ari.channels
           .list()

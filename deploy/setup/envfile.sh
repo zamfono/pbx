@@ -6,8 +6,9 @@ random_base64() {
 }
 
 # Hex keeps the ARI and AMI passwords safe in every Asterisk configuration file they land in.
+# random_hex [BYTES] — BYTES random bytes, 24 by default, in hex.
 random_hex() {
-  od -An -tx1 -N24 /dev/urandom | tr -d ' \n'
+  od -An -tx1 -N"${1:-24}" /dev/urandom | tr -d ' \n'
 }
 
 # dotenv_quote VALUE — a value Compose reads back verbatim. Single quotes are literal in a .env;

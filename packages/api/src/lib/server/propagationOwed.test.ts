@@ -92,12 +92,16 @@ describe('an owed config propagation', () => {
       certificateSync: { state: 'unknown', at: null },
       sipBanHelper: { running: false, heartbeat: null, dropped: null },
       mailRelay: null,
-      skippedConfigRows: 0
+      skippedConfigRows: 0,
+      mediaDir: '/nonexistent/media',
+      mediaStorageMax: null
     });
     expect(health.checks['config:propagation']).toEqual([{ status: 'warn' }]);
     const metrics = await renderMetrics({
       db,
       dbFile: ':memory:',
+      mediaDir: '/nonexistent/media',
+      mediaStorageMax: null,
       checkAri: () => Promise.resolve(false),
       coreState: () => Promise.reject(new Error('core unreachable')),
       certSyncStatus: () => 'unknown',

@@ -8,6 +8,7 @@ import {
   dbFileFrom,
   DEFAULT_MEDIA_DIR,
   MAX_PORT,
+  parseMediaStorageMax,
   resolveVersion,
   stackTimeZoneError,
   type ZamfonoVersion
@@ -31,6 +32,8 @@ export type CoreEnv = {
   amiPassword: string;
   dbFile: string;
   mediaDir: string;
+  /** `MEDIA_STORAGE_MAX` in bytes, `null` without a limit (§11.6). */
+  mediaStorageMax: number | null;
   hepEnabled: boolean;
   /** `SIP_UDP_ENABLED` and `SIP_TCP_ENABLED` (§9.1): whether the plain SIP transports serve trunks. */
   sipUdpEnabled: boolean;
@@ -122,6 +125,7 @@ export function readEnv(env: NodeJS.ProcessEnv): CoreEnv {
     amiPassword: requireEnv(env, 'AMI_PASSWORD'),
     dbFile: dbFileFrom(env.DB_FILE),
     mediaDir: optionalEnv(env, 'MEDIA_DIR') ?? DEFAULT_MEDIA_DIR,
+    mediaStorageMax: parseMediaStorageMax(env.MEDIA_STORAGE_MAX),
     hepEnabled: env.HEP_ENABLED !== 'false',
     sipUdpEnabled: env.SIP_UDP_ENABLED !== 'false',
     sipTcpEnabled: env.SIP_TCP_ENABLED !== 'false',

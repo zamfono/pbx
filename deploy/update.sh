@@ -147,10 +147,11 @@ latest_version() {
 
 
 # ZAMFONO_VERSION follows the update by its form (tag_kind): a pinned release becomes the new one,
-# a line the new release's line, X.Y or X as before; empty and latest stay. The settings a newer
-# .env.example added are listed, for the operator to set.
+# a line the new release's line, X.Y or X as before; empty and latest stay. An empty or missing
+# METRICS_TOKEN gets a generated one, which only .env holds: this output reaches the host agent's
+# records. The other settings a newer .env.example added are listed, for the operator to set.
 update_env() {
-  local name tag new
+  local name tag new token
   tag=$(env_tag)
   case $(tag_kind "$tag") in
     release) new=$target ;;
@@ -160,6 +161,15 @@ update_env() {
   if [[ $new != "$tag" ]]; then
     set_env_line .env ZAMFONO_VERSION "$new"
     echo "  .env: ZAMFONO_VERSION $tag -> $new"
+  fi
+  if [[ -z $(env_value METRICS_TOKEN) ]]; then
+    token=$(random_hex 32)
+    if ! set_env_line .env METRICS_TOKEN "$token"; then
+      # On a line of its own, whether or not .env ends in one.
+      [[ -z $(tail -c 1 .env) ]] || echo >>.env
+      echo "METRICS_TOKEN=$(dotenv_quote "$token")" >>.env
+    fi
+    echo "  .env: METRICS_TOKEN generated, the bearer token of /metrics and the full /healthz (see .env)"
   fi
   sed -nE 's/^([A-Z_][A-Z0-9_]*)=.*/\1/p' .env.example | while read -r name; do
     grep -qE "^$name=" .env || echo "  .env: new setting $name, unset (see .env.example)"

@@ -16,6 +16,8 @@ export const HTTP_TOO_MANY_REQUESTS = 429;
 export const HTTP_INTERNAL_SERVER_ERROR = 500;
 export const HTTP_BAD_GATEWAY = 502;
 export const HTTP_SERVICE_UNAVAILABLE = 503;
+/** RFC 4918 §11.5: the media volume is at its limit (§11.6 `MEDIA_STORAGE_MAX`). */
+export const HTTP_INSUFFICIENT_STORAGE = 507;
 
 /** The media type of an RFC 9457 problem details body. */
 export const PROBLEM_CONTENT_TYPE = 'application/problem+json';

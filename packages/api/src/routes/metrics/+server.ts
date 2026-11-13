@@ -39,6 +39,8 @@ export async function GET(event: RequestEvent): Promise<Response> {
   const body = await renderMetrics({
     db: getDb(),
     dbFile: env.DB_FILE,
+    mediaDir: env.MEDIA_DIR,
+    mediaStorageMax: env.MEDIA_STORAGE_MAX,
     checkAri,
     coreState: async () => getCoreClient().state(),
     certSyncStatus,

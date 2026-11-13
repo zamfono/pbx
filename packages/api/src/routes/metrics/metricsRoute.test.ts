@@ -24,6 +24,7 @@ const EMPTY_STATE: StateResponse = {
   trunkChannels: {},
   registeredDevices: 0,
   recordingMixFailures: 0,
+  recordingsRefused: 0,
   asteriskChannels: 0,
   recordingsInProgress: 0,
   presence: {}

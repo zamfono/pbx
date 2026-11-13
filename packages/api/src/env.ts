@@ -12,7 +12,11 @@
  */
 import { defineEnvVars } from '@sveltejs/kit/env';
 
-import { dbFileFrom, DEFAULT_MEDIA_DIR } from '@zamfono/shared';
+import {
+  dbFileFrom,
+  DEFAULT_MEDIA_DIR,
+  parseMediaStorageMax
+} from '@zamfono/shared';
 
 const MAX_HOUR = 23;
 
@@ -90,6 +94,7 @@ export const variables = defineEnvVars({
   MAIL_FROM: optional,
   MAIN_DID: optional,
   MEDIA_DIR: withDefault(DEFAULT_MEDIA_DIR),
+  MEDIA_STORAGE_MAX: { schema: parseMediaStorageMax },
   METRICS_TOKEN: optional,
   MIGRATIONS_DIR: withDefault('/app/db/migrations'),
   MOH_SOURCE_DIR: withDefault('/usr/share/asterisk/moh'),

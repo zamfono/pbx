@@ -3,6 +3,7 @@ import * as env from '$app/env/private';
 import {
   healthDocument,
   isDbOpen,
+  mediaUsageBytes,
   pendingMigrations,
   type Db,
   type HealthCheck,
@@ -46,6 +47,9 @@ export type ApiHealthDeps = {
   mailRelay: RelayOutcome | null;
   /** How many rows the latest config render left out (§3.1 "Config propagation"). */
   skippedConfigRows: number;
+  mediaDir: string;
+  /** `MEDIA_STORAGE_MAX` in bytes, `null` without a limit (§11.6). */
+  mediaStorageMax: number | null;
 };
 
 /** `certificate:sync`'s status per state of the sync (§10.3 "Health"). */
@@ -136,6 +140,23 @@ function configRenderCheck(skipped: number): [HealthCheck] {
     : [{ status: 'pass', observedValue: 0 }];
 }
 
+/**
+ * `media:storage`, only while `MEDIA_STORAGE_MAX` is set: `warn` while the media volume is at or
+ * over it, when no upload, call recording, voicemail message or phone greeting is taken; the space
+ * its files take, in bytes, as `observedValue` (§11.6). Without a limit there is nothing to be at, so no check.
+ */
+async function mediaCheck(deps: ApiHealthDeps): Promise<HealthChecks> {
+  if (deps.mediaStorageMax === null) {
+    return {};
+  }
+  const usage = await mediaUsageBytes(deps.mediaDir);
+  return {
+    'media:storage': check(usage >= deps.mediaStorageMax, 'warn', {
+      observedValue: usage
+    })
+  };
+}
+
 /** The checks read from the tables, which only a migrated database holds. */
 async function tableChecks(deps: ApiHealthDeps): Promise<HealthChecks> {
   const { keyring: kr } = deps;
@@ -180,6 +201,7 @@ export async function apiHealth(deps: ApiHealthDeps): Promise<HealthDocument> {
       heartbeat === null ? {} : { time: heartbeat }
     ),
     'config:render': configRenderCheck(deps.skippedConfigRows),
+    ...(await mediaCheck(deps)),
     ...(database[0].status === 'pass' ? await tableChecks(deps) : {})
   });
 }
@@ -203,6 +225,8 @@ export async function currentHealth(db: () => Db): Promise<HealthDocument> {
     certificateSync: { state: certSyncStatus(), at: certSyncLastPass() },
     sipBanHelper: await sipBanHelperState(),
     mailRelay: relayState(),
-    skippedConfigRows: skippedConfigRows().length
+    skippedConfigRows: skippedConfigRows().length,
+    mediaDir: env.MEDIA_DIR,
+    mediaStorageMax: env.MEDIA_STORAGE_MAX
   });
 }

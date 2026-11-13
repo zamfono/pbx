@@ -1,8 +1,15 @@
-import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, onTestFinished, vi } from 'vitest';
 
-import { newId, nowIso, type Db, type StateResponse } from '@zamfono/shared';
+import {
+  mediaUsageBytes,
+  newId,
+  nowIso,
+  type Db,
+  type StateResponse
+} from '@zamfono/shared';
 import { seedSettings } from '@zamfono/shared/testDb.js';
 
 import { makeTestDb } from '#testing/testDb.js';
@@ -23,6 +30,7 @@ const EMPTY_STATE: StateResponse = {
   trunkChannels: {},
   registeredDevices: 0,
   recordingMixFailures: 0,
+  recordingsRefused: 0,
   asteriskChannels: 0,
   recordingsInProgress: 0,
   presence: {}
@@ -33,6 +41,8 @@ function stubDeps(
 ): Parameters<typeof renderMetrics>[0] {
   return {
     dbFile: ':memory:',
+    mediaDir: '/nonexistent/media',
+    mediaStorageMax: null,
     checkAri: () => Promise.resolve(true),
     coreState: () => Promise.resolve(EMPTY_STATE),
     certSyncStatus: () => 'unknown',
@@ -113,6 +123,7 @@ describe('renderMetrics', () => {
       trunkChannels: {},
       registeredDevices: 0,
       recordingMixFailures: 0,
+      recordingsRefused: 0,
       asteriskChannels: 0,
       recordingsInProgress: 0,
       presence: {}
@@ -180,6 +191,7 @@ describe('renderMetrics', () => {
       trunkChannels: {},
       registeredDevices: 0,
       recordingMixFailures: 0,
+      recordingsRefused: 0,
       asteriskChannels: 0,
       recordingsInProgress: 0,
       presence: {}
@@ -479,6 +491,43 @@ describe('renderMetrics', () => {
     expect(parseMetrics(down).has('zamfono_recording_mix_failures_total')).toBe(
       false
     );
+  });
+
+  it('reports the media volume in bytes, its limit only while MEDIA_STORAGE_MAX is set, and the recordings core refused at it (§11.6)', async () => {
+    const db = await makeTestDb();
+    await seedSettings(db);
+    const mediaDir = await mkdtemp(
+      path.join(tmpdir(), 'zamfono-metrics-media-')
+    );
+    onTestFinished(() => rm(mediaDir, { recursive: true, force: true }));
+    await mkdir(path.join(mediaDir, 'recordings'));
+    await writeFile(
+      path.join(mediaDir, 'recordings', 'r.wav'),
+      Buffer.alloc(300)
+    );
+    // The space the directory and its file take on disk (§11.6).
+    const used = String(await mediaUsageBytes(mediaDir));
+
+    const limited = parseMetrics(
+      await renderMetrics(
+        stubDeps({
+          db,
+          mediaDir,
+          mediaStorageMax: 1024,
+          coreState: () =>
+            Promise.resolve({ ...EMPTY_STATE, recordingsRefused: 2 })
+        })
+      )
+    );
+    const unlimited = parseMetrics(
+      await renderMetrics(stubDeps({ db, mediaDir }))
+    );
+
+    expect(limited.get('zamfono_media_bytes')).toBe(used);
+    expect(limited.get('zamfono_media_limit_bytes')).toBe('1024');
+    expect(limited.get('zamfono_recordings_refused_total')).toBe('2');
+    expect(unlimited.get('zamfono_media_bytes')).toBe(used);
+    expect(unlimited.has('zamfono_media_limit_bytes')).toBe(false);
   });
 
   it("reports a backup target's last successful run age in seconds", async () => {

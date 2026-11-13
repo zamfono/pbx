@@ -120,11 +120,15 @@ pin() {
 echo "  - to a newer release"
 fresh_stack
 key=$(grep '^SECRETBOX_KEY=' "$work/stack/.env")
+metrics_token=$(grep '^METRICS_TOKEN=' "$work/stack/.env")
 # A setting .env.example names and .env lacks is listed for the operator, not filled in.
 sed -i '/^UPDATER_TOKEN=/d' "$work/stack/.env"
 update 1.2.4 >"$work/out" 2>&1 || { cat "$work/out"; fail "the update to 1.2.4 failed"; }
 [[ $(pin) == '1.2.4 ZAMFONO_VERSION:-1.2.4' ]] || fail "the stack pins $(pin), not 1.2.4"
 [[ $(grep '^SECRETBOX_KEY=' "$work/stack/.env") == "$key" ]] || fail "the update changed SECRETBOX_KEY"
+[[ $(grep '^METRICS_TOKEN=' "$work/stack/.env") == "$metrics_token" ]] ||
+  fail "the update replaced a set METRICS_TOKEN"
+grep -q 'METRICS_TOKEN' "$work/out" && fail "the update spoke of a METRICS_TOKEN it kept"
 grep -q 'new setting UPDATER_TOKEN, unset' "$work/out" || fail "UPDATER_TOKEN was not listed as new"
 grep -q '^UPDATER_TOKEN=' "$work/stack/.env" && fail "the update filled in UPDATER_TOKEN"
 [[ $(stat -c %a "$work/stack/.env") == 600 ]] || fail ".env is no longer private"
@@ -323,6 +327,22 @@ grep -qx "HOST_CONTROL='true'" "$work/stack/.env" || fail "Enter did not take mo
 # A plain up -d recreates what changed: api for HOST_CONTROL; it removes an old updater.
 grep -qx 'compose up -d --remove-orphans' "$work/runtime.log" ||
   fail "the stack was not brought up to date for HOST_CONTROL: $(cat "$work/runtime.log")"
+
+echo "  - an empty or missing METRICS_TOKEN is generated, its value kept out of the output"
+for how in empty missing; do
+  fresh_stack
+  if [[ $how == empty ]]; then
+    sed -i 's/^METRICS_TOKEN=.*/METRICS_TOKEN=/' "$work/stack/.env"
+  else
+    sed -i '/^METRICS_TOKEN=/d' "$work/stack/.env"
+  fi
+  update 1.2.4 >"$work/out.token" 2>&1 || { cat "$work/out.token"; fail "the update to 1.2.4 failed"; }
+  token=$(sed -nE "s/^METRICS_TOKEN='([0-9a-f]{64})'\$/\\1/p" "$work/stack/.env")
+  [[ -n $token ]] || fail "the update left METRICS_TOKEN $how: $(grep METRICS_TOKEN "$work/stack/.env")"
+  [[ $(grep -c '^METRICS_TOKEN=' "$work/stack/.env") == 1 ]] || fail "two METRICS_TOKEN lines"
+  grep -q 'METRICS_TOKEN generated' "$work/out.token" || fail "the update did not say it generated METRICS_TOKEN"
+  grep -qF "$token" "$work/out.token" && fail "the update printed METRICS_TOKEN"
+done
 
 # shellcheck source=update-runtime-test.sh
 . "$repo_root/deploy/update-runtime-test.sh"

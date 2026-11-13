@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { AUDIO_KINDS } from '@zamfono/shared';
+import { AUDIO_KINDS, HTTP_INSUFFICIENT_STORAGE } from '@zamfono/shared';
 
 import { isAcceptedUploadType } from '#lib/server/audio/uploadTypes.js';
 
@@ -48,6 +48,7 @@ export const createAudioAsset = defineOperation({
     'Uploads and transcodes a new audio asset; over MCP, answers with a link to upload the file to.',
   input: createAudioAssetInput,
   output: audioAssetOut,
+  problems: [HTTP_INSUFFICIENT_STORAGE],
   minRole: 'admin',
   entity: (_input, out: AudioAssetOut) => ({ kind: 'audio', id: out.id }),
   prepare: (ctx, input) => storeUpload(ctx, input.kind, input.upload),

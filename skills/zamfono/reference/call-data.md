@@ -1,8 +1,9 @@
 # Call data
 
-What the stack records as calls happen, and how to read it: voicemails, the presence history and
-the call statistics. The call history itself is `calls.list` (`GET /api/v1/calls`) and `calls.get`
-(`GET /api/v1/calls/{id}`); its routing trace is in `diagnose-bad-call`.
+What the stack records as calls happen, and how to read it: voicemails, the storage limit they and
+recordings count against, the presence history and the call statistics. The call history itself
+is `calls.list` (`GET /api/v1/calls`) and `calls.get` (`GET /api/v1/calls/{id}`); its routing
+trace is in `diagnose-bad-call`.
 
 ## Voicemails
 
@@ -53,6 +54,28 @@ On the phone, `*96` opens one's own mailbox and `*95<ext>` the mailbox of that e
 or ring group, for its owner or a member: play and delete messages, and on `*96` record the
 personal greeting. Voicemails
 are kept until someone deletes them; no retention job removes them.
+
+## Storage limit
+
+The hosting provider may cap what the stack keeps on its media volume (`MEDIA_STORAGE_MAX` in
+the stack's `.env`, which no operation changes): uploaded audio, voicemail and call recordings
+together. `system.health` warns `media:storage` while the volume is at or over it, with the space
+its files take, in bytes, as `observedValue`. Until then:
+
+- `audio.create`, `users.setVoicemailGreeting` and upload links answer 507 Insufficient Storage,
+  also when the upload itself would take the volume over the limit;
+- no new call recording starts: calls go on unrecorded;
+- a caller to voicemail hears that the mailbox is full, and the call is missed, its missed-call
+  mail going out as usual;
+- a greeting recorded on the phone (`*96` or `*95<ext>`, then `0`) is not recorded: the caller
+  hears that the mailbox is full, the current greeting stays, and the call's trace shows
+  `mailboxGreeting` with the reason `mediaFull`.
+
+A recording or message already running finishes. To make room, delete voicemails
+(`voicemails.delete`) or recordings (`recordings.delete`), which frees their space at once, or
+shorten `settings.recordingRetentionDays`. Deleting uploaded audio (`audio.delete`) frees nothing
+yet: the asset stays restorable, files and all, until the daily purge
+`settings.softDeleteRetentionDays` later.
 
 ## Presence history
 

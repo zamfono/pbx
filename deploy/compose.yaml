@@ -105,6 +105,7 @@ services:
       SIP_UDP_ENABLED: ${SIP_UDP_ENABLED:-}     # false turns trunks on that transport unreachable (§9.4)
       SIP_TCP_ENABLED: ${SIP_TCP_ENABLED:-}
       CALL_LOG_MAX_BYTES: ${CALL_LOG_MAX_BYTES:-}
+      MEDIA_STORAGE_MAX: ${MEDIA_STORAGE_MAX:-} # at or over it, no new recording or voicemail message (§11.6)
       ZAMFONO_VERSION: ${ZAMFONO_VERSION:-latest}   # the tag pulled, reported as the version (§7)
       TZ: ${TZ:-}
     volumes:
@@ -138,6 +139,7 @@ services:
       STUN_ENABLED: ${STUN_ENABLED:-}           # false provisions phones without STUN (§10.4)
       TLS_RELOAD_HOUR: ${TLS_RELOAD_HOUR:-}     # certificate swap hour when settings.tls_reload_hour is NULL (§6.4)
       METRICS_TOKEN: ${METRICS_TOKEN:-}         # empty = GET /metrics answers 404 (§7)
+      MEDIA_STORAGE_MAX: ${MEDIA_STORAGE_MAX:-} # at or over it, uploads answer 507; empty = no limit (§11.6)
       ZAMFONO_VERSION: ${ZAMFONO_VERSION:-latest}   # the tag pulled, reported as the version (§7)
       TZ: ${TZ:-}
       # first-boot seed, read only while the database holds no user (§6.3 "First boot")

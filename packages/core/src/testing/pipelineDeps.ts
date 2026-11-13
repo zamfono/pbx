@@ -126,6 +126,7 @@ export function testPipelineDeps(
     legStasisWaitMs: STASIS_WAIT_MS,
     callLogMaxBytes: 1_048_576,
     mediaDir,
+    mediaFull: () => Promise.resolve(false),
     db,
     apiClient: { mail: () => Promise.resolve() },
     logger: noopLogger,
@@ -166,6 +167,9 @@ export function idlePresence(): Pick<
 
 /** The internal server's recorder for a suite that records nothing. */
 export const idleRecorder = { inProgressCount: 0, mixFailureCount: 0 };
+
+/** The internal server's media limit for a suite that reaches none. */
+export const idleMedia = { refusedRecordings: 0 };
 
 /** The internal server's trunk dependency where a test exercises none of it. */
 export const idleTrunks = {

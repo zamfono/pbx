@@ -10,6 +10,7 @@ import type { AriClient } from '../ari/client.js';
 import { logUnlessGone } from '../ari/failures.js';
 import type { Logger } from '../ari/types.js';
 import type { ConfigCache } from '../internal/snapshot.js';
+import type { MediaLimit } from '../mediaLimit.js';
 import {
   legParticipant,
   type Call,
@@ -31,6 +32,8 @@ type RecorderDeps = {
   db: Db;
   mediaDir: string;
   mix?: Mixer;
+  // §11.6 `MEDIA_STORAGE_MAX`: unset, every participation is admitted.
+  media?: Pick<MediaLimit, 'admitsRecording'>;
   log: Logger;
   now: () => string;
 };
@@ -144,8 +147,11 @@ export class Recorder {
     recorded: () => Promise<{ userId: string | null } | null>
   ): Promise<void> {
     const key = participationKey(callId, channelId);
-    const snoops = recorded().then(party =>
-      party === null ? null : this.startSnoops(callId, party.userId, channelId)
+    const snoops = recorded().then(async party =>
+      party === null ||
+      (await this.deps.media?.admitsRecording({ callId, channelId })) === false
+        ? null
+        : this.startSnoops(callId, party.userId, channelId)
     );
     const entry: Entry = { key, callId, snoops: snoops.catch(() => null) };
     this.participations.set(key, entry);
@@ -268,18 +274,15 @@ export class Recorder {
       this.deps.ari,
       `${RECORDINGS_SUBDIR}/${participation.id}-r`
     );
-    await Promise.all([
-      this.deps.ari.channels.hangup(participation.leftChannelId).catch(
-        logUnlessGone(this.deps.log, 'snoop hangup', {
-          participationId: participation.id
-        })
-      ),
-      this.deps.ari.channels.hangup(participation.rightChannelId).catch(
-        logUnlessGone(this.deps.log, 'snoop hangup', {
-          participationId: participation.id
-        })
+    await Promise.all(
+      [participation.leftChannelId, participation.rightChannelId].map(snoop =>
+        this.deps.ari.channels.hangup(snoop).catch(
+          logUnlessGone(this.deps.log, 'snoop hangup', {
+            participationId: participation.id
+          })
+        )
       )
-    ]);
+    );
     await Promise.all([leftFinished, rightFinished]);
     const stored = await storeParticipation(
       {

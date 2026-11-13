@@ -10,7 +10,7 @@ import { asRun, makeTestDb } from '#testing/testDb.js';
 import '../ringGroups/index.js';
 
 import { runOperation } from '../runner.js';
-import { Conflict } from '../types.js';
+import { Conflict, OpError } from '../types.js';
 
 import './index.js';
 
@@ -83,6 +83,24 @@ describe('audio', () => {
     );
     await expect(attempt).rejects.toMatchObject({ status: 422 });
     expect(storeAudio).not.toHaveBeenCalled();
+  });
+
+  it('answers 507 while the media volume is at its limit, rowing nothing (§11.6)', async () => {
+    const db = await makeTestDb();
+    vi.mocked(storeAudio).mockRejectedValueOnce(
+      new OpError(507, 'upload: the media volume is at its limit')
+    );
+    await expect(
+      runOperation(
+        db,
+        'audio.create',
+        { kind: 'greeting', label: 'Main greeting', upload },
+        asRun()
+      )
+    ).rejects.toMatchObject({ status: 507 });
+    expect(await db.selectFrom('audioAssets').select('id').execute()).toEqual(
+      []
+    );
   });
 
   it('accepts an MP3 upload and a WAV type in any case', async () => {

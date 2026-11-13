@@ -83,7 +83,8 @@ const PROBLEM_DESCRIPTIONS: Record<ProblemStatus, string> = {
   409: 'Confirmation required, or the change conflicts with the stored state',
   422: 'The input is invalid',
   502: 'An upstream service answered with an error',
-  503: 'A service the operation needs is unavailable'
+  503: 'A service the operation needs is unavailable',
+  507: 'The media volume is at its limit (MEDIA_STORAGE_MAX)'
 };
 
 const BEARER_SECURITY_SCHEME: JsonSchema = {
