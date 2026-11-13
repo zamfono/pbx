@@ -29,9 +29,13 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# The capabilities and no-new-privileges deploy/compose.yaml runs asterisk with (§6.3).
+HARDENED=(--cap-drop ALL --cap-add NET_ADMIN --cap-add CHOWN --cap-add DAC_OVERRIDE
+  --cap-add SETUID --cap-add SETGID --security-opt no-new-privileges:true)
+
 docker run -d --name "$NETNS_CONTAINER" --entrypoint sleep "$ASTERISK_IMAGE" infinity > /dev/null
 # EXTERNAL_IPV4 as in the ports mode (§6.1), for the TLS transports' Contact and Via below.
-docker run -d --name "$CONTAINER" --cap-add NET_ADMIN \
+docker run -d --name "$CONTAINER" "${HARDENED[@]}" \
   --network "container:$NETNS_CONTAINER" \
   -e HEP_ENABLED=false \
   -e SIP_UDP_ENABLED=false \
@@ -65,6 +69,12 @@ await_ready() {
   fail "asterisk did not finish booting within ${STARTUP_TIMEOUT_S}s"
 }
 await_ready
+
+# Asterisk, PID 1, runs as user asterisk and holds no capability: CAP_NET_ADMIN, which the ban
+# helper needs, would let it change the ban list's table (§6.3, §9.1).
+creds=$(docker exec "$CONTAINER" grep -E '^(Uid|CapPrm|CapEff):' /proc/1/status)
+grep -qE '^Uid:\s+1000\s' <<< "$creds" || fail "Asterisk does not run as user asterisk: $creds"
+[ "$(grep -cE '^Cap(Prm|Eff):\s+0+$' <<< "$creds")" = 2 ] || fail "Asterisk holds capabilities: $creds"
 
 # Asterisk logs to its console alone, the container log, which the runtime caps (spec §7): no log
 # file grows in the writable layer, and no colour code reaches a log reader.

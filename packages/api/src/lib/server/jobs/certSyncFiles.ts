@@ -1,6 +1,6 @@
 /**
  * The certificate files on both sides of the sync (§6.4 "TLS certificates"): the fixed copy the
- * `proxy` image's `cert_obtained` hook writes to `caddy-data` (images/proxy/zamfono-cert-hook),
+ * `proxy` image's `cert_obtained` hook writes to the `cert-copy` volume (images/proxy/zamfono-cert-hook),
  * and the fixed copy on the `asterisk-config` volume that `transport-tls` reads. `certSync.ts`
  * decides when to copy; this file finds, reads, checks and writes the files.
  */
@@ -32,14 +32,13 @@ async function pathExists(filePath: string): Promise<boolean> {
 }
 
 /**
- * The hook's copy of the certificate/key pair under `caddyDataDir` (§6.4: `zamfono/cert.pem` and
- * `zamfono/privkey.pem`, images/proxy/zamfono-cert-hook), `null` while neither file exists yet —
- * a fresh stack whose first certificate Caddy has not obtained, or notified, yet.
+ * The hook's copy of the certificate/key pair in `dir`, the `cert-copy` volume (§6.4: `cert.pem`
+ * and `privkey.pem`, images/proxy/zamfono-cert-hook), `null` while neither file exists yet — a
+ * fresh stack whose first certificate Caddy has not obtained, or notified, yet.
  */
-export async function findCaddyCert(
-  caddyDataDir: string
+export async function findCertCopy(
+  dir: string
 ): Promise<{ crt: string; key: string } | null> {
-  const dir = path.join(caddyDataDir, 'zamfono');
   const crt = path.join(dir, TLS_CERT_FILENAME);
   const key = path.join(dir, TLS_KEY_FILENAME);
   if (!(await pathExists(crt)) || !(await pathExists(key))) {

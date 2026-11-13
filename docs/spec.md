@@ -367,7 +367,7 @@ A stack runs on any Linux host with a container runtime that implements the Comp
 
 Everything else is the operator's choice; the stack contains no host-specific values (§12, "Day-one discipline"). §6.2 walks through one deployment of each mode.
 
-**One IP, three listeners.** The `netns` container holds the stack's network namespace: an idle container of the `proxy` image that owns the address, the published ports and the attachment to `internal`, where it answers to the name `asterisk`. The `asterisk`, `stun` and `proxy` containers run with `network_mode: service:netns` and therefore bind their ports in that same namespace. Caddy (80 for the automatic redirect to HTTPS and the ACME HTTP-01 challenge, 443 for everything), Asterisk (5060/5061 and the RTP range, `RTP_PORT_START`–`RTP_PORT_END`, default 10000–10200) and the STUN server (3478/udp) split the one address by port. In the macvlan mode that address is public and nothing translates it; in the ports mode the host maps each port 1:1 onto the namespace, so port numbers survive and only the address changes, which `EXTERNAL_IPV4` accounts for.
+**One IP, three listeners.** The `netns` container holds the stack's network namespace: an idle container of the `proxy` image that owns the address, the published ports and the attachment to `internal`, where it answers to the name `asterisk`. The `asterisk`, `stun` and `proxy` containers run with `network_mode: service:netns` and therefore bind their ports in that same namespace. Caddy (80 for the automatic redirect to HTTPS and the ACME HTTP-01 challenge, 443 for everything, which it binds as uid 1000 without a capability since `netns` lowers `net.ipv4.ip_unprivileged_port_start` to 80 in the namespace, §6.3 "Capabilities"), Asterisk (5060/5061 and the RTP range, `RTP_PORT_START`–`RTP_PORT_END`, default 10000–10200) and the STUN server (3478/udp) split the one address by port. In the macvlan mode that address is public and nothing translates it; in the ports mode the host maps each port 1:1 onto the namespace, so port numbers survive and only the address changes, which `EXTERNAL_IPV4` accounts for.
 
 Two consequences follow from the shared namespace:
 
@@ -463,6 +463,9 @@ Clients and trunks see the VPS address in SIP and SDP; the host forwards each po
 # (§6.1), which requires it; this file alone runs the stack with no public reachability.
 # api's and core's healthcheck: GET /readyz on the internal port answers 200 (§6.3 "Health"). The
 # script holds no space, since Podman's Docker-compatible API splits a CMD argument at its spaces.
+# Every service drops every capability and runs with no-new-privileges; asterisk adds back what its
+# root entrypoint and ban helper need (§6.3 "Capabilities"). read_only where a service writes only
+# to its volumes and tmpfs.
 x-readyz: &readyz ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/readyz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
 
 networks:
@@ -476,6 +479,11 @@ services:
     image: ghcr.io/zamfono/proxy:${ZAMFONO_VERSION:-latest}
     entrypoint: ["sleep", "infinity"]
     stop_signal: SIGKILL
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    read_only: true
+    sysctls:                                    # proxy, uid 1000 without capabilities, binds 80 and 443 in this namespace
+      net.ipv4.ip_unprivileged_port_start: 80
     networks:
       internal:
         aliases:
@@ -496,8 +504,15 @@ services:
       SIP_UDP_ENABLED: ${SIP_UDP_ENABLED:-}     # false binds transport-udp to loopback (§9.1)
       SIP_TCP_ENABLED: ${SIP_TCP_ENABLED:-}     # false binds transport-tcp to loopback (§9.1)
       TZ: ${TZ:-}
-    cap_add:
+    cap_drop: [ALL]
+    cap_add:                                    # the root entrypoint's and ban helper's; Asterisk starts as user asterisk with none
       - NET_ADMIN                               # the ban helper's nftables table, in this namespace only (§5.6, §9.1)
+      - CHOWN                                   # hands asterisk-config and astdb to user asterisk
+      - DAC_OVERRIDE                            # renders into /etc/asterisk, user asterisk's; a root exec reaches Asterisk's CLI socket
+      - SETUID                                  # starts Asterisk as user asterisk
+      - SETGID
+    security_opt: [no-new-privileges:true]
+    # not read_only: the entrypoint renders the configuration into /etc/asterisk on every start
     healthcheck:                                # the ban helper's heartbeat in sip_ban_helper.status is fresh (§9.1)
       test: ["CMD", "/usr/local/bin/ban-helper-alive"]
     ulimits:
@@ -532,12 +547,18 @@ services:
         --log-file stdout --simple-log "$$@"
       - stun
     stop_signal: SIGKILL
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    read_only: true
     restart: unless-stopped
 
   migrate:
     image: ghcr.io/zamfono/migrate:${ZAMFONO_VERSION:-latest}   # node:26-slim + Kysely + db/migrations; applies pending migrations, then exits
     networks:
       - internal
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    read_only: true
     volumes:
       - db:/data
     restart: "no"                 # a container that exited 0 is the success api and core wait for
@@ -564,6 +585,9 @@ services:
       MEDIA_STORAGE_MAX: ${MEDIA_STORAGE_MAX:-} # at or over it, no new recording or voicemail message (§11.6)
       ZAMFONO_VERSION: ${ZAMFONO_VERSION:-latest}   # the tag pulled, reported as the version (§7)
       TZ: ${TZ:-}
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    read_only: true
     volumes:
       - media:/media
       - db:/data                  # /data/zamfono.sqlite3
@@ -612,11 +636,15 @@ services:
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       COUNTRY: ${COUNTRY}                       # ISO 3166-1 alpha-2
       EXT_LENGTH: ${EXT_LENGTH:-}
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    # not read_only: a backup writes its database snapshot to /tmp and restic its cache under HOME,
+    # which a tmpfs would hold in memory (§6.5)
     volumes:
       - media:/media
       - db:/data
       - asterisk-config:/etc/asterisk/gen
-      - caddy-data:/caddy-data:ro               # certificate sync source (§6.4)
+      - cert-copy:/cert-copy:ro                 # the cert_obtained hook's copy, the certificate sync's source (§6.4)
       - backups:/backups                        # the default local backup target's repository (§6.5)
       - ./.update:/update:ro                    # the host agent's reports: root's, 0750 (§6.3 "Updates")
       - ./.update/requests:/update/requests     # the one place it writes there: its requests to the host agent, a tmpfs
@@ -634,8 +662,14 @@ services:
     environment:
       FQDN: ${FQDN}                             # Caddyfile site address, Let's Encrypt; also read by the cert_obtained hook (§6.4)
       METRICS_TOKEN: ${METRICS_TOKEN:-}         # Caddyfile refuses /metrics while unset (§7)
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    read_only: true
+    tmpfs:
+      - /config:mode=1777                       # Caddy's autosave of the config it runs; uid 1000 writes it
     volumes:
-      - caddy-data:/data
+      - caddy-data:/data                        # Caddy's certificates and ACME account; proxy's alone
+      - cert-copy:/cert-copy                    # the cert_obtained hook writes its copy for api here (§6.4)
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
     restart: unless-stopped
 
@@ -644,6 +678,7 @@ volumes:
   db:
   backups:
   caddy-data:
+  cert-copy:
   asterisk-config:
   astdb:
 ```
@@ -714,7 +749,7 @@ services:
 # and :80 answering with a redirect to HTTPS.
 #
 # The global options block, first and only (Caddy allows exactly one): the `cert_obtained` hook
-# that copies a new certificate onto caddy-data and notifies `api` (§6.4, images/proxy/Dockerfile
+# that copies a new certificate onto cert-copy and notifies `api` (§6.4, images/proxy/Dockerfile
 # for the plugin and the hook script itself). `import`ing a glob that matches nothing is
 # harmless, which is what lets the test harness add its own global option — switching automatic
 # HTTPS to Caddy's internal CA, so it can prove §6.4 with no internet reachable
@@ -809,9 +844,11 @@ handle /metrics/litestream {
 }
 ```
 
-**Images.** The stack's own images, `asterisk`, `migrate`, `api`, `core`, `proxy` and `updater`, the last retired and kept for older releases' `update.sh` (Updates), are published to GitHub Container Registry as `ghcr.io/zamfono/<name>`, linked to the `zamfono/pbx` repository. Each tag is one image for `linux/amd64` and `linux/arm64`, both built and tested by CI, so a runtime pulls the host's own; both platforms' `asterisk` install the same Asterisk version, or nothing is published. `proxy` is Caddy built with `xcaddy` from the official `caddy` builder and runtime images and the `caddy-events-exec` plugin, each pinned to one exact version in `images/proxy/Dockerfile`, which alone names them. Its Caddy runs as uid 1000 and the image's `/data` belongs to that uid, so a fresh `caddy-data` volume does too. A newer Caddy is adopted by changing the pins in a pull request that passes CI, which Dependabot opens for the two images; the plugin's pin moves by hand. Every base image a Dockerfile starts from, `debian:trixie-slim`, `node:26-slim` and Caddy's two, is named by tag and index digest, `<image>:<tag>@sha256:<digest>`, so an upstream tag moved under the same name changes no build until a pull request moves the digest, which Dependabot opens weekly; the Zamfono APT repository's keyring package, which the `asterisk` image fetches before it has a key to check anything with, is installed only with the SHA-256 its Dockerfile names. The one upstream image the stack runs unmodified, the Litestream sidecar of §6.5, is pinned exactly by the operator, in `compose.local.yaml`. Every push to `main` that passes CI publishes `edge` and `sha-<short commit>`. A `vX.Y.Z` tag on a commit of `main` adds `X.Y.Z`, `X.Y`, `X` and `latest` to the image `main` already built and tested for that commit, so a release is byte-identical to the edge build it came from, and removes the `sha-` images of the commits that release contains. `latest` only ever names a release. The same tag publishes a GitHub release that attaches the operator files of `deploy/` (`compose.yaml`, both overlays, `Caddyfile`, `litestream.caddy`, `.env.example`, `README.md`, `CHANGELOG.md`, `update.sh` (Updates), the `setup/` helpers it and `setup.sh` share, and `setup.sh`, which writes a new stack's `.env`: it asks for the values only the operator knows, and on request for the listeners to switch off (`SIP_UDP_ENABLED`, `SIP_TCP_ENABLED`, `STUN_ENABLED`) and the RTP range, which must leave out 3478 and 5060, or reads them from the environment, offers on a host with apt, run as root, unattended upgrades of the host's packages, the distribution's and Docker's repository's, at 04:00 host time and never rebooting (`UNATTENDED_UPGRADES`, a checkbox ticked unless set, false without a terminal), writes `HOST_CONTROL` (Host control), a checkbox ticked in the ports mode and unticked in the macvlan mode, false without a terminal unless set, installs the host agent (Updates) as root on a systemd host unless `ZAMFONO_AGENT=false`, generates every secret, checks `COUNTRY` and hashes the owner's password (at least 8 characters, or a given Argon2id hash) with the `api` image, never overwrites an `.env` that holds values, refuses while the stack's `db` volume from an earlier start exists, and in a release's bundle first pulls the release's images and checks each against `DIGESTS`, writing nothing where one differs or has no entry, unless `ZAMFONO_VERSION` names another tag than the bundle's) as `zamfono-deploy.tar.gz` and `zamfono-deploy.zip`, with their `SHA256SUMS` and a build-provenance attestation of both; the release is created as a draft, the assets attached, and only then published, since the repository's releases are immutable: once published, a release's tag and assets cannot change, only its title and notes, and the `v*` tags cannot be deleted or moved either. In the bundle, a `DIGESTS` file names each image's index digest for the release, `<name> <digest>` per line, the one every tag the release added names, so `SHA256SUMS` covers the images too; every `${ZAMFONO_VERSION:-latest}` default of `compose.yaml` names the release, so the files and the images they pull come from one commit, and a `VERSION` file names it as data: `update.sh` and `setup.sh` read the release a stack directory runs from it, unless `.env` pins one in `ZAMFONO_VERSION` (Updates). The release is created only after the tags are added. A pull request that a maintainer has labelled `publish-image` after reading it has its six CI-built images published for review as `ghcr.io/zamfono/<name>-pr:<N>` and `<N>-<short commit>`, never `latest`, run with `deploy/compose.pr.yaml`, which takes the tag from `ZAMFONO_PR`, never from `ZAMFONO_VERSION`, and passes it to `api` and `core` as their version; a later push removes the label, and closing the pull request deletes them. Every image carries the full commit it was built from as the label `org.opencontainers.image.revision`, and the `api` and `core` images also as the environment variable `ZAMFONO_REVISION`, which a release keeps, since it adds tags and rebuilds nothing.
+**Images.** The stack's own images, `asterisk`, `migrate`, `api`, `core`, `proxy` and `updater`, the last retired and kept for older releases' `update.sh` (Updates), are published to GitHub Container Registry as `ghcr.io/zamfono/<name>`, linked to the `zamfono/pbx` repository. Each tag is one image for `linux/amd64` and `linux/arm64`, both built and tested by CI, so a runtime pulls the host's own; both platforms' `asterisk` install the same Asterisk version, or nothing is published. `proxy` is Caddy built with `xcaddy` from the official `caddy` builder and runtime images and the `caddy-events-exec` plugin, each pinned to one exact version in `images/proxy/Dockerfile`, which alone names them. Its Caddy runs as uid 1000 and the image's `/data` and `/cert-copy` belong to that uid, so a fresh `caddy-data` or `cert-copy` volume does too; its binary carries no file capability (Capabilities). A newer Caddy is adopted by changing the pins in a pull request that passes CI, which Dependabot opens for the two images; the plugin's pin moves by hand. Every base image a Dockerfile starts from, `debian:trixie-slim`, `node:26-slim` and Caddy's two, is named by tag and index digest, `<image>:<tag>@sha256:<digest>`, so an upstream tag moved under the same name changes no build until a pull request moves the digest, which Dependabot opens weekly; the Zamfono APT repository's keyring package, which the `asterisk` image fetches before it has a key to check anything with, is installed only with the SHA-256 its Dockerfile names. The one upstream image the stack runs unmodified, the Litestream sidecar of §6.5, is pinned exactly by the operator, in `compose.local.yaml`. Every push to `main` that passes CI publishes `edge` and `sha-<short commit>`. A `vX.Y.Z` tag on a commit of `main` adds `X.Y.Z`, `X.Y`, `X` and `latest` to the image `main` already built and tested for that commit, so a release is byte-identical to the edge build it came from, and removes the `sha-` images of the commits that release contains. `latest` only ever names a release. The same tag publishes a GitHub release that attaches the operator files of `deploy/` (`compose.yaml`, both overlays, `Caddyfile`, `litestream.caddy`, `.env.example`, `README.md`, `CHANGELOG.md`, `update.sh` (Updates), the `setup/` helpers it and `setup.sh` share, and `setup.sh`, which writes a new stack's `.env`: it asks for the values only the operator knows, and on request for the listeners to switch off (`SIP_UDP_ENABLED`, `SIP_TCP_ENABLED`, `STUN_ENABLED`) and the RTP range, which must leave out 3478 and 5060, or reads them from the environment, offers on a host with apt, run as root, unattended upgrades of the host's packages, the distribution's and Docker's repository's, at 04:00 host time and never rebooting (`UNATTENDED_UPGRADES`, a checkbox ticked unless set, false without a terminal), writes `HOST_CONTROL` (Host control), a checkbox ticked in the ports mode and unticked in the macvlan mode, false without a terminal unless set, installs the host agent (Updates) as root on a systemd host unless `ZAMFONO_AGENT=false`, generates every secret, checks `COUNTRY` and hashes the owner's password (at least 8 characters, or a given Argon2id hash) with the `api` image, never overwrites an `.env` that holds values, refuses while the stack's `db` volume from an earlier start exists, and in a release's bundle first pulls the release's images and checks each against `DIGESTS`, writing nothing where one differs or has no entry, unless `ZAMFONO_VERSION` names another tag than the bundle's) as `zamfono-deploy.tar.gz` and `zamfono-deploy.zip`, with their `SHA256SUMS` and a build-provenance attestation of both; the release is created as a draft, the assets attached, and only then published, since the repository's releases are immutable: once published, a release's tag and assets cannot change, only its title and notes, and the `v*` tags cannot be deleted or moved either. In the bundle, a `DIGESTS` file names each image's index digest for the release, `<name> <digest>` per line, the one every tag the release added names, so `SHA256SUMS` covers the images too; every `${ZAMFONO_VERSION:-latest}` default of `compose.yaml` names the release, so the files and the images they pull come from one commit, and a `VERSION` file names it as data: `update.sh` and `setup.sh` read the release a stack directory runs from it, unless `.env` pins one in `ZAMFONO_VERSION` (Updates). The release is created only after the tags are added. A pull request that a maintainer has labelled `publish-image` after reading it has its six CI-built images published for review as `ghcr.io/zamfono/<name>-pr:<N>` and `<N>-<short commit>`, never `latest`, run with `deploy/compose.pr.yaml`, which takes the tag from `ZAMFONO_PR`, never from `ZAMFONO_VERSION`, and passes it to `api` and `core` as their version; a later push removes the label, and closing the pull request deletes them. Every image carries the full commit it was built from as the label `org.opencontainers.image.revision`, and the `api` and `core` images also as the environment variable `ZAMFONO_REVISION`, which a release keeps, since it adds tags and rebuilds nothing.
 
 **Runtimes.** The file is written to the Compose Specification and is run with `docker compose` or `podman compose`; every command in this document accepts either prefix. CI brings the stack up on both (§8). Four features of the file are the ones that differ between runtimes and are therefore what that test guards: the network namespace `asterisk`, `stun` and `proxy` share with `netns` (`network_mode: service:`), the health-gated `depends_on`, the `service_completed_successfully` condition on the one-shot `migrate` service, and the static address on the `public` network. Podman needs a systemd host, since it runs healthchecks and restart policies through systemd.
+
+**Capabilities.** Every service runs with every capability dropped (`cap_drop: [ALL]`) and with `no-new-privileges`, so no process gains a capability or another user through a setuid or file-capability binary. Only `asterisk` adds any back, for its entrypoint and the ban helper, which run as root: `NET_ADMIN` for the ban list's nftables table in the stack's namespace (§5.6, §9.1), `CHOWN` to hand `asterisk-config` and the `astdb` volume to user `asterisk`, `DAC_OVERRIDE` to render the configuration into `/etc/asterisk`, which belongs to user `asterisk`, and for a root `exec` of `asterisk -rx` to reach Asterisk's control socket, and `SETUID` and `SETGID` to start Asterisk as user `asterisk`, which the entrypoint does with `setpriv`, so Asterisk itself holds no capability; its own `-U` would have kept `NET_ADMIN`. `proxy`'s Caddy, uid 1000, binds 80 and 443 without `CAP_NET_BIND_SERVICE`: `netns` sets `net.ipv4.ip_unprivileged_port_start` to 80 in the namespace it holds, which Docker sets to 0 by itself and Podman, rootful or rootless, leaves at the kernel's 1024. Its binary carries no file capability, which `no-new-privileges` ignores and the dropped capabilities would make unexecutable. `netns`, `stun`, `migrate`, `core` and `proxy` run with a read-only root filesystem, writing only to their volumes and, for `proxy`, a tmpfs at `/config` for Caddy's autosaved configuration, mode 1777 so its uid 1000 writes it where the runtime would make it root's 0755, as Docker does. `asterisk` keeps a writable one, since its entrypoint renders the configuration into `/etc/asterisk` beside the image's own files on every start, and so does `api`, whose backups write the database snapshot to `/tmp` and restic's cache under its home directory, which a tmpfs would hold in memory (§6.5).
 
 **Environment.** One `.env` per deployment holds the deployment-specific values; Compose interpolates them into the service definitions above, and a service sees only the variables listed for it:
 
@@ -824,7 +861,7 @@ handle /metrics/litestream {
 - the first-boot seed ("First boot");
 - optional `TZ`, `TLS_RELOAD_HOUR` (§6.4), `CALL_LOG_MAX_BYTES` and `HEP_ENABLED` (§7, default `true`), `SIP_UDP_ENABLED` and `SIP_TCP_ENABLED` (§9.1, default `true`), `STUN_ENABLED` (§6.1, default `true`), `METRICS_TOKEN` (§7; absent = no metrics endpoint; `setup.sh` generates a random 256-bit one and prints it once, "Updates" adds one where it is empty), `MEDIA_STORAGE_MAX` (§11.6 "Media storage limit"; empty = no limit; a malformed value stops `api` and `core` at start with a message naming it), and `ZAMFONO_VERSION`, the tag of the six `zamfono/` images (default `latest`), which Compose also passes to `api` and `core` as the version they report (§7).
 
-**Migrations.** The `migrate` service is the only thing that changes the schema. Its image, built from the repository root by `images/migrate/Dockerfile` with the `db` workspace's production dependencies alone, holds `db/migrate.ts`, `db/migrations/` and the shared `stackPaths.ts` that names the database file's default, and applies them with Kysely's `Migrator` to the `db` volume, retrying five times at 5 s intervals for a file that is briefly locked, then exits: 0 when every migration is applied, which is also the idle case on every later start, 1 when a migration fails on its own merits. `api` and `core` start only on that exit 0, so a failed migration stops the deployment before any code runs against an older schema. Migrations are forward-only; a bad release is undone by restoring the snapshot the upgrade began with (Upgrades, §6.5) and setting `ZAMFONO_VERSION` to the previous release. Every container that writes a shared volume runs as uid 1000: the three images that open the database as `node`, the `asterisk` image with its `asterisk` user mapped to that uid, and the `proxy` image, so the migration's database file, the rendered configuration and certificate on `asterisk-config`, the voicemail and prompt files on `media` and the certificate copy on `caddy-data` are readable and writable across containers.
+**Migrations.** The `migrate` service is the only thing that changes the schema. Its image, built from the repository root by `images/migrate/Dockerfile` with the `db` workspace's production dependencies alone, holds `db/migrate.ts`, `db/migrations/` and the shared `stackPaths.ts` that names the database file's default, and applies them with Kysely's `Migrator` to the `db` volume, retrying five times at 5 s intervals for a file that is briefly locked, then exits: 0 when every migration is applied, which is also the idle case on every later start, 1 when a migration fails on its own merits. `api` and `core` start only on that exit 0, so a failed migration stops the deployment before any code runs against an older schema. Migrations are forward-only; a bad release is undone by restoring the snapshot the upgrade began with (Upgrades, §6.5) and setting `ZAMFONO_VERSION` to the previous release. Every container that writes a shared volume runs as uid 1000: the three images that open the database as `node`, the `asterisk` image with its `asterisk` user mapped to that uid, and the `proxy` image, so the migration's database file, the rendered configuration and certificate on `asterisk-config`, the voicemail and prompt files on `media` and the certificate copy on `cert-copy` are readable and writable across containers.
 
 **First boot.** On its first start against a freshly migrated, empty database, `api` seeds it from `.env`:
 
@@ -851,11 +888,11 @@ The hash is required: without it, or with a value that is not an Argon2id PHC st
 
 The stack FQDN serves both HTTPS and SIP-TLS on one shared IP (§6.1). Caddy's automatically obtained and renewed Let's Encrypt certificate is therefore the stack's only certificate.
 
-Asterisk cannot do ACME; it reads static PEM files. Whenever Caddy obtains or renews the certificate, its `cert_obtained` event runs a hook in the `proxy` image: the hook copies chain and key from the paths the event names to `zamfono/` on `caddy-data`, a location of the stack's own, then notifies `api` with `POST /internal/certificate` over the internal network. The `proxy` image's entrypoint also runs the hook once for the certificate Caddy holds when it starts, since Caddy emits no event for a stored certificate and can emit one before the hook is subscribed. `api` mounts `caddy-data` read-only and compares that copy with the one on the `asterisk-config` volume on each notification, hourly as a fallback for a missed one, and at start. On a change it copies chain and key over and triggers the PJSIP reload through `core` (§9.1), which both TLS transports pick up because the file paths in their configuration never change: Asterisk restarts a TLS transport's listener when its certificate or key file has changed at the same path. Neither has `allow_reload=yes`, which would instead destroy and recreate the transport on a PJSIP reload and crash Asterisk when an outgoing TLS connection is still in its handshake. The same sync runs at `api` start. The reload is a config propagation (§3.1): one that `core` does not answer or refuses, as at a fresh start, where `api` syncs before `core` runs, leaves the copy in place and is owed like any other, retried until a propagation succeeds, which reloads every module and so picks up the certificate.
+Asterisk cannot do ACME; it reads static PEM files. Whenever Caddy obtains or renews the certificate, its `cert_obtained` event runs a hook in the `proxy` image: the hook copies chain and key from the paths the event names to `cert.pem` and `privkey.pem` on `cert-copy`, a volume of their own that `proxy` mounts read-write and `api` read-only, so `api` never mounts `caddy-data` with Caddy's ACME account key and private keys, then notifies `api` with `POST /internal/certificate` over the internal network. The `proxy` image's entrypoint also runs the hook once for the certificate Caddy holds when it starts, since Caddy emits no event for a stored certificate and can emit one before the hook is subscribed; this also fills `cert-copy` on a stack's first start with it, and removes the `zamfono/` copy earlier releases kept on `caddy-data`. `api` compares that copy with the one on the `asterisk-config` volume on each notification, hourly as a fallback for a missed one, and at start. On a change it copies chain and key over and triggers the PJSIP reload through `core` (§9.1), which both TLS transports pick up because the file paths in their configuration never change: Asterisk restarts a TLS transport's listener when its certificate or key file has changed at the same path. Neither has `allow_reload=yes`, which would instead destroy and recreate the transport on a PJSIP reload and crash Asterisk when an outgoing TLS connection is still in its handshake. The same sync runs at `api` start. The reload is a config propagation (§3.1): one that `core` does not answer or refuses, as at a fresh start, where `api` syncs before `core` runs, leaves the copy in place and is owed like any other, retried until a propagation succeeds, which reloads every module and so picks up the certificate.
 
 A transport reload can briefly drop TLS registrations. Clients re-register within seconds and the RTP of running calls is unaffected, but the job still reloads only on an actual change.
 
-`/healthz` reports the sync's state in its check `certificate:sync` (§10.3 "Health") and `/metrics` as `zamfono_certificate_sync_ok` (1 only for `ok`), the first of these that applies: `unknown` before the first pass, `missing` while `caddy-data` holds no copy, `failed` after a pass that could not read, check or copy the certificate until one succeeds, `pending` while the reload of a copied certificate is owed, `expired` while the copy on `asterisk-config` has expired, `expiring` while it expires within 14 days, else `ok`.
+`/healthz` reports the sync's state in its check `certificate:sync` (§10.3 "Health") and `/metrics` as `zamfono_certificate_sync_ok` (1 only for `ok`), the first of these that applies: `unknown` before the first pass, `missing` while `cert-copy` holds no copy, `failed` after a pass that could not read, check or copy the certificate until one succeeds, `pending` while the reload of a copied certificate is owed, `expired` while the copy on `asterisk-config` has expired, `expiring` while it expires within 14 days, else `ok`.
 
 **Fresh stack.** The Asterisk entrypoint generates a self-signed placeholder certificate when the volume holds none, so `transport-tls` loads before Caddy has obtained anything. The first real certificate replaces the placeholder immediately. The reload-timing rule governs only replacements of a working certificate.
 

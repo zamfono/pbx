@@ -1,6 +1,6 @@
 # shellcheck shell=bash
 # Sourced by test.sh: the image's second run, with HEP on and the astdb on a volume (§7, §9.1).
-# Reads test.sh's `HEP_CONTAINER`, `ASTDB_VOLUME`, `ASTERISK_IMAGE`, `fail` and `await_ready`.
+# Reads test.sh's `HARDENED`, `HEP_CONTAINER`, `ASTDB_VOLUME`, `ASTERISK_IMAGE`, `fail` and `await_ready`.
 
 # §7, §9.1: with HEP on, res_hep mirrors to the numeric address `core` resolves to whenever
 # hep.conf is loaded, since res_hep refuses a hostname ("Failed to create address") and then
@@ -9,7 +9,7 @@
 # The astdb, where registrations live, sits on a volume and must outlive the container (§9.1).
 docker volume create "$ASTDB_VOLUME" > /dev/null
 start_hep_container() {
-  docker run -d --name "$HEP_CONTAINER" --cap-add NET_ADMIN \
+  docker run -d --name "$HEP_CONTAINER" "${HARDENED[@]}" \
     "$@" \
     -e ARI_PASSWORD=x \
     -e AMI_PASSWORD=y \

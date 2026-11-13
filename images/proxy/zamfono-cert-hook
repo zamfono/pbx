@@ -20,8 +20,9 @@
 #
 # The copy this hook makes is what `api` reads instead of Caddy's own store, whose layout is
 # undocumented (§6.4: "`api` reads only the hook's copy, never Caddy's own certificate store").
-# It lands at a fixed pair of its own on the same `caddy-data` volume, $XDG_DATA_HOME/zamfono/
-# cert.pem and privkey.pem, written atomically (temp file, then `mv` within the same directory,
+# It lands at a fixed pair on a volume of its own, `cert-copy`, mounted at /cert-copy, so `api`
+# mounts that volume and never `caddy-data` with its ACME account key: /cert-copy/cert.pem and
+# privkey.pem, written atomically (temp file, then `mv` within the same directory,
 # so the rename is atomic) and left owned by this image's own uid (1000, the `caddy` user this
 # image runs as, and the uid `api` also runs as — §6.3 "Migrations"). Caddy-events-exec runs
 # handlers in the background by default (its own README), so a hook that hangs never blocks
@@ -67,8 +68,7 @@ if [ "$readable" = false ]; then
   exit 1
 fi
 
-dest_dir="$data_home/zamfono"
-mkdir -p "$dest_dir"
+dest_dir=/cert-copy
 
 tmp_crt=$(mktemp "$dest_dir/.cert.pem.XXXXXX")
 tmp_key=$(mktemp "$dest_dir/.privkey.pem.XXXXXX")
@@ -77,7 +77,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-log "copying the certificate for '$identifier' onto caddy-data"
+log "copying the certificate for '$identifier' onto cert-copy"
 cp "$src_crt" "$tmp_crt"
 cp "$src_key" "$tmp_key"
 # 0640/owned 1000: `api`, the reader, is uid 1000 too (§6.3 "Migrations"); the key stays

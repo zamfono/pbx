@@ -115,6 +115,15 @@ why the specified behaviour changed; the commit history, how.
   over it.
 - Every base image is pinned by digest as well as tag, kept current by Dependabot, and the
   Asterisk repository's keyring package is checked against its SHA-256 before it is installed.
+- Every container drops every Linux capability and runs with `no-new-privileges`. Only `asterisk`
+  adds some back, for its root entrypoint and SIP ban helper (`NET_ADMIN`, `CHOWN`,
+  `DAC_OVERRIDE`, `SETUID`, `SETGID`), and Asterisk itself now starts with none: it used to keep
+  `NET_ADMIN`, enough to change the ban list's packet filter. `proxy` binds 80 and 443 through
+  `netns`'s `net.ipv4.ip_unprivileged_port_start`, no longer through a file capability on Caddy.
+  `netns`, `stun`, `migrate`, `core` and `proxy` run with a read-only root filesystem.
+- `api` no longer mounts `caddy-data`, which holds the ACME account key and Caddy's private keys:
+  it reads the certificate copy from a volume of its own, `cert-copy`, which `proxy` fills on its
+  first start after the upgrade.
 - A SIP request from anywhere could have any address banned, or keep its own sender from being
   banned, with an escaped CR/LF in its From user, which Asterisk writes unescaped into the AMI
   security event `core` counts. `core` now drops every AMI frame Asterisk could not have written:

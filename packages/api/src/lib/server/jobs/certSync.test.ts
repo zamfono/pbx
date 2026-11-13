@@ -114,13 +114,12 @@ afterEach(() => {
 });
 
 /** Places `crt`/`key` bytes where the `proxy` image's `cert_obtained` hook writes them
- * (images/proxy/zamfono-cert-hook: `zamfono/cert.pem`/`privkey.pem` under `caddyDataDir`). */
-async function seedCaddyCert(
-  caddyDataDir: string,
+ * (images/proxy/zamfono-cert-hook: `cert.pem`/`privkey.pem` in `certCopyDir`). */
+async function seedCertCopy(
+  dir: string,
   crt: Buffer,
   key: Buffer
 ): Promise<void> {
-  const dir = path.join(caddyDataDir, 'zamfono');
   await mkdir(dir, { recursive: true });
   await writeFile(path.join(dir, 'cert.pem'), crt);
   await writeFile(path.join(dir, 'privkey.pem'), key);
@@ -263,27 +262,27 @@ describe('CertSync', () => {
 
   async function makeDirs(): Promise<{
     genDir: string;
-    caddyDataDir: string;
+    certCopyDir: string;
     workDir: string;
   }> {
     const workDir = await mkdtemp(path.join(tmpdir(), 'zamfono-certsync-'));
     work.dir = workDir;
     const genDir = path.join(workDir, 'gen');
-    const caddyDataDir = path.join(workDir, 'caddy-data');
+    const certCopyDir = path.join(workDir, 'cert-copy');
     await mkdir(genDir, { recursive: true });
-    await mkdir(caddyDataDir, { recursive: true });
-    return { genDir, caddyDataDir, workDir };
+    await mkdir(certCopyDir, { recursive: true });
+    return { genDir, certCopyDir, workDir };
   }
 
-  it('reports missing while the hook has not copied a certificate onto caddy-data yet', async () => {
-    const { genDir, caddyDataDir } = await makeDirs();
+  it('reports missing while the hook has not copied a certificate onto cert-copy yet', async () => {
+    const { genDir, certCopyDir } = await makeDirs();
     const db = await settingsDb();
     const coreClient = stubCore();
     const sync = new CertSync({
       db,
       coreClient,
       genDir,
-      caddyDataDir
+      certCopyDir
     });
 
     await expect(sync.run()).resolves.toBe('missing');
@@ -291,42 +290,42 @@ describe('CertSync', () => {
   });
 
   it('does not copy when the source matches the currently installed certificate', async () => {
-    const { genDir, caddyDataDir } = await makeDirs();
+    const { genDir, certCopyDir } = await makeDirs();
     const same = Buffer.from('identical certificate bytes');
-    await seedCaddyCert(caddyDataDir, same, Buffer.from('key'));
+    await seedCertCopy(certCopyDir, same, Buffer.from('key'));
     await seedCurrentCert(genDir, same, Buffer.from('key'));
     const db = await settingsDb();
     const coreClient = stubCore();
 
     await expect(
-      new CertSync({ db, coreClient, genDir, caddyDataDir }).run()
+      new CertSync({ db, coreClient, genDir, certCopyDir }).run()
     ).resolves.toBe('ok');
     expect(coreClient.configChangedCalls).toEqual([]);
   });
 
   it('reports expiring while the installed certificate expires within 14 days', async () => {
-    const { genDir, caddyDataDir, workDir } = await makeDirs();
+    const { genDir, certCopyDir, workDir } = await makeDirs();
     const lapsing = caIssuedCert(workDir, 10);
-    await seedCaddyCert(caddyDataDir, lapsing.crt, lapsing.key);
+    await seedCertCopy(certCopyDir, lapsing.crt, lapsing.key);
     await seedCurrentCert(genDir, lapsing.crt, lapsing.key);
     const db = await settingsDb();
 
     await expect(
-      new CertSync({ db, coreClient: stubCore(), genDir, caddyDataDir }).run()
+      new CertSync({ db, coreClient: stubCore(), genDir, certCopyDir }).run()
     ).resolves.toBe('expiring');
   });
 
   it('reports expired while the installed certificate has expired', async () => {
-    const { genDir, caddyDataDir, workDir } = await makeDirs();
+    const { genDir, certCopyDir, workDir } = await makeDirs();
     const lapsed = caIssuedCert(workDir, 1);
-    await seedCaddyCert(caddyDataDir, lapsed.crt, lapsed.key);
+    await seedCertCopy(certCopyDir, lapsed.crt, lapsed.key);
     await seedCurrentCert(genDir, lapsed.crt, lapsed.key);
     const db = await settingsDb();
     const sync = new CertSync({
       db,
       coreClient: stubCore(),
       genDir,
-      caddyDataDir,
+      certCopyDir,
       now: () => new Date(Date.now() + 2 * DAY_MS)
     });
 
@@ -334,14 +333,14 @@ describe('CertSync', () => {
   });
 
   it('copies immediately when no certificate is installed yet (fresh stack)', async () => {
-    const { genDir, caddyDataDir, workDir } = await makeDirs();
+    const { genDir, certCopyDir, workDir } = await makeDirs();
     const source = caIssuedCert(workDir, 3650);
-    await seedCaddyCert(caddyDataDir, source.crt, source.key);
+    await seedCertCopy(certCopyDir, source.crt, source.key);
     const db = await settingsDb();
     const coreClient = stubCore();
 
     await expect(
-      new CertSync({ db, coreClient, genDir, caddyDataDir }).run()
+      new CertSync({ db, coreClient, genDir, certCopyDir }).run()
     ).resolves.toBe('ok');
     expect(coreClient.configChangedCalls).toEqual([['pjsip']]);
     const installed = await readFile(path.join(genDir, 'tls', 'cert.pem'));
@@ -351,21 +350,21 @@ describe('CertSync', () => {
     expect(keyStat.mode & 0o777).toBe(0o600);
   });
 
-  it("copies nothing while the key on caddy-data is not the certificate's, then the matching pair", async () => {
-    const { genDir, caddyDataDir, workDir } = await makeDirs();
+  it("copies nothing while the key on cert-copy is not the certificate's, then the matching pair", async () => {
+    const { genDir, certCopyDir, workDir } = await makeDirs();
     const previous = caIssuedCert(workDir, 3650);
     const renewed = caIssuedCert(workDir, 3650);
     // The hook has renamed the new chain into place but not yet the new key.
-    await seedCaddyCert(caddyDataDir, renewed.crt, previous.key);
+    await seedCertCopy(certCopyDir, renewed.crt, previous.key);
     const db = await settingsDb();
     const coreClient = stubCore();
-    const sync = new CertSync({ db, coreClient, genDir, caddyDataDir });
+    const sync = new CertSync({ db, coreClient, genDir, certCopyDir });
 
     await expect(sync.run()).resolves.toBe('ok');
     expect(coreClient.configChangedCalls).toEqual([]);
     await expect(stat(path.join(genDir, 'tls', 'cert.pem'))).rejects.toThrow();
 
-    await seedCaddyCert(caddyDataDir, renewed.crt, renewed.key);
+    await seedCertCopy(certCopyDir, renewed.crt, renewed.key);
     await expect(sync.run()).resolves.toBe('ok');
     expect(coreClient.configChangedCalls).toEqual([['pjsip']]);
     const installedKey = await readFile(
@@ -375,30 +374,30 @@ describe('CertSync', () => {
   });
 
   it('copies immediately when the installed certificate is still the self-signed placeholder', async () => {
-    const { genDir, caddyDataDir, workDir } = await makeDirs();
+    const { genDir, certCopyDir, workDir } = await makeDirs();
     const placeholder = selfSignedCert(workDir);
     await seedCurrentCert(genDir, placeholder.crt, placeholder.key);
     const source = caIssuedCert(workDir, 3650);
-    await seedCaddyCert(caddyDataDir, source.crt, source.key);
+    await seedCertCopy(certCopyDir, source.crt, source.key);
     const db = await settingsDb();
     const coreClient = stubCore();
 
     await expect(
-      new CertSync({ db, coreClient, genDir, caddyDataDir }).run()
+      new CertSync({ db, coreClient, genDir, certCopyDir }).run()
     ).resolves.toBe('ok');
     expect(coreClient.configChangedCalls).toEqual([['pjsip']]);
   });
 
   it('owes the reload core does not take, keeping the copy, until the owed propagation succeeds', async () => {
-    const { genDir, caddyDataDir, workDir } = await makeDirs();
+    const { genDir, certCopyDir, workDir } = await makeDirs();
     const source = caIssuedCert(workDir, 3650);
-    await seedCaddyCert(caddyDataDir, source.crt, source.key);
+    await seedCertCopy(certCopyDir, source.crt, source.key);
     const db = await settingsDb();
     const coreClient = stubCore();
     const up = { value: false };
     refuseReloadsUnless(coreClient, up);
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
-    const sync = new CertSync({ db, coreClient, genDir, caddyDataDir });
+    const sync = new CertSync({ db, coreClient, genDir, certCopyDir });
 
     await expect(sync.run()).resolves.toBe('ok');
     expect(sync.reloadOwed()).toBe(true);
@@ -422,27 +421,27 @@ describe('CertSync', () => {
   });
 
   it('defers a working certificate change to the next maintenance moment', async () => {
-    const { genDir, caddyDataDir, workDir } = await makeDirs();
+    const { genDir, certCopyDir, workDir } = await makeDirs();
     const current = caIssuedCert(workDir, 3650);
     await seedCurrentCert(genDir, current.crt, current.key);
     const nextCert = caIssuedCert(workDir, 3650);
-    await seedCaddyCert(caddyDataDir, nextCert.crt, nextCert.key);
+    await seedCertCopy(certCopyDir, nextCert.crt, nextCert.key);
     const db = await settingsDb();
     await seedFarOoo(db);
     const coreClient = stubCore();
 
     await expect(
-      new CertSync({ db, coreClient, genDir, caddyDataDir }).run()
+      new CertSync({ db, coreClient, genDir, certCopyDir }).run()
     ).resolves.toBe('ok');
     expect(coreClient.configChangedCalls).toEqual([]);
   });
 
   it('applies a deferred change once the resolved maintenance moment is reached on a later poll', async () => {
-    const { genDir, caddyDataDir, workDir } = await makeDirs();
+    const { genDir, certCopyDir, workDir } = await makeDirs();
     const current = caIssuedCert(workDir, 3650);
     await seedCurrentCert(genDir, current.crt, current.key);
     const nextCert = caIssuedCert(workDir, 3650);
-    await seedCaddyCert(caddyDataDir, nextCert.crt, nextCert.key);
+    await seedCertCopy(certCopyDir, nextCert.crt, nextCert.key);
     const db = await settingsDb();
     vi.stubEnv('TLS_RELOAD_HOUR', undefined);
     const coreClient = stubCore();
@@ -452,7 +451,7 @@ describe('CertSync', () => {
       db,
       coreClient,
       genDir,
-      caddyDataDir,
+      certCopyDir,
       now: () => now
     });
 
@@ -468,11 +467,11 @@ describe('CertSync', () => {
   });
 
   it('waits at the maintenance moment while a call is live, then applies once the system is idle', async () => {
-    const { genDir, caddyDataDir, workDir } = await makeDirs();
+    const { genDir, certCopyDir, workDir } = await makeDirs();
     const current = caIssuedCert(workDir, 3650);
     await seedCurrentCert(genDir, current.crt, current.key);
     const nextCert = caIssuedCert(workDir, 3650);
-    await seedCaddyCert(caddyDataDir, nextCert.crt, nextCert.key);
+    await seedCertCopy(certCopyDir, nextCert.crt, nextCert.key);
     const db = await settingsDb();
     vi.stubEnv('TLS_RELOAD_HOUR', undefined);
     const coreClient = stubCore();
@@ -482,7 +481,7 @@ describe('CertSync', () => {
       db,
       coreClient,
       genDir,
-      caddyDataDir,
+      certCopyDir,
       now: () => now
     });
 
@@ -498,11 +497,11 @@ describe('CertSync', () => {
   });
 
   it('gives up two hours past the moment while the system stays busy, until the next moment', async () => {
-    const { genDir, caddyDataDir, workDir } = await makeDirs();
+    const { genDir, certCopyDir, workDir } = await makeDirs();
     const current = caIssuedCert(workDir, 3650);
     await seedCurrentCert(genDir, current.crt, current.key);
     const nextCert = caIssuedCert(workDir, 3650);
-    await seedCaddyCert(caddyDataDir, nextCert.crt, nextCert.key);
+    await seedCertCopy(certCopyDir, nextCert.crt, nextCert.key);
     const db = await settingsDb();
     vi.stubEnv('TLS_RELOAD_HOUR', undefined);
     const coreClient = stubCore();
@@ -512,7 +511,7 @@ describe('CertSync', () => {
       db,
       coreClient,
       genDir,
-      caddyDataDir,
+      certCopyDir,
       now: () => now
     });
 
@@ -541,33 +540,33 @@ describe('CertSync', () => {
   });
 
   it('applies the placeholder replacement at once even while a call is live', async () => {
-    const { genDir, caddyDataDir, workDir } = await makeDirs();
+    const { genDir, certCopyDir, workDir } = await makeDirs();
     const placeholder = selfSignedCert(workDir);
     await seedCurrentCert(genDir, placeholder.crt, placeholder.key);
     const source = caIssuedCert(workDir, 3650);
-    await seedCaddyCert(caddyDataDir, source.crt, source.key);
+    await seedCertCopy(certCopyDir, source.crt, source.key);
     const db = await settingsDb();
     const coreClient = stubCore();
     coreClient.liveCalls = [LIVE_CALL];
 
     await expect(
-      new CertSync({ db, coreClient, genDir, caddyDataDir }).run()
+      new CertSync({ db, coreClient, genDir, certCopyDir }).run()
     ).resolves.toBe('ok');
     expect(coreClient.configChangedCalls).toEqual([['pjsip']]);
   });
 
   it('applies immediately when the installed certificate expires before the scheduled moment (safety valve)', async () => {
-    const { genDir, caddyDataDir, workDir } = await makeDirs();
+    const { genDir, certCopyDir, workDir } = await makeDirs();
     const expiringSoon = caIssuedCert(workDir, 1);
     await seedCurrentCert(genDir, expiringSoon.crt, expiringSoon.key);
     const nextCert = caIssuedCert(workDir, 3650);
-    await seedCaddyCert(caddyDataDir, nextCert.crt, nextCert.key);
+    await seedCertCopy(certCopyDir, nextCert.crt, nextCert.key);
     const db = await settingsDb();
     await seedFarOoo(db);
     const coreClient = stubCore();
 
     await expect(
-      new CertSync({ db, coreClient, genDir, caddyDataDir }).run()
+      new CertSync({ db, coreClient, genDir, certCopyDir }).run()
     ).resolves.toBe('ok');
     expect(coreClient.configChangedCalls).toEqual([['pjsip']]);
   });
@@ -592,9 +591,9 @@ describe('startCertSync', () => {
     const workDir = await mkdtemp(path.join(tmpdir(), 'zamfono-certsync-'));
     work.dir = workDir;
     const genDir = path.join(workDir, 'gen');
-    const caddyDataDir = path.join(workDir, 'caddy-data');
+    const certCopyDir = path.join(workDir, 'cert-copy');
     await mkdir(genDir, { recursive: true });
-    await mkdir(caddyDataDir, { recursive: true });
+    await mkdir(certCopyDir, { recursive: true });
     const db = await settingsDb();
     const coreClient = stubCore();
     expect(certSyncStatus()).toBe('unknown');
@@ -604,12 +603,12 @@ describe('startCertSync', () => {
       db,
       coreClient,
       genDir,
-      caddyDataDir,
+      certCopyDir,
       now: () => passedAt
     });
     expect(certSyncLastPass()).toBeNull();
     try {
-      // Nothing under caddyDataDir yet: the start-of-process pass finds no hook copy.
+      // Nothing in certCopyDir yet: the start-of-process pass finds no hook copy.
       await vi.waitFor(() => {
         expect(scheduler.status()).toBe('missing');
       });
@@ -617,7 +616,7 @@ describe('startCertSync', () => {
       expect(coreClient.configChangedCalls).toEqual([]);
 
       const source = caIssuedCert(workDir, 3650);
-      await seedCaddyCert(caddyDataDir, source.crt, source.key);
+      await seedCertCopy(certCopyDir, source.crt, source.key);
       notifyCertSync();
 
       await vi.waitFor(() => {
@@ -635,22 +634,22 @@ describe('startCertSync', () => {
     const workDir = await mkdtemp(path.join(tmpdir(), 'zamfono-certsync-'));
     work.dir = workDir;
     const genDir = path.join(workDir, 'gen');
-    const caddyDataDir = path.join(workDir, 'caddy-data');
+    const certCopyDir = path.join(workDir, 'cert-copy');
     await mkdir(genDir, { recursive: true });
-    await mkdir(caddyDataDir, { recursive: true });
+    await mkdir(certCopyDir, { recursive: true });
     const db = await settingsDb();
     const coreClient = stubCore();
 
-    const scheduler = startCertSync({ db, coreClient, genDir, caddyDataDir });
+    const scheduler = startCertSync({ db, coreClient, genDir, certCopyDir });
     try {
       await vi.waitFor(() => {
         expect(scheduler.status()).toBe('missing');
       });
       const source = caIssuedCert(workDir, 3650);
-      await seedCaddyCert(caddyDataDir, source.crt, source.key);
+      await seedCertCopy(certCopyDir, source.crt, source.key);
       // A key that cannot be read.
-      await rm(path.join(caddyDataDir, 'zamfono', 'privkey.pem'));
-      await mkdir(path.join(caddyDataDir, 'zamfono', 'privkey.pem'));
+      await rm(path.join(certCopyDir, 'privkey.pem'));
+      await mkdir(path.join(certCopyDir, 'privkey.pem'));
       notifyCertSync();
 
       await vi.waitFor(() => {
@@ -666,17 +665,17 @@ describe('startCertSync', () => {
     const workDir = await mkdtemp(path.join(tmpdir(), 'zamfono-certsync-'));
     work.dir = workDir;
     const genDir = path.join(workDir, 'gen');
-    const caddyDataDir = path.join(workDir, 'caddy-data');
+    const certCopyDir = path.join(workDir, 'cert-copy');
     await mkdir(genDir, { recursive: true });
     const source = caIssuedCert(workDir, 3650);
-    await seedCaddyCert(caddyDataDir, source.crt, source.key);
+    await seedCertCopy(certCopyDir, source.crt, source.key);
     const db = await settingsDb();
     const coreClient = stubCore();
     const up = { value: false };
     refuseReloadsUnless(coreClient, up);
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
 
-    const scheduler = startCertSync({ db, coreClient, genDir, caddyDataDir });
+    const scheduler = startCertSync({ db, coreClient, genDir, certCopyDir });
     try {
       await vi.waitFor(() => {
         expect(certSyncStatus()).toBe('pending');

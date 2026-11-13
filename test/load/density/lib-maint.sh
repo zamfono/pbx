@@ -171,7 +171,7 @@ maint_tls_prep() {
   # shellcheck disable=SC2317 # called through poll
   new_cert() {
     new=$(cert_sync_caddy_fingerprint)
-    [ -n "$new" ] && [ "$new" != "$old" ] && [ "$(dc exec -T proxy cat /data/zamfono/cert.pem \
+    [ -n "$new" ] && [ "$new" != "$old" ] && [ "$(dc exec -T proxy cat /cert-copy/cert.pem \
       | openssl x509 -noout -fingerprint -sha256 2>/dev/null | cut -d= -f2)" = "$new" ]
   }
   poll 120 1 new_cert || fail "stack $si: Caddy issued no new certificate"

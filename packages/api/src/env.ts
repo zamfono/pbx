@@ -80,7 +80,7 @@ export const variables = defineEnvVars({
   BOOTSTRAP_OWNER_EMAIL: optional,
   BOOTSTRAP_OWNER_NAME: optional,
   BOOTSTRAP_OWNER_PASSWORD_HASH: optional,
-  CADDY_DATA_DIR: withDefault('/caddy-data'),
+  CERT_COPY_DIR: withDefault('/cert-copy'),
   COMPANY_NAME: optional,
   CORE_URL: withDefault('http://core:3000'),
   COUNTRY: optional,

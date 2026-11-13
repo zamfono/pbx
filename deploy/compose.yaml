@@ -7,6 +7,9 @@
 # (§6.1), which requires it; this file alone runs the stack with no public reachability.
 # api's and core's healthcheck: GET /readyz on the internal port answers 200 (§6.3 "Health"). The
 # script holds no space, since Podman's Docker-compatible API splits a CMD argument at its spaces.
+# Every service drops every capability and runs with no-new-privileges; asterisk adds back what its
+# root entrypoint and ban helper need (§6.3 "Capabilities"). read_only where a service writes only
+# to its volumes and tmpfs.
 x-readyz: &readyz ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/readyz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
 
 networks:
@@ -20,6 +23,11 @@ services:
     image: ghcr.io/zamfono/proxy:${ZAMFONO_VERSION:-latest}
     entrypoint: ["sleep", "infinity"]
     stop_signal: SIGKILL
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    read_only: true
+    sysctls:                                    # proxy, uid 1000 without capabilities, binds 80 and 443 in this namespace
+      net.ipv4.ip_unprivileged_port_start: 80
     networks:
       internal:
         aliases:
@@ -40,8 +48,15 @@ services:
       SIP_UDP_ENABLED: ${SIP_UDP_ENABLED:-}     # false binds transport-udp to loopback (§9.1)
       SIP_TCP_ENABLED: ${SIP_TCP_ENABLED:-}     # false binds transport-tcp to loopback (§9.1)
       TZ: ${TZ:-}
-    cap_add:
+    cap_drop: [ALL]
+    cap_add:                                    # the root entrypoint's and ban helper's; Asterisk starts as user asterisk with none
       - NET_ADMIN                               # the ban helper's nftables table, in this namespace only (§5.6, §9.1)
+      - CHOWN                                   # hands asterisk-config and astdb to user asterisk
+      - DAC_OVERRIDE                            # renders into /etc/asterisk, user asterisk's; a root exec reaches Asterisk's CLI socket
+      - SETUID                                  # starts Asterisk as user asterisk
+      - SETGID
+    security_opt: [no-new-privileges:true]
+    # not read_only: the entrypoint renders the configuration into /etc/asterisk on every start
     healthcheck:                                # the ban helper's heartbeat in sip_ban_helper.status is fresh (§9.1)
       test: ["CMD", "/usr/local/bin/ban-helper-alive"]
     ulimits:
@@ -76,12 +91,18 @@ services:
         --log-file stdout --simple-log "$$@"
       - stun
     stop_signal: SIGKILL
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    read_only: true
     restart: unless-stopped
 
   migrate:
     image: ghcr.io/zamfono/migrate:${ZAMFONO_VERSION:-latest}   # node:26-slim + Kysely + db/migrations; applies pending migrations, then exits
     networks:
       - internal
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    read_only: true
     volumes:
       - db:/data
     restart: "no"                 # a container that exited 0 is the success api and core wait for
@@ -108,6 +129,9 @@ services:
       MEDIA_STORAGE_MAX: ${MEDIA_STORAGE_MAX:-} # at or over it, no new recording or voicemail message (§11.6)
       ZAMFONO_VERSION: ${ZAMFONO_VERSION:-latest}   # the tag pulled, reported as the version (§7)
       TZ: ${TZ:-}
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    read_only: true
     volumes:
       - media:/media
       - db:/data                  # /data/zamfono.sqlite3
@@ -156,11 +180,15 @@ services:
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       COUNTRY: ${COUNTRY}                       # ISO 3166-1 alpha-2
       EXT_LENGTH: ${EXT_LENGTH:-}
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    # not read_only: a backup writes its database snapshot to /tmp and restic its cache under HOME,
+    # which a tmpfs would hold in memory (§6.5)
     volumes:
       - media:/media
       - db:/data
       - asterisk-config:/etc/asterisk/gen
-      - caddy-data:/caddy-data:ro               # certificate sync source (§6.4)
+      - cert-copy:/cert-copy:ro                 # the cert_obtained hook's copy, the certificate sync's source (§6.4)
       - backups:/backups                        # the default local backup target's repository (§6.5)
       - ./.update:/update:ro                    # the host agent's reports: root's, 0750 (§6.3 "Updates")
       - ./.update/requests:/update/requests     # the one place it writes there: its requests to the host agent, a tmpfs
@@ -178,8 +206,14 @@ services:
     environment:
       FQDN: ${FQDN}                             # Caddyfile site address, Let's Encrypt; also read by the cert_obtained hook (§6.4)
       METRICS_TOKEN: ${METRICS_TOKEN:-}         # Caddyfile refuses /metrics while unset (§7)
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    read_only: true
+    tmpfs:
+      - /config:mode=1777                       # Caddy's autosave of the config it runs; uid 1000 writes it
     volumes:
-      - caddy-data:/data
+      - caddy-data:/data                        # Caddy's certificates and ACME account; proxy's alone
+      - cert-copy:/cert-copy                    # the cert_obtained hook writes its copy for api here (§6.4)
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
     restart: unless-stopped
 
@@ -188,5 +222,6 @@ volumes:
   db:
   backups:
   caddy-data:
+  cert-copy:
   asterisk-config:
   astdb:

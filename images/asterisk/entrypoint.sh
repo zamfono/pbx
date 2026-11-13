@@ -162,4 +162,6 @@ table inet zamfono {
 NFT
 /usr/local/bin/sip-ban-helper &
 
-exec asterisk -f -U asterisk
+# Asterisk starts as user `asterisk` (its groups included) with no capability. Its own `-U`, root
+# dropping to that user, would keep CAP_NET_ADMIN, and with it the ban list's table (§6.3).
+exec setpriv --reuid asterisk --regid asterisk --init-groups asterisk -f

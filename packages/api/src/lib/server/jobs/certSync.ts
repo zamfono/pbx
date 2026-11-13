@@ -1,6 +1,6 @@
 /**
  * TLS certificate sync (§6.4 "TLS certificates"): compares the `proxy` image's `cert_obtained`
- * hook's copy on `caddy-data` (`zamfono/cert.pem`/`privkey.pem`, images/proxy/zamfono-cert-hook)
+ * hook's copy on `cert-copy` (`cert.pem`/`privkey.pem`, images/proxy/zamfono-cert-hook)
  * with the copy on the `asterisk-config` volume, and on a change copies chain and key across —
  * at once for a fresh stack's self-signed placeholder or an expiring current certificate,
  * otherwise once the maintenance gate opens (`maintenanceWindow.ts`) — then propagates the
@@ -21,7 +21,7 @@ import { propagateConfig, runWhatWaited } from '../propagation.js';
 import {
   copyCertificate,
   expiresBefore,
-  findCaddyCert,
+  findCertCopy,
   isMatchingPair,
   isSelfSigned,
   TLS_CERT_FILENAME
@@ -35,7 +35,7 @@ import {
 
 const logger = pino({ name: 'certSync' });
 
-/** What a pass found (§6.4): no copy on `caddy-data`, or the state of the copy on `asterisk-config`. */
+/** What a pass found (§6.4): no copy on `cert-copy`, or the state of the copy on `asterisk-config`. */
 type PassStatus = 'expired' | 'expiring' | 'missing' | 'ok';
 
 /**
@@ -52,7 +52,7 @@ export type CertSyncDeps = {
   db: Db;
   coreClient: CoreClient;
   genDir?: string;
-  caddyDataDir?: string;
+  certCopyDir?: string;
   now?: () => Date;
 };
 
@@ -95,7 +95,7 @@ export class CertSync {
 
   /**
    * One check-and-act pass (§6.4): `'missing'` while the hook's copy does not exist yet on
-   * `caddy-data` (the alert case: a fresh stack before its first certificate, or a `proxy`
+   * `cert-copy` (the alert case: a fresh stack before its first certificate, or a `proxy`
    * upgrade gone wrong); once the pass is done, `'expired'` while the copy on `asterisk-config`
    * has expired, `'expiring'` while it expires within `EXPIRY_ALERT_MS`; `'ok'` otherwise,
    * whether nothing had changed, the change was applied now, or it was left for a later pass to
@@ -123,8 +123,7 @@ export class CertSync {
     currentCrtPath: string
   ): Promise<'missing' | 'ok'> {
     const deps = this.#deps;
-    const caddyDataDir = deps.caddyDataDir ?? env.CADDY_DATA_DIR;
-    const source = await findCaddyCert(caddyDataDir);
+    const source = await findCertCopy(deps.certCopyDir ?? env.CERT_COPY_DIR);
     if (!source) {
       this.#pending = undefined;
       this.#reloadOwed = false;
@@ -138,7 +137,7 @@ export class CertSync {
     if (!isMatchingPair(sourceCrt, sourceKey)) {
       // Read between the hook's two renames; the next pass (or the hook's notification) sees both.
       logger.warn(
-        'certSync: the certificate and key on caddy-data do not match yet; retrying on the next pass'
+        'certSync: the certificate and key on cert-copy do not match yet; retrying on the next pass'
       );
       return 'ok';
     }

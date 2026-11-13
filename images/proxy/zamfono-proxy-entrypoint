@@ -7,8 +7,9 @@
 # its own Start, and Caddy starts its apps in no fixed order, so an issuance that completes
 # before the events app has started (a `local_certs` one takes a millisecond) reaches no hook.
 # A certificate already in storage when Caddy starts (a restart, a restored caddy-data) emits no
-# event either. The hook is idempotent: it rewrites the same copy, and `api`'s compare-and-
-# schedule pass changes nothing for an unchanged certificate.
+# event either, nor does one an update finds already there (the first start with the
+# `cert-copy` volume, §6.4, which this fills). The hook is idempotent: it rewrites the same copy,
+# and `api`'s compare-and-schedule pass changes nothing for an unchanged certificate.
 set -eu
 
 : "${FQDN:?FQDN is required}"
@@ -34,6 +35,8 @@ reconcile() {
   echo "zamfono-proxy-entrypoint: no certificate for '$fqdn' after 120s; leaving it to the event" >&2
 }
 
+# The copy earlier releases kept on caddy-data, which api no longer mounts (§6.4).
+rm -rf "${XDG_DATA_HOME:-/data}/zamfono"
 reconcile &
 
 exec "$@"

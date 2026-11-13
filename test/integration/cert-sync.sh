@@ -1,6 +1,6 @@
 # Sourced by `run.sh`: §6.4's certificate sync end to end against the real `proxy` image the stack
 # ships (built by docker-bake.hcl's `proxy` target, like the other five) — the `cert_obtained`
-# hook's copy onto caddy-data is the only thing that makes a Dependabot PR bumping Caddy
+# hook's copy onto cert-copy is the only thing that makes a Dependabot PR bumping Caddy
 # (images/proxy/Dockerfile) a real test of `packages/api/src/lib/server/jobs/certSync*.ts`, the
 # only code that depends on it.
 #
@@ -8,8 +8,8 @@
 # the directory the shipped deploy/Caddyfile's global options block imports, adding
 # `local_certs` there, so Caddy issues the FQDN's certificate from its own internal CA — no
 # internet needed, no ACME challenge to answer. The hook fires the same way a real Let's Encrypt
-# issuance would and copies it to the fixed pair `api` reads, `zamfono/cert.pem` and
-# `zamfono/privkey.pem` on `caddy-data` (certSyncFiles.ts).
+# issuance would and copies it to the fixed pair `api` reads, `cert.pem` and `privkey.pem` on the
+# `cert-copy` volume (certSyncFiles.ts).
 #
 # Two parts. Bring-up waits until Asterisk presents that certificate in place of the entrypoint's
 # self-signed placeholder (§6.4 "Fresh stack", `await_certificate_synced`), so every scenario
@@ -80,8 +80,8 @@ cert_sync_caddy_fingerprint() {
 cert_sync_dump_extra_diagnostics() {
   echo '-- caddy-data certificates tree --' >&2
   dc exec -T proxy find /data/caddy/certificates >&2 2>&1
-  echo '-- caddy-data zamfono/ (the hook copy, §6.4) --' >&2
-  dc exec -T proxy ls -la /data/zamfono >&2 2>&1
+  echo '-- cert-copy (the hook copy, §6.4) --' >&2
+  dc exec -T proxy ls -la /cert-copy >&2 2>&1
   echo '-- proxy log lines from the hook --' >&2
   dc logs --no-color proxy 2>&1 | grep zamfono-cert-hook >&2
   echo '-- api healthz body --' >&2

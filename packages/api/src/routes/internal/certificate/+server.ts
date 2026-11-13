@@ -5,7 +5,7 @@ import { notifyCertSync } from '#lib/server/jobs/certSync.js';
 /**
  * `POST /internal/certificate` (§3.1, §6.4 "TLS certificates"): the `proxy` image's
  * `cert_obtained` hook (images/proxy/zamfono-cert-hook) posts here, with an empty body, right
- * after it copies a new certificate onto `caddy-data`. `api` responds by running the same
+ * after it copies a new certificate onto the `cert-copy` volume. `api` responds by running the same
  * compare-and-schedule pass its hourly poll and its own start already run (`certSync.ts`), which
  * keeps §6.4's reload-timing rules — a notification only makes that pass run sooner, it never
  * skips them.

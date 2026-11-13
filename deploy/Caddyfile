@@ -3,7 +3,7 @@
 # and :80 answering with a redirect to HTTPS.
 #
 # The global options block, first and only (Caddy allows exactly one): the `cert_obtained` hook
-# that copies a new certificate onto caddy-data and notifies `api` (§6.4, images/proxy/Dockerfile
+# that copies a new certificate onto cert-copy and notifies `api` (§6.4, images/proxy/Dockerfile
 # for the plugin and the hook script itself). `import`ing a glob that matches nothing is
 # harmless, which is what lets the test harness add its own global option — switching automatic
 # HTTPS to Caddy's internal CA, so it can prove §6.4 with no internet reachable
