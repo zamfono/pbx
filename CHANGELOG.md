@@ -69,6 +69,11 @@ why the specified behaviour changed; the commit history, how.
   fails its runs. To keep one on another disk, mount the disk into `api` at `/backups/<name>` in
   `compose.local.yaml`. restic and rclone no longer inherit `api`'s environment, its encryption key
   and JWT secret among it.
+- `/healthz` told anyone which protection or job was down, such as a stopped SIP ban helper or a
+  failed automatic update. Without credentials it now answers only the overall `status`, with
+  the HTTP status as before (200 for `pass` and `warn`, 503 for `fail`), so an uptime check keeps
+  working. With `Authorization: Bearer <METRICS_TOKEN>` it answers every check as before; owners
+  and admins read them with the new `system.health` (`GET /api/v1/system/health`).
 
 ## [0.9.1] - 2026-11-12
 

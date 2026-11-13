@@ -1,4 +1,3 @@
-import { timingSafeEqual } from 'node:crypto';
 import type { RequestEvent } from '@sveltejs/kit';
 import * as env from '$app/env/private';
 
@@ -9,7 +8,7 @@ import {
   resolveVersion
 } from '@zamfono/shared';
 
-import { BEARER_PREFIX } from '#lib/server/auth/bearer.js';
+import { isValidBearer } from '#lib/server/auth/bearer.js';
 import { getCoreClient } from '#lib/server/coreClient.js';
 import { getDb } from '#lib/server/db.js';
 import { certSyncStatus } from '#lib/server/jobs/certSync.js';
@@ -21,13 +20,6 @@ const PROMETHEUS_CONTENT_TYPE = 'text/plain; version=0.0.4';
 async function checkAri(): Promise<boolean> {
   const { checks } = await getCoreClient().health();
   return checks['core:ari']?.[0].status === 'pass';
-}
-
-/** Whether `authorization` is exactly `Bearer <token>`, compared in constant time (§7 `METRICS_TOKEN`: a static shared secret, so a byte-by-byte comparison would leak it through timing). */
-function isValidBearer(authorization: string | null, token: string): boolean {
-  const expected = Buffer.from(`${BEARER_PREFIX}${token}`);
-  const actual = Buffer.from(authorization ?? '');
-  return actual.length === expected.length && timingSafeEqual(actual, expected);
 }
 
 /**

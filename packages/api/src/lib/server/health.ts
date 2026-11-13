@@ -1,3 +1,5 @@
+import * as env from '$app/env/private';
+
 import {
   healthDocument,
   isDbOpen,
@@ -9,17 +11,23 @@ import {
   type HealthStatus
 } from '@zamfono/shared';
 
-import type { CertSyncStatus } from './jobs/certSync.js';
+import { skippedConfigRows } from './configRenderSkips.js';
+import { getCoreClient } from './coreClient.js';
+import {
+  certSyncLastPass,
+  certSyncStatus,
+  type CertSyncStatus
+} from './jobs/certSync.js';
 import { countKeyRotationRemaining } from './jobs/keyRotation.js';
 import { isRelayConfigured } from './mail/relay.js';
-import type { RelayOutcome } from './mail/relayState.js';
+import { relayState, type RelayOutcome } from './mail/relayState.js';
 import { isRosterPending } from './ops/roster.js';
 import { updateNews } from './ops/system/_state.js';
 import { hasEmergencyTrunk } from './ops/trunks/_shared.js';
 import { isPropagationPending } from './propagationPending.js';
 import { isProfilePending } from './provisioning/profilePending.js';
-import type { Keyring } from './secretbox.js';
-import type { SipBanHelperState } from './sipBanList.js';
+import { keyringFromEnv, type Keyring } from './secretbox.js';
+import { sipBanHelperState, type SipBanHelperState } from './sipBanList.js';
 
 /** The certificate sync's state and the time of its last pass, `null` before the first (§6.4). */
 export type CertificateSyncState = { state: CertSyncStatus; at: string | null };
@@ -147,8 +155,8 @@ async function tableChecks(deps: ApiHealthDeps): Promise<HealthChecks> {
 }
 
 /**
- * `GET /healthz`'s document (§6.3 "Health", §10.3 "Health"): one check per measurement and
- * nothing configurational or versioned, since it is public. The table checks are left out while
+ * The full health document (§6.3 "Health", §10.3 "Health"): one check per measurement and
+ * nothing configurational or versioned, since `/healthz` shows it to the metrics token's bearer. The table checks are left out while
  * `database:status` fails, since `api` never runs a migration itself (§6.3 "Migrations"); a
  * query that fails on a migrated database rejects.
  */
@@ -173,5 +181,28 @@ export async function apiHealth(deps: ApiHealthDeps): Promise<HealthDocument> {
     ),
     'config:render': configRenderCheck(deps.skippedConfigRows),
     ...(database[0].status === 'pass' ? await tableChecks(deps) : {})
+  });
+}
+
+/** `core`'s own checks from its `/healthz`, whatever its status; `null` while it does not answer. */
+async function liveCoreChecks(): Promise<HealthChecks | null> {
+  try {
+    return (await getCoreClient().health()).checks;
+  } catch {
+    return null;
+  }
+}
+
+/** The running stack's health document, which `/healthz` and `system.health` both answer with. */
+export async function currentHealth(db: () => Db): Promise<HealthDocument> {
+  return apiHealth({
+    db,
+    migrationsDir: env.MIGRATIONS_DIR,
+    coreChecks: liveCoreChecks,
+    keyring: keyringFromEnv(env),
+    certificateSync: { state: certSyncStatus(), at: certSyncLastPass() },
+    sipBanHelper: await sipBanHelperState(),
+    mailRelay: relayState(),
+    skippedConfigRows: skippedConfigRows().length
   });
 }

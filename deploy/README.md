@@ -290,7 +290,7 @@ printf '2:%s' "$(openssl rand -base64 32)"    # the new SECRETBOX_KEY
 ```
 
 Run `docker compose up -d`, wait for `api`'s log line `key rotation: {n} re-encrypted, 0 remaining`
-(`/healthz` reports the same count as `secrets:keyRotation`), then empty `SECRETBOX_KEY_PREVIOUS`.
+(`system.health` reports the same count as `secrets:keyRotation`), then empty `SECRETBOX_KEY_PREVIOUS`.
 Keep the retired key outside the stack, like `.env`, for as long as snapshots made under it are
 retained: restoring one needs it as `SECRETBOX_KEY_PREVIOUS`.
 `api` refuses to start while both keys carry the same generation.
@@ -331,7 +331,9 @@ curl -sS https://<your FQDN>/healthz | jq .
 ```
 
 Until a trunk carrying emergency calls exists, its check `trunks:emergency` fails, and with it the
-whole document (503); every other check should pass. If the request fails, `docker compose logs proxy api` shows whether the
+whole document: `{"status":"fail"}` with 503. Which check fails, `system.health` shows an owner or
+admin, and `/healthz` the bearer of `METRICS_TOKEN` (Monitoring below); every other check should
+pass. If the request fails, `docker compose logs proxy api` shows whether the
 certificate or the application is the problem; a certificate failure is almost always DNS or
 port 80.
 
@@ -578,8 +580,10 @@ to the audit log. They then sign in with their password and set up a second fact
 ## Monitoring
 
 Point an uptime check at `https://<FQDN>/healthz`; its HTTP status suffices. The body is
-`application/health+json`: one entry per check under `checks`, and a `status` that is the worst
-of theirs. `fail` (a closed or unmigrated database, `core` or its Asterisk down, no emergency
+`application/health+json`: a `status` that is the worst of the stack's checks, and only with
+`Authorization: Bearer <METRICS_TOKEN>` also one entry per check under `checks`, since a check
+tells anyone which protection or job is down; owners and admins read them with `system.health`.
+`fail` (a closed or unmigrated database, `core` or its Asterisk down, no emergency
 trunk, no usable certificate, a stopped SIP ban helper) answers 503; `warn` (an owed config
 propagation or Ringotel push, configuration rows left out of the render, which `system.info`
 names, a failed automatic update, an expiring certificate, secrets left under a retired key)

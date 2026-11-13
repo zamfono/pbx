@@ -7,8 +7,9 @@ import { MIGRATIONS_DIR } from '@zamfono/shared/testDb.js';
 
 import { getCoreClient } from '#lib/server/coreClient.js';
 import { stubCoreClient } from '#testing/coreClientStub.js';
+import { requestEvent } from '#testing/requestEvent.js';
 
-import { GET } from './+server.js';
+import { GET as getHealthz } from './+server.js';
 
 const KEY_BYTE_LENGTH = 32;
 
@@ -18,6 +19,17 @@ const KEY_BYTE_LENGTH = 32;
 process.env.DB_FILE = ':memory:';
 process.env.MIGRATIONS_DIR = MIGRATIONS_DIR;
 process.env.SECRETBOX_KEY = `1:${randomBytes(KEY_BYTE_LENGTH).toString('base64')}`;
+// The checks are the metrics token's bearer's alone (views.test.ts), which these cases read.
+process.env.METRICS_TOKEN = 'metrics-token';
+
+/** `GET /healthz` as the metrics token's bearer, who gets the full document. */
+async function GET(): Promise<Response> {
+  return getHealthz(
+    requestEvent('http://api/healthz', {
+      init: { headers: { authorization: 'Bearer metrics-token' } }
+    })
+  );
+}
 
 afterEach(() => {
   vi.mocked(getCoreClient).mockReset();

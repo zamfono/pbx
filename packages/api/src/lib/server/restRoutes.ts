@@ -222,6 +222,7 @@ const STATIC_ROUTES: RouteTuple[] = [
   ['GET', '/backups/runs/{id}', 'backups.runs.get'],
   ['GET', '/settings', 'settings.get'],
   ['GET', '/system/info', 'system.info'],
+  ['GET', '/system/health', 'system.health'],
   ['POST', '/system/updateCheck', 'system.checkUpdate'],
   ['POST', '/system/hostCheck', 'system.checkHost'],
   ['POST', '/system/update', 'system.update'],

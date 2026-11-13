@@ -66,7 +66,7 @@ update that is already running when the stack asks, one started with `system.upd
 `update.sh`, counts as no failed attempt: the stack tries again once it ended. From the first
 failure until an update succeeds:
 
-- `/healthz` warns `update:automatic`, and `/metrics` (with `METRICS_TOKEN`)
+- `system.health` warns `update:automatic`, and `/metrics` (with `METRICS_TOKEN`)
   `zamfono_auto_update_failed 1` with the failed attempts in
   `zamfono_auto_update_failed_attempts`;
 - `system.info` shows the release in `autoUpdate.failed`, with the reason of the last attempt,
@@ -89,7 +89,7 @@ automatically, whether `autoUpdate` is on or not, nor by `system.update` without
 `system.info` shows the release in `update.latest` with `update.breaking: true`, `/metrics` has
 `zamfono_breaking_update_available 1`, and every owner gets one `breakingUpdate` mail per such
 release. `/healthz`, the public uptime check, says nothing of releases, since anyone can read it.
-Without `UPDATER_TOKEN` the stack updates nothing on its own and announces nothing: `/healthz` passes `update:automatic`, the `/metrics` update gauges are
+Without `UPDATER_TOKEN` the stack updates nothing on its own and announces nothing: `system.health` passes `update:automatic`, the `/metrics` update gauges are
 0, and `system.info` has no `autoUpdate.failed`. Read its upgrade notes, at `update.latest.url`, then install it with `system.update` and
 `breaking: true`, or on the host with `update.sh`. Notes that ask for work on the host, such as a
 new `.env` setting, need `update.sh` there.

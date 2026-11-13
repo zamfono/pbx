@@ -89,8 +89,11 @@ api_delete() {
 }
 
 # The status of `/healthz`'s check `$1` (`pass`, `warn` or `fail`); a 503 carries the document too.
+# Only the bearer of the stack's METRICS_TOKEN gets the checks, anyone else the overall status
+# alone (§6.3 "Health").
 healthz_check() {
-  curl -sS "${FWD[@]}" "$api_base/healthz" | jsonfield "checks.$1.0.status"
+  curl -sS "${FWD[@]}" -H "Authorization: Bearer ${METRICS_TOKEN:?healthz_check needs METRICS_TOKEN}" \
+    "$api_base/healthz" | jsonfield "checks.$1.0.status"
 }
 
 # `/healthz`'s HTTP status: 200 for `pass` and `warn`, 503 for `fail` (§6.3 "Health").

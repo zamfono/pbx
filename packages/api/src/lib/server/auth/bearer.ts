@@ -3,6 +3,8 @@
  * server hook, the MCP endpoint and the `/events` handshake. It never reads `$app/env/private`, since
  * `server.ts` runs the handshake outside the SvelteKit bundle.
  */
+import { timingSafeEqual } from 'node:crypto';
+
 import { epochSeconds, nowIso, type Db } from '@zamfono/shared';
 
 import type { Actor } from '../ops/types.js';
@@ -16,6 +18,16 @@ import {
 import { liveSessionIds } from './tokens.js';
 
 export const BEARER_PREFIX = 'Bearer ';
+
+/** Whether `authorization` is exactly `Bearer <token>`, compared in constant time (§7 `METRICS_TOKEN`: a static shared secret, so a byte-by-byte comparison would leak it through timing). */
+export function isValidBearer(
+  authorization: string | null,
+  token: string
+): boolean {
+  const expected = Buffer.from(`${BEARER_PREFIX}${token}`);
+  const actual = Buffer.from(authorization ?? '');
+  return actual.length === expected.length && timingSafeEqual(actual, expected);
+}
 /** The query parameter a download or upload link carries its token in (RFC 6750 §2.3, §10.5). */
 export const ACCESS_TOKEN_PARAM = 'access_token';
 

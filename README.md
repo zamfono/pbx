@@ -37,7 +37,7 @@ curl -fsSL https://github.com/zamfono/pbx/releases/latest/download/zamfono-deplo
   | tar xz --strip-components=1
 ./setup.sh              # asks, generates the secrets, writes .env
 docker compose up -d
-curl -sS https://<your FQDN>/healthz   # every check passes but trunks:emergency, until a trunk carries emergency calls
+curl -sS https://<your FQDN>/healthz   # {"status":"fail"} (503) until a trunk carries emergency calls
 ```
 
 ## Operating it
