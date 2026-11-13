@@ -35,7 +35,7 @@ arguments:
      run, a sent e-mail), creating or revoking a personal access token (a credential is revoked,
      never revived), or a hard delete of a voicemail or recording whose file is gone.
 4. A 403 means the undo is above your role: only an owner undoes the deletion of an admin or an
-   owner.
+   owner, or an owner's creation (whose undo deletes the owner).
 
 Six operations record what an effect outside Zamfono answered rather than a change:
 `ringotel.push`, `ringotel.profile`, `ringotel.roster`, `ringotel.rereg`, `system.autoUpdate` and

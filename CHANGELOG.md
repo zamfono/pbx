@@ -19,6 +19,10 @@ why the specified behaviour changed; the commit history, how.
   one that repeats a key, an event that does not open with `Event` then `Privilege`, and a
   security or `Registry` event missing one of its fields. Such a request is no longer counted
   as a failed attempt; it names no account that exists.
+- An admin could soft-delete an owner created as owner by undoing that creation, which no API
+  call can take back: an undo replayed the owner's deletion without the owner-only rule a direct
+  delete obeys. Every operation an undo replays now obeys the role, scope and owner-only rules
+  of whoever undoes, as a direct call does, so that undo answers 403 for an admin.
 
 ## [0.9.1] - 2026-11-12
 

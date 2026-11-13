@@ -36,17 +36,38 @@ async function ownerAndAdmin(): Promise<Db> {
   return db;
 }
 
-/** Creates the admin Ada as `actor`. */
+/** Creates Ada as `actor`, an admin unless `role` says otherwise. */
 function createAdmin(
   db: Db,
-  actor: Actor
+  actor: Actor,
+  role = 'admin'
 ): Promise<{ user: { id: string; role: string } }> {
   return runOperation(
     db,
     'users.create',
-    { name: 'Ada', email: 'ada@x.test', role: 'admin', extension: '120' },
+    { name: 'Ada', email: 'ada@x.test', role, extension: '120' },
     asRun({ actor })
   ) as Promise<{ user: { id: string; role: string } }>;
+}
+
+/** The audit entry `users.create` wrote for `userId`. */
+function creationEntry(db: Db, userId: string): Promise<{ id: string }> {
+  return db
+    .selectFrom('auditLog')
+    .select('id')
+    .where('operation', '=', 'users.create')
+    .where('entityId', '=', userId)
+    .executeTakeFirstOrThrow();
+}
+
+/** Whether `userId` is soft-deleted. */
+async function isDeleted(db: Db, userId: string): Promise<boolean> {
+  const row = await db
+    .selectFrom('users')
+    .select('deletedAt')
+    .where('id', '=', userId)
+    .executeTakeFirstOrThrow();
+  return row.deletedAt !== null;
 }
 
 /** The lifetime of the newest set-password link of `userId`, in days. */
@@ -127,6 +148,33 @@ describe("an owner's account (§10.3)", () => {
       runOperation(db, 'audit.undo', entry, asRun({ actor: admin }))
     ).rejects.toMatchObject({ status: 403 });
     await runOperation(db, 'audit.undo', entry, asRun());
+  });
+
+  it("refuses an admin the undo of an owner's creation, as the delete it replays (§5.8)", async () => {
+    const db = await ownerAndAdmin();
+    const { user } = await createAdmin(db, owner, 'owner');
+    const entry = await creationEntry(db, user.id);
+    await expect(
+      runOperation(db, 'audit.undo', entry, asRun({ actor: admin }))
+    ).rejects.toMatchObject({ status: 403 });
+    expect(await isDeleted(db, user.id)).toBe(false);
+    const audit = await db
+      .selectFrom('auditLog')
+      .select(['operation', 'undoneAt'])
+      .orderBy('id')
+      .execute();
+    expect(audit).toEqual([{ operation: 'users.create', undoneAt: null }]);
+
+    await runOperation(db, 'audit.undo', entry, asRun());
+    expect(await isDeleted(db, user.id)).toBe(true);
+  });
+
+  it("lets an admin undo an admin's creation of a user", async () => {
+    const db = await ownerAndAdmin();
+    const { user } = await createAdmin(db, admin, 'user');
+    const entry = await creationEntry(db, user.id);
+    await runOperation(db, 'audit.undo', entry, asRun({ actor: admin }));
+    expect(await isDeleted(db, user.id)).toBe(true);
   });
 });
 

@@ -1,6 +1,7 @@
 import { HTTP_CONFLICT } from '@zamfono/shared';
 
 import { absorbEffects, newEffects } from './effects.js';
+import { checkRole, checkScope } from './gates.js';
 import { registry, type ErasedOperation } from './registry.js';
 import { OpError, type Context } from './types.js';
 
@@ -15,12 +16,15 @@ export type PreparedReplay = {
 /**
  * Resolves the replay of `input` through the operation `name` (§5.8). An operation not
  * registered, or a recorded diff that does not form a valid input for it, is refused with a 409,
- * so the entry stays live and the caller learns why.
+ * so the entry stays live and the caller learns why. The replay obeys the undoing actor's role,
+ * scope and owner-only rules as a direct call does (403), checked before its `prepare` runs; it
+ * never asks confirmation (§10.3).
  */
-function resolveReplay(
+async function resolveReplay(
+  ctx: Context,
   name: string,
   input: unknown
-): { op: ErasedOperation; input: unknown } {
+): Promise<{ op: ErasedOperation; input: unknown }> {
   const op = registry.get(name);
   if (!op) {
     throw new OpError(
@@ -36,6 +40,8 @@ function resolveReplay(
       parsed.error.issues
     );
   }
+  checkRole(op, ctx.actor);
+  await checkScope(op, ctx, parsed.data);
   return { op, input: parsed.data };
 }
 
@@ -49,7 +55,7 @@ export async function prepareReplay(
   name: string,
   input: unknown
 ): Promise<PreparedReplay> {
-  const replay = resolveReplay(name, input);
+  const replay = await resolveReplay(ctx, name, input);
   const prepared = await replay.op.prepare?.(ctx, replay.input);
   return { name, ...replay, prepared };
 }
@@ -82,7 +88,7 @@ export async function replayOperation(
   name: string,
   input: unknown
 ): Promise<void> {
-  const replay = resolveReplay(name, input);
+  const replay = await resolveReplay(ctx, name, input);
   if (replay.op.prepare) {
     throw new Error(
       `audit.undo: '${name}' prepares outside the transaction; replay it through prepareReplay`

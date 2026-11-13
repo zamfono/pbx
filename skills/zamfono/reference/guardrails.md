@@ -19,7 +19,8 @@ the change would recreate a duplicate (a reused extension, e-mail or DID number)
 would point at a row deleted since (undo that deletion first), or when the entry itself is not
 undoable — a secret-bearing change, a one-shot action such as a manual backup run or a sent e-mail,
 creating or revoking a personal access token, or a hard delete whose file is already gone. Only an
-owner undoes the deletion of an admin or an owner; an admin gets 403. The entries of the six
+owner undoes the deletion of an admin or an owner, or an owner's creation; an admin gets 403, as
+an undo obeys the rules of the call it replays. The entries of the six
 operations that record what an effect outside Zamfono answered (`ringotel.push`, `ringotel.profile`,
 `ringotel.roster`, `ringotel.rereg`, `system.autoUpdate`, `system.maintenanceGate`) are never
 undoable and never block an undo. See the `undo` recipe for the full walk-through.
