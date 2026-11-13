@@ -701,7 +701,7 @@ services:
       EXTERNAL_IPV4: ${EXTERNAL_IPV4:?the ports mode needs the host's public IPv4}   # the stack's public address, shown by system.info (§10.3)
 ```
 
-**Caddyfile.** Validated with `caddy validate`; the only two inputs are the two environment variables of the `proxy` service. Its global options wire the certificate hook (§6.4) and import `/etc/caddy/global.d/*.caddy`, which is empty in a deployment and where the integration harness adds `local_certs`, so it can test the certificate sync without reaching Let's Encrypt.
+**Caddyfile.** Validated with `caddy validate`; the only two inputs are the two environment variables of the `proxy` service. Its global options wire the certificate hook (§6.4) and import `/etc/caddy/global.d/*.caddy`, which is empty in a deployment and where the integration harness adds `local_certs`, so it can test the certificate sync without reaching Let's Encrypt. Caddy's admin endpoint is off: by default it listens on `localhost:2019` in the network namespace `proxy` shares with `asterisk` and `stun` (§6.1), where it would take a new configuration, and serve Caddy's metrics and profiles, without a credential. Nothing needs it, since the certificate hook and renewal run inside Caddy (§6.4), so a change of the Caddyfile takes a restart of `proxy`.
 
 ```caddyfile
 # Caddyfile — the stack's only public HTTP listener (§6.1). Site address and metrics token come
@@ -716,6 +716,10 @@ services:
 # (test/integration/Caddyfile.local-ca) — by mounting a snippet here instead of wrapping this
 # file, since a second global block of its own would make Caddy refuse the config.
 {
+	# No admin endpoint: Caddy's default, localhost:2019, would accept a new config without a
+	# credential from asterisk and stun, which share this network namespace (§6.1). A config
+	# change therefore takes a restart of the proxy container.
+	admin off
 	events {
 		on cert_obtained exec /usr/local/bin/zamfono-cert-hook {event.data.certificate_path} {event.data.private_key_path} {event.data.identifier}
 	}

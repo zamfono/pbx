@@ -82,6 +82,11 @@ why the specified behaviour changed; the commit history, how.
   time, the others waiting. A voicemail greeting that a new one replaces or a removal clears,
   through the API or on `*96`, is deleted at once, row and files, unless another mailbox still
   uses it.
+- Caddy's admin endpoint, on `localhost:2019` in the network namespace the proxy shares with
+  Asterisk and the STUN server, is off: code running in either could load a Caddy configuration
+  of its own there without a credential, intercepting the web traffic with the stack's TLS key,
+  and read Caddy's metrics past `METRICS_TOKEN`. A change of the Caddyfile takes a restart of
+  `proxy`, as before.
 
 ## [0.9.1] - 2026-11-12
 

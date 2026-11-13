@@ -170,6 +170,16 @@ curl -sk -D - -o /dev/null "https://localhost:$port/auth/login" \
   | grep -ix "content-security-policy: frame-ancestors 'none'"$'\r' >/dev/null \
   || fail "a page was answered without Content-Security-Policy: frame-ancestors 'none'"
 
+echo "==> no admin endpoint on localhost:2019 in the proxy's network namespace (§6.3 Caddyfile)"
+# The stand-in api runs Caddy with its default admin endpoint, so the same probe reaching it there
+# shows the probe would see one. 127.0.0.1, which Caddy binds for `localhost`: busybox's wget
+# resolves `localhost` to ::1 alone.
+docker exec "$tag-api" wget -q -T 3 -O /dev/null http://127.0.0.1:2019/config/ \
+  || fail "the probe did not reach the stand-in api's default admin endpoint"
+if docker exec "$tag-proxy" wget -q -T 3 -O /dev/null http://127.0.0.1:2019/config/ 2>/dev/null; then
+  fail "the proxy answers on localhost:2019; the Caddyfile's admin off is missing"
+fi
+
 echo "==> the access log keeps no credential a URI carries in its query or a provisioning link's path (§7, §10.4)"
 curl -sk -o /dev/null -H "Referer: https://localhost/auth/setPassword?token=secret-referer" \
   "https://localhost:$port/upload/audio?token=secret-t&access_token=secret-a&code=secret-c&kept=1"

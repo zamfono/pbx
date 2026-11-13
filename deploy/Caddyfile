@@ -10,6 +10,10 @@
 # (test/integration/Caddyfile.local-ca) — by mounting a snippet here instead of wrapping this
 # file, since a second global block of its own would make Caddy refuse the config.
 {
+	# No admin endpoint: Caddy's default, localhost:2019, would accept a new config without a
+	# credential from asterisk and stun, which share this network namespace (§6.1). A config
+	# change therefore takes a restart of the proxy container.
+	admin off
 	events {
 		on cert_obtained exec /usr/local/bin/zamfono-cert-hook {event.data.certificate_path} {event.data.private_key_path} {event.data.identifier}
 	}
