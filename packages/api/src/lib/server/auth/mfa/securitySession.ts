@@ -10,6 +10,7 @@ import type { Cookies } from '@sveltejs/kit';
 
 import { MS_PER_SECOND } from '@zamfono/shared';
 
+import type { SignIn } from '#lib/server/auth/loginUser.js';
 import { TtlMap } from '#lib/server/ttlMap.js';
 
 const TTL_S = 600;
@@ -19,6 +20,8 @@ const COOKIE = { name: 'zamfono_security', path: '/' } as const;
 
 export type SecuritySession = {
   userId: string;
+  /** The `credential_epoch` read at the sign-in (§5.2): the session ends once it moves. */
+  epoch: number;
   /** An authenticator secret shown for setup, awaiting its first code, else `null`. */
   totpSecret: Buffer | null;
   /** The challenge of the passkey registration options shown last, else `null`. */
@@ -29,8 +32,8 @@ type Entry = { session: SecuritySession; expiresAtMs: number };
 
 const sessions = new TtlMap<string, Entry>();
 
-/** Opens the page for `userId`, replacing any session the browser held. */
-export function startSecuritySession(cookies: Cookies, userId: string): void {
+/** Opens the page for `signIn`'s user, replacing any session the browser held. */
+export function startSecuritySession(cookies: Cookies, signIn: SignIn): void {
   const old = cookies.get(COOKIE.name);
   if (old !== undefined) {
     sessions.delete(old);
@@ -39,7 +42,15 @@ export function startSecuritySession(cookies: Cookies, userId: string): void {
   const expiresAtMs = Date.now() + TTL_S * MS_PER_SECOND;
   sessions.set(
     id,
-    { session: { userId, totpSecret: null, challenge: null }, expiresAtMs },
+    {
+      session: {
+        userId: signIn.userId,
+        epoch: signIn.epoch,
+        totpSecret: null,
+        challenge: null
+      },
+      expiresAtMs
+    },
     expiresAtMs
   );
   cookies.set(COOKIE.name, id, {

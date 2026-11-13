@@ -582,8 +582,8 @@ sign-in. An owner whom no other owner can reset is reset from the host, in the s
 docker compose exec api node reset-mfa.mjs owner@example.com
 ```
 
-It removes the owner's methods and recovery codes, signs them out everywhere and writes the reset
-to the audit log. They then sign in with their password and set up a second factor again.
+It removes the owner's methods and recovery codes, signs them out everywhere, revokes the personal
+access tokens they hold and writes the reset to the audit log. They then sign in with their password and set up a second factor again.
 
 ## Monitoring
 

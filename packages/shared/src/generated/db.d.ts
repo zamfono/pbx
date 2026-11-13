@@ -544,6 +544,7 @@ export interface Users {
   callerIdDidId: string | null;
   clir: number | null;
   createdAt: string;
+  credentialEpoch: Generated<number>;
   deletedAt: string | null;
   dnd: Generated<number>;
   email: string | null;

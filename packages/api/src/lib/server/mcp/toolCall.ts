@@ -112,6 +112,7 @@ export function operationCall(
       channel: 'mcp',
       clientId: call.auth.clientId,
       clientName: call.auth.clientName,
+      credentialEpoch: call.auth.credentialEpoch,
       requestId: newId(),
       confirm: isAffirmative(answer) || confirmArg === true
     };

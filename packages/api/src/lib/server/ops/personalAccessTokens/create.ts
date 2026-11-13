@@ -1,8 +1,10 @@
 import { z } from 'zod';
 
 import {
+  credentialEpoch,
   HTTP_CONFLICT,
   HTTP_NOT_FOUND,
+  HTTP_UNAUTHORIZED,
   HTTP_UNPROCESSABLE_CONTENT,
   newId
 } from '@zamfono/shared';
@@ -64,6 +66,15 @@ export const create = defineOperation({
   ownerOnly: forAnOwner,
   entity: (_input, output) => ({ kind: 'personalAccessToken', id: output.id }),
   run: async (ctx, input) => {
+    // The epoch the request was authenticated at, read again in the call's transaction, which
+    // holds the write lock: a password or MFA reset that committed since refuses the token
+    // rather than leave it live after the reset revoked the user's others (§5.2).
+    if (
+      ctx.credentialEpoch !== undefined &&
+      (await credentialEpoch(ctx.db, ctx.actor.id)) !== ctx.credentialEpoch
+    ) {
+      throw new OpError(HTTP_UNAUTHORIZED, 'unauthorized');
+    }
     if (!mayLogIn(await liveUser(ctx.db, input.userId))) {
       throw new OpError(
         HTTP_CONFLICT,

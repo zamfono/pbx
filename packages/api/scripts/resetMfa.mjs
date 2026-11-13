@@ -5,9 +5,10 @@
 //
 //   docker compose exec api node reset-mfa.mjs owner@example.com
 //
-// It removes the owner's methods and recovery codes, ends their sessions and records the reset in
-// the audit log as the system's (channel `job`). The owner signs in with their password next and
-// sets up a second factor again.
+// It removes the owner's methods and recovery codes, ends their sessions and sign-ins in flight,
+// revokes the personal access tokens they hold and records the reset in the audit log as the
+// system's (channel `job`). The owner signs in with their password next and sets up a second
+// factor again.
 import { dbFileFrom, newId, nowIso, openDb, resetMfa } from '@zamfono/shared';
 
 const REFUSED_EXIT_CODE = 1;

@@ -43,7 +43,8 @@ describe('authenticateToken', () => {
     );
     expect(await authenticateToken(deps, await tokenFor('owner'))).toEqual({
       actor: { ...OWNER, role: 'admin' },
-      sessionId: SESSION_ID
+      sessionId: SESSION_ID,
+      credentialEpoch: 0
     });
   });
 
@@ -65,6 +66,7 @@ describe('authenticateToken', () => {
     ).toEqual({
       actor: OWNER,
       sessionId: SESSION_ID,
+      credentialEpoch: 0,
       clientId: 'client-1',
       clientName: 'Ops Console'
     });

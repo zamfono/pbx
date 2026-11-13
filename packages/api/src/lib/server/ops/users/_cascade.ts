@@ -1,7 +1,6 @@
-import { removeMfaMethods, type Db } from '@zamfono/shared';
+import { endSignIns, removeMfaMethods, type Db } from '@zamfono/shared';
 
-import { revokeUserPersonalAccessTokens } from '#lib/server/auth/personalAccessTokens.js';
-import { revokeUserTokens } from '#lib/server/auth/tokens.js';
+import { revokeResetTokens } from '#lib/server/auth/tokens.js';
 import type { DeviceRow } from '#lib/server/provisioning/types.js';
 
 import { recordChange } from '../audit.js';
@@ -74,8 +73,9 @@ export async function releaseUser(
 
 /**
  * Soft-deletes `userId` and cascades per §5.9: their devices, their extension row (dropping the
- * BLF keys that watched it through the FK), their sessions, personal access tokens and second
- * factors, recording every dropped row in the audit diff for undo. Shared by `users.delete` and `users.erase` (§5.10).
+ * BLF keys that watched it through the FK), their sign-ins (`endSignIns`: sessions, personal
+ * access tokens, sign-ins in flight), set-password links and second factors, recording every
+ * dropped row in the audit diff for undo. Shared by `users.delete` and `users.erase` (§5.10).
  */
 export async function cascadeSoftDeleteUser(
   ctx: Context,
@@ -95,8 +95,8 @@ export async function cascadeSoftDeleteUser(
     .execute();
   await ctx.db.deleteFrom('extensions').where('userId', '=', userId).execute();
   await pushRoster(ctx);
-  await revokeUserTokens(ctx.db, userId, ctx.now);
-  await revokeUserPersonalAccessTokens(ctx.db, userId, ctx.now);
+  await endSignIns(ctx.db, userId, ctx.now);
+  await revokeResetTokens(ctx.db, userId, ctx.now);
   await removeMfaMethods(ctx.db, userId);
   // Recorded under `ext`, the field name `audit.undo` special-cases to re-insert the dropped
   // `extensions` row (§5.9); `users.update`'s own rename field is `extension` (§10.3).

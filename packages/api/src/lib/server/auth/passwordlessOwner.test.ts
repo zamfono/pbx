@@ -50,6 +50,7 @@ describe('an owner who has not set a password (§5.2)', () => {
     const codes = new AuthCodeStore(() => 0);
     const code = codes.issue({
       userId: 'olga',
+      epoch: 0,
       clientId: 'client-1',
       redirectUri: REDIRECT_URI,
       codeChallenge: createHash('sha256').update(VERIFIER).digest('base64url'),

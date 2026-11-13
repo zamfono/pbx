@@ -16,6 +16,7 @@ import { keyringFromEnv } from '#lib/server/secretbox.js';
 
 import { loadBranding } from '../branding.js';
 import { completeLogin, type ConsentStep } from '../completeLogin.js';
+import { loginUser } from '../loginUser.js';
 import { noticeMfaChange, type MfaChange } from './notice.js';
 import { registerPasskey, verifyPasskey } from './passkeys.js';
 import { issueRecoveryCodes, redeemRecoveryCode } from './recoveryCodes.js';
@@ -62,7 +63,7 @@ export async function beginSecondFactor(
   event: RequestEvent,
   login: Pick<
     SecondFactorLogin,
-    'purpose' | 'userId' | 'account' | 'email' | 'client'
+    'purpose' | 'userId' | 'epoch' | 'account' | 'email' | 'client'
   >,
   status: MfaMethods
 ): Promise<SecondFactorStep> {
@@ -88,13 +89,20 @@ async function enrolled(
 ): Promise<SecondFactorStep | null> {
   const db = getDb();
   const now = nowIso();
-  const codes = await db
-    .transaction()
-    .execute(async trx =>
-      (await store(trx, now))
-        ? issueRecoveryCodes(trx, login.userId, now)
-        : null
-    );
+  // `secondFactorSubmit`'s epoch check again, in the transaction that holds the write lock from
+  // its start: a reset that committed since refuses the method rather than store it after it.
+  const codes = await db.transaction().execute(async trx => {
+    if ((await loginUser(trx, login.userId, login.epoch)) === null) {
+      return 'expired';
+    }
+    return (await store(trx, now))
+      ? issueRecoveryCodes(trx, login.userId, now)
+      : null;
+  });
+  if (codes === 'expired') {
+    finishSecondFactorLogin(event.cookies);
+    error(HTTP_BAD_REQUEST, 'oauth/authorize: sign-in expired');
+  }
   if (codes === null) {
     return null;
   }
@@ -181,17 +189,18 @@ function finish(event: RequestEvent, login: SecondFactorLogin): ConsentStep {
   limiter.loginSucceeded(login.account);
   finishSecondFactorLogin(event.cookies);
   if (login.purpose === 'security') {
-    startSecuritySession(event.cookies, login.userId);
+    startSecuritySession(event.cookies, login);
     redirect(HTTP_SEE_OTHER, '/auth/security');
   }
-  return completeLogin(event, login.userId, login.client);
+  return completeLogin(event, login, login.client);
 }
 
 /**
  * The second step's form (§5.2 "Two-factor authentication", §5.5): every code or passkey counts
  * against the account lock as a password does, and a locked account's is refused like a wrong
  * one; the lock's counter resets only once the whole sign-in has passed. A pending sign-in that
- * expired or finished answers the error page, like a consent step that did.
+ * expired or finished answers the error page, like a consent step that did, and so does one whose
+ * user may no longer log in or whose `credential_epoch` moved since its password step (§5.2).
  */
 export async function secondFactorSubmit(
   event: RequestEvent,
@@ -199,6 +208,10 @@ export async function secondFactorSubmit(
 ): Promise<SecondFactorStep | ConsentStep> {
   const login = secondFactorLogin(event.cookies);
   if (login === null) {
+    error(HTTP_BAD_REQUEST, 'oauth/authorize: sign-in expired');
+  }
+  if ((await loginUser(getDb(), login.userId, login.epoch)) === null) {
+    finishSecondFactorLogin(event.cookies);
     error(HTTP_BAD_REQUEST, 'oauth/authorize: sign-in expired');
   }
   if (login.recoveryCodes !== null) {

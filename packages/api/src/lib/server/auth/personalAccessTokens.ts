@@ -35,17 +35,34 @@ function liveAt(now: string) {
 }
 
 /**
- * Personal access token `raw` and the user it acts as, `null` for an unknown, revoked or expired
- * one. Records the use in `last_used_at` when the stored time is more than a minute old.
+ * Personal access token `raw` and the user it acts as, with that user's `credential_epoch` read in
+ * the same statement, so the token was live at that epoch (§5.2); `null` for an unknown, revoked
+ * or expired one. Records the use in `last_used_at` when the stored time is more than a minute old.
  */
 export async function livePersonalAccessToken(
   db: Db,
   raw: string,
   now: string
-): Promise<(PersonalAccessTokenGrant & { userId: string }) | null> {
+): Promise<
+  | (PersonalAccessTokenGrant & {
+      userId: string;
+      credentialEpoch: number | null;
+    })
+  | null
+> {
   const row = await db
     .selectFrom('personalAccessTokens')
-    .select(['id', 'userId', 'expiresAt', 'lastUsedAt'])
+    .select(eb => [
+      'id',
+      'userId',
+      'expiresAt',
+      'lastUsedAt',
+      eb
+        .selectFrom('users')
+        .select('credentialEpoch')
+        .whereRef('users.id', '=', 'personalAccessTokens.userId')
+        .as('credentialEpoch')
+    ])
     .where('tokenHash', '=', sha256Hex(raw))
     .where(liveAt(now))
     .executeTakeFirst();
@@ -60,7 +77,12 @@ export async function livePersonalAccessToken(
       .where('id', '=', row.id)
       .execute();
   }
-  return { id: row.id, userId: row.userId, expiresAt: row.expiresAt };
+  return {
+    id: row.id,
+    userId: row.userId,
+    expiresAt: row.expiresAt,
+    credentialEpoch: row.credentialEpoch
+  };
 }
 
 /** Which of the tokens `ids` are still live at `now`. */
@@ -79,18 +101,4 @@ export async function livePersonalAccessTokenIds(
     .where(liveAt(now))
     .execute();
   return new Set(rows.map(row => row.id));
-}
-
-/** Revokes every live personal access token of `userId` (§5.9: a soft-deleted user's). */
-export async function revokeUserPersonalAccessTokens(
-  db: Db,
-  userId: string,
-  now: string
-): Promise<void> {
-  await db
-    .updateTable('personalAccessTokens')
-    .set({ revokedAt: now })
-    .where('userId', '=', userId)
-    .where('revokedAt', 'is', null)
-    .execute();
 }

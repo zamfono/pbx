@@ -37,9 +37,10 @@ export type OperationLink = z.infer<typeof operationLink>;
 
 /**
  * The link of `kind` to `route` for `args`, the tool call's input: the path's captures from their
- * input fields, every other field as the query, and the token of `auth`'s user and client for
- * the REST path, valid for five minutes. A download link is that REST path itself; an upload
- * link is it below `UPLOAD_PREFIX`, the page and endpoint that take the file.
+ * input fields, every other field as the query, and the token of `auth`'s user, client and
+ * `credential_epoch` (§5.2) for the REST path, valid for five minutes. A download link is that
+ * REST path itself; an upload link is it below `UPLOAD_PREFIX`, the page and endpoint that take
+ * the file.
  */
 async function signedLink(
   deps: McpDeps,
@@ -60,11 +61,15 @@ async function signedLink(
       query.set(field, String(value));
     }
   }
+  if (auth.credentialEpoch === undefined) {
+    throw new Error('a link is signed only for a user credential');
+  }
   const nowS = epochSeconds(Date.now());
   const exp = nowS + LINK_TTL_S;
   const token = await encodeLinkToken(deps.jwtSecret, kind, {
     sub: auth.actor.id,
     cid: auth.clientId ?? null,
+    ep: auth.credentialEpoch,
     aud: `${API_PREFIX}${path}`,
     iat: nowS,
     exp

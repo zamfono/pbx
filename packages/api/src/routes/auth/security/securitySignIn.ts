@@ -49,11 +49,21 @@ export async function securitySignIn(
   if (hasMfa(status)) {
     return beginSecondFactor(
       event,
-      { purpose: 'security', userId: user.id, account, email, client: null },
+      {
+        purpose: 'security',
+        userId: user.id,
+        epoch: user.credentialEpoch,
+        account,
+        email,
+        client: null
+      },
       status
     );
   }
   limiter.loginSucceeded(account);
-  startSecuritySession(event.cookies, user.id);
+  startSecuritySession(event.cookies, {
+    userId: user.id,
+    epoch: user.credentialEpoch
+  });
   return redirect(HTTP_SEE_OTHER, '/auth/security');
 }

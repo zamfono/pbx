@@ -2,22 +2,19 @@
  * What a `users.update` changes about how the user logs in (§5.2): promoting a user without a
  * password to owner, and removing a user's e-mail.
  */
-import { revokeUserPersonalAccessTokens } from '#lib/server/auth/personalAccessTokens.js';
-import {
-  revokeResetTokens,
-  revokeUserTokens
-} from '#lib/server/auth/tokens.js';
+import { endSignIns } from '@zamfono/shared';
+
+import { revokeResetTokens } from '#lib/server/auth/tokens.js';
 
 import { recordChange } from '../audit.js';
 import type { Context } from '../types.js';
 import { issueSetPasswordLink } from './_setupMail.js';
 import type { UserRow } from './_shared.js';
 
-/** Ends every session and personal access token of `userId`, recorded as the delete cascade
- *  records it, so an undo leaves them revoked (§5.8). */
+/** Ends every sign-in of `userId` (`endSignIns`), recorded as the delete cascade records it, so
+ *  an undo leaves them revoked (§5.8). */
 async function revokeLogins(ctx: Context, userId: string): Promise<void> {
-  await revokeUserTokens(ctx.db, userId, ctx.now);
-  await revokeUserPersonalAccessTokens(ctx.db, userId, ctx.now);
+  await endSignIns(ctx.db, userId, ctx.now);
   recordChange(ctx, { field: 'tokensRevoked', from: false, to: true });
 }
 

@@ -30,6 +30,9 @@ export type RunInput = {
   clientName?: string;
   requestId: string;
   confirm?: boolean;
+  /** The actor's `credential_epoch` as the request was authenticated (§5.2), absent for undo,
+   *  jobs and a voice bot's session. */
+  credentialEpoch?: number;
 };
 
 type AuditWrite = {
@@ -88,6 +91,7 @@ function newContext(
     clientId: run.clientId,
     clientName: run.clientName,
     requestId: run.requestId,
+    credentialEpoch: run.credentialEpoch,
     effects
   };
 }

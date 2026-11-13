@@ -74,6 +74,7 @@ export async function runUploadLink(
     channel: 'mcp',
     clientId: auth.clientId,
     clientName: auth.clientName,
+    credentialEpoch: auth.credentialEpoch,
     requestId: newId()
   });
 }

@@ -14,6 +14,7 @@ const NOW_MS = Date.parse('2026-01-01T00:00:00.000Z');
 
 const consent: PendingConsent = {
   userId: 'user-1',
+  epoch: 0,
   clientName: 'Callback Client',
   authorize: {
     clientId: 'client-1',

@@ -33,6 +33,8 @@ export type Context = {
   clientId?: string;
   clientName?: string;
   requestId: string;
+  /** The actor's `credential_epoch` as the request was authenticated (§5.2), if it was. */
+  credentialEpoch?: number;
   /** What `run` accumulates for the runner: the audit diff, reload kinds, after-commit steps. */
   effects: Effects;
 };

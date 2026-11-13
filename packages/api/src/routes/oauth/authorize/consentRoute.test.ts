@@ -64,6 +64,7 @@ function sealConsent(
 ): void {
   setSealedCookie(jar, keyringFromEnv(privateEnv), CONSENT_COOKIE, {
     userId: 'user-1',
+    epoch: 0,
     clientName,
     authorize: {
       clientId,

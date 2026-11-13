@@ -4,6 +4,7 @@ import { isRedirect, type RequestEvent } from '@sveltejs/kit';
 import * as privateEnv from '$app/env/private';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { nowIso } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { encodeMetadataClientId } from '#lib/server/auth/clients.js';
@@ -48,6 +49,16 @@ const finishLoginMock = vi.mocked(finishLogin);
 
 beforeAll(async () => {
   await migrateForTest(getDb());
+  await getDb()
+    .insertInto('users')
+    .values({
+      id: 'user-1',
+      name: 'Anna',
+      email: 'anna@example.com',
+      role: 'user',
+      createdAt: nowIso()
+    })
+    .execute();
 });
 
 beforeEach(() => {

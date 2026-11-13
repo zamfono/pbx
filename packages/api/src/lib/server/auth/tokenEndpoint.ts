@@ -59,13 +59,24 @@ async function handleAuthorizationCode(
   if (!redeemed) {
     return oauthError(HTTP_BAD_REQUEST, 'invalid_grant');
   }
-  const user = await loginUser(deps.db, redeemed.userId);
-  if (!user) {
+  const nowIso = deps.now();
+  // The epoch check and the session it lets in are one transaction, which holds the write lock
+  // from its start: a password or MFA reset (`endSignIns`) commits either before it, and the
+  // check refuses, or after it, and revokes the session with the user's others (§5.2).
+  const issued = await deps.db.transaction().execute(async trx => {
+    const user = await loginUser(trx, redeemed.userId, redeemed.epoch);
+    return (
+      user && {
+        user,
+        refresh: await issueRefresh(trx, user.id, clientId, nowIso)
+      }
+    );
+  });
+  if (!issued) {
     return oauthError(HTTP_BAD_REQUEST, 'invalid_grant');
   }
-  const nowIso = deps.now();
+  const { user, refresh } = issued;
   const nowS = epochSeconds(Date.parse(nowIso));
-  const refresh = await issueRefresh(deps.db, user.id, clientId, nowIso);
   const accessToken = await signAccessToken(
     deps.jwtSecret,
     { sub: user.id, role: user.role, cid: clientId, sid: refresh.sessionId },

@@ -98,7 +98,7 @@ export async function liveSessionIds(
 
 /**
  * Revokes every live refresh token of `userId`, or only those for `clientId` when given
- * (§5.2: a rotation replay revokes the pair's tokens; a password reset revokes every session).
+ * (§5.2: a rotation replay revokes the pair's tokens; `endSignIns` revokes every session).
  */
 export async function revokeUserTokens(
   db: Db,

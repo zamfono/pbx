@@ -289,7 +289,8 @@ describe('authenticateEventsSocket', () => {
     client.send(JSON.stringify({ type: 'auth', token }));
     expect(await serverResult).toEqual({
       actor: { id: 'u1', name: 'A User', role: 'user' },
-      sessionId
+      sessionId,
+      credentialEpoch: 0
     });
     client.close();
   });

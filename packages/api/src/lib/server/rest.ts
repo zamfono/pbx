@@ -23,6 +23,7 @@ export type RestDeps = {
   requestId: string;
   clientId?: string | null;
   clientName?: string;
+  credentialEpoch?: number;
 };
 
 /** A `{name}` path segment becomes a named regex capture, so its value comes back as `match.groups.name`. */
@@ -110,6 +111,7 @@ export async function handleRest(
       clientId: deps.clientId ?? undefined,
       clientName: deps.clientName,
       requestId: deps.requestId,
+      credentialEpoch: deps.credentialEpoch,
       confirm: confirm === true
     });
     return await outputResponse(output);

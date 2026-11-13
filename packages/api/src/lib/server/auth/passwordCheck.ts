@@ -18,7 +18,7 @@ const CredentialsSchema = z.object({
 
 /** The account a password sign-in proved, with its §5.5 lock key and the address typed. */
 export type CheckedPassword = {
-  user: { id: string; role: UserRole };
+  user: { id: string; role: UserRole; credentialEpoch: number };
   account: string;
   email: string;
 };
@@ -53,5 +53,13 @@ export async function checkPassword(
   if (!verified || !user) {
     return null;
   }
-  return { user: { id: user.id, role: user.role }, account, email };
+  return {
+    user: {
+      id: user.id,
+      role: user.role,
+      credentialEpoch: user.credentialEpoch
+    },
+    account,
+    email
+  };
 }

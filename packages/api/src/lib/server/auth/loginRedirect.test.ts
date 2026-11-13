@@ -21,9 +21,9 @@ function pendingAuthorize(state: string | null): PendingAuthorize {
 describe('loginRedirect', () => {
   it('sends a sign-in without client parameters to the post-login page', () => {
     const codes = new AuthCodeStore(() => Date.parse(NOW));
-    expect(loginRedirect(codes, 'user-1', null, ORIGIN)).toBe(
-      `${ORIGIN}/auth/done`
-    );
+    expect(
+      loginRedirect(codes, { userId: 'user-1', epoch: 0 }, null, ORIGIN)
+    ).toBe(`${ORIGIN}/auth/done`);
   });
 
   it('issues an authorization code and redirects to the outer redirect_uri', () => {
@@ -35,7 +35,9 @@ describe('loginRedirect', () => {
         .update(codeVerifier)
         .digest('base64url')
     };
-    const location = new URL(loginRedirect(codes, 'user-1', authorize, ORIGIN));
+    const location = new URL(
+      loginRedirect(codes, { userId: 'user-1', epoch: 0 }, authorize, ORIGIN)
+    );
     expect(location.origin + location.pathname).toBe(authorize.redirectUri);
     expect(location.searchParams.get('state')).toBe('outer-state');
     expect(location.searchParams.get('iss')).toBe(ORIGIN);
@@ -50,13 +52,18 @@ describe('loginRedirect', () => {
         authorize.clientId,
         authorize.redirectUri
       )
-    ).toEqual({ userId: 'user-1' });
+    ).toEqual({ userId: 'user-1', epoch: 0 });
   });
 
   it('omits state from the response when the request carried none (OAuth 2.1 §4.1.2)', () => {
     const codes = new AuthCodeStore(() => Date.parse(NOW));
     const location = new URL(
-      loginRedirect(codes, 'user-1', pendingAuthorize(null), ORIGIN)
+      loginRedirect(
+        codes,
+        { userId: 'user-1', epoch: 0 },
+        pendingAuthorize(null),
+        ORIGIN
+      )
     );
     expect(location.searchParams.get('code')).toEqual(expect.any(String));
     expect(location.searchParams.get('iss')).toBe(ORIGIN);

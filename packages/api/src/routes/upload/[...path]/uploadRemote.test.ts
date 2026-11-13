@@ -73,6 +73,7 @@ async function linkToken(expiresInS: number, sub = 'admin1'): Promise<string> {
   return encodeLinkToken(JWT_SECRET, 'upload', {
     sub,
     cid: null,
+    ep: 0,
     aud: '/api/v1/audio',
     iat: nowS - 600,
     exp: nowS + expiresInS

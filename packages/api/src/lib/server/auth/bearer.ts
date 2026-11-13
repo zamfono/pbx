@@ -42,28 +42,38 @@ export type Authenticated = {
   personalAccessToken?: PersonalAccessTokenGrant;
   /** The session an access token was issued in (§5.2), which an `/events` socket lives by. */
   sessionId?: string;
+  /** The user's `credential_epoch` (§5.2), which a link minted for this request carries; absent
+   *  for a voice bot's session token, which acts for no user. */
+  credentialEpoch?: number;
 };
 
 export type BearerDeps = { db: Db; jwtSecret: string };
 
-/** The user `claims` names, read fresh from `users`, and the OAuth client it acts through. */
+/** The user `claims` names, read fresh from `users`, and the OAuth client it acts through;
+ *  given an `ep` claim, `null` once the user's `credential_epoch` has moved on (`loginUser`). */
 async function liveAuthenticated(
   deps: BearerDeps,
-  claims: { sub: string; cid: string | null }
+  claims: { sub: string; cid: string | null; ep?: number }
 ): Promise<Authenticated | null> {
-  const actor = await loginUser(deps.db, claims.sub);
-  if (!actor) {
+  const user = await loginUser(deps.db, claims.sub, claims.ep);
+  if (!user) {
     return null;
   }
+  const { credentialEpoch, ...actor } = user;
   if (claims.cid === null) {
-    return { actor };
+    return { actor, credentialEpoch };
   }
   const client = await deps.db
     .selectFrom('oauthClients')
     .select('name')
     .where('clientId', '=', claims.cid)
     .executeTakeFirst();
-  return { actor, clientId: claims.cid, clientName: client?.name };
+  return {
+    actor,
+    credentialEpoch,
+    clientId: claims.cid,
+    clientName: client?.name
+  };
 }
 
 /**
@@ -82,7 +92,13 @@ export async function authenticateToken(
     if (pat === null) {
       return null;
     }
-    const auth = await liveAuthenticated(deps, { sub: pat.userId, cid: null });
+    // The epoch the token was read live at: a password or MFA reset since then, which revoked
+    // it, refuses it here, rather than let the request carry the reset's epoch (§5.2).
+    const auth = await liveAuthenticated(deps, {
+      sub: pat.userId,
+      cid: null,
+      ep: pat.credentialEpoch ?? undefined
+    });
     return (
       auth && {
         ...auth,
@@ -107,8 +123,9 @@ export async function authenticateToken(
 
 /**
  * The live user behind link `url` of `kind` (§10.5): its `access_token` query parameter, a link
- * token of that kind issued for `path`, by default `url`'s own; `null` without one or for one that
- * fails, as `authenticateToken` decides.
+ * token of that kind issued for `path`, by default `url`'s own; `null` without one, for one that
+ * fails, as `authenticateToken` decides, or for one minted before the user's `credential_epoch`
+ * last moved (§5.2).
  */
 export async function authenticateLink(
   deps: BearerDeps,

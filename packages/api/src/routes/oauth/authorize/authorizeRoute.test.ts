@@ -406,6 +406,7 @@ describe('GET /oauth/authorize (load)', () => {
     const kr = keyringFromEnv(privateEnv);
     setSealedCookie(cookies, kr, CONSENT_COOKIE, {
       userId: 'user-1',
+      epoch: 0,
       clientName: 'Callback Client',
       authorize: {
         clientId: 'client-1',

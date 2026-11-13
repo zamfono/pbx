@@ -36,6 +36,7 @@ async function setup(): Promise<{ deps: TokenDeps; code: string }> {
     .execute();
   const code = codes.issue({
     userId: 'owner',
+    epoch: 0,
     clientId: CLIENT_ID,
     redirectUri: REDIRECT_URI,
     codeChallenge: createHash('sha256').update(VERIFIER).digest('base64url'),

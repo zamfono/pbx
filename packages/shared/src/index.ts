@@ -28,3 +28,4 @@ export * from './version.js';
 export * from './stackPaths.js';
 export * from './ports.js';
 export * from './mfa.js';
+export * from './credentials.js';

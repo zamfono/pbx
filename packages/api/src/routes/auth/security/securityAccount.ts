@@ -14,7 +14,11 @@ import {
 } from '@zamfono/shared';
 
 import type { Dictionary } from '#lib/i18n/index.js';
-import { mayLogIn } from '#lib/server/auth/loginUser.js';
+import {
+  loginUser,
+  mayLogIn,
+  type SignIn
+} from '#lib/server/auth/loginUser.js';
 import {
   noticeMfaChange,
   type MfaChange
@@ -51,7 +55,9 @@ export type SignedIn = {
 
 /**
  * The page's session (§5.2) and its live user, `null` once it expired, the user was deleted or
- * may no longer log in (`mayLogIn`): the page's session is held to the rule every token is.
+ * may no longer log in (`mayLogIn`), or their `credential_epoch` moved since the sign-in (a
+ * password or MFA reset): the page's session is held to the rule every token is. Read from the
+ * database on every action, so a reset by the host command `reset-mfa.mjs` ends it too.
  */
 export async function signedIn(event: RequestEvent): Promise<SignedIn | null> {
   const session = securitySession(event.cookies);
@@ -60,11 +66,16 @@ export async function signedIn(event: RequestEvent): Promise<SignedIn | null> {
       ? undefined
       : await getDb()
           .selectFrom('users')
-          .select(['id', 'email', 'role', 'passwordHash'])
+          .select(['id', 'email', 'role', 'passwordHash', 'credentialEpoch'])
           .where('id', '=', session.userId)
           .where('deletedAt', 'is', null)
           .executeTakeFirst();
-  if (session === null || user === undefined || !mayLogIn(user)) {
+  if (
+    session === null ||
+    user === undefined ||
+    !mayLogIn(user) ||
+    user.credentialEpoch !== session.epoch
+  ) {
     return null;
   }
   return {
@@ -83,18 +94,31 @@ export async function sessionUser(event: RequestEvent): Promise<SignedIn> {
 }
 
 /**
+ * `signedIn`'s check again, in a write's transaction, which holds the write lock from its start:
+ * a password or MFA reset that committed since sends the browser back to the sign-in, so no
+ * second factor is stored or removed after it (§5.2).
+ */
+export async function stillSignedIn(trx: Db, session: SignIn): Promise<void> {
+  if ((await loginUser(trx, session.userId, session.epoch)) === null) {
+    redirect(HTTP_SEE_OTHER, SECURITY_PATH);
+  }
+}
+
+/**
  * Stores the method `store` writes, issuing recovery codes with the user's first method, and
  * mails the user; `null` when `store` refuses.
  */
 export async function added(
   db: Db,
-  userId: string,
+  session: SignIn,
   store: (trx: Db, now: string) => Promise<boolean>,
   change: MfaChange
 ): Promise<ManageResult | null> {
+  const { userId } = session;
   const first = !hasMfa(await mfaMethods(db, userId));
   const now = nowIso();
   const outcome = await db.transaction().execute(async trx => {
+    await stillSignedIn(trx, session);
     if (!(await store(trx, now))) {
       return null;
     }
@@ -112,7 +136,7 @@ export async function added(
  * recovery codes go with the last method, which they no longer stand in for.
  */
 export async function removed(
-  user: { id: string; role: UserRole },
+  { session, user }: SignedIn,
   remove: (trx: Db) => Promise<void>,
   change: MfaChange,
   dict: Dictionary['security']
@@ -124,6 +148,7 @@ export async function removed(
     return { ...NOTHING, error: dict.lastMethod };
   }
   await db.transaction().execute(async trx => {
+    await stillSignedIn(trx, session);
     await remove(trx);
     if (after <= 0) {
       await trx

@@ -96,6 +96,19 @@ why the specified behaviour changed; the commit history, how.
   writes `.env`. An image whose tag was moved stops either, changing nothing. A stack that follows
   `edge` is not checked, as `edge` has no bundle. The check runs from the update after this
   release on, as each update runs the `update.sh` of the release it starts from.
+- A personal access token survived a password reset and a two-factor reset of its user, so one
+  minted with a stolen session kept working without expiry. Redeeming a password reset link,
+  `users.resetMfa` and `reset-mfa.mjs` now revoke every token the user holds. Tokens they created
+  for others stay, so resetting an admin's forgotten password keeps the integrations they set up;
+  the audit log names who created each token.
+- A sign-in that passed shortly before a password reset, a two-factor reset or the user's deletion
+  could still finish afterwards: the security page's 10-minute session, which could still set up
+  an authenticator, a login waiting for its second factor, a consent step, which also replayed
+  for more codes until it expired, an authorization code and an MCP file link. Each now carries
+  a counter kept with the user, which those three changes increase, and is refused once it
+  differs.
+- Deleting a user now revokes their set-password links too, so a link issued before the deletion
+  no longer works after an undo.
 
 ## [0.9.1] - 2026-11-12
 

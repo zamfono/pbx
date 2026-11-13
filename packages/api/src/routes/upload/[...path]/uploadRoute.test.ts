@@ -48,6 +48,7 @@ async function uploadUrl(aud: string): Promise<URL> {
   const token = await encodeLinkToken(JWT_SECRET, 'upload', {
     sub: 'admin1',
     cid: null,
+    ep: 0,
     aud,
     iat: nowS,
     exp: nowS + 300

@@ -256,6 +256,7 @@ describe('hooks handle', () => {
     expect(event.locals.auth).toEqual({
       actor: { id: 'admin1', name: 'Admin', role: 'admin' },
       sessionId: 'session-1',
+      credentialEpoch: 0,
       clientId: 'client1',
       clientName: 'Ops Console'
     });
@@ -267,6 +268,7 @@ describe('hooks handle', () => {
     const linkToken = await encodeLinkToken(JWT_SECRET, 'download', {
       sub: 'admin1',
       cid: null,
+      ep: 0,
       aud: path,
       iat: nowS,
       exp: nowS + 300

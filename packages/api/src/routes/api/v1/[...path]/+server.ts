@@ -12,7 +12,8 @@ function handle(event: RequestEvent): Promise<Response> {
     db: getDb(),
     requestId: newId(),
     clientId: auth?.clientId,
-    clientName: auth?.clientName
+    clientName: auth?.clientName,
+    credentialEpoch: auth?.credentialEpoch
   });
 }
 

@@ -21,6 +21,7 @@ import {
   NOTHING,
   removed,
   sessionUser,
+  stillSignedIn,
   type ManageResult,
   type SignedIn
 } from './securityAccount.js';
@@ -81,7 +82,7 @@ const ACTIONS: Record<ManagePayload['action'], Action> = {
     const kr = keyringFromEnv(env);
     const result = await added(
       getDb(),
-      userId,
+      session,
       async (trx, now) => {
         await saveTotp(trx, kr, { userId, secret, step }, now);
         return true;
@@ -90,10 +91,10 @@ const ACTIONS: Record<ManagePayload['action'], Action> = {
     );
     return result ?? NOTHING;
   },
-  totpRemove: async (_event, { user, dict }) =>
+  totpRemove: async (_event, { dict, ...signed }) =>
     removed(
-      user,
-      async trx => removeTotp(trx, user.id),
+      signed,
+      async trx => removeTotp(trx, signed.user.id),
       { kind: 'removed' },
       dict.security
     ),
@@ -107,7 +108,7 @@ const ACTIONS: Record<ManagePayload['action'], Action> = {
         ? null
         : await added(
             getDb(),
-            userId,
+            session,
             async (trx, now) =>
               registerPasskey(
                 trx,
@@ -119,15 +120,18 @@ const ACTIONS: Record<ManagePayload['action'], Action> = {
           );
     return result ?? { ...NOTHING, error: dict.mfa.passkeyFailed };
   },
-  codes: async (_event, { user, dict }) => {
-    const db = getDb();
-    if (!hasMfa(await mfaMethods(db, user.id))) {
-      return { ...NOTHING, error: dict.security.codesNeedMethod };
-    }
-    return {
-      ...NOTHING,
-      codes: await issueRecoveryCodes(db, user.id, nowIso())
-    };
+  codes: async (_event, { session, user, dict }) => {
+    const codes = await getDb()
+      .transaction()
+      .execute(async trx => {
+        await stillSignedIn(trx, session);
+        return hasMfa(await mfaMethods(trx, user.id))
+          ? issueRecoveryCodes(trx, user.id, nowIso())
+          : null;
+      });
+    return codes === null
+      ? { ...NOTHING, error: dict.security.codesNeedMethod }
+      : { ...NOTHING, codes };
   }
 };
 
@@ -150,7 +154,8 @@ export async function removePasskeySubmit(
   event: RequestEvent,
   id: string
 ): Promise<ManageResult> {
-  const { user } = await sessionUser(event);
+  const signed = await sessionUser(event);
+  const { user } = signed;
   const db = getDb();
   const passkey = await db
     .selectFrom('webauthnCredentials')
@@ -163,7 +168,7 @@ export async function removePasskeySubmit(
   }
   const { dictionary } = await loadBranding(db);
   return removed(
-    user,
+    signed,
     async trx => {
       await trx
         .deleteFrom('webauthnCredentials')

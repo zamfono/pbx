@@ -4,6 +4,7 @@
  * the host command an operator runs for an owner who lost every method
  * (`packages/api/scripts/resetMfa.mjs`).
  */
+import { endSignIns } from './credentials.js';
 import type { Db } from './db.js';
 
 /** What a user holds: never a secret, only flags and counts. */
@@ -49,9 +50,9 @@ export async function removeMfaMethods(db: Db, userId: string): Promise<void> {
   await db.deleteFrom('recoveryCodes').where('userId', '=', userId).execute();
 }
 
-/** Removes `userId`'s methods and codes and ends their sessions (their live refresh tokens), so
- *  every client signs in again, through enrolment where a second factor is required. Answers what
- *  the user held before. */
+/** Removes `userId`'s methods and codes and ends their sign-ins (`endSignIns`: their sessions,
+ *  the personal access tokens they hold and every sign-in in flight), so every client signs in
+ *  again, through enrolment where a second factor is required. Answers what the user held before. */
 export async function resetMfa(
   db: Db,
   userId: string,
@@ -59,12 +60,6 @@ export async function resetMfa(
 ): Promise<MfaMethods> {
   const before = await mfaMethods(db, userId);
   await removeMfaMethods(db, userId);
-  await db
-    .updateTable('tokens')
-    .set({ revokedAt: now })
-    .where('userId', '=', userId)
-    .where('kind', '=', 'refresh')
-    .where('revokedAt', 'is', null)
-    .execute();
+  await endSignIns(db, userId, now);
   return before;
 }

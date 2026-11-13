@@ -6,6 +6,7 @@ import { HTTP_FOUND } from '@zamfono/shared';
 import { authCodeStore } from '#lib/server/auth/codes.js';
 import { CONSENT_COOKIE } from '#lib/server/auth/consent.js';
 import { loginRedirect } from '#lib/server/auth/loginRedirect.js';
+import type { SignIn } from '#lib/server/auth/loginUser.js';
 import { setSealedCookie } from '#lib/server/auth/sealedCookie.js';
 import type { PendingAuthorize } from '#lib/server/auth/ssoCookie.js';
 import { keyringFromEnv } from '#lib/server/secretbox.js';
@@ -29,17 +30,18 @@ export type ConsentStep = {
  */
 export function completeLogin(
   event: RequestEvent,
-  userId: string,
+  signIn: SignIn,
   client: { authorize: PendingAuthorize; clientName: string } | null
 ): ConsentStep {
   const origin = originFromEnv();
   if (client === null) {
-    redirect(HTTP_FOUND, loginRedirect(authCodeStore, userId, null, origin), {
+    redirect(HTTP_FOUND, loginRedirect(authCodeStore, signIn, null, origin), {
       external: [origin]
     });
   }
   setSealedCookie(event.cookies, keyringFromEnv(env), CONSENT_COOKIE, {
-    userId,
+    userId: signIn.userId,
+    epoch: signIn.epoch,
     clientName: client.clientName,
     authorize: client.authorize
   });

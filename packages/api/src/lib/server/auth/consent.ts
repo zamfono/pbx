@@ -5,12 +5,14 @@ import { PendingAuthorizeSchema } from './ssoCookie.js';
 
 const PendingConsentSchema = z.object({
   userId: z.string(),
+  epoch: z.number().int(),
   clientName: z.string(),
   authorize: PendingAuthorizeSchema
 });
 
-/** The authenticated user and outer OAuth request a consent decision is pending for, sealed into
- *  the `zamfono_consent` cookie between the login action and the approve/deny action so neither
+/** The authenticated user, with the `credential_epoch` their sign-in read (§5.2), and outer OAuth
+ *  request a consent decision is pending for, sealed into the `zamfono_consent` cookie between the
+ *  login action and the approve/deny action so neither
  *  carries a client-writable `userId` (§5.2 "Authentication pages": "a consent step naming the
  *  requesting client"). */
 export type PendingConsent = z.infer<typeof PendingConsentSchema>;

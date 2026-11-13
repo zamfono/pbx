@@ -25,6 +25,8 @@ export type SecondFactorLogin = {
   /** What the sign-in opens: an OAuth login, or the security page's own session. */
   purpose: 'oauth' | 'security';
   userId: string;
+  /** The `credential_epoch` read at the password step (§5.2): the sign-in ends once it moves. */
+  epoch: number;
   /** The §5.5 account-lock key, which every code attempt counts against. */
   account: string;
   /** The e-mail the person signed in with, which names the account in their authenticator. */

@@ -47,7 +47,8 @@ describe('a personal access token as bearer', () => {
     const deps = await seeded();
     expect(await authenticate(deps)).toEqual({
       actor: { ...owner, personalAccessTokenId: GRANT.id },
-      personalAccessToken: GRANT
+      personalAccessToken: GRANT,
+      credentialEpoch: 0
     });
     expect(
       await authenticateToken(
@@ -57,7 +58,8 @@ describe('a personal access token as bearer', () => {
       )
     ).toEqual({
       actor: { ...owner, personalAccessTokenId: GRANT.id },
-      personalAccessToken: GRANT
+      personalAccessToken: GRANT,
+      credentialEpoch: 0
     });
     const request = new Request(MCP_AUDIENCE, {
       headers: { authorization: `Bearer ${deps.raw}` }
@@ -69,7 +71,8 @@ describe('a personal access token as bearer', () => {
       )
     ).toEqual({
       actor: { ...owner, personalAccessTokenId: GRANT.id },
-      personalAccessToken: GRANT
+      personalAccessToken: GRANT,
+      credentialEpoch: 0
     });
   });
 
@@ -82,7 +85,8 @@ describe('a personal access token as bearer', () => {
       .execute();
     expect(await authenticate(deps)).toEqual({
       actor: { ...owner, role: 'user', personalAccessTokenId: GRANT.id },
-      personalAccessToken: GRANT
+      personalAccessToken: GRANT,
+      credentialEpoch: 0
     });
   });
 
@@ -116,7 +120,8 @@ describe('livePersonalAccessToken', () => {
     const first = '2026-10-04T10:00:00.000Z';
     expect(await livePersonalAccessToken(deps.db, deps.raw, first)).toEqual({
       ...GRANT,
-      userId: owner.id
+      userId: owner.id,
+      credentialEpoch: 0
     });
     expect(await lastUsed()).toBe(first);
     const withinMinute = addMsIso(

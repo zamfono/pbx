@@ -73,9 +73,9 @@ const TARGET_COLUMN = /^(?:.+T|t)argetId$/u;
 
 /**
  * Every live row of every table, as JSON, each table's rows sorted; a soft-deleted row counts as
- * gone, and a forward target as its contents. Neither the audit log nor `tokens` is state an undo
- * restores: revoked tokens stay revoked (§5.9), and a deleted user's set-password link is refused
- * when redeemed.
+ * gone, and a forward target as its contents. Neither the audit log, `tokens` nor a user's
+ * `credential_epoch` is state an undo restores: revoked tokens stay revoked and sign-ins in flight
+ * stay ended (§5.9).
  */
 async function liveState(db: Db): Promise<Record<string, string[]>> {
   const tables = await sql<{ name: string }>`
@@ -95,11 +95,14 @@ async function liveState(db: Db): Promise<Record<string, string[]>> {
       const live = rows
         .filter(row => row.deletedAt === undefined || row.deletedAt === null)
         .map(row =>
-          JSON.stringify(row, (key, value: unknown) =>
-            TARGET_COLUMN.test(key) && typeof value === 'string'
+          JSON.stringify(row, (key, value: unknown) => {
+            if (key === 'credentialEpoch') {
+              return undefined;
+            }
+            return TARGET_COLUMN.test(key) && typeof value === 'string'
               ? targets.get(value)
-              : value
-          )
+              : value;
+          })
         )
         .sort();
       return [name, live] as const;

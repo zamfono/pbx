@@ -80,13 +80,15 @@ export function signAccessToken(
 }
 
 /**
- * A link's token (§10.5): the user and client a file tool call ran as, `aud` the one REST path it
- * opens. Its `typ`, `download+jwt` or `upload+jwt`, sets it apart from an access token and from the
- * other kind of link (RFC 8725 §3.11), so it never authenticates as either.
+ * A link's token (§10.5): the user and client a file tool call ran as, `ep` the user's
+ * `credential_epoch` then (§5.2), `aud` the one REST path it opens. Its `typ`, `download+jwt` or
+ * `upload+jwt`, sets it apart from an access token and from the other kind of link (RFC 8725
+ * §3.11), so it never authenticates as either.
  */
 export type LinkPayload = {
   sub: string;
   cid: string | null;
+  ep: number;
   aud: string;
   iat: number;
   exp: number;
@@ -95,6 +97,7 @@ export type LinkPayload = {
 const LinkPayloadSchema = z.object({
   sub: z.string(),
   cid: z.string().nullable(),
+  ep: z.number().int(),
   aud: z.string(),
   iat: z.number(),
   exp: z.number()
@@ -165,19 +168,19 @@ export async function verifyAccessToken(
   );
 }
 
-/** The user and client of link token `token` of `kind`, verified like an access token and opening
- *  `path` alone; `null` for any token that fails. */
+/** The user, client and epoch of link token `token` of `kind`, verified like an access token and
+ *  opening `path` alone; `null` for any token that fails. */
 export async function verifyLinkToken(
   secret: string,
   kind: LinkKind,
   token: string,
   nowS: number,
   path: string
-): Promise<{ sub: string; cid: string | null } | null> {
+): Promise<{ sub: string; cid: string | null; ep: number } | null> {
   const payload = await verifiedPayload(secret, token, nowS, {
     typ: `${kind}+jwt`,
     audience: path,
     schema: LinkPayloadSchema
   });
-  return payload && { sub: payload.sub, cid: payload.cid };
+  return payload && { sub: payload.sub, cid: payload.cid, ep: payload.ep };
 }

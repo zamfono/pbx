@@ -9,6 +9,8 @@ const CODE_BYTES = 32;
 
 type IssueParams = {
   userId: string;
+  /** The sign-in's `credential_epoch` (§5.2), which the token endpoint checks. */
+  epoch: number;
   clientId: string;
   redirectUri: string;
   /** The authorization request sent no `redirect_uri` (OAuth 2.1 §2.3.2), `redirectUri` being
@@ -47,7 +49,7 @@ export class AuthCodeStore {
     codeVerifier: string,
     clientId: string,
     redirectUri: string | null
-  ): { userId: string } | null {
+  ): { userId: string; epoch: number } | null {
     const record = this.#codes.get(code);
     this.#codes.delete(code);
     if (!record) {
@@ -64,7 +66,7 @@ export class AuthCodeStore {
     if (computedChallenge !== record.codeChallenge) {
       return null;
     }
-    return { userId: record.userId };
+    return { userId: record.userId, epoch: record.epoch };
   }
 }
 

@@ -2,7 +2,7 @@ import { redirect, type RequestEvent } from '@sveltejs/kit';
 import * as env from '$app/env/private';
 import pino from 'pino';
 
-import { HTTP_FOUND, nowIso, type Db } from '@zamfono/shared';
+import { credentialEpoch, HTTP_FOUND, nowIso, type Db } from '@zamfono/shared';
 
 import { clientMetaFor } from '#lib/server/auth/clients.js';
 import { authCodeStore } from '#lib/server/auth/codes.js';
@@ -125,18 +125,22 @@ export async function GET(event: RequestEvent): Promise<Response> {
   if (!result.ok) {
     toErrorPage(origin, publicReason(result.reason));
   }
+  // What the sign-in issues carries the user's `credential_epoch` as of now (§5.2).
+  const epoch = await credentialEpoch(db, result.userId);
+  if (epoch === null) {
+    toErrorPage(origin, 'noUser');
+  }
+  const signIn = { userId: result.userId, epoch };
   if (pending.security === true) {
-    startSecuritySession(event.cookies, result.userId);
+    startSecuritySession(event.cookies, signIn);
     redirect(HTTP_FOUND, new URL('/auth/security', origin).toString(), {
       external: [origin]
     });
   }
   if (pending.authorizeParams === null) {
-    redirect(
-      HTTP_FOUND,
-      loginRedirect(authCodeStore, result.userId, null, origin),
-      { external: [origin] }
-    );
+    redirect(HTTP_FOUND, loginRedirect(authCodeStore, signIn, null, origin), {
+      external: [origin]
+    });
   }
   // A client re-resolution failure here (an expired CIMD cache entry gone stale mid-flow) cannot
   // name the client on the consent step, so it is reported the same way an expired link is.
@@ -145,7 +149,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
     toErrorPage(origin, 'expired');
   }
   setSealedCookie(event.cookies, kr, CONSENT_COOKIE, {
-    userId: result.userId,
+    ...signIn,
     clientName: meta.name,
     authorize: pending.authorizeParams
   });

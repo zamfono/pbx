@@ -161,11 +161,17 @@ export async function lookupUser(
   db: Db,
   email: string
 ): Promise<
-  { id: string; passwordHash: string | null; role: UserRole } | undefined
+  | {
+      id: string;
+      passwordHash: string | null;
+      role: UserRole;
+      credentialEpoch: number;
+    }
+  | undefined
 > {
   return db
     .selectFrom('users')
-    .select(['id', 'passwordHash', 'role'])
+    .select(['id', 'passwordHash', 'role', 'credentialEpoch'])
     .where('email', '=', email)
     .where('deletedAt', 'is', null)
     .executeTakeFirst();

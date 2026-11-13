@@ -16,12 +16,13 @@ import { defineOperation } from '../types.js';
 import { liveUser, namesAnOwner } from './_shared.js';
 
 /** `POST /users/{id}/resetMfa` (§5.2 "Two-factor authentication", §10.3): removes every second
- *  factor and recovery code of a user and ends their sessions; one who must have a second factor
- *  sets one up at their next sign-in. An owner's is owner-only, like `users.resetPassword`. */
+ *  factor and recovery code of a user and ends their sign-ins and the personal access tokens they
+ *  hold (`endSignIns`); one who must have a second factor sets one up at their next sign-in. An
+ *  owner's is owner-only, like `users.resetPassword`. */
 export const resetMfa = defineOperation({
   name: 'users.resetMfa',
   description:
-    "Removes a user's two-factor methods and recovery codes and signs them out everywhere.",
+    "Removes a user's two-factor methods and recovery codes, signs them out everywhere and revokes the personal access tokens they hold.",
   input: z.object({ id: z.string() }).strict(),
   output: idOutput,
   problems: [HTTP_NOT_FOUND],
@@ -29,7 +30,7 @@ export const resetMfa = defineOperation({
   ownerOnly: namesAnOwner,
   confirm: async (ctx, input) => {
     const user = await liveUser(ctx.db, input.id);
-    return `Reset the two-factor sign-in of ${user.name}? Their methods and recovery codes are removed and every session of theirs ends; this cannot be undone.`;
+    return `Reset the two-factor sign-in of ${user.name}? Their methods and recovery codes are removed, every session of theirs ends and the personal access tokens they hold are revoked; this cannot be undone.`;
   },
   entity: input => ({ kind: 'user', id: input.id }),
   run: async (ctx, input) => {

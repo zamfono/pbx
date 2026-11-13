@@ -81,6 +81,7 @@ describe('tokenEndpoint (authorization_code)', () => {
     const verifier = 'a-valid-code-verifier';
     const code = codes.issue({
       userId: 'owner',
+      epoch: 0,
       clientId: 'client-1',
       redirectUri: 'https://client.test/callback',
       codeChallenge: s256(verifier),
@@ -109,6 +110,7 @@ describe('tokenEndpoint (authorization_code)', () => {
     const { deps, codes } = await tokenDeps();
     const code = codes.issue({
       userId: 'owner',
+      epoch: 0,
       clientId: 'client-1',
       redirectUri: 'https://client.test/callback',
       codeChallenge: s256('the-real-verifier'),
@@ -133,6 +135,7 @@ describe('tokenEndpoint (authorization_code)', () => {
     const verifier = 'a-valid-code-verifier';
     const code = codes.issue({
       userId: 'owner',
+      epoch: 0,
       clientId: 'client-1',
       redirectUri: 'https://client.test/callback',
       codeChallenge: s256(verifier),

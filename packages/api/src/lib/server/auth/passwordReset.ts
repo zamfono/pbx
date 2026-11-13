@@ -10,7 +10,7 @@ import * as env from '$app/env/private';
 import pino from 'pino';
 import { z } from 'zod';
 
-import { addressKey, nowIso, type Db } from '@zamfono/shared';
+import { addressKey, endSignIns, nowIso, type Db } from '@zamfono/shared';
 
 import { MIN_PASSWORD_LENGTH } from '#lib/auth/passwordPolicy.js';
 
@@ -24,8 +24,7 @@ import {
   issueResetToken,
   liveResetTokenUser,
   redeemResetToken,
-  revokeResetTokens,
-  revokeUserTokens
+  revokeResetTokens
 } from './tokens.js';
 
 const logger = pino({ name: 'auth-reset-request' });
@@ -125,9 +124,10 @@ export type RedeemOutcome =
   | { kind: 'passwordSet' };
 
 /**
- * Redeems a single-use set-password token (§5.2 "Tokens"), sets the new Argon2id hash and revokes
- * every refresh token and every other set-password token the user held, in one transaction, so
- * neither an earlier session nor an earlier link survives a password reset. Outside the §5.5
+ * Redeems a single-use set-password token (§5.2 "Tokens"), sets the new Argon2id hash, ends the
+ * user's sign-ins (`endSignIns`: sessions, the personal access tokens they hold, sign-ins in
+ * flight) and revokes every other set-password token they held, in one transaction, so neither an
+ * earlier session, token or sign-in nor an earlier link survives a password reset. Outside the §5.5
  * rate limits: the token itself is the guard. The password is hashed once the token is seen to
  * be live, before the transaction, so no guessed token costs a hash and no hash holds the
  * database's write lock.
@@ -163,7 +163,7 @@ export async function redeemPasswordReset(
       if (!user) {
         return { kind: 'invalidLink' };
       }
-      await revokeUserTokens(trx, user.id, now);
+      await endSignIns(trx, user.id, now);
       await revokeResetTokens(trx, user.id, now);
       return { kind: 'passwordSet' };
     });

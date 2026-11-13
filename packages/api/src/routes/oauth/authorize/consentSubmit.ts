@@ -13,6 +13,7 @@ import {
   type PendingConsent
 } from '#lib/server/auth/consent.js';
 import { loginRedirect } from '#lib/server/auth/loginRedirect.js';
+import { loginUser } from '#lib/server/auth/loginUser.js';
 import { unsealCookie } from '#lib/server/auth/sealedCookie.js';
 import { getDb } from '#lib/server/db.js';
 import { keyringFromEnv } from '#lib/server/secretbox.js';
@@ -115,17 +116,17 @@ export async function approveConsentSubmit(
   shown: ConsentShown
 ): Promise<never> {
   const pending = takePendingConsent(event, shown);
+  // The cookie is stateless and replays until it expires: the user's `credential_epoch` is what
+  // ends it once a password reset, MFA reset or soft delete came after the sign-in (§5.2).
+  if ((await loginUser(getDb(), pending.userId, pending.epoch)) === null) {
+    error(HTTP_BAD_REQUEST, 'oauth/authorize: consent session expired');
+  }
   if (!(await writeClientRow(pending.authorize))) {
     authorizationErrorRedirect(pending.authorize, SERVER_ERROR);
   }
   redirect(
     HTTP_FOUND,
-    loginRedirect(
-      authCodeStore,
-      pending.userId,
-      pending.authorize,
-      originFromEnv()
-    ),
+    loginRedirect(authCodeStore, pending, pending.authorize, originFromEnv()),
     { external: true }
   );
 }

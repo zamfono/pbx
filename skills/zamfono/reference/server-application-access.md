@@ -34,4 +34,6 @@ OAuth instead: they are told where to log in and continue on their own.
    shows each token's `lastUsedAt`, updated at most once a minute, never the token itself.
 5. Replace or withdraw it: create a new token under another name, switch the application over, then
    `personalAccessTokens.revoke` (`POST /api/v1/personalAccessTokens/{id}/revoke`) the old one. It
-   stops working at once and cannot be undone. Deleting the user revokes all of their tokens.
+   stops working at once and cannot be undone. Deleting the user revokes all of their tokens, and so
+   does a reset of their password or second factor (`users.resetMfa`); tokens a person created for
+   another user stay.

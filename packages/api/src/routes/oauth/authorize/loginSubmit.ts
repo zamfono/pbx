@@ -66,10 +66,21 @@ export async function loginSubmit(
   if (hasMfa(status) || (await mfaRequired(db, user.role))) {
     return beginSecondFactor(
       event,
-      { purpose: 'oauth', userId: user.id, account, email, client },
+      {
+        purpose: 'oauth',
+        userId: user.id,
+        epoch: user.credentialEpoch,
+        account,
+        email,
+        client
+      },
       status
     );
   }
   limiter.loginSucceeded(account);
-  return completeLogin(event, user.id, client);
+  return completeLogin(
+    event,
+    { userId: user.id, epoch: user.credentialEpoch },
+    client
+  );
 }

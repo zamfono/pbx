@@ -16,6 +16,7 @@ describe('AuthCodeStore', () => {
     const verifier = 'a-code-verifier';
     const code = store.issue({
       userId: 'u1',
+      epoch: 0,
       clientId: 'c1',
       redirectUri: 'https://client.test/callback',
       codeChallenge: challengeFor(verifier),
@@ -23,7 +24,7 @@ describe('AuthCodeStore', () => {
     });
     expect(
       store.redeem(code, verifier, 'c1', 'https://client.test/callback')
-    ).toEqual({ userId: 'u1' });
+    ).toEqual({ userId: 'u1', epoch: 0 });
   });
 
   it('is single-use: a second redemption of the same code fails', () => {
@@ -32,6 +33,7 @@ describe('AuthCodeStore', () => {
     const verifier = 'a-code-verifier';
     const code = store.issue({
       userId: 'u1',
+      epoch: 0,
       clientId: 'c1',
       redirectUri: 'https://client.test/callback',
       codeChallenge: challengeFor(verifier),
@@ -48,6 +50,7 @@ describe('AuthCodeStore', () => {
     const store = new AuthCodeStore(() => now);
     const code = store.issue({
       userId: 'u1',
+      epoch: 0,
       clientId: 'c1',
       redirectUri: 'https://client.test/callback',
       codeChallenge: challengeFor('the-real-verifier'),
@@ -69,6 +72,7 @@ describe('AuthCodeStore', () => {
     const verifier = 'a-code-verifier';
     const code = store.issue({
       userId: 'u1',
+      epoch: 0,
       clientId: 'c1',
       redirectUri: 'https://client.test/callback',
       codeChallenge: challengeFor(verifier),
@@ -86,6 +90,7 @@ describe('AuthCodeStore', () => {
     const verifier = 'a-code-verifier';
     const code = store.issue({
       userId: 'u1',
+      epoch: 0,
       clientId: 'c1',
       redirectUri: 'https://client.test/callback',
       codeChallenge: challengeFor(verifier),
@@ -109,6 +114,7 @@ describe('AuthCodeStore', () => {
     const verifier = 'a-code-verifier';
     const issued = {
       userId: 'u1',
+      epoch: 0,
       clientId: 'c1',
       redirectUri: 'https://client.test/callback',
       codeChallenge: challengeFor(verifier),
@@ -118,7 +124,8 @@ describe('AuthCodeStore', () => {
     expect(store.redeem(sent, verifier, 'c1', null)).toBeNull();
     const omitted = store.issue({ ...issued, redirectUriDefaulted: true });
     expect(store.redeem(omitted, verifier, 'c1', null)).toEqual({
-      userId: 'u1'
+      userId: 'u1',
+      epoch: 0
     });
     const omittedThenSent = store.issue({
       ...issued,

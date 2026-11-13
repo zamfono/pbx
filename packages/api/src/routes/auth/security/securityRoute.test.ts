@@ -135,7 +135,7 @@ describe('the security page (§5.2 "Authentication pages", "Two-factor authentic
     const phoneOnly = await seedUser(db, { email: null, ext: '4711' });
     for (const userId of [owner, phoneOnly]) {
       const cookies = cookieJar();
-      startSecuritySession(cookies, userId);
+      startSecuritySession(cookies, { userId, epoch: 0 });
       // eslint-disable-next-line no-await-in-loop -- one user after the other keeps the cases apart
       const data = await load(pageEvent(cookies) as Parameters<typeof load>[0]);
       expect(data).toMatchObject({ manage: null });

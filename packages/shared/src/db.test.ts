@@ -6,7 +6,7 @@ import { migrateForTest, MIGRATIONS_DIR, seedSettings } from './testDb.js';
 
 test('migrates and enforces the schema', async () => {
   const db = openDb(':memory:');
-  expect(await pendingMigrations(db, MIGRATIONS_DIR)).toHaveLength(19);
+  expect(await pendingMigrations(db, MIGRATIONS_DIR)).toHaveLength(20);
   await migrateForTest(db);
   expect(await pendingMigrations(db, MIGRATIONS_DIR)).toEqual([]);
 

@@ -1,5 +1,6 @@
 import { authorizationResponseUrl } from './authorizationResponse.js';
 import type { AuthCodeStore } from './codes.js';
+import type { SignIn } from './loginUser.js';
 import type { PendingAuthorize } from './ssoCookie.js';
 
 /**
@@ -9,7 +10,7 @@ import type { PendingAuthorize } from './ssoCookie.js';
  */
 export function loginRedirect(
   codes: AuthCodeStore,
-  userId: string,
+  signIn: SignIn,
   authorizeParams: PendingAuthorize | null,
   origin: string
 ): string {
@@ -17,7 +18,8 @@ export function loginRedirect(
     return new URL('/auth/done', origin).toString();
   }
   const code = codes.issue({
-    userId,
+    userId: signIn.userId,
+    epoch: signIn.epoch,
     clientId: authorizeParams.clientId,
     redirectUri: authorizeParams.redirectUri,
     redirectUriDefaulted: authorizeParams.redirectUriDefaulted === true,
