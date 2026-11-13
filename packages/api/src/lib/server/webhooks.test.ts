@@ -22,17 +22,19 @@ function noDelay(): Promise<void> {
 type StubRequest = { headers: http.IncomingHttpHeaders; body: string };
 
 /**
- * A local HTTP receiver that records every POST and answers with `status` until changed, on
- * whatever port is free: a fixed port can already be held by another suite on the same host.
+ * A local HTTP receiver that records every POST and answers with `status` and `headers` until
+ * changed, on whatever port is free: a fixed port can already be held by another suite on the
+ * same host.
  */
 async function startStub(): Promise<{
   url: string;
   requests: StubRequest[];
-  setStatus: (status: number) => void;
+  setStatus: (status: number, headers?: Record<string, string>) => void;
   close: () => Promise<void>;
 }> {
   const requests: StubRequest[] = [];
   let status = 200;
+  let headers: Record<string, string> = {};
   const server = http.createServer((req, res) => {
     const chunks: Buffer[] = [];
     req.on('data', (chunk: Buffer) => {
@@ -43,7 +45,7 @@ async function startStub(): Promise<{
         headers: req.headers,
         body: Buffer.concat(chunks).toString('utf8')
       });
-      res.writeHead(status);
+      res.writeHead(status, headers);
       res.end();
     });
   });
@@ -56,8 +58,9 @@ async function startStub(): Promise<{
   return {
     url: `http://127.0.0.1:${port}`,
     requests,
-    setStatus: value => {
+    setStatus: (value, valueHeaders = {}) => {
       status = value;
+      headers = valueHeaders;
     },
     close: () =>
       new Promise(resolve => {
@@ -531,11 +534,12 @@ describe('WebhookDispatcher across a restart', () => {
     });
   });
 
-  it('follows no redirect: a 3xx is a failed attempt (§10.6)', async () => {
+  it('follows no redirect: a 307 is a failed attempt and its Location gets no request (§10.6)', async () => {
     const db = await migratedTestDb();
     const kr = testKeyring();
     await insertWebhook(db, kr, { url: stub.url });
-    stub.setStatus(307);
+    const elsewhere = await startStub();
+    stub.setStatus(307, { Location: `${elsewhere.url}/hook` });
     const dispatcher = new WebhookDispatcher({
       db,
       kr,
@@ -545,7 +549,10 @@ describe('WebhookDispatcher across a restart', () => {
 
     await dispatcher.enqueue(sampleEvent());
 
+    await elsewhere.close();
+
     expect(stub.requests).toHaveLength(3);
+    expect(elsewhere.requests).toEqual([]);
     expect(await lastStatusOf(db)).toBe('failing');
   });
 });
