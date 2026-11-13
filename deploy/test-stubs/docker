@@ -2,8 +2,8 @@
 # update-test.sh's stub runtime: `docker compose version` answers, `up --help` names --wait unless
 # STUB_PODMAN_COMPOSE, which also has no `rm`, as podman-compose has neither; everything else is
 # recorded and succeeds, `ps -q` naming two containers, which `inspect` reports healthy and
-# without a healthcheck, bar a pull under STUB_FAIL_PULL and an `up` under STUB_FAIL_UP, and
-# `ps -aq`, the host agent's look for an old updater, goes unrecorded. A pull
+# without a healthcheck, and `ps -q api` api's, bar a pull under STUB_FAIL_PULL and an `up` under
+# STUB_FAIL_UP, and `ps -aq`, the host agent's look for an old updater, goes unrecorded. A pull
 # copies the update's record, .update/state.json, to $STUB_LOG.state, as it stands mid-run.
 # `compose config` names the five services' release images at ZAMFONO_VERSION, else VERSION's,
 # or under STUB_OWN_IMAGES images of the operator's own in their place;
@@ -30,6 +30,7 @@ fi
 echo "$*" >>"$STUB_LOG"
 case $* in
   compose*' ps -q') printf 'api-1\nmigrate-1\n' && exit 0 ;;
+  compose*' ps -q api') echo a1 && exit 0 ;;
   compose*' config')
     echo services:
     for name in netns asterisk migrate core api proxy; do

@@ -492,13 +492,17 @@ install_units() {
   chmod 644 "$UNIT_DIR/$mount" "$UNIT_DIR/$base".{service,path,timer}
   systemctl daemon-reload
   systemctl enable --now "$mount" >/dev/null 2>&1
-  systemctl enable --now "$base.path" "$base.timer" >/dev/null 2>&1
+  # Started only below, once api binds the tmpfs: the timer runs the agent at once where the host
+  # has been up for more than its first minute, and that run would find api bound to the directory
+  # under the tmpfs and recreate it alongside this script.
+  systemctl enable "$base.path" "$base.timer" >/dev/null 2>&1
   if [[ -z $mounted ]]; then
     # Mounted just now, over a directory a running api and the path unit still hold: both take
     # the tmpfs once restarted.
-    systemctl restart "$base.path"
     ! api_container >/dev/null || recreate_api
+    systemctl restart "$base.path"
   fi
+  systemctl start "$base.path" "$base.timer"
   # A tmpfs a release before 0.9.1 mounted, root's alone (0700), until the next boot mounts it as
   # the unit now says.
   update_dir

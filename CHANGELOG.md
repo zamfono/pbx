@@ -58,6 +58,11 @@ why the specified behaviour changed; the commit history, how.
 
 - The shipped mails' last line no longer starts with a stray `·` while no company name is set:
   it names the FQDN alone.
+- Installing the host agent on a running stack, with `setup/agent.sh install` or by the
+  `update.sh` run that offers it, no longer leaves "could not recreate api" in the agent's
+  journal: its timer ran the agent at once, before the install had recreated `api` on the new
+  request tmpfs, and both recreated it. The install now recreates `api` first and starts the
+  agent's units after; `api` ends up bound to the tmpfs as before.
 
 ### Security
 

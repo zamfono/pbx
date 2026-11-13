@@ -217,8 +217,16 @@ if (($(id -u) == 0)); then
   grep -qx "RequiresMountsFor=$work/stack/.update/requests" "$work/units/$base.path" ||
     fail "the path unit could watch the directory under the tmpfs"
   grep -qx "systemctl enable --now $mount" "$work/runtime.log" || fail "the tmpfs was not mounted"
-  grep -qx "systemctl enable --now $base.path $base.timer" "$work/runtime.log" ||
+  grep -qx "systemctl enable $base.path $base.timer" "$work/runtime.log" ||
     fail "the units were not enabled: $(cat "$work/runtime.log")"
+  # The running api takes the fresh tmpfs before the path unit and the timer start, as the timer
+  # runs the agent at once, which would otherwise recreate api alongside the install.
+  awk -v start="systemctl start $base.path $base.timer" '
+    / up -d --force-recreate --no-deps api$/ { recreated = NR }
+    $0 == start && !started { started = NR }
+    END { exit !(recreated && started > recreated) }
+  ' "$work/runtime.log" ||
+    fail "the agent's units started before api took the tmpfs: $(cat "$work/runtime.log")"
   # update.sh rewrites units a release changed, and leaves unchanged ones be.
   : >"$work/runtime.log"
   agent_refresh() {
