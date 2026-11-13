@@ -1,3 +1,5 @@
+import { mkdir, readdir, writeFile } from 'node:fs/promises';
+import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
@@ -293,8 +295,11 @@ describe('mailbox menu (§10.2 "Mailbox access")', () => {
     await done;
   });
 
-  it('0 plays the greeting instructions, records after a tone and confirms the greeting was saved', async () => {
+  it('0 plays the greeting instructions, records after a tone, confirms the greeting was saved and deletes the one it replaces', async () => {
     const previous = newId();
+    const promptsDir = path.join(pipeline.deps.mediaDir, 'prompts');
+    await mkdir(promptsDir, { recursive: true });
+    await writeFile(path.join(promptsDir, `${previous}.wav`), 'wav');
     await db
       .insertInto('audioAssets')
       .values({
@@ -345,10 +350,11 @@ describe('mailbox menu (§10.2 "Mailbox access")', () => {
     expect(user.mailboxAudioId).toBe(params.name.replace('prompts/', ''));
     const replaced = await db
       .selectFrom('audioAssets')
-      .select('deletedAt')
+      .select('id')
       .where('id', '=', previous)
-      .executeTakeFirstOrThrow();
-    expect(replaced.deletedAt).not.toBeNull();
+      .executeTakeFirst();
+    expect(replaced).toBeUndefined();
+    await expect(readdir(promptsDir)).resolves.not.toContain(`${previous}.wav`);
   });
 
   it('a caller who hangs up to leave the menu is in the history as answered, not missed', async () => {

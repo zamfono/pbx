@@ -2,6 +2,7 @@
  * makes `core` insert the `audio_assets` row and set the mailbox's `mailbox_audio_id` (§3.1
  * "Known cross-writes"). The menu itself is `mailbox.ts`'s. */
 import {
+  deletePromptFiles,
   MS_PER_SECOND,
   newId,
   PROMPTS_SUBDIR,
@@ -21,15 +22,15 @@ const RECORDING_FALLBACK_BUFFER_S = 5;
 const MAILBOX_GREETING_MAX_S = 30;
 const MAILBOX_GREETING_SILENCE_S = 3;
 
-/** Inserts the recorded greeting's `audio_assets` row, points the mailbox at it and soft-deletes
- * the greeting it replaces, in one transaction. */
+/** Inserts the recorded greeting's `audio_assets` row, points the mailbox at it and deletes the
+ * greeting it replaces (§5.9), in one transaction; returns the id of the one deleted, or `null`. */
 async function storeGreeting(
   db: Db,
   owner: Owner,
   greeting: { id: string; uploadedBy: string; now: string }
-): Promise<void> {
+): Promise<string | null> {
   const { id, uploadedBy, now } = greeting;
-  await db.transaction().execute(async trx => {
+  return db.transaction().execute(async trx => {
     await trx
       .insertInto('audioAssets')
       .values({
@@ -65,13 +66,14 @@ async function storeGreeting(
         .where('id', '=', owner.ringGroupId)
         .execute();
     }
-    await retireGreeting(trx, previous?.mailboxAudioId ?? null, now);
+    return retireGreeting(trx, previous?.mailboxAudioId ?? null);
   });
 }
 
 /** Digit `0`: plays `instructions`, then records a new greeting after a tone into `audio_assets`
- * kind `vmGreeting` and sets it as `mailbox_audio_id`, replacing the previous one, which is
- * soft-deleted in the same transaction (§10.2 "Mailbox access"). Whether a greeting was stored. */
+ * kind `vmGreeting` and sets it as `mailbox_audio_id`, replacing the previous one, whose row is
+ * deleted in the same transaction and its files once it committed (§10.2 "Mailbox access",
+ * §5.9). Whether a greeting was stored. */
 export async function recordGreeting(
   pipeline: Pipeline,
   call: Call,
@@ -115,7 +117,7 @@ export async function recordGreeting(
   if (durationS === null) {
     return false;
   }
-  await storeGreeting(db, owner, {
+  const retired = await storeGreeting(db, owner, {
     id,
     uploadedBy: call.callerUserId,
     now: pipeline.deps.now()
@@ -123,5 +125,17 @@ export async function recordGreeting(
   // Core's own cross-write (§3.1) reaches no `/internal/configChanged`; `deposit` resolves the
   // greeting from the config snapshot, so it must reload after these writes.
   pipeline.deps.cache.invalidate();
+  if (retired !== null) {
+    // Once no reloaded snapshot names it. A file this misses has no row left: `api`'s orphan
+    // sweep takes it (§11.6).
+    await deletePromptFiles(pipeline.deps.mediaDir, retired).catch(
+      (error: unknown) => {
+        pipeline.deps.logger.warn(
+          { err: error, audioId: retired },
+          'mailbox: the replaced greeting files were not deleted'
+        );
+      }
+    );
+  }
   return true;
 }

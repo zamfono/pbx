@@ -1,4 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 
 import { newId, type Db } from '@zamfono/shared';
 import { seedUser } from '@zamfono/shared/testDb.js';
@@ -55,13 +58,28 @@ async function greetingOf(db: Db, userId: string): Promise<string | null> {
   return row.mailboxAudioId;
 }
 
-async function liveAssetIds(db: Db): Promise<string[]> {
-  const rows = await db
-    .selectFrom('audioAssets')
-    .select('id')
-    .where('deletedAt', 'is', null)
-    .execute();
+async function assetIds(db: Db): Promise<string[]> {
+  const rows = await db.selectFrom('audioAssets').select('id').execute();
   return rows.map(row => row.id);
+}
+
+/** A media volume of its own for the test, `MEDIA_DIR`; its `prompts/` directory. */
+async function stubMediaDir(): Promise<string> {
+  const mediaDir = await mkdtemp(path.join(os.tmpdir(), 'zamfono-greeting-'));
+  onTestFinished(() => rm(mediaDir, { recursive: true, force: true }));
+  vi.stubEnv('MEDIA_DIR', mediaDir);
+  const promptsDir = path.join(mediaDir, 'prompts');
+  await mkdir(promptsDir);
+  return promptsDir;
+}
+
+/** Writes greeting `id`'s playback WAV and master into `promptsDir`, as `storeAudio` does. */
+async function writeGreetingFiles(
+  promptsDir: string,
+  id: string
+): Promise<void> {
+  await writeFile(path.join(promptsDir, `${id}.wav16`), 'wav');
+  await writeFile(path.join(promptsDir, `${id}.master.mp3`), 'mp3');
 }
 
 function as(actor: Actor): RunInput {
@@ -153,15 +171,17 @@ describe('users.setVoicemailGreeting and users.clearVoicemailGreeting', () => {
     expect(storeAudio).not.toHaveBeenCalled();
   });
 
-  it('clears back to the default prompt only once confirmed, soft-deleting the greeting', async () => {
+  it('clears back to the default prompt only once confirmed, deleting the greeting and its files', async () => {
     const db = await makeTestDb();
     await seedUsers(db);
-    await runOperation(
+    const promptsDir = await stubMediaDir();
+    const first = (await runOperation(
       db,
       'users.setVoicemailGreeting',
       { id: 'anna', upload },
       as(anna)
-    );
+    )) as { mailboxAudioId: string };
+    await writeGreetingFiles(promptsDir, first.mailboxAudioId);
     await expect(
       runOperation(db, 'users.clearVoicemailGreeting', { id: 'anna' }, as(anna))
     ).rejects.toMatchObject({ status: 409 });
@@ -172,36 +192,50 @@ describe('users.setVoicemailGreeting and users.clearVoicemailGreeting', () => {
       { ...as(anna), confirm: true }
     );
     await expect(greetingOf(db, 'anna')).resolves.toBeNull();
-    await expect(liveAssetIds(db)).resolves.toEqual([]);
+    await expect(assetIds(db)).resolves.toEqual([]);
+    await expect(readdir(promptsDir)).resolves.toEqual([]);
   });
 
-  it('soft-deletes the greeting a new one replaces', async () => {
+  it('deletes the greeting a new one replaces at once, its row and its files', async () => {
     const db = await makeTestDb();
     await seedUsers(db);
-    await runOperation(
-      db,
-      'users.setVoicemailGreeting',
-      { id: 'anna', upload },
-      as(anna)
-    );
-    const second = (await runOperation(
-      db,
-      'users.setVoicemailGreeting',
-      { id: 'anna', upload },
-      as(anna)
-    )) as { mailboxAudioId: string };
-    await expect(liveAssetIds(db)).resolves.toEqual([second.mailboxAudioId]);
-  });
-
-  it('keeps a replaced greeting another mailbox still uses', async () => {
-    const db = await makeTestDb();
-    await seedUsers(db);
+    const promptsDir = await stubMediaDir();
     const first = (await runOperation(
       db,
       'users.setVoicemailGreeting',
       { id: 'anna', upload },
       as(anna)
     )) as { mailboxAudioId: string };
+    await writeGreetingFiles(promptsDir, first.mailboxAudioId);
+    const second = (await runOperation(
+      db,
+      'users.setVoicemailGreeting',
+      { id: 'anna', upload },
+      as(anna)
+    )) as { mailboxAudioId: string };
+    await writeGreetingFiles(promptsDir, second.mailboxAudioId);
+    await runOperation(
+      db,
+      'users.setVoicemailGreeting',
+      { id: 'anna', upload },
+      as(anna)
+    );
+    await expect(assetIds(db)).resolves.not.toContain(first.mailboxAudioId);
+    await expect(assetIds(db)).resolves.not.toContain(second.mailboxAudioId);
+    await expect(readdir(promptsDir)).resolves.toEqual([]);
+  });
+
+  it('keeps a replaced greeting, row and files, that another mailbox still uses', async () => {
+    const db = await makeTestDb();
+    await seedUsers(db);
+    const promptsDir = await stubMediaDir();
+    const first = (await runOperation(
+      db,
+      'users.setVoicemailGreeting',
+      { id: 'anna', upload },
+      as(anna)
+    )) as { mailboxAudioId: string };
+    await writeGreetingFiles(promptsDir, first.mailboxAudioId);
     await db
       .updateTable('users')
       .set({ mailboxAudioId: first.mailboxAudioId })
@@ -213,7 +247,8 @@ describe('users.setVoicemailGreeting and users.clearVoicemailGreeting', () => {
       { id: 'anna' },
       { ...as(anna), confirm: true }
     );
-    await expect(liveAssetIds(db)).resolves.toEqual([first.mailboxAudioId]);
+    await expect(assetIds(db)).resolves.toEqual([first.mailboxAudioId]);
+    await expect(readdir(promptsDir)).resolves.toHaveLength(2);
   });
 
   it('takes the upload as multipart form data on PUT /users/{id}/voicemailGreeting', async () => {

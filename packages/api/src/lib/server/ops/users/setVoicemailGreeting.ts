@@ -7,16 +7,16 @@ import { uploadSchema } from '../audio/create.js';
 import { ownUserId } from '../gates.js';
 import { propagate } from '../propagate.js';
 import { defineOperation } from '../types.js';
-import { GREETING_LABEL } from './_greeting.js';
+import { GREETING_LABEL, retireGreetingFiles } from './_greeting.js';
 import { liveUser } from './_shared.js';
 
 /**
  * `PUT /users/{id}/voicemailGreeting` (§10.2 "Mailbox access", "Greetings and audio"): the
  * user's personal mailbox greeting, as `*96` records it: the upload, transcoded like any
  * `audio.create` of kind `vmGreeting`, becomes an `audio_assets` row of that kind and the user's
- * `mailbox_audio_id`, replacing the previous one, which is soft-deleted. Outside the audit log like the phone's own
- * recording (§5.7). The propagation makes `core` reload its config, from which a deposit plays
- * the greeting.
+ * `mailbox_audio_id`, replacing the previous one, whose row and files are deleted (§5.9). Outside
+ * the audit log like the phone's own recording (§5.7). The propagation makes `core` reload its
+ * config, from which a deposit plays the greeting.
  */
 export const setVoicemailGreeting = defineOperation({
   name: 'users.setVoicemailGreeting',
@@ -54,7 +54,7 @@ export const setVoicemailGreeting = defineOperation({
       .set({ mailboxAudioId: stored.id })
       .where('id', '=', input.id)
       .execute();
-    await retireGreeting(ctx.db, user.mailboxAudioId, ctx.now);
+    retireGreetingFiles(ctx, await retireGreeting(ctx.db, user.mailboxAudioId));
     propagate(ctx, []);
     return { id: input.id, mailboxAudioId: stored.id };
   }

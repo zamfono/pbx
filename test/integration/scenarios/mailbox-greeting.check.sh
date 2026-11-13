@@ -2,11 +2,13 @@
 # §10.2 "Mailbox access": the greeting 101 recorded over `*96` is their mailbox's greeting now,
 # shared with the REST API, and the feature call is in the history as 101's own: from their
 # extension, not from the device's SIP username (§11.2 `calls.from_uri`, §9.3 caller ID), and
-# answered, though the caller left it by hanging up.
+# answered, though the caller left it by hanging up. The greeting it replaced, the setup's upload,
+# is deleted at once, its row and its files (§5.9).
 set -euo pipefail
 
 api_base=$1
 token=$2
+compose=$3
 # shellcheck source=_lib.sh
 . "$(dirname "$0")/_lib.sh"
 
@@ -41,3 +43,15 @@ print(next(c["id"] for c in json.load(sys.stdin)["items"] if c["toUri"] == "*96"
     ;;
   *) ;;
 esac
+
+# The uploaded greeting the setup left is gone, its row and its files.
+replaced=$(cat "$(state_file mailbox-greeting)")
+rm -f "$(state_file mailbox-greeting)"
+if api GET /audio | grep -q "\"$replaced\""; then
+  echo "the replaced greeting $replaced is still an audio asset" >&2
+  exit 1
+fi
+if dc exec -T core ls /media/prompts </dev/null | grep -q "^$replaced\."; then
+  echo "the replaced greeting $replaced still has files in prompts/" >&2
+  exit 1
+fi

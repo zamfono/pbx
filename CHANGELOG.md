@@ -74,6 +74,14 @@ why the specified behaviour changed; the commit history, how.
   the HTTP status as before (200 for `pass` and `warn`, 503 for `fail`), so an uptime check keeps
   working. With `Authorization: Bearer <METRICS_TOKEN>` it answers every check as before; owners
   and admins read them with the new `system.health` (`GET /api/v1/system/health`).
+- Any user could fill the media volume with their voicemail greeting: ffmpeg read an upload in
+  whatever format it found and wrote its output without a limit, so an hour of FLAC in 656 KB
+  became 115 MB of WAV, and a day in 17 MB 2.76 GB, kept after being replaced and copied by every
+  backup run. An upload's audio is now at most one hour, read only as its declared WAV or MP3,
+  and a longer or unreadable upload is refused with 422; at most one transcode per CPU runs at a
+  time, the others waiting. A voicemail greeting that a new one replaces or a removal clears,
+  through the API or on `*96`, is deleted at once, row and files, unless another mailbox still
+  uses it.
 
 ## [0.9.1] - 2026-11-12
 

@@ -5,13 +5,14 @@ import { HTTP_NOT_FOUND, retireGreeting } from '@zamfono/shared';
 import { ownUserId } from '../gates.js';
 import { propagate } from '../propagate.js';
 import { defineOperation } from '../types.js';
+import { retireGreetingFiles } from './_greeting.js';
 import { liveUser } from './_shared.js';
 
 /**
  * `DELETE /users/{id}/voicemailGreeting` (§10.2 "Voicemail", "Mailbox access"): the user's
  * mailbox greets with the language default prompt again, and the greeting's own audio asset is
- * soft-deleted, as one a newer greeting replaces is. Outside the audit log like the greeting
- * itself (§5.7).
+ * deleted with its files, as one a newer greeting replaces is (§5.9). Outside the audit log like
+ * the greeting itself (§5.7).
  */
 export const clearVoicemailGreeting = defineOperation({
   name: 'users.clearVoicemailGreeting',
@@ -36,7 +37,7 @@ export const clearVoicemailGreeting = defineOperation({
       .set({ mailboxAudioId: null })
       .where('id', '=', input.id)
       .execute();
-    await retireGreeting(ctx.db, user.mailboxAudioId, ctx.now);
+    retireGreetingFiles(ctx, await retireGreeting(ctx.db, user.mailboxAudioId));
     propagate(ctx, []);
     return { id: input.id, mailboxAudioId: null };
   }
