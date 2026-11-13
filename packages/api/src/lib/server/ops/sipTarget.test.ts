@@ -114,7 +114,7 @@ describe('sip forward targets', () => {
     });
   });
 
-  it('lets an admin set a sip target on a user, and refuses a user who sets or keeps one', async () => {
+  it('lets an admin set a sip target on a user, and refuses a user who sets one or sends it in full', async () => {
     const db = await makeTestDb();
     await seedSettings(db);
     const trunkId = await createOpenAiTrunk(db);
@@ -159,15 +159,23 @@ describe('sip forward targets', () => {
         asRun({ actor: self })
       )
     ).rejects.toMatchObject({ status: 403 });
-    // Keeping one: an update that leaves the admin's target in place.
+    // Keeping one: an update that leaves the admin's target in place, which the user reads as
+    // its marker; sent in full it is refused, naming the marker.
+    const kept = (await runOperation(
+      db,
+      'ooo.update',
+      { id: ooo.id, active: false },
+      asRun({ actor: self })
+    )) as { target: unknown };
+    expect(kept.target).toEqual({ managed: true, kind: 'sip' });
     await expect(
       runOperation(
         db,
         'ooo.update',
-        { id: ooo.id, active: false },
+        { id: ooo.id, target: sipTarget(trunkId) },
         asRun({ actor: self })
       )
-    ).rejects.toMatchObject({ status: 403 });
+    ).rejects.toMatchObject({ status: 422 });
     // Replacing it with another kind is the user's own business.
     const replaced = (await runOperation(
       db,

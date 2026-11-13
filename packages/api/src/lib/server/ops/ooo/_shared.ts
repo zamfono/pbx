@@ -3,21 +3,22 @@ import { z } from 'zod';
 
 import { HTTP_UNPROCESSABLE_CONTENT, type Db, type DB } from '@zamfono/shared';
 
-import { targetSpecSchema } from '../forwardTargetSchema.js';
+import { ownTargetSchema } from '../forwardTargetSchema.js';
 import { liveRow } from '../rows.js';
 import { inScope, scopeInputSchema, type ScopeInput } from '../scope.js';
 import { OpError, type Context } from '../types.js';
 
 export type OooRuleRow = Selectable<DB['oooRules']>;
 
-/** An out-of-office rule as the `ooo` operations return it (§10.2 "Out of office"). */
+/** An out-of-office rule as the `ooo` operations return it (§10.2 "Out of office"), an admin-set
+ * target as its marker to a `user` (§10.3 "Forward targets"). */
 export const oooRuleOut = z.object({
   id: z.string(),
   scope: scopeInputSchema,
   active: z.boolean(),
   startsAt: z.string().nullable(),
   expiresAt: z.string().nullable(),
-  target: targetSpecSchema,
+  target: ownTargetSchema,
   createdAt: z.string()
 });
 export type OooRuleOut = z.infer<typeof oooRuleOut>;
@@ -47,8 +48,8 @@ export const oooFields = {
     .describe(
       'When the rule ends, after startsAt; null: until deactivated. Active periods within a scope must not overlap.'
     ),
-  target: targetSpecSchema.describe(
-    "Where the scope's calls go while the rule is in effect, ahead of opening hours (see zamfono.help vacation-rule)."
+  target: ownTargetSchema.describe(
+    "Where the scope's calls go while the rule is in effect, ahead of opening hours (see zamfono.help vacation-rule); an admin-set target's { managed: true } marker, sent back unchanged, keeps it."
   )
 };
 

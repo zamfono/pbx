@@ -255,7 +255,7 @@ describe('fallbacks a user sets on their own forwarding', () => {
     });
   });
 
-  it('keeps an admin-set chain the user sends back unchanged, and refuses it changed', async () => {
+  it('reads an admin-set chain to the user as its marker, keeps it by that, and refuses it sent in full', async () => {
     const db = await makeTestDb();
     await seedSettings(db);
     const trunkId = await createSipTrunk(db);
@@ -273,14 +273,21 @@ describe('fallbacks a user sets on their own forwarding', () => {
       .orderBy('id')
       .execute();
 
-    await setForwarding(db, 'owner', stored, anna);
+    // The external number heads it, but the sip fallback makes the whole chain the admin's.
+    const marker = { managed: true, kind: 'external' };
+    expect((await setForwarding(db, 'owner', marker, anna)).rules).toEqual([
+      { condition: 'unconditional', target: marker }
+    ]);
     expect(
       await db.selectFrom('forwardTargets').select('id').orderBy('id').execute()
     ).toEqual(idsBefore);
 
     await expect(
+      setForwarding(db, 'owner', stored, anna)
+    ).rejects.toMatchObject({ status: 422 });
+    await expect(
       setForwarding(db, 'owner', { ...stored, ringTimeoutS: 30 }, anna)
-    ).rejects.toMatchObject({ status: 403 });
+    ).rejects.toMatchObject({ status: 422 });
   });
 });
 

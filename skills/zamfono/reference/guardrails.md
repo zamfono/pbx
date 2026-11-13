@@ -56,12 +56,16 @@ placed, while their own phone is in it, or are connected in (`call-control`), as
 Recordings are `admin`/`owner` only, including of a user's own calls. A `sip` or `webSocket`
 target, and an `external` one with `"record": true`, is admin-only everywhere, a fallback included: a user's own forwarding, OOO rule
 or hours that names a new one anywhere in its fallback chain is refused with 403. A user may give
-their own forward to an external number a `ringTimeoutS` and a `fallback` of any other kind. A user whose forwarding an admin pointed at one reads their rules with `users.getForwarding`
-(`GET /api/v1/users/{id}/forwarding`), in the shape `users.setForwarding`
-(`PUT /api/v1/users/{id}/forwarding`) takes, and sends them back edited: the `PUT` replaces the
-rules as a whole, keeps the admin's rule when it comes back unchanged under the same
-condition, down to its whole fallback chain, refuses it changed in any field or under another
-condition, and removes it when left out.
+their own forward to an external number a `ringTimeoutS` and a `fallback` of any other kind. A
+user reads such a target an admin set on their own forwarding with `users.getForwarding`
+(`GET /api/v1/users/{id}/forwarding`), OOO rules (`ooo.list`) or hours (`hours.get`) as a marker,
+`{ "managed": true, "kind": "webSocket" }`, never its URL, token, trunk or headers; an admin reads it
+in full. Acting for a user, read, edit and send back: `users.setForwarding`
+(`PUT /api/v1/users/{id}/forwarding`) replaces the rules as a whole, keeps the admin's target where
+the marker comes back unchanged under the same condition, refuses it under another condition, and
+removes the rule when left out; `ooo.update` and `hours.set` keep it the same way in the same rule
+or schedule, as does an `ooo.update` that leaves `target` out. Sending such a target in full,
+rebuilt from fields or changed, is refused with 422, which names the marker to send instead.
 
 ## Rate limits protect logins, not the API
 

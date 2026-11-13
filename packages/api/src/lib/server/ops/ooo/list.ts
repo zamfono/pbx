@@ -4,6 +4,7 @@ import { HTTP_NOT_FOUND } from '@zamfono/shared';
 
 import { arrayPage, pageInput, pageOutput } from '#lib/server/pagination.js';
 
+import { readableTarget } from '../forwardTargets.js';
 import { resolveTarget } from '../forwardTargetSpec.js';
 import {
   assertScopeExists,
@@ -50,7 +51,7 @@ export const list = defineOperation({
         active: row.active === 1,
         startsAt: row.startsAt,
         expiresAt: row.expiresAt,
-        target: await resolveTarget(ctx.db, row.targetId),
+        target: readableTarget(ctx, await resolveTarget(ctx.db, row.targetId)),
         createdAt: row.createdAt
       }))
     );

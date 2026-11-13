@@ -6,8 +6,7 @@ import {
   type UserForwardCondition
 } from '@zamfono/shared';
 
-import { isAdminTarget, targetChain } from '../forwardTargets.js';
-import { targetSpecSchema, type TargetSpec } from '../forwardTargetSchema.js';
+import { ownTargetSchema, type TargetSpec } from '../forwardTargetSchema.js';
 import { rowToTarget } from '../forwardTargetSpec.js';
 
 /** A user's forwarding rules (§10.3 "Users"), as `users.setForwarding` takes them and both
@@ -23,7 +22,7 @@ export const forwardingSchema = z
             .describe(
               'unconditional: every call; busy: every device busy; noAnswer: nobody answers within ringTimeoutS; dnd: DND on; offline: no registered device, falling to noAnswer without this rule.'
             ),
-          target: targetSpecSchema
+          target: ownTargetSchema
         })
       )
       .describe(
@@ -33,7 +32,8 @@ export const forwardingSchema = z
   .strict();
 export type Forwarding = z.infer<typeof forwardingSchema>;
 
-/** One stored rule: the wire rule `users.getForwarding` returns, plus the target row it owns. */
+/** One stored rule: its condition and target in full, as an admin reads it, plus the target row
+ * it owns. */
 export type StoredForwardRule = {
   condition: UserForwardCondition;
   target: TargetSpec;
@@ -41,8 +41,8 @@ export type StoredForwardRule = {
 };
 
 /**
- * A user's stored forwarding rules in `USER_FORWARD_CONDITIONS` order, each target as the wire returns it
- * (§10.3 "Forward targets"), so a read is exactly what `users.setForwarding` takes back.
+ * A user's stored forwarding rules in `USER_FORWARD_CONDITIONS` order, each target in full, as an
+ * admin reads it and `users.setForwarding` takes it back (§10.3 "Forward targets").
  */
 export async function storedForwardRules(
   db: Db,
@@ -69,33 +69,4 @@ export async function storedForwardRules(
     }))
   );
   return rules.sort((left, right) => byCondition(left) - byCondition(right));
-}
-
-/** `value` as JSON with every object's keys sorted, so two targets compare without key order. */
-function canonical(value: unknown): string {
-  return JSON.stringify(value, (_key, inner: unknown) =>
-    inner !== null && typeof inner === 'object' && !Array.isArray(inner)
-      ? Object.fromEntries(
-          Object.entries(inner).sort(([left], [right]) =>
-            left.localeCompare(right)
-          )
-        )
-      : inner
-  );
-}
-
-/**
- * §10.3 "Forward targets": whether `input` is the very target `stored` holds, field for field down
- * its whole fallback chain, a `sip` target's headers in order, while that chain holds an admin
- * target (`isAdminTarget`) anywhere. Both come parsed, `stored` through `rowToTarget`, so every
- * defaulted field (`sampleRate`, `ringTimeoutS`, `fallback`) is set on either side.
- */
-export function isSameAdminTarget(
-  stored: TargetSpec,
-  input: TargetSpec
-): boolean {
-  return (
-    targetChain(stored).some(isAdminTarget) &&
-    canonical(stored) === canonical(input)
-  );
 }

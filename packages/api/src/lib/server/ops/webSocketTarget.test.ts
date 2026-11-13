@@ -129,21 +129,27 @@ describe('webSocket forward targets', () => {
     ).rejects.toMatchObject({ status: 422 });
   });
 
-  it('lets an admin set one on a user, refuses a user who sets one, and keeps it when sent back unchanged', async () => {
+  it('lets an admin set one on a user, refuses a user who sets one, and keeps it by its marker', async () => {
     const db = await makeTestDb();
     await seedSettings(db);
     const target = { kind: 'webSocket', protocol: 'twilio', url: BOT_URL };
+    await expect(setForwarding(db, target, self)).rejects.toMatchObject({
+      status: 403,
+      message: 'a webSocket target is set by an admin'
+    });
     await setForwarding(db, target);
-    // Sent back as it reads, the admin's rule stays.
+    // Sent back as it reads, the marker, the admin's rule stays.
     await expect(
-      setForwarding(db, { ...target, sampleRate: 8000, record: false }, self)
+      setForwarding(db, { managed: true, kind: 'webSocket' }, self)
     ).resolves.toBeDefined();
-    // Any change to it is a new admin target.
+    // Sent in full, unchanged or not, it is refused, naming the marker.
     await expect(
       setForwarding(db, { ...target, url: 'wss://other.example/' }, self)
     ).rejects.toMatchObject({
-      status: 403,
-      message: 'a webSocket target is set by an admin'
+      status: 422,
+      message: expect.stringContaining(
+        'send back the marker read in its place'
+      ) as string
     });
     await expect(
       runOperation(

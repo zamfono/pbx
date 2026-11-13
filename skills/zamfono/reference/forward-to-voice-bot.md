@@ -52,7 +52,9 @@ OpenAI's Realtime API, is `forward-to-ai-agent` instead.
 
    A ring-group member's own forward to a bot skips the member instead of ringing the bot. Only an
    admin or owner sets one, as for a `sip` target (`guardrails`), since it sends the call's audio
-   to whatever URL it names. Add `"record": true` to record every call the bot answers, and a
+   to whatever URL it names; a user reads one on their own forwarding, out-of-office rule or
+   opening hours as `{ "managed": true, "kind": "webSocket" }`, never the URL or its token, and
+   keeps it by sending that marker back unchanged. Add `"record": true` to record every call the bot answers, and a
    `"fallback"` target, such as a ring group, for when the bot cannot be reached; without one the
    call ends with 503 (`mental-model`).
 

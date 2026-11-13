@@ -53,6 +53,16 @@ why the specified behaviour changed; the commit history, how.
   to owners alone; an admin gets 403.
 - `system.info` answers a user only the stack's version (`api.version`) and its address
   (`stack`); everything else it reports is for admins and owners.
+- A user reading their own forwarding (`users.getForwarding`), out-of-office rules (`ooo.list`)
+  or opening hours (`hours.get`), and the answers to writing them, gets a target an admin set
+  (`sip`, `webSocket`, or `external` with `record`, anywhere in its fallback chain) as
+  `{ "managed": true, "kind": "webSocket" }` (`ManagedForwardTarget` in the OpenAPI document and
+  the MCP tool schemas), never its URL, token, trunk, user part or headers; admins and owners read
+  it in full as before. Sent back unchanged in the same place (the same forwarding condition, OOO
+  rule or schedule), the marker keeps the admin's target as it is, and an `ooo.update` that leaves
+  `target` out keeps it too, which a user was refused before. A REST or MCP client that writes
+  back what it read keeps working; one that rebuilds such a target from its fields gets 422, whose
+  message names the marker to send instead.
 
 ### Fixed
 
@@ -84,6 +94,10 @@ why the specified behaviour changed; the commit history, how.
   before its body is read unless it was sent from a page whose link is valid, and the page then
   shows that the link has expired. `proxy` no longer lets a body over 512 KiB through for another
   form posted to an upload link under a name ending in `/upload`.
+- A user read the admin-set forward targets of their own forwarding, out-of-office rules and
+  opening hours in full, a voice bot's URL with the token the bot checks, and a SIP target's
+  header values, so the user could talk to the bot as the stack does. A user now reads them as a
+  marker without those values (see Changed).
 - `/oauth/authorize` fetched any client metadata document URL for anyone, without a limit. A fetch
   the cache cannot answer now counts against the client address, 240 a minute, which four
   fetches per sign-in times the login's 60 sign-ins a minute leaves room for; a client whose

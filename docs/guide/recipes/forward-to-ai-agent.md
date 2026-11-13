@@ -53,8 +53,9 @@ outside the stack; this recipe gets the call to OpenAI. OpenAI's guide:
    - an out-of-office rule, closed opening hours, a menu option or a ring group's fallback.
 
    Only an admin or owner sets one; a user editing their own forwarding, out-of-office rule or
-   opening hours is refused with 403 for it, except that their own forwarding may send an
-   admin-set `sip` rule back unchanged, which keeps it (`guardrails`). The trunk cannot be deleted while a target dials over it.
+   opening hours is refused with 403 for it, reads an admin-set one as
+   `{ "managed": true, "kind": "sip" }`, without trunk, user part or headers, and keeps it by
+   sending that marker back unchanged (`guardrails`). The trunk cannot be deleted while a target dials over it.
 
    Add `"record": true` to record every call the agent answers, one recording per call, however
    it was forwarded there; a DID answered by the agent alone records each of its concurrent calls.

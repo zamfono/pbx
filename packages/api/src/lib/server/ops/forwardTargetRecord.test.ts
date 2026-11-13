@@ -107,7 +107,7 @@ describe('a forward target that records', () => {
     ).rejects.toMatchObject({ status: 422 });
   });
 
-  it('is set by an admin alone: a user may only send the admin-set target back unchanged', async () => {
+  it('is set by an admin alone: a user keeps the admin-set target only by its marker', async () => {
     const db = await makeTestDb();
     await seedSettings(db);
     await expect(setForwarding(db, RECORDED, self)).rejects.toMatchObject({
@@ -130,11 +130,14 @@ describe('a forward target that records', () => {
 
     await setForwarding(db, RECORDED);
     const before = await ruleTarget(db);
-    await setForwarding(db, RECORDED, self);
+    await setForwarding(db, { managed: true, kind: 'external' }, self);
     expect(await ruleTarget(db)).toEqual(before);
     expect(before.recordCalls).toBe(1);
+    await expect(setForwarding(db, RECORDED, self)).rejects.toMatchObject({
+      status: 422
+    });
     await expect(
       setForwarding(db, { ...RECORDED, external: '+4318888' }, self)
-    ).rejects.toMatchObject({ status: 403 });
+    ).rejects.toMatchObject({ status: 422 });
   });
 });

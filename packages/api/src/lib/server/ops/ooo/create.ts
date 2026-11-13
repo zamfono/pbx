@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { HTTP_NOT_FOUND, newId } from '@zamfono/shared';
 
 import { recordChange } from '../audit.js';
-import { createTarget } from '../forwardTargets.js';
+import { createTarget, resolveOwnTarget } from '../forwardTargets.js';
 import { propagate } from '../propagate.js';
 import {
   assertScopeExists,
@@ -48,7 +48,9 @@ export const create = defineOperation({
     if (active) {
       await assertNoOverlap(ctx, input.scope, startsAt, expiresAt);
     }
-    const targetId = await createTarget(ctx, input.target);
+    // A new rule holds nothing a marker could keep.
+    const { target } = resolveOwnTarget(ctx, input.target, undefined);
+    const targetId = await createTarget(ctx, target);
     const id = newId();
     await ctx.db
       .insertInto('oooRules')
@@ -72,7 +74,7 @@ export const create = defineOperation({
       active,
       startsAt,
       expiresAt,
-      target: input.target,
+      target,
       createdAt: ctx.now
     };
   }

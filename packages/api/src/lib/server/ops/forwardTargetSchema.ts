@@ -224,6 +224,28 @@ export const targetSpecSchema: z.ZodType<TargetSpec> = z
   .describe(
     'Where the call goes: one of nine kinds, chosen by `kind` (see zamfono.help mental-model).'
   );
+/**
+ * What a `user` reads in place of a target an admin set on their own forwarding rule, OOO rule or
+ * opening hours (§10.3 "Forward targets"), a chain holding a `sip` or `webSocket` target, or an
+ * `external` one that records, anywhere in it: its kind alone, never its number, URL, token or
+ * headers. Sent back unchanged in the same place, it keeps the admin's target as it is.
+ */
+export const managedTargetSchema = z
+  .strictObject({
+    managed: z.literal(true),
+    kind: z.enum(['external', 'sip', 'webSocket'])
+  })
+  .meta({ id: 'ManagedForwardTarget' })
+  .describe(
+    "A target an admin set, as a user reads it: send it back unchanged in the same place to keep the admin's target, or send another target, or leave the rule out, to replace or remove it."
+  );
+export type ManagedTarget = z.infer<typeof managedTargetSchema>;
+
+/** A target a `user` may read and write in its masked form (`managedTargetSchema`): their own
+ * forwarding rule's, OOO rule's and opening hours' closed one. */
+export const ownTargetSchema = z.union([managedTargetSchema, targetSpecSchema]);
+export type OwnTarget = ManagedTarget | TargetSpec;
+
 /** What `targetSpecSchema` parses to, written out since its fallback nests it (`fallbackSchema`).
  * `ringTimeoutS` and `fallback` are always set on a parsed or read target; a target built in code
  * may leave them out for `null`. */

@@ -26,7 +26,7 @@ async function auditCount(db: Db, operation: string): Promise<number> {
 
 // §10.3 "Users": `GET /users/{id}/forwarding` returns the rules in the shape the `PUT` takes.
 describe('users.getForwarding', () => {
-  it('reads a user’s own rules in the PUT’s shape, sip headers included, in condition order', async () => {
+  it('reads a user’s rules in the PUT’s shape, in condition order, sip headers to an admin and the marker to the user', async () => {
     const db = await makeTestDb();
     await seedSettings(db);
     const anna = await createUserActor(db, 'Anna Huber', '101');
@@ -52,34 +52,24 @@ describe('users.getForwarding', () => {
       }
     ]);
     const auditBefore = await auditCount(db, 'users.getForwarding');
-    expect(await getForwarding(db, anna.id, anna)).toEqual({
+    const sip = (user: string, sipHeaders: unknown[]): unknown => ({
+      kind: 'sip',
+      trunkId,
+      user,
+      headers: sipHeaders,
+      record: false,
+      ringTimeoutS: null,
+      fallback: null
+    });
+    const rules = (
+      unconditional: unknown,
+      noAnswer: unknown
+    ): Record<string, unknown> => ({
       id: anna.id,
       rules: [
-        {
-          condition: 'unconditional',
-          target: {
-            kind: 'sip',
-            trunkId,
-            user: 'proj_def456',
-            headers: [...DEFAULT_SIP_HEADERS],
-            record: false,
-            ringTimeoutS: null,
-            fallback: null
-          }
-        },
+        { condition: 'unconditional', target: unconditional },
         { condition: 'busy', target: { kind: 'mailboxUser', userId: anna.id } },
-        {
-          condition: 'noAnswer',
-          target: {
-            kind: 'sip',
-            trunkId,
-            user: 'proj_abc123',
-            headers,
-            record: false,
-            ringTimeoutS: null,
-            fallback: null
-          }
-        },
+        { condition: 'noAnswer', target: noAnswer },
         {
           condition: 'offline',
           target: {
@@ -92,6 +82,17 @@ describe('users.getForwarding', () => {
         }
       ]
     });
+    // An admin reads the sip targets in full; the user, whose admin set them, their marker.
+    expect(await getForwarding(db, anna.id, admin)).toEqual(
+      rules(
+        sip('proj_def456', [...DEFAULT_SIP_HEADERS]),
+        sip('proj_abc123', headers)
+      )
+    );
+    const marker = { managed: true, kind: 'sip' };
+    expect(await getForwarding(db, anna.id, anna)).toEqual(
+      rules(marker, marker)
+    );
     expect(auditBefore).toBe(0);
     expect(await auditCount(db, 'users.getForwarding')).toBe(0);
   });
@@ -117,7 +118,7 @@ describe('users.getForwarding', () => {
     });
   });
 
-  it('round-trips: a user sending back what they read, a sip rule included, changes nothing', async () => {
+  it('round-trips: a user sending back what they read, a sip rule’s marker included, changes nothing', async () => {
     const db = await makeTestDb();
     await seedSettings(db);
     const anna = await createUserActor(db, 'Anna Huber', '101');

@@ -2,7 +2,8 @@ import { z } from 'zod';
 
 import { HTTP_NOT_FOUND } from '@zamfono/shared';
 
-import { targetSpecSchema } from '../forwardTargetSchema.js';
+import { readableTarget } from '../forwardTargets.js';
+import { ownTargetSchema } from '../forwardTargetSchema.js';
 import { resolveTarget } from '../forwardTargetSpec.js';
 import {
   assertScopeExists,
@@ -14,12 +15,13 @@ import { intervalSchema, loadIntervals, loadSchedule } from './_shared.js';
 
 const inputSchema = z.object({ scope: scopeInputSchema }).strict();
 
-/** A scope's schedule as `hours.get` returns it and `hours.set` answers with (§10.2 "Opening hours"). */
+/** A scope's schedule as `hours.get` returns it and `hours.set` answers with (§10.2 "Opening
+ * hours"), an admin-set closed target as its marker to a `user` (§10.3 "Forward targets"). */
 export const hoursWire = z.object({
   id: z.string(),
   scope: scopeInputSchema,
   active: z.boolean(),
-  closedTarget: targetSpecSchema,
+  closedTarget: ownTargetSchema,
   intervals: z.array(intervalSchema)
 });
 export type HoursWire = z.infer<typeof hoursWire>;
@@ -49,7 +51,10 @@ export const get = defineOperation({
       id: schedule.id,
       scope: input.scope,
       active: schedule.active === 1,
-      closedTarget: await resolveTarget(ctx.db, schedule.closedTargetId),
+      closedTarget: readableTarget(
+        ctx,
+        await resolveTarget(ctx.db, schedule.closedTargetId)
+      ),
       intervals: intervals.map(row => ({
         weekday: row.weekday,
         opens: row.opens,

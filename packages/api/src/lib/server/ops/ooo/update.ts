@@ -3,7 +3,11 @@ import { z } from 'zod';
 import { HTTP_NOT_FOUND } from '@zamfono/shared';
 
 import { fromFlag, recordChange, recordFieldChanges } from '../audit.js';
-import { assertMayHoldTarget, createTarget } from '../forwardTargets.js';
+import {
+  createTarget,
+  readableTarget,
+  resolveOwnTarget
+} from '../forwardTargets.js';
 import { resolveTarget } from '../forwardTargetSpec.js';
 import { orBefore } from '../patch.js';
 import { propagate } from '../propagate.js';
@@ -44,7 +48,9 @@ function resolveSchedule(
   return { startsAt, expiresAt };
 }
 
-/** `PATCH /ooo/{id}` (§10.2 "Out of office"): active flag, schedule and target are editable. */
+/** `PATCH /ooo/{id}` (§10.2 "Out of office"): active flag, schedule and target are editable; a
+ * target left out, or a `user`'s marker for an admin-set one, keeps the rule's own (§10.3
+ * "Forward targets"). */
 export const update = defineOperation({
   name: 'ooo.update',
   description:
@@ -65,24 +71,24 @@ export const update = defineOperation({
     if (active) {
       await assertNoOverlap(ctx, scope, startsAt, expiresAt, input.id);
     }
-    const beforeTarget = await resolveTarget(ctx.db, before.targetId);
-    if (input.target === undefined) {
-      // A rule kept as it is keeps its target, which a `user` may not do for a `sip` one.
-      assertMayHoldTarget(ctx, beforeTarget);
-    }
-    const targetId =
+    const held = {
+      targetId: before.targetId,
+      target: await resolveTarget(ctx.db, before.targetId)
+    };
+    const next =
       input.target === undefined
-        ? before.targetId
-        : await createTarget(ctx, input.target);
+        ? held
+        : resolveOwnTarget(ctx, input.target, held);
+    const targetId = next.targetId ?? (await createTarget(ctx, next.target));
     const columns = { active: active ? 1 : 0, startsAt, expiresAt };
     recordFieldChanges(ctx, before, columns, { active: { decode: fromFlag } });
-    if (input.target !== undefined) {
+    if (next.targetId === null) {
       // The diff names this operation's own input field and carries the wire target, so
       // `audit.undo` replays it straight back through `ooo.update` (§5.8).
       recordChange(ctx, {
         field: 'target',
-        from: beforeTarget,
-        to: input.target
+        from: held.target,
+        to: next.target
       });
     }
     await ctx.db
@@ -90,7 +96,6 @@ export const update = defineOperation({
       .set({ ...columns, targetId })
       .where('id', '=', input.id)
       .execute();
-    const target = input.target ?? beforeTarget;
     // Read by the routing pipeline (§3.1), and nothing in it reaches Asterisk's own
     // configuration, so this drops `core`'s config cache without a reload.
     propagate(ctx, []);
@@ -100,7 +105,7 @@ export const update = defineOperation({
       active,
       startsAt,
       expiresAt,
-      target,
+      target: readableTarget(ctx, next.target),
       createdAt: before.createdAt
     };
   }

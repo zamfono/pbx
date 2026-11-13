@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { HTTP_NOT_FOUND } from '@zamfono/shared';
 
+import { readableTarget } from '../forwardTargets.js';
 import { ownUserId } from '../gates.js';
 import { defineOperation } from '../types.js';
 import { forwardingSchema, storedForwardRules } from './_forwarding.js';
@@ -10,7 +11,8 @@ import { liveUser } from './_shared.js';
 /**
  * `GET /users/{id}/forwarding` (§10.3 "Users"): reads a user's forwarding rules as `{ id, rules }`,
  * the shape `users.setForwarding` takes and returns, `sip` targets with their `headers`, so a
- * read, an edit and a `PUT` round-trip unchanged. Self-service on a `user` actor's own id.
+ * read, an edit and a `PUT` round-trip unchanged. Self-service on a `user` actor's own id, who
+ * reads an admin-set target as its marker (`readableTarget`).
  */
 export const getForwarding = defineOperation({
   name: 'users.getForwarding',
@@ -27,7 +29,10 @@ export const getForwarding = defineOperation({
     const rules = await storedForwardRules(ctx.db, input.id);
     return {
       id: input.id,
-      rules: rules.map(({ condition, target }) => ({ condition, target }))
+      rules: rules.map(({ condition, target }) => ({
+        condition,
+        target: readableTarget(ctx, target)
+      }))
     };
   }
 });

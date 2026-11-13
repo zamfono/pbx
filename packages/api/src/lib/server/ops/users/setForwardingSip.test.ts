@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { DEFAULT_SIP_HEADERS, type Db } from '@zamfono/shared';
+import { type Db } from '@zamfono/shared';
 import { seedSettings } from '@zamfono/shared/testDb.js';
 
 import {
@@ -56,9 +56,12 @@ async function latestChanges(db: Db, actorId: string): Promise<unknown> {
   return JSON.parse(entry.changesJson);
 }
 
-// §10.3 "Forward targets": a user's `PUT` keeps the very `sip` target a condition already holds.
+const SIP_MARKER = { managed: true, kind: 'sip' };
+
+// §10.3 "Forward targets": a user reads the `sip` target a condition holds as its marker, and
+// keeps it by sending that back.
 describe('users.setForwarding, an admin-set sip rule', () => {
-  it('keeps an identical sip rule, on its own row, while the user changes another condition', async () => {
+  it('keeps the sip rule by its marker, on its own row, while the user changes another condition', async () => {
     const { db, anna, sipRule } = await withAdminSipRule();
     const idsBefore = await storedTargetIds(db, anna.id);
     const targetsBefore = await db
@@ -75,9 +78,16 @@ describe('users.setForwarding, an admin-set sip rule', () => {
         fallback: null
       }
     };
+    const marked: Rule = { condition: 'noAnswer', target: SIP_MARKER };
 
-    await setForwarding(db, anna.id, [sipRule, external], anna);
+    expect(
+      (await setForwarding(db, anna.id, [marked, external], anna)).rules
+    ).toEqual([marked, external]);
     expect((await getForwarding(db, anna.id, anna)).rules).toEqual([
+      external,
+      marked
+    ]);
+    expect((await getForwarding(db, anna.id, admin)).rules).toEqual([
       external,
       sipRule
     ]);
@@ -90,7 +100,7 @@ describe('users.setForwarding, an admin-set sip rule', () => {
       .select('id')
       .execute();
     expect(targetsAfter).toHaveLength(targetsBefore.length);
-    // The user's audit entry records the sip rule as unchanged, `from` and `to` alike.
+    // The user's audit entry records the sip rule in full and unchanged, `from` and `to` alike.
     expect(await latestChanges(db, anna.id)).toEqual([
       {
         field: 'rules',
@@ -106,32 +116,7 @@ describe('users.setForwarding, an admin-set sip rule', () => {
     ]);
   });
 
-  it('keeps a sip rule sent without headers when it holds the defaults, as the wire returns it', async () => {
-    const db = await makeTestDb();
-    await seedSettings(db);
-    const anna = await createUserActor(db, 'Anna Huber', '101');
-    const trunkId = await createSipTargetTrunk(db);
-    const bare: Rule = {
-      condition: 'offline',
-      target: { kind: 'sip', trunkId, user: 'proj_abc123' }
-    };
-    await setForwarding(db, anna.id, [bare]);
-    await setForwarding(db, anna.id, [bare], anna);
-    expect((await getForwarding(db, anna.id, anna)).rules).toEqual([
-      {
-        condition: 'offline',
-        target: {
-          ...bare.target,
-          headers: [...DEFAULT_SIP_HEADERS],
-          record: false,
-          ringTimeoutS: null,
-          fallback: null
-        }
-      }
-    ]);
-  });
-
-  it('refuses a user a sip rule differing in its trunk, user part or headers with 403', async () => {
+  it('refuses a user the sip rule sent in full with 422, unchanged or differing in any field', async () => {
     const { db, anna, sipRule } = await withAdminSipRule();
     const otherTrunk = await createSipTargetTrunk(
       db,
@@ -140,6 +125,8 @@ describe('users.setForwarding, an admin-set sip rule', () => {
     );
     const target = sipRule.target;
     const variants: Record<string, unknown>[] = [
+      target,
+      { kind: 'sip', trunkId: target.trunkId, user: target.user },
       { ...target, trunkId: otherTrunk },
       { ...target, user: 'proj_other' },
       { ...target, headers: [{ name: 'X-Ext', value: '{{did}}' }] },
@@ -149,7 +136,7 @@ describe('users.setForwarding, an admin-set sip rule', () => {
       },
       { ...target, headers: [] }
     ];
-    const before = await getForwarding(db, anna.id, anna);
+    const before = await getForwarding(db, anna.id, admin);
     await Promise.all(
       variants.map(variant =>
         expect(
@@ -159,21 +146,31 @@ describe('users.setForwarding, an admin-set sip rule', () => {
             [{ condition: 'noAnswer', target: variant }],
             anna
           )
-        ).rejects.toMatchObject({ status: 403 })
+        ).rejects.toMatchObject({
+          status: 422,
+          message: expect.stringContaining(
+            '{ "managed": true, "kind": "sip" }'
+          ) as string
+        })
       )
     );
-    expect(await getForwarding(db, anna.id, anna)).toEqual(before);
+    expect(await getForwarding(db, anna.id, admin)).toEqual(before);
   });
 
-  it('refuses the identical sip target under another condition with 403, moved or copied', async () => {
+  it('refuses the sip target under another condition, moved or copied, in full or as its marker', async () => {
     const { db, anna, sipRule } = await withAdminSipRule();
-    const before = await getForwarding(db, anna.id, anna);
+    const before = await getForwarding(db, anna.id, admin);
     const moved: Rule = { condition: 'busy', target: sipRule.target };
     await expect(
       setForwarding(db, anna.id, [moved], anna)
     ).rejects.toMatchObject({ status: 403 });
     await expect(
-      setForwarding(db, anna.id, [sipRule, moved], anna)
+      setForwarding(
+        db,
+        anna.id,
+        [{ condition: 'noAnswer', target: SIP_MARKER }, moved],
+        anna
+      )
     ).rejects.toMatchObject({ status: 403 });
     await expect(
       setForwarding(
@@ -183,7 +180,15 @@ describe('users.setForwarding, an admin-set sip rule', () => {
         anna
       )
     ).rejects.toMatchObject({ status: 403 });
-    expect(await getForwarding(db, anna.id, anna)).toEqual(before);
+    await expect(
+      setForwarding(
+        db,
+        anna.id,
+        [{ condition: 'busy', target: SIP_MARKER }],
+        anna
+      )
+    ).rejects.toMatchObject({ status: 422 });
+    expect(await getForwarding(db, anna.id, admin)).toEqual(before);
   });
 
   it('removes the sip rule, and its target row, when the user leaves it out', async () => {

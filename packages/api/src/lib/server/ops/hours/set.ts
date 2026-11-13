@@ -3,8 +3,12 @@ import { z } from 'zod';
 import { HTTP_NOT_FOUND, newId } from '@zamfono/shared';
 
 import { recordChange } from '../audit.js';
-import { createTarget } from '../forwardTargets.js';
-import { targetSpecSchema } from '../forwardTargetSchema.js';
+import {
+  createTarget,
+  readableTarget,
+  resolveOwnTarget
+} from '../forwardTargets.js';
+import { ownTargetSchema } from '../forwardTargetSchema.js';
 import { resolveTarget } from '../forwardTargetSpec.js';
 import { propagate } from '../propagate.js';
 import {
@@ -32,8 +36,8 @@ const inputSchema = z
       .describe(
         "Whether the schedule applies (on by default); off, it is kept and the scope follows the tenant's."
       ),
-    closedTarget: targetSpecSchema.describe(
-      'Where inbound and forwarded calls go outside every open interval; internal calls ignore opening hours.'
+    closedTarget: ownTargetSchema.describe(
+      "Where inbound and forwarded calls go outside every open interval; internal calls ignore opening hours. An admin-set target's { managed: true } marker, sent back unchanged, keeps it."
     ),
     intervals: z
       .array(intervalSchema)
@@ -104,8 +108,14 @@ export const set = defineOperation({
     await assertScopeExists(ctx.db, input.scope);
     const intervals = validateIntervals(input.intervals);
     const active = input.active ?? true;
-    const closedTargetId = await createTarget(ctx, input.closedTarget);
     const before = await loadSchedule(ctx.db, input.scope);
+    const held = before && {
+      targetId: before.closedTargetId,
+      target: await resolveTarget(ctx.db, before.closedTargetId)
+    };
+    const closed = resolveOwnTarget(ctx, input.closedTarget, held);
+    const closedTargetId =
+      closed.targetId ?? (await createTarget(ctx, closed.target));
     const beforeIntervals = before
       ? await loadIntervals(ctx.db, before.id)
       : [];
@@ -120,8 +130,8 @@ export const set = defineOperation({
       }
       recordChange(ctx, {
         field: 'closedTarget',
-        from: await resolveTarget(ctx.db, before.closedTargetId),
-        to: input.closedTarget
+        from: held?.target,
+        to: closed.target
       });
       await ctx.db
         .updateTable('openingHours')
@@ -132,7 +142,7 @@ export const set = defineOperation({
       recordChange(ctx, {
         field: 'closedTarget',
         from: null,
-        to: input.closedTarget
+        to: closed.target
       });
       await ctx.db
         .insertInto('openingHours')
@@ -158,7 +168,7 @@ export const set = defineOperation({
       id,
       scope: input.scope,
       active,
-      closedTarget: input.closedTarget,
+      closedTarget: readableTarget(ctx, closed.target),
       intervals
     };
   }
