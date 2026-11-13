@@ -5,6 +5,8 @@ import {
   CLIENT_ID,
   confirmationProblem,
   CURRENT,
+  currentHeaders,
+  currentMeta,
   currentRequest,
   currentToolResult,
   mcpRequest,
@@ -18,6 +20,7 @@ import {
 import { handleMcpRequest } from './mcp.js';
 import { protectedResourceMetadata } from './mcp/auth.js';
 import { callHelp } from './mcp/guide.js';
+import { MAX_BODY_BYTES } from './requestBody.js';
 
 // The result shapes below are asserted field by field against the MCP schema,
 // https://modelcontextprotocol.io/specification/2026-07-28/schema. The fixtures, test operations
@@ -137,6 +140,141 @@ describe('handleMcpRequest, 2026-07-28', () => {
       ]
     });
   });
+
+  it('lists every issue of invalid arguments in the SDK refusal', async () => {
+    const body = await rpc(
+      await seededDeps(),
+      currentRequest(3, 'tools/call', {
+        name: 'trunks.setOrder',
+        arguments: { trunkIds: [0, 0, 0] }
+      })
+    );
+    const text = (body.result?.content as { text: string }[])[0]?.text;
+    expect(text).toMatch(/^Input validation error: /u);
+    expect(text).toContain('trunkIds.0: ');
+    expect(text).toContain('trunkIds.2: ');
+    expect(text).not.toContain('left out');
+  });
+
+  it('keeps the SDK refusal within the body limit, counting the issues it leaves out', async () => {
+    const issueCount = 170_000;
+    const response = await handleMcpRequest(
+      await seededDeps(),
+      currentRequest(3, 'tools/call', {
+        name: 'trunks.setOrder',
+        arguments: { trunkIds: Array<number>(issueCount).fill(0) }
+      })
+    );
+    const raw = await response.text();
+    expect(Buffer.byteLength(raw)).toBeLessThanOrEqual(MAX_BODY_BYTES);
+    const body = JSON.parse(raw) as RpcBody;
+    expect(body.result).toMatchObject({ isError: true });
+    const text = (body.result?.content as { text: string }[])[0]?.text ?? '';
+    expect(text).toMatch(/^Input validation error: .*trunkIds\.0: /u);
+    const omitted = Number(
+      /(?<omitted>\d+) more issues left out$/u.exec(text)?.groups?.omitted
+    );
+    expect(omitted).toBeGreaterThan(0);
+    expect(omitted).toBeLessThan(issueCount);
+    expect(text).toContain(`trunkIds.${issueCount - omitted - 1}: `);
+    expect(text).not.toContain(`trunkIds.${issueCount - omitted}: `);
+  });
+
+  it("shows the SDK's own short refusal of an invalid request whole", async () => {
+    const body = await rpc(
+      await seededDeps(),
+      currentRequest(3, 'prompts/get', {
+        name: 'update-stack',
+        arguments: { version: 1 }
+      })
+    );
+    expect(body.error?.message).toContain(
+      'Invalid input: expected string, received number'
+    );
+    expect(body.error?.message).not.toContain('left out');
+  });
+
+  it.each([
+    [
+      'every issue of invalid prompt arguments',
+      currentRequest(3, 'prompts/get', {
+        name: 'update-stack',
+        arguments: Object.fromEntries(
+          Array.from({ length: 30_000 }, (_value, index) => [`x${index}`, 0])
+        )
+      })
+    ],
+    [
+      'a protocol version the body names twice over',
+      mcpRequest(
+        {
+          jsonrpc: '2.0',
+          id: 3,
+          method: 'tools/list',
+          params: {
+            _meta: {
+              ...currentMeta(),
+              'io.modelcontextprotocol/protocolVersion': 'x'.repeat(400_000)
+            }
+          }
+        },
+        currentHeaders('tools/list')
+      )
+    ]
+  ])(
+    "keeps the SDK's own refusal quoting %s within the body limit",
+    async (_name, request) => {
+      const response = await handleMcpRequest(await seededDeps(), request);
+      const raw = await response.text();
+      expect(Buffer.byteLength(raw)).toBeLessThanOrEqual(MAX_BODY_BYTES);
+      const body = JSON.parse(raw) as RpcBody;
+      expect(body.id).toBe(3);
+      expect(body.error?.data).toBeUndefined();
+      expect(body.error?.message).toMatch(/… \d+ more characters left out/u);
+    }
+  );
+
+  // An id of nearly a whole request, which the response echoes, with arguments that draw a long
+  // refusal in what is left of the request: the response still fits the limit, the id whole.
+  it.each([
+    [
+      'its own refusal of invalid prompt arguments',
+      'prompts/get',
+      {
+        name: 'update-stack',
+        arguments: Object.fromEntries(
+          Array.from({ length: 1_200 }, (_value, index) => [`x${index}`, 0])
+        )
+      }
+    ],
+    [
+      'a refusal of invalid tool arguments',
+      'tools/call',
+      {
+        name: 'trunks.setOrder',
+        arguments: { trunkIds: Array<number>(6_000).fill(0) }
+      }
+    ]
+  ])(
+    'keeps %s within the body limit beside a long id',
+    async (_name, method, params) => {
+      const short = await currentRequest(3, method, params).text();
+      const id = 'i'.repeat(MAX_BODY_BYTES - Buffer.byteLength(short) - 8);
+      const request = currentRequest(id, method, params);
+      expect(
+        Buffer.byteLength(await request.clone().text())
+      ).toBeLessThanOrEqual(MAX_BODY_BYTES);
+      const response = await handleMcpRequest(await seededDeps(), request);
+      const raw = await response.text();
+      expect(Buffer.byteLength(raw)).toBeLessThanOrEqual(MAX_BODY_BYTES);
+      const body = JSON.parse(raw) as RpcBody;
+      expect(body.id).toBe(id);
+      const text =
+        body.error?.message ??
+        (body.result?.content as { text: string }[])[0]?.text;
+      expect(text).toMatch(/… \d+ more characters left out/u);
+    }
+  );
 
   it('reports an unknown help topic as a tool execution error', async () => {
     const body = await rpc(

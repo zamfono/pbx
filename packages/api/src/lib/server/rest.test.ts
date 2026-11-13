@@ -14,6 +14,7 @@ import { storeAudio } from './audio/store.js';
 import { getCoreClient } from './coreClient.js';
 import { buildOpenApiDocument, type OpenApiDocument } from './openapi.js';
 import { registry } from './ops/registry.js';
+import { MAX_BODY_BYTES } from './requestBody.js';
 import { handleRest, type RestDeps } from './rest.js';
 import { routes } from './restRoutes.js';
 
@@ -129,6 +130,39 @@ describe('handleRest', () => {
     expect(response.headers.get('content-type')).toBe(
       'application/problem+json'
     );
+  });
+
+  it('lists every issue of an invalid body in the 422 problem', async () => {
+    const deps = await testDeps();
+    const response = await rest(deps, '/trunks/order', {
+      ...postJson({ trunkIds: [0, 0, 0] }),
+      method: 'PUT'
+    });
+    expect(response.status).toBe(422);
+    const body = (await response.json()) as Record<string, unknown>;
+    expect(body.errors).toHaveLength(3);
+    expect(body).not.toHaveProperty('errorsOmitted');
+  });
+
+  it('keeps a 422 problem within the body limit, counting the issues it leaves out', async () => {
+    const deps = await testDeps();
+    // 170,000 invalid elements in a body of some 340 KB: one issue each, 23 MB of JSON unbounded.
+    const issueCount = 170_000;
+    const response = await rest(deps, '/trunks/order', {
+      ...postJson({ trunkIds: Array<number>(issueCount).fill(0) }),
+      method: 'PUT'
+    });
+    expect(response.status).toBe(422);
+    const text = await response.text();
+    expect(Buffer.byteLength(text)).toBeLessThanOrEqual(MAX_BODY_BYTES);
+    const body = JSON.parse(text) as {
+      errors: { path: unknown[] }[];
+      errorsOmitted: number;
+    };
+    expect(body.errors.length).toBeGreaterThan(0);
+    // The issues kept are the first ones, in order.
+    expect(body.errors[1]?.path).toEqual(['trunkIds', 1]);
+    expect(body.errors.length + body.errorsOmitted).toBe(issueCount);
   });
 
   it('answers 404 for a path matching no route', async () => {

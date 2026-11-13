@@ -2,6 +2,15 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-11-13 · §10.5 MCP interface (Tools).** Where a refusal, a JSON-RPC error the SDK answers with or a tool's refusal of its arguments, would make the response larger than the request body limit with the request's `id` it echoes, its message or text is cut further, as a long error's message is, until the whole response fits; the `id` stays whole.
+*Why:* an independent review found that the bound counted the error alone: a request under 512 KiB whose `id`, a string of any length, took some 510,000 bytes drew a refusal of invalid prompt or tool arguments larger than the limit, 538 KB and 577 KB.
+
+**2026-11-13 · §10.5 MCP interface (Tools).** A JSON-RPC error the MCP SDK answers a request with before any handler runs is cut to a quarter of the request body limit where it is larger: its message to its first 21,845 characters, followed by `… <n> more characters left out`, and its `data` left out, which the message says as `(its data left out)`.
+*Why:* an independent review found that the bound on validation refusals missed the SDK's own validation of a request's protocol parameters: `prompts/get` with 30,000 prompt arguments that are not strings, a request of 320 KB, drew a refusal of 6.9 MB listing every issue, and a protocol version in the body that its header contradicts is quoted twice in the refusal, in its message and its `data`. Bounding the response `api` hands on covers every such refusal, whichever check the SDK makes; a refusal cannot arrive in a stream, which only a running handler opens.
+
+**2026-11-13 · §10.3 Operations layer (conventions), §10.5 MCP interface (Tools).** A problem's validation issues, under `errors`, are bounded: from the first in order, as many as fit a quarter of the 512 KiB request body limit as a JSON array, the issues left out counted as `errorsOmitted`; the MCP SDK's own refusal of invalid arguments lists its issues within the same bound, ending with the count of those left out.
+*Why:* a security audit of 0.9.1 (TASK-103) found that the 422 echoed every issue, so a 512 KiB request of 170,000 invalid array elements drew a response of 23 MB, and the MCP SDK's refusal listed every issue too. A quarter, rather than the whole limit, keeps an MCP tool error within it, since it carries the problem as structured content and again as escaped text. The product owner decided on 2026-11-13 to bound the list by size, never larger than the request limit, with a count of the issues left out rather than a fixed number of issues.
+
 **2026-11-13 · §6.3 Compose stack (listing, Capabilities).** `proxy`'s tmpfs at `/config` has mode 1777.
 *Why:* a test of the update from a plain 0.8.6 stack to this release found `proxy` logging an error at every start on Docker: Docker mounts a tmpfs root's with mode 0755, so Caddy, uid 1000, could not autosave its configuration. Podman refuses a tmpfs's `uid` option, so the mode serves both runtimes.
 

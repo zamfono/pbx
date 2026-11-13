@@ -127,6 +127,14 @@ why the specified behaviour changed; the commit history, how.
 - `api` no longer mounts `caddy-data`, which holds the ACME account key and Caddy's private keys:
   it reads the certificate copy from a volume of its own, `cert-copy`, which `proxy` fills on its
   first start after the upgrade.
+- A validation refusal could be far larger than the request that drew it: a 512 KiB body of
+  invalid array elements drew a 422 of some 23 MB listing every issue, over REST and MCP alike. A
+  problem's `errors` now stop at a quarter of the request limit, and `errorsOmitted` counts the
+  issues left out; the MCP SDK's own refusal of invalid tool arguments is bounded the same way.
+  The SDK's refusals of a request before any tool or prompt runs, such as 30,000 prompt arguments
+  that are not strings, which drew 6.9 MB from a 320 KB request, are cut to a quarter of the
+  limit too, their message saying how many characters it left out. A refusal is cut further where
+  the request's `id`, which every response repeats, would make it larger than the limit.
 - A SIP request from anywhere could have any address banned, or keep its own sender from being
   banned, with an escaped CR/LF in its From user, which Asterisk writes unescaped into the AMI
   security event `core` counts. `core` now drops every AMI frame Asterisk could not have written:

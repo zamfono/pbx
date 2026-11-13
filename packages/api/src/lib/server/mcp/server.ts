@@ -1,6 +1,12 @@
-import { McpServer, type ServerContext } from '@modelcontextprotocol/server';
+import {
+  McpServer,
+  type ServerContext,
+  type StandardSchemaV1
+} from '@modelcontextprotocol/server';
+import type { z } from 'zod';
 
 import type { Authenticated } from '../auth/bearer.js';
+import { boundedIssues } from '../problem.js';
 import type { McpDeps } from './auth.js';
 import { HELP_TOOL_NAME } from './guide.js';
 import INSTRUCTIONS_RAW from './instructions.txt?raw';
@@ -27,6 +33,39 @@ function callOf(ctx: ServerContext): McpCall {
   return ctx.http?.authInfo?.extra as McpCall;
 }
 
+/** A failed validation's issues bounded as a problem's `errors` are, the rest counted in one more. */
+function boundResult<T>(
+  result: StandardSchemaV1.Result<T>
+): StandardSchemaV1.Result<T> {
+  if (!result.issues) {
+    return result;
+  }
+  const { kept, omitted } = boundedIssues(result.issues);
+  return omitted > 0
+    ? { issues: [...kept, { message: `${omitted} more issues left out` }] }
+    : result;
+}
+
+/**
+ * `schema` with a bounded Standard Schema validation: the SDK validates a call's arguments with it
+ * before the tool runs and refuses an invalid one with `Input validation error: …` listing every
+ * issue it returns (§10.5), so its refusal stays as small as a REST problem's (§10.3).
+ */
+function boundedValidation(schema: z.ZodObject): z.ZodObject {
+  const bounded = schema.clone();
+  const standard = schema['~standard'];
+  bounded['~standard'] = {
+    ...standard,
+    validate: (value, options) => {
+      const result = standard.validate(value, options);
+      return result instanceof Promise
+        ? result.then(boundResult)
+        : boundResult(result);
+    }
+  };
+  return bounded;
+}
+
 /** The server instance answering one request, its tools and prompts registered afresh. */
 export function mcpServer(): McpServer {
   const server = new McpServer(serverInfo(), {
@@ -42,8 +81,12 @@ export function mcpServer(): McpServer {
       'prompts/list': CACHE_HINT
     }
   });
-  for (const { name, ...config } of listTools()) {
-    server.registerTool(name, config, (args, ctx) =>
+  for (const { name, inputSchema, ...config } of listTools()) {
+    const definition = {
+      ...config,
+      inputSchema: boundedValidation(inputSchema)
+    };
+    server.registerTool(name, definition, (args, ctx) =>
       name === HELP_TOOL_NAME
         ? helpCall(args)
         : operationCall(callOf(ctx), name, args, ctx)
