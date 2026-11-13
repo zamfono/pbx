@@ -11,7 +11,10 @@ import * as privateEnv from '$app/env/private';
 import { backupParamsColumn } from '@zamfono/shared';
 
 import type { BackupSecret } from '../ops/backups/_secret.js';
-import type { BackupTargetRow } from '../ops/backups/_shared.js';
+import {
+  assertLocalPath,
+  type BackupTargetRow
+} from '../ops/backups/_shared.js';
 
 export type ExecFn = (
   file: string,
@@ -21,6 +24,23 @@ export type ExecFn = (
   // non-zero-exit error message).
   options: { env: NodeJS.ProcessEnv; input?: string }
 ) => Promise<{ stdout: string; stderr: string }>;
+
+// What restic, rclone, sshpass and ssh take from api's own environment: finding the binaries,
+// their cache and config under HOME, a temp dir, the time zone snapshots are stamped in and the
+// locale. Nothing else of it, SECRETBOX_KEY and JWT_SECRET least of all, reaches them (§6.5).
+const INHERITED_ENV = ['PATH', 'HOME', 'TMPDIR', 'TZ', 'LANG', 'LC_ALL'];
+
+/** `own` over the few variables of api's environment a backup tool needs (`INHERITED_ENV`). */
+export function toolEnv(own: Record<string, string>): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = {};
+  for (const key of INHERITED_ENV) {
+    const value = process.env[key];
+    if (value !== undefined) {
+      env[key] = value;
+    }
+  }
+  return { ...env, ...own };
+}
 
 // The rclone remote name; its connection comes entirely from `RCLONE_CONFIG_<NAME>_*` env vars.
 const RCLONE_REMOTE_NAME = 'zamfono';
@@ -68,7 +88,7 @@ async function obscurePassword(
   password: string
 ): Promise<string> {
   const { stdout } = await exec('rclone', ['obscure'], {
-    env: process.env,
+    env: toolEnv({}),
     input: password
   });
   return stdout.trim();
@@ -171,6 +191,8 @@ export async function repositoryAndEnv(
   const { kind } = target;
   switch (kind) {
     case 'local':
+      // Checked on every write already; checked again for a row written before the rule.
+      assertLocalPath(params.path);
       return { repository: str(params, 'path'), env: {}, options: [] };
     case 's3': {
       const prefix = optStr(params, 'path');

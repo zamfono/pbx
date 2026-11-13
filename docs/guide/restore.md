@@ -17,7 +17,10 @@ start the stack.
 - **The default `local` target** needs nothing beyond `.env`: its repository is `/backups/restic`
   on the `backups` volume and its password is `BACKUP_PASSWORD`. It lives on the same host as the
   stack, so it restores a broken database or a bad upgrade, but a lost host takes it along; that
-  is what a target elsewhere is for.
+  is what a target elsewhere is for. Every `local` target's repository lies under `/backups`, the
+  only place `backups.targets.create` takes one; to keep one on a disk of its own, mount the disk
+  into `api` at `/backups/<name>` in `compose.dr.yaml`, the overlay of your own that updates and
+  boots keep (`compose.override.yaml` is the mode's published overlay, which an update replaces).
 - **The restic repository location and password for each other target**, from the operator's own record of
   what was entered in `backups.targets.create` (`POST /api/v1/backups/targets`) when the target was
   created, or an out-of-band copy kept alongside `.env` — a target's encrypted repository password
@@ -66,7 +69,7 @@ unit of step 7, `systemctl stop zamfono.service`.
 
    | Kind          | Repository                        | Variables                                                                                         |
    | ------------- | --------------------------------- | ------------------------------------------------------------------------------------------------- |
-   | `local`       | `/backups/restic`                 | none; the password is `BACKUP_PASSWORD` from `.env`                                               |
+   | `local`       | `/backups/restic`, or its `path`  | none; the default target's password is `BACKUP_PASSWORD` from `.env`                              |
    | `s3`          | `s3:<endpoint>/<bucket>[/<path>]` | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`                                                      |
    | `sftp`        | `sftp:<username>@<host>:<path>`   | `SSHPASS` (the password)                                                                          |
    | `ftp`, `ftps` | `rclone:zamfono:<path>`           | `RCLONE_CONFIG_ZAMFONO_TYPE=ftp`, `_HOST`, `_USER`, `_PASS`; for `ftps` also `_EXPLICIT_TLS=true` |

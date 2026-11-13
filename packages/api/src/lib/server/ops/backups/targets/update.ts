@@ -13,13 +13,10 @@ import { liveRow } from '#lib/server/ops/rows.js';
 import { defineOperation } from '#lib/server/ops/types.js';
 import { keyringFromEnv } from '#lib/server/secretbox.js';
 
-import {
-  assertSecretFitsKind,
-  openTargetSecret,
-  sealTargetSecret
-} from '../_secret.js';
+import { assertSecretFitsKind, sealTargetSecret } from '../_secret.js';
 import {
   assertParamsFitKind,
+  assertRepointCarriesSecret,
   backupTargetWire,
   targetFields,
   targetToWire,
@@ -56,18 +53,21 @@ export const targetsUpdate = defineOperation({
     if (input.params !== undefined || kind !== before.kind) {
       assertParamsFitKind(kind, backupParamsColumn.decode(paramsJson));
     }
-    const kr = keyringFromEnv(env);
-    // A new kind takes other credentials: the stored secret must fit it, unless a new one comes.
-    if (input.secret !== undefined || kind !== before.kind) {
-      assertSecretFitsKind(
-        kind,
-        input.secret ?? openTargetSecret(kr, before.secretEnc)
-      );
+    assertRepointCarriesSecret(
+      {
+        kind: before.kind,
+        params: backupParamsColumn.decode(before.paramsJson)
+      },
+      { kind, params: backupParamsColumn.decode(paramsJson) },
+      input.secret !== undefined
+    );
+    if (input.secret !== undefined) {
+      assertSecretFitsKind(kind, input.secret);
     }
     const secretEnc =
       input.secret === undefined
         ? before.secretEnc
-        : sealTargetSecret(kr, input.secret);
+        : sealTargetSecret(keyringFromEnv(env), input.secret);
     const columns = { kind, enabled: enabled ? 1 : 0, paramsJson };
     recordFieldChanges(ctx, before, columns, {
       enabled: { decode: fromFlag },

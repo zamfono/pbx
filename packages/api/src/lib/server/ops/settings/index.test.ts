@@ -104,18 +104,51 @@ describe('settings', () => {
         row.smtpPasswordEnc
       ).toString()
     ).toBe('***');
-    await runOperation(
-      db,
-      'settings.update',
-      { smtpHost: 'relay.example.com' },
-      asRun()
-    );
+    await runOperation(db, 'settings.update', { smtpPort: 587 }, asRun());
     expect(await get()).toMatchObject({ smtpPasswordSet: true });
     await runOperation(db, 'settings.update', { smtpPassword: null }, asRun());
     expect(await get()).toMatchObject({ smtpPasswordSet: false });
     await expect(
       runOperation(db, 'settings.update', { smtpPasswordSet: true }, asRun())
     ).rejects.toMatchObject({ status: 422 });
+  });
+
+  // §5.4: a stored secret is write-only, so it must not follow a change of where it is sent.
+  it('needs smtpPassword again for a new smtpHost and ssoClientSecret for a new issuer', async () => {
+    const db = await makeTestDb();
+    await seedSettings(db);
+    const update = (input: Record<string, unknown>): Promise<unknown> =>
+      runOperation(db, 'settings.update', input, asRun());
+    await update({ smtpHost: 'mail.example.com', smtpPassword: 'pw' });
+    await expect(
+      update({ smtpHost: 'evil.example.net' })
+    ).rejects.toMatchObject({ status: 422 });
+    await update({ smtpHost: 'mail.example.com' });
+    await update({ smtpPort: 587, smtpSecurity: 'starttls' });
+    await update({ smtpHost: 'relay.example.com', smtpPassword: 'pw2' });
+    await update({ smtpHost: null });
+    await expect(
+      update({ smtpHost: 'mail.example.com' })
+    ).rejects.toMatchObject({ status: 422 });
+    await update({ smtpPassword: null });
+    await update({ smtpHost: 'mail.example.com' });
+
+    await update({
+      ssoProvider: 'oidc',
+      ssoLabel: 'Corp',
+      ssoClientId: 'client',
+      ssoIssuer: 'https://idp.example.com',
+      ssoClientSecret: 's3cret'
+    });
+    await expect(
+      update({ ssoIssuer: 'https://idp.evil.example.net' })
+    ).rejects.toMatchObject({ status: 422 });
+    await update({ ssoLabel: 'Corporate', ssoClientId: 'client2' });
+    await update({
+      ssoIssuer: 'https://idp2.example.com',
+      ssoClientSecret: 's3cret2'
+    });
+    expect((await loadSettings(db)).ssoIssuer).toBe('https://idp2.example.com');
   });
 
   // §3.1 "Config propagation": `core` reads `language` (§9.1, §9.4 "Cross-trunk failover") from

@@ -34,7 +34,10 @@ import {
   applyHoldMohAudioId,
   applyMainDidId
 } from './referenceFields.js';
-import { applySecretFields } from './secrets.js';
+import {
+  applySecretFields,
+  assertSecretsFollowDestinations
+} from './secrets.js';
 import { assertSsoInvariants, maybeResetSsoSubjects } from './sso.js';
 
 const inputSchema = settingsInputSchema;
@@ -146,6 +149,7 @@ export const update = defineOperation({
     assertCallLogLevel(input.callLogLevel);
     assertHostFields(input);
     assertSsoInvariants(before, input);
+    assertSecretsFollowDestinations(before, input);
     assertRetentionWindows(before, input);
     const columns: SettingsColumns = {};
     applyPlainFields(ctx, before, input, columns);

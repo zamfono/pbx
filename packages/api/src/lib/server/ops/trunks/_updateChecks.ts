@@ -4,6 +4,7 @@ import {
 } from '@zamfono/shared';
 
 import { OpError } from '../types.js';
+import type { HostInput } from './_shared.js';
 import { assertValidPassword, assertValidUsername } from './hostValidation.js';
 
 /** The credential and registration fields of a `trunks.update` request these checks read. */
@@ -60,5 +61,41 @@ export function assertValidCredentialFields(input: CredentialInput): void {
   }
   if (input.password !== undefined && input.password !== null) {
     assertValidPassword(input.password);
+  }
+}
+
+/**
+ * Where a trunk's password can go (§9.4): every host it dials or registers to, by host and port
+ * (a null port resolves through SRV, so it is a destination of its own), and its outbound proxy.
+ * An inbound-only host is never sent anything, so it is not one.
+ */
+export function passwordDestinations(
+  hosts: readonly HostInput[],
+  outboundProxy: string | null
+): Set<string> {
+  const destinations = hosts
+    .filter(host => host.direction !== 'inbound')
+    .map(host => `host ${host.host} ${host.port ?? ''}`);
+  if (outboundProxy !== null) {
+    destinations.push(`proxy ${outboundProxy}`);
+  }
+  return new Set(destinations);
+}
+
+/**
+ * Throws 422 when `after` names a destination `before` did not, for an update that keeps the
+ * stored password (§5.4): the password must not follow the trunk to a registrar or proxy it was
+ * not given for. Removing a destination, reordering hosts or changing an inbound-only one needs
+ * no password.
+ */
+export function assertPasswordFollowsDestinations(
+  before: Set<string>,
+  after: Set<string>
+): void {
+  if ([...after].some(dest => !before.has(dest))) {
+    throw new OpError(
+      HTTP_UNPROCESSABLE_CONTENT,
+      'a new outbound host or outboundProxy needs the trunk password again'
+    );
   }
 }

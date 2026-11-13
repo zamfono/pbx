@@ -28,7 +28,9 @@ import { UNKNOWN_STATUS } from './_status.js';
 import {
   assertNoStrayCredentials,
   assertNoStrayRegistrationFields,
-  assertValidCredentialFields
+  assertPasswordFollowsDestinations,
+  assertValidCredentialFields,
+  passwordDestinations
 } from './_updateChecks.js';
 import { mergeScalars, type Merged } from './_updateMerge.js';
 import {
@@ -56,6 +58,7 @@ type Input = z.infer<typeof inputSchema>;
 /** Every check a merged update must pass before the row is written (§9.4, §11.2). */
 async function assertUpdateAllowed(
   ctx: Context,
+  row: TrunkRow,
   merged: Merged,
   input: Input
 ): Promise<void> {
@@ -88,6 +91,14 @@ async function assertUpdateAllowed(
   }
   if (input.outboundProxy !== undefined) {
     assertValidOutboundProxy(input.outboundProxy);
+  }
+  const moves = input.hosts !== undefined || input.outboundProxy !== undefined;
+  if (moves && input.password === undefined && merged.passwordEnc !== null) {
+    const hostsBefore = await loadTrunkHosts(ctx.db, input.id);
+    assertPasswordFollowsDestinations(
+      passwordDestinations(hostsBefore, row.outboundProxy),
+      passwordDestinations(input.hosts ?? hostsBefore, merged.outboundProxy)
+    );
   }
   assertValidCredentialFields(input);
   if (input.name !== undefined) {
@@ -162,7 +173,7 @@ export const update = defineOperation({
   run: async (ctx, input) => {
     const row = await liveTrunk(ctx.db, input.id);
     const merged = mergeScalars(row, input);
-    await assertUpdateAllowed(ctx, merged, input);
+    await assertUpdateAllowed(ctx, row, merged, input);
     const logLevel = resolveLogLevel(ctx, row, input);
     const hostsBefore: HostWire[] | undefined = input.hosts
       ? hostsToWire(await loadTrunkHosts(ctx.db, input.id))

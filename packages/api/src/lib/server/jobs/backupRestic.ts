@@ -3,7 +3,6 @@
  * taking the snapshot with `restic backup --json` and reading its id and sizes, and applying the target's keep-daily/weekly/monthly policy with
  * `restic forget --prune`. `backup.ts` holds the run lifecycle around them.
  */
-import process from 'node:process';
 import pino from 'pino';
 
 import { DEFAULT_FORGET_POLICY } from '../ops/backups/_shared.js';
@@ -104,7 +103,7 @@ const KEEP_POLICY: readonly (readonly [string, string])[] = [
  */
 export async function pruneSnapshots(
   exec: ExecFn,
-  env: Record<string, string>,
+  env: NodeJS.ProcessEnv,
   options: readonly string[],
   params: Params
 ): Promise<void> {
@@ -124,10 +123,9 @@ export async function pruneSnapshots(
     args.push(flag, String(value));
   }
   args.push(...options);
-  const fullEnv = { ...process.env, ...env };
   // Best-effort: the backup itself already succeeded, but a repository that stops pruning
   // (lock contention, credentials, full disk) needs a trace somewhere.
-  await exec(RESTIC_BIN, args, { env: fullEnv }).catch((error: unknown) => {
+  await exec(RESTIC_BIN, args, { env }).catch((error: unknown) => {
     logger.warn({ err: error }, 'restic forget --prune failed');
   });
 }

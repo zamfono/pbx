@@ -350,6 +350,85 @@ describe('runBackup: command lines per target kind', () => {
   });
 });
 
+describe('runBackup: what reaches restic and rclone (§6.5)', () => {
+  it('refuses a stored local path outside /backups before running anything', async () => {
+    const db = await migratedTestDb();
+    const kr = testKeyring();
+    const { bus } = fakeBus();
+    const paths = ['sftp:x@h:/p', 'rest:http://core:3000/', '/media/x'];
+    const runs = await Promise.all(
+      paths.map(async repository => {
+        const targetId = await insertTarget(
+          db,
+          kr,
+          'local',
+          { path: repository },
+          { resticPassword: 'pw' }
+        );
+        const { exec, calls } = recordingExec('snap', SNAPSHOT_BYTES);
+        const run = await runBackup(db, kr, targetId, {
+          exec,
+          mediaDir: '/media',
+          bus
+        });
+        return { repository, run, calls };
+      })
+    );
+
+    for (const { repository, run, calls } of runs) {
+      expect(run.status, repository).toBe('failed');
+      expect(run.error, repository).toContain('/backups');
+      expect(calls, repository).toEqual([]);
+    }
+  });
+
+  it('passes restic and rclone only the environment they need, no key of api', async () => {
+    vi.stubEnv('JWT_SECRET', 'jwt-secret-of-api');
+    vi.stubEnv('SECRETBOX_KEY', 'secretbox-key-of-api');
+    vi.stubEnv('PATH', '/usr/bin:/bin');
+    vi.stubEnv('HOME', '/home/node');
+    try {
+      const db = await migratedTestDb();
+      const kr = testKeyring();
+      const { bus } = fakeBus();
+      const { exec, calls } = recordingExec('snap', SNAPSHOT_BYTES);
+      const targets = [
+        ['ftp', { host: 'ftp.example.net' }],
+        ['sftp', { host: 'sftp.example.net', path: '/srv/restic' }]
+      ] as const;
+      await Promise.all(
+        targets.map(async ([kind, params]) => {
+          const targetId = await insertTarget(db, kr, kind, params, {
+            resticPassword: 'pw',
+            username: 'u',
+            password: 'p'
+          });
+          await runBackup(db, kr, targetId, { exec, mediaDir: '/media', bus });
+        })
+      );
+
+      expect(new Set(calls.map(call => call.args[0]))).toEqual(
+        new Set(['obscure', 'cat', 'backup', 'forget'])
+      );
+      for (const call of calls) {
+        expect(call.env.PATH).toBe('/usr/bin:/bin');
+        expect(call.env.HOME).toBe('/home/node');
+        expect(call.env).not.toHaveProperty('JWT_SECRET');
+        expect(call.env).not.toHaveProperty('SECRETBOX_KEY');
+        const extra = Object.keys(call.env).filter(
+          key =>
+            !/^(?:PATH|HOME|TMPDIR|TZ|LANG|LC_ALL|SSHPASS|RESTIC_\w+|RCLONE_CONFIG_ZAMFONO_\w+)$/u.test(
+              key
+            )
+        );
+        expect(extra, call.args.join(' ')).toEqual([]);
+      }
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+});
+
 describe('runBackup: retention grouping', () => {
   it('backs up the same target under the same path on every run', async () => {
     const db = await migratedTestDb();

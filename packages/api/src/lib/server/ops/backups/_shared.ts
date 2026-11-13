@@ -1,3 +1,4 @@
+import { isDeepStrictEqual } from 'node:util';
 import type { Selectable } from 'kysely';
 import { z } from 'zod';
 
@@ -27,10 +28,10 @@ export const targetFields = {
   kind: z
     .enum(BACKUP_TARGET_KINDS)
     .describe(
-      'The restic backend: local (a host path or volume), ftp, ftps, sftp, s3 or webdav.'
+      'The restic backend: local (a directory under /backups), ftp, ftps, sftp, s3 or webdav.'
     ),
   params: backupParamsSchema.describe(
-    'The repository location per kind: local { path }, s3 { endpoint, bucket, path? }, sftp { host, path }, ftp and ftps { host, path? }, webdav { url, path? }; optional forget { keepDaily, keepWeekly, keepMonthly }, default 7/4/6.'
+    'The repository location per kind: local { path }, /backups or a path below it, s3 { endpoint, bucket, path? }, sftp { host, path }, ftp and ftps { host, path? }, webdav { url, path? }; optional forget { keepDaily, keepWeekly, keepMonthly }, default 7/4/6. Changing the kind or any field but forget needs the secret again.'
   ),
   secret: targetSecretSchema,
   enabled: z
@@ -57,15 +58,40 @@ export function withDefaultForgetPolicy(
     : { ...params, forget: DEFAULT_FORGET_POLICY };
 }
 
+/** The volume local targets live on (§6.5 "Target kinds"): another disk is mounted below it. */
+export const LOCAL_BACKUP_ROOT = '/backups';
+
+/**
+ * Throws 422 unless `path` is an absolute path that is `/backups` or lies below it, with no `..`
+ * segment (refused rather than resolved), so restic takes it as a plain directory: no backend
+ * prefix (`sftp:`, `rest:`, `rclone:`, `local:`) and no other state of the stack (§6.5).
+ */
+export function assertLocalPath(path: unknown): void {
+  const fits =
+    typeof path === 'string' &&
+    !path.split('/').includes('..') &&
+    (path === LOCAL_BACKUP_ROOT || path.startsWith(`${LOCAL_BACKUP_ROOT}/`));
+  if (!fits) {
+    throw new OpError(
+      HTTP_UNPROCESSABLE_CONTENT,
+      `backups: a local target's path is ${LOCAL_BACKUP_ROOT} or a path below it, without ..`
+    );
+  }
+}
+
 /**
  * Throws 422 unless a `kind` target's `params` name its server as the backend can take it
  * (§6.5 "Target kinds"): an sftp, ftp or ftps `host` is an FQDN or an IPv4 address, so it can
- * never reach ssh as an option, and a webdav `url` is an `http` or `https` URL.
+ * never reach ssh as an option, a webdav `url` is an `http` or `https` URL, and a local `path`
+ * lies under `/backups` (`assertLocalPath`).
  */
 export function assertParamsFitKind(
   kind: string,
   params: Record<string, unknown>
 ): void {
+  if (kind === 'local') {
+    assertLocalPath(params.path);
+  }
   if (kind === 'sftp' || kind === 'ftp' || kind === 'ftps') {
     assertValidHost(typeof params.host === 'string' ? params.host : '', 'both');
   }
@@ -77,6 +103,34 @@ export function assertParamsFitKind(
         'backups: a webdav target needs an http or https url'
       );
     }
+  }
+}
+
+/**
+ * Throws 422 when an update moves a target elsewhere, a new `kind` or any `params` field but the
+ * `forget` policy differing from the stored one, without a new secret (§5.4): the stored backend
+ * credentials must not follow the target to a location they were not given for.
+ */
+export function assertRepointCarriesSecret(
+  before: { kind: string; params: Record<string, unknown> },
+  after: { kind: string; params: Record<string, unknown> },
+  secretGiven: boolean
+): void {
+  const keys = new Set([
+    ...Object.keys(before.params),
+    ...Object.keys(after.params)
+  ]);
+  keys.delete('forget');
+  const moved =
+    before.kind !== after.kind ||
+    [...keys].some(
+      key => !isDeepStrictEqual(before.params[key], after.params[key])
+    );
+  if (moved && !secretGiven) {
+    throw new OpError(
+      HTTP_UNPROCESSABLE_CONTENT,
+      "backups: a new kind or location needs the target's secret again"
+    );
   }
 }
 

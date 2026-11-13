@@ -52,6 +52,21 @@ why the specified behaviour changed; the commit history, how.
   every kind an admin can edit (voicemail, missed call, setup, reset, two-factor notice); a
   template test still sends the tenant's own, as a preview.
 
+- An admin could have the stack send a backup target's stored password to a host of their
+  own, by changing the target's host, URL or kind and leaving out its secret, and a trunk's
+  digest responses by changing its hosts or outbound proxy. A change of where a stored secret is
+  sent now needs the secret again, 422 without it: a backup target's kind or any field of its
+  `params` but `forget`; a trunk's new outbound or `both` host, or a new outbound proxy, while a
+  password is stored; a new `smtpHost` while a relay password is stored and a new SSO issuer
+  while a client secret is stored. Renaming, `enabled`, `forget` and every other field change
+  without it.
+- A `local` backup target's `path` reached restic as its repository whatever it said, so an admin
+  could name another restic backend or a directory of the stack's own state. It must now be
+  `/backups` or a path below it, without `..`, on every write and in each run; a target elsewhere
+  fails its runs. To keep one on another disk, mount the disk into `api` at `/backups/<name>` in
+  `compose.dr.yaml`. restic and rclone no longer inherit `api`'s environment, its encryption key
+  and JWT secret among it.
+
 ## [0.9.1] - 2026-11-12
 
 ### Upgrade notes

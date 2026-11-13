@@ -157,6 +157,162 @@ describe('backups', () => {
     ).resolves.toBeDefined();
   });
 
+  it('keeps a local target under /backups, refusing any backend prefix and ..', async () => {
+    const db = await makeTestDb();
+    const create = (path: unknown): Promise<unknown> =>
+      runOperation(
+        db,
+        'backups.targets.create',
+        {
+          kind: 'local',
+          params: { path },
+          secret: { resticPassword: 'pw' }
+        },
+        asRun()
+      );
+    const refused = [
+      'sftp:x@h:/p',
+      'rest:http://core:3000/',
+      'rclone:x:y',
+      'local:/backups/x',
+      's3:http://core:3000/b',
+      '/media/x',
+      '/data/x',
+      '/backups/../data',
+      '/backups/x/..',
+      '/backupsx',
+      'backups/x',
+      '',
+      42
+    ];
+    await Promise.all(
+      refused.map(path =>
+        expect(create(path), String(path)).rejects.toMatchObject({
+          status: 422
+        })
+      )
+    );
+    await Promise.all(
+      ['/backups', '/backups/restic', '/backups/disk2/x'].map(path =>
+        expect(create(path), path).resolves.toBeDefined()
+      )
+    );
+    const created = (await create('/backups/restic')) as BackupTargetWire;
+    await expect(
+      runOperation(
+        db,
+        'backups.targets.update',
+        {
+          id: created.id,
+          params: { path: '/data/x' },
+          secret: { resticPassword: 'pw' }
+        },
+        asRun()
+      )
+    ).rejects.toMatchObject({ status: 422 });
+  });
+
+  // §5.4: the stored backend credentials must not follow a target to a new kind or location.
+  it('needs the secret again for a new kind or location, not for enabled or forget', async () => {
+    const db = await makeTestDb();
+    const userPass = { resticPassword: 'pw', username: 'u', password: 'p' };
+    const create = async (
+      kind: string,
+      params: Record<string, unknown>,
+      secret: Record<string, string>
+    ): Promise<string> =>
+      (
+        (await runOperation(
+          db,
+          'backups.targets.create',
+          { kind, params, secret },
+          asRun()
+        )) as BackupTargetWire
+      ).id;
+    const update = (id: string, input: Record<string, unknown>) =>
+      runOperation(db, 'backups.targets.update', { id, ...input }, asRun());
+    const refused = { status: 422 };
+
+    const sftp = await create(
+      'sftp',
+      { host: 'backup.example.net', path: '/srv/restic' },
+      userPass
+    );
+    const sftpParams = { host: 'backup.example.net', path: '/srv/restic' };
+    await Promise.all(
+      ['ftp', 'ftps'].map(kind =>
+        expect(
+          update(sftp, { kind, params: sftpParams })
+        ).rejects.toMatchObject(refused)
+      )
+    );
+    await expect(
+      update(sftp, {
+        kind: 'webdav',
+        params: { url: 'https://dav.example.net' }
+      })
+    ).rejects.toMatchObject(refused);
+    await expect(
+      update(sftp, { params: { ...sftpParams, host: 'evil.example.net' } })
+    ).rejects.toMatchObject(refused);
+    await expect(
+      update(sftp, { params: { ...sftpParams, path: '/elsewhere' } })
+    ).rejects.toMatchObject(refused);
+    // The same location, a new forget policy or the enabled flag keep the stored secret.
+    await update(sftp, { params: sftpParams });
+    await update(sftp, {
+      params: { ...sftpParams, forget: { keepDaily: 3 } },
+      enabled: false
+    });
+    const ftp = (await update(sftp, {
+      kind: 'ftp',
+      params: { host: 'ftp.example.net' },
+      secret: userPass
+    })) as BackupTargetWire;
+    expect(ftp.kind).toBe('ftp');
+
+    const webdav = await create(
+      'webdav',
+      { url: 'https://dav.example.net/dav' },
+      userPass
+    );
+    await expect(
+      update(webdav, { params: { url: 'http://evil.example.net/dav' } })
+    ).rejects.toMatchObject(refused);
+
+    const s3Secret = {
+      resticPassword: 'pw',
+      accessKeyId: 'AKID',
+      secretAccessKey: 'SECRET'
+    };
+    const s3Params = { endpoint: 'https://s3.example.net', bucket: 'b' };
+    const s3 = await create('s3', s3Params, s3Secret);
+    await expect(
+      update(s3, { params: { ...s3Params, bucket: 'other' } })
+    ).rejects.toMatchObject(refused);
+    await expect(
+      update(s3, { params: { ...s3Params, endpoint: 'https://evil.example' } })
+    ).rejects.toMatchObject(refused);
+    const moved = (await update(s3, {
+      params: { ...s3Params, bucket: 'other' },
+      secret: s3Secret
+    })) as BackupTargetWire;
+    expect(moved.params.bucket).toBe('other');
+
+    const local = await create(
+      'local',
+      { path: '/backups/restic' },
+      { resticPassword: 'pw' }
+    );
+    await expect(
+      update(local, { params: { path: '/backups/other' } })
+    ).rejects.toMatchObject(refused);
+    await update(local, {
+      params: { path: '/backups/other' },
+      secret: { resticPassword: 'pw' }
+    });
+  });
+
   it('defaults the forget policy to 7 daily/4 weekly/6 monthly on create', async () => {
     const db = await makeTestDb();
     const created = (await runOperation(

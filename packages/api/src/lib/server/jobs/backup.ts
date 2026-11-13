@@ -7,7 +7,6 @@
 import { mkdir, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import process from 'node:process';
 import { sql } from 'kysely';
 import pino from 'pino';
 
@@ -28,7 +27,12 @@ import {
   type BackupTargetRow
 } from '../ops/backups/_shared.js';
 import { type Keyring } from '../secretbox.js';
-import { loadParams, repositoryAndEnv, type ExecFn } from './backupBackends.js';
+import {
+  loadParams,
+  repositoryAndEnv,
+  toolEnv,
+  type ExecFn
+} from './backupBackends.js';
 import {
   ensureRepository,
   pruneSnapshots,
@@ -120,16 +124,16 @@ export async function performBackup(
       secret,
       deps.exec
     );
-    const fullEnv = {
+    const fullEnv = toolEnv({
       ...env,
       RESTIC_REPOSITORY: repository,
       RESTIC_PASSWORD: secret.resticPassword
-    };
-    await ensureRepository(deps.exec, { ...process.env, ...fullEnv }, options);
+    });
+    await ensureRepository(deps.exec, fullEnv, options);
     await sql`VACUUM INTO ${snapshotFile}`.execute(db);
     const { snapshotId, bytesAdded, bytesTotal } = await takeSnapshot(
       deps.exec,
-      { ...process.env, ...fullEnv },
+      fullEnv,
       options,
       [snapshotFile, deps.mediaDir]
     );
