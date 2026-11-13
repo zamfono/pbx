@@ -93,9 +93,15 @@ dropped() {
   } END { print packets["udp"] + 0, bytes["udp"] + 0, packets["tcp"] + 0, bytes["tcp"] + 0 }'
 }
 
+# The heartbeat goes to a file `mktemp` creates, renamed over the status, which replaces whatever
+# is there rather than writing through it; written as `asterisk`, since uid 1000 writes this
+# directory and could swap a link in under any name a root write is about to open (§9.1).
 write_status() {
-  echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) $applied $(dropped)" > "$STATUS.tmp" \
-    && mv "$STATUS.tmp" "$STATUS"
+  echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) $applied $(dropped)" \
+    | setpriv --reuid=asterisk --regid=asterisk --clear-groups sh -c '
+        tmp=$(mktemp "$1.XXXXXX") || exit 1
+        { cat > "$tmp" && chmod 644 "$tmp" && mv -fT "$tmp" "$1"; } || { rm -f "$tmp"; exit 1; }
+      ' sh "$STATUS"
 }
 
 # The list's identity, size and time, which a rename, a rewrite or a deletion changes.

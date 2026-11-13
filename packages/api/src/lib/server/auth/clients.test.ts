@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { keySpec } from '#testing/fixtures.js';
 import { fakeHttpsRequest, type FakeResponse } from '#testing/httpsFake.js';
 
+import { limiter } from '../limiter.js';
 import { keyringFromEnv } from '../secretbox.js';
 import {
   clientMetaFor,
@@ -18,6 +19,8 @@ import { redirectUriAllowed } from './redirectUris.js';
 // A documentation-range address stands for every name a test resolves; an IP literal resolves to
 // itself, as the real lookup does.
 const PUBLIC_ADDRESS = '203.0.113.10';
+// The address the requests come from, for §5.5's limit.
+const CLIENT_ADDRESS = '198.51.100.7';
 type Answer = { address: string; family: number };
 /** What the mocked lookup answers for a host; each test's `beforeEach` sets it. */
 const answers: { for: (host: string) => Answer[] } = vi.hoisted(() => ({
@@ -73,7 +76,11 @@ describe('clientMetaFor', () => {
   it('decodes, never fetches, a client id that is not an https URL', async () => {
     const kr = keyringFromEnv({ SECRETBOX_KEY: keySpec(1) });
     expect(
-      await clientMetaFor(kr, 'http://client.example/metadata.json')
+      await clientMetaFor(
+        kr,
+        'http://client.example/metadata.json',
+        CLIENT_ADDRESS
+      )
     ).toBeNull();
   });
 });
@@ -116,25 +123,29 @@ describe('fetchCimd', () => {
       redirect_uris: ['https://client.example/callback'],
       application_type: 'web'
     });
-    expect(await fetchCimd(url)).toBeNull();
+    expect(await fetchCimd(url, CLIENT_ADDRESS)).toBeNull();
   });
 
   it('answers null for a document whose host is unreachable', async () => {
     serve(() => {
       throw new Error('connect ECONNREFUSED');
     });
-    expect(await fetchCimd('https://down.example/metadata.json')).toBeNull();
+    expect(
+      await fetchCimd('https://down.example/metadata.json', CLIENT_ADDRESS)
+    ).toBeNull();
   });
 
   it('answers null for a document that is not JSON', async () => {
     serve(() => ({ body: '<html>oops</html>' }));
-    expect(await fetchCimd('https://html.example/metadata.json')).toBeNull();
+    expect(
+      await fetchCimd('https://html.example/metadata.json', CLIENT_ADDRESS)
+    ).toBeNull();
   });
 
   it('answers null for a document larger than the size cap', async () => {
     const url = 'https://big.example/metadata.json';
     serveJson({ ...cimdDocument(url), padding: 'x'.repeat(65_536) });
-    expect(await fetchCimd(url)).toBeNull();
+    expect(await fetchCimd(url, CLIENT_ADDRESS)).toBeNull();
   });
 
   it('gives the fetch a deadline', async () => {
@@ -144,7 +155,7 @@ describe('fetchCimd', () => {
       ({ signal } = options);
       return { body: JSON.stringify(cimdDocument(url)) };
     });
-    await fetchCimd(url);
+    await fetchCimd(url, CLIENT_ADDRESS);
     expect(signal).toBeInstanceOf(AbortSignal);
   });
 
@@ -158,8 +169,8 @@ describe('fetchCimd', () => {
         headers: { 'cache-control': 'no-store, max-age=3600' }
       };
     });
-    await fetchCimd(url);
-    await fetchCimd(url);
+    await fetchCimd(url, CLIENT_ADDRESS);
+    await fetchCimd(url, CLIENT_ADDRESS);
     expect(fetches).toBe(2);
   });
 
@@ -177,12 +188,15 @@ describe('fetchCimd', () => {
         headers: { 'cache-control': 'max-age=999999999' }
       };
     });
+    // From many addresses, so §5.5's per-address limit does not stop the flood first.
+    const unlimited = vi.spyOn(limiter, 'check').mockReturnValue({ ok: true });
     for (let index = 0; index < documents; index += 1) {
       // eslint-disable-next-line no-await-in-loop -- one document after another, as a flood of page loads would
-      await fetchCimd(urlOf(index));
+      await fetchCimd(urlOf(index), CLIENT_ADDRESS);
     }
+    unlimited.mockRestore();
     fetched.clear();
-    await fetchCimd(urlOf(0));
+    await fetchCimd(urlOf(0), CLIENT_ADDRESS);
     expect(fetched.has(urlOf(0))).toBe(true);
   });
 
@@ -198,9 +212,9 @@ describe('fetchCimd', () => {
     });
     vi.useFakeTimers();
     try {
-      await fetchCimd(url);
+      await fetchCimd(url, CLIENT_ADDRESS);
       vi.advanceTimersByTime(24 * 60 * 60 * 1000);
-      await fetchCimd(url);
+      await fetchCimd(url, CLIENT_ADDRESS);
     } finally {
       vi.useRealTimers();
     }
@@ -228,7 +242,7 @@ describe('fetchCimd', () => {
   ])('refuses a document with %s', async (_case, override) => {
     const url = 'https://limits.example/metadata.json';
     serveJson({ ...cimdDocument(url), ...override });
-    expect(await fetchCimd(url)).toBeNull();
+    expect(await fetchCimd(url, CLIENT_ADDRESS)).toBeNull();
   });
 
   it('does not follow a redirect', async () => {
@@ -238,7 +252,7 @@ describe('fetchCimd', () => {
       headers: { location: 'https://elsewhere.example/metadata.json' },
       body: JSON.stringify(cimdDocument(url))
     }));
-    expect(await fetchCimd(url)).toBeNull();
+    expect(await fetchCimd(url, CLIENT_ADDRESS)).toBeNull();
   });
 
   // Anyone can make the server fetch a URL: it never reaches the stack's own network.
@@ -261,7 +275,9 @@ describe('fetchCimd', () => {
     ];
     const served = vi.fn(() => ({ body: '{}' }));
     serve(served);
-    expect(await fetchCimd('https://inside.example/metadata.json')).toBeNull();
+    expect(
+      await fetchCimd('https://inside.example/metadata.json', CLIENT_ADDRESS)
+    ).toBeNull();
     expect(served).not.toHaveBeenCalled();
   });
 
@@ -269,7 +285,7 @@ describe('fetchCimd', () => {
     'refuses an IP literal %s on a loopback address',
     async url => {
       serve(() => ({ body: '{}' }));
-      expect(await fetchCimd(url)).toBeNull();
+      expect(await fetchCimd(url, CLIENT_ADDRESS)).toBeNull();
       expect(request).not.toHaveBeenCalled();
     }
   );
@@ -277,7 +293,7 @@ describe('fetchCimd', () => {
   it('refuses a document whose redirect URI is not an absolute http(s) URI', async () => {
     const url = 'https://relative.example/metadata.json';
     serveJson({ ...cimdDocument(url), redirect_uris: ['callback'] });
-    expect(await fetchCimd(url)).toBeNull();
+    expect(await fetchCimd(url, CLIENT_ADDRESS)).toBeNull();
   });
 
   it('reads a document without application_type as a web client', async () => {
@@ -299,7 +315,7 @@ describe('fetchCimd', () => {
       },
       { 'content-type': 'application/json' }
     );
-    expect(await fetchCimd(url)).toEqual({
+    expect(await fetchCimd(url, CLIENT_ADDRESS)).toEqual({
       clientId: url,
       kind: 'cimd',
       name: 'Claude',
@@ -316,7 +332,33 @@ describe('fetchCimd', () => {
       redirect_uris: ['https://client.example/callback'],
       application_type: 'service'
     });
-    expect(await fetchCimd(url)).toBeNull();
+    expect(await fetchCimd(url, CLIENT_ADDRESS)).toBeNull();
+  });
+
+  // §5.5: a fetch the cache cannot answer counts against the address, a cached document does not.
+  it('limits uncached fetches per client address, never a cached document', async () => {
+    const cachedUrl = 'https://cached.example/metadata.json';
+    serve(url => ({
+      body: JSON.stringify(cimdDocument(url)),
+      headers: {
+        'cache-control': url === cachedUrl ? 'max-age=3600' : 'no-store'
+      }
+    }));
+    const address = '192.0.2.44';
+    for (let index = 0; index < 300; index += 1) {
+      // eslint-disable-next-line no-await-in-loop -- one page load after another
+      expect(await fetchCimd(cachedUrl, address)).not.toBeNull();
+    }
+    const uncachedUrl = 'https://uncached.example/metadata.json';
+    for (let index = 1; index < 240; index += 1) {
+      // eslint-disable-next-line no-await-in-loop -- one page load after another
+      expect(await fetchCimd(uncachedUrl, address)).not.toBeNull();
+    }
+    await expect(fetchCimd(uncachedUrl, address)).rejects.toMatchObject({
+      status: 429
+    });
+    expect(await fetchCimd(cachedUrl, address)).not.toBeNull();
+    expect(await fetchCimd(uncachedUrl, '192.0.2.45')).not.toBeNull();
   });
 
   // The address checked is the one the socket connects to, whatever an earlier resolution of
@@ -333,7 +375,9 @@ describe('fetchCimd', () => {
     });
     const { port } = server.address() as AddressInfo;
     try {
-      expect(await fetchCimd(`https://localhost:${port}/x.json`)).toBeNull();
+      expect(
+        await fetchCimd(`https://localhost:${port}/x.json`, CLIENT_ADDRESS)
+      ).toBeNull();
     } finally {
       server.close();
     }
@@ -356,7 +400,7 @@ describe('redirectUriAllowed', () => {
       response_types: ['code'],
       token_endpoint_auth_method: 'none'
     });
-    const meta = await fetchCimd(CLAUDE_CODE_CLIENT_ID);
+    const meta = await fetchCimd(CLAUDE_CODE_CLIENT_ID, CLIENT_ADDRESS);
     if (meta === null) {
       throw new Error("expected Claude Code's document to parse");
     }

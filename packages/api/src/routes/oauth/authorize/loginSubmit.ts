@@ -52,7 +52,11 @@ export async function loginSubmit(
 ): Promise<LoginResult> {
   const db = getDb();
   const kr = keyringFromEnv(env);
-  const resolved = await resolveClient(kr, paramsFromPayload(payload));
+  const resolved = await resolveClient(
+    kr,
+    paramsFromPayload(payload),
+    event.getClientAddress()
+  );
   const { dictionary } = await loadBranding(db);
   const checked = await checkPassword(db, payload);
   if (checked === null) {

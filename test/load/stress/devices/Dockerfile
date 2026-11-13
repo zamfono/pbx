@@ -11,11 +11,13 @@
 # baresip comes from the Zamfono APT repository (same archive keyring as images/asterisk): Debian
 # ships baresip 1.1.0 in every suite. The package puts its modules under the multiarch libdir; the symlink gives the
 # harness's configs one module_path for amd64 and arm64.
-FROM debian:trixie-slim
+FROM debian:trixie-slim@sha256:a72b4433de1cf7d6bae0c4cee74d0547f58601a643b3375f070c51600d63b6b2
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates curl \
     && curl -fsSL -o /tmp/zamfono-archive-keyring.deb \
        https://packages.zamfono.com/debian/baresip/pool/main/z/zamfono-archive-keyring/zamfono-archive-keyring_1.0_all.deb \
+    && echo '831397f10ab08cdf51e658026c873f98d3717fa4c27d2f5d76961148cfedbc34  /tmp/zamfono-archive-keyring.deb' \
+       | sha256sum -c - \
     && apt-get install -y --no-install-recommends /tmp/zamfono-archive-keyring.deb \
     && rm /tmp/zamfono-archive-keyring.deb \
     && echo 'deb [signed-by=/usr/share/keyrings/zamfono-archive-keyring.gpg] https://packages.zamfono.com/debian/baresip trixie main' \

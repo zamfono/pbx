@@ -13,6 +13,10 @@ const TOKEN_LIMIT = 60;
 const RESET_ADDRESS_LIMIT = 30;
 const REGISTER_LIMIT = 60;
 const PROVISION_LIMIT = 300;
+// A sign-in resolves its client at most four times (the page, the login or SSO submission, the SSO
+// callback, the consent), each a fetch when the client's metadata document is not cached; the
+// login's 60 submissions a minute times four.
+const CLIENT_METADATA_LIMIT = 240;
 
 // §5.5 account lock: five failures within this window lock the account for the same duration.
 const LOGIN_FAILURE_LIMIT = 5;
@@ -28,7 +32,8 @@ export type LimitKind =
   | 'resetAddress'
   | 'resetAccount'
   | 'register'
-  | 'provision';
+  | 'provision'
+  | 'clientMetadata';
 
 const CHECK_LIMITS: Record<LimitKind, { max: number; windowMs: number }> = {
   loginAddress: { max: LOGIN_ADDRESS_LIMIT, windowMs: MS_PER_MINUTE },
@@ -36,7 +41,8 @@ const CHECK_LIMITS: Record<LimitKind, { max: number; windowMs: number }> = {
   resetAddress: { max: RESET_ADDRESS_LIMIT, windowMs: MS_PER_HOUR },
   resetAccount: { max: RESET_ACCOUNT_LIMIT, windowMs: MS_PER_HOUR },
   register: { max: REGISTER_LIMIT, windowMs: MS_PER_MINUTE },
-  provision: { max: PROVISION_LIMIT, windowMs: MS_PER_MINUTE }
+  provision: { max: PROVISION_LIMIT, windowMs: MS_PER_MINUTE },
+  clientMetadata: { max: CLIENT_METADATA_LIMIT, windowMs: MS_PER_MINUTE }
 };
 
 type FixedWindow = { start: number; count: number };

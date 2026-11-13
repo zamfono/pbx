@@ -1,4 +1,4 @@
-FROM debian:trixie-slim
+FROM debian:trixie-slim@sha256:a72b4433de1cf7d6bae0c4cee74d0547f58601a643b3375f070c51600d63b6b2
 
 # Links the published package to its repository (§6.3 "Images"). CI adds
 # org.zamfono.asterisk.version, the installed package's version, after the build: a LABEL cannot
@@ -6,7 +6,8 @@ FROM debian:trixie-slim
 LABEL org.opencontainers.image.source=https://github.com/zamfono/pbx
 
 # Zamfono APT repository (spec §4):
-# fetch its archive keyring package, register the source, install Asterisk 22 plus the module
+# fetch its archive keyring package, refused unless it is the one checked in here by its SHA-256
+# (a new keyring package is a change to this line), register the source, install Asterisk 22 plus the module
 # and music-on-hold packages the stack needs (spec §9.1, §9.3, §9.4), nftables and inotify-tools for
 # the ban helper (§5.6), and coturn for the STUN server the `stun` service runs from this image
 # (§6.1). The `asterisk` package pulls in Debian's English sounds, kept as the safety net for a
@@ -16,6 +17,8 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates curl \
     && curl -fsSL -o /tmp/zamfono-archive-keyring.deb \
        https://packages.zamfono.com/debian/asterisk/22/pool/main/z/zamfono-archive-keyring/zamfono-archive-keyring_1.0_all.deb \
+    && echo '831397f10ab08cdf51e658026c873f98d3717fa4c27d2f5d76961148cfedbc34  /tmp/zamfono-archive-keyring.deb' \
+       | sha256sum -c - \
     && apt-get install -y --no-install-recommends /tmp/zamfono-archive-keyring.deb \
     && rm /tmp/zamfono-archive-keyring.deb \
     && echo 'deb [signed-by=/usr/share/keyrings/zamfono-archive-keyring.gpg] https://packages.zamfono.com/debian/asterisk/22 trixie main' \

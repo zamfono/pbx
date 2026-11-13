@@ -108,23 +108,28 @@ if grep -q '^capture_address' /etc/asterisk/hep.conf; then
   exit 1
 fi
 
+# gen is the asterisk-config volume, which uid 1000 writes, Asterisk here and `api`: a link planted
+# in it would take a write by root anywhere in the container. Root only makes the directory and
+# hands it over (`chown -R` follows no link); everything written into it is written as `asterisk`,
+# which a link cannot take anywhere `asterisk` could not write anyway (spec §9.1).
+mkdir -p "$GEN_DIR"
+chown -R asterisk:asterisk "$GEN_DIR"
+as_asterisk() { setpriv --reuid=asterisk --regid=asterisk --clear-groups "$@"; }
+
 # Self-signed placeholder certificate so transport-tls loads before Caddy has obtained a real
 # one; api replaces both files in place once it has synced the real certificate (spec §6.4).
 if [ ! -f "$TLS_DIR/cert.pem" ] || [ ! -f "$TLS_DIR/privkey.pem" ]; then
-  mkdir -p "$TLS_DIR"
-  openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
+  as_asterisk mkdir -p "$TLS_DIR"
+  as_asterisk openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
     -keyout "$TLS_DIR/privkey.pem" -out "$TLS_DIR/cert.pem" \
     -subj "/CN=zamfono"
 fi
 
 # `api` renders these onto the shared volume; an empty placeholder keeps the #include valid
 # until then.
-mkdir -p "$GEN_DIR"
 for f in pjsip_users.conf pjsip_trunks.conf extensions_hints.conf musiconhold.conf; do
-  [ -f "$GEN_DIR/$f" ] || : > "$GEN_DIR/$f"
+  [ -f "$GEN_DIR/$f" ] || as_asterisk sh -c ': > "$1"' sh "$GEN_DIR/$f"
 done
-
-chown -R asterisk:asterisk "$GEN_DIR"
 
 # The astdb, where the PJSIP contacts live (sorcery.conf), sits on a volume of its own
 # (asterisk.conf's astdbdir), so UDP registrations survive a recreated container (spec §9.1). A

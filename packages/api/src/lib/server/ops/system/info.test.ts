@@ -23,9 +23,9 @@ vi.mock('./_updater.js', async importOriginal => ({
   hostClient: vi.fn()
 }));
 
-// The lowest role: every signed-in user may read what the stack runs.
-const asUser: RunInput = {
-  actor: { id: 'u1', name: 'User', role: 'user' },
+// The lowest role that reads the whole diagnosis (§10.3 "System").
+const asAdmin: RunInput = {
+  actor: { id: 'u1', name: 'Admin', role: 'admin' },
   channel: 'mcp',
   requestId: 'req-1'
 };
@@ -59,6 +59,26 @@ async function tenantDb(): Promise<Db> {
 }
 
 describe('system.info', () => {
+  it("answers a user only the stack's version and address, nothing that diagnoses it", async () => {
+    vi.stubEnv('ZAMFONO_VERSION', '0.0.5');
+    vi.stubEnv('ZAMFONO_REVISION', '79c1041aaaaaaa');
+    vi.mocked(getCoreClient).mockReturnValue(
+      stubCoreClient({ version: () => Promise.resolve(CORE) })
+    );
+    recordSkippedConfigRows([{ type: 'user', id: 'u9', field: 'users.name' }]);
+    const asUser: RunInput = {
+      ...asAdmin,
+      actor: { id: 'u2', name: 'User', role: 'user' }
+    };
+
+    expect(
+      await runOperation(await tenantDb(), 'system.info', {}, asUser)
+    ).toEqual({
+      api: { version: '0.0.5' },
+      stack: { domain: 'pbx.test', ipv4: '192.0.2.10' }
+    });
+  });
+
   it("reports api's version and the one core reports, each on its own", async () => {
     vi.stubEnv('ZAMFONO_VERSION', '0.0.5');
     vi.stubEnv('ZAMFONO_REVISION', '79c1041aaaaaaa');
@@ -67,7 +87,7 @@ describe('system.info', () => {
     );
 
     expect(
-      await runOperation(await tenantDb(), 'system.info', {}, asUser)
+      await runOperation(await tenantDb(), 'system.info', {}, asAdmin)
     ).toEqual({
       api: {
         version: '0.0.5',
@@ -91,7 +111,7 @@ describe('system.info', () => {
       await tenantDb(),
       'system.info',
       {},
-      asUser
+      asAdmin
     )) as { api: { startedAt: string } };
 
     const startedMs = Date.parse(out.api.startedAt);
@@ -109,7 +129,7 @@ describe('system.info', () => {
     );
 
     expect(
-      await runOperation(await tenantDb(), 'system.info', {}, asUser)
+      await runOperation(await tenantDb(), 'system.info', {}, asAdmin)
     ).toEqual({
       api: {
         version: 'dev',
@@ -142,7 +162,7 @@ describe('system.info', () => {
     }));
     const db = await makeTestDb();
     await seedSettings(db);
-    expect(await runOperation(db, 'system.info', {}, asUser)).toMatchObject({
+    expect(await runOperation(db, 'system.info', {}, asAdmin)).toMatchObject({
       update: status
     });
 
@@ -150,7 +170,7 @@ describe('system.info', () => {
       status: () => Promise.reject(new Error('connect ECONNREFUSED')),
       update: () => Promise.reject(new Error('unused'))
     }));
-    expect(await runOperation(db, 'system.info', {}, asUser)).toMatchObject({
+    expect(await runOperation(db, 'system.info', {}, asAdmin)).toMatchObject({
       update: {
         unavailable: 'the update status could not be read: connect ECONNREFUSED'
       }
@@ -177,14 +197,14 @@ describe('system.info', () => {
       .execute();
 
     // Without an updater there are no automatic updates, so no failure to show; the record stays.
-    expect(await runOperation(db, 'system.info', {}, asUser)).toMatchObject({
+    expect(await runOperation(db, 'system.info', {}, asAdmin)).toMatchObject({
       autoUpdate: { enabled: true, failed: null }
     });
     vi.mocked(updaterClient).mockImplementation(() => ({
       status: () => Promise.reject(new Error('not answering')),
       update: () => Promise.reject(new Error('not asked'))
     }));
-    expect(await runOperation(db, 'system.info', {}, asUser)).toMatchObject({
+    expect(await runOperation(db, 'system.info', {}, asAdmin)).toMatchObject({
       autoUpdate: { enabled: true, failed }
     });
   });
@@ -202,7 +222,7 @@ describe('system.info', () => {
       })
       .execute();
 
-    expect(await runOperation(db, 'system.info', {}, asUser)).toMatchObject({
+    expect(await runOperation(db, 'system.info', {}, asAdmin)).toMatchObject({
       maintenanceGate: {
         certSync: {
           at: '2026-10-01T05:00:00.000Z',
@@ -231,7 +251,7 @@ describe('system.info', () => {
       reboot: () => Promise.reject(new Error('unused'))
     });
     await setRebootRequest(db, { at: '2026-11-12T09:00:00.000Z', by: 'Olga' });
-    const out = (await runOperation(db, 'system.info', {}, asUser)) as Record<
+    const out = (await runOperation(db, 'system.info', {}, asAdmin)) as Record<
       string,
       unknown
     >;
@@ -253,7 +273,7 @@ describe('system.info', () => {
       reboot: () => Promise.reject(new Error('unused'))
     });
     await expect(
-      runOperation(db, 'system.info', {}, asUser)
+      runOperation(db, 'system.info', {}, asAdmin)
     ).resolves.toMatchObject({ host: { unavailable: 'fetch failed' } });
   });
 
@@ -261,7 +281,7 @@ describe('system.info', () => {
     const db = await makeTestDb();
     await seedSettings(db, { ringotelProfilePending: 1 });
 
-    expect(await runOperation(db, 'system.info', {}, asUser)).toMatchObject({
+    expect(await runOperation(db, 'system.info', {}, asAdmin)).toMatchObject({
       ringotel: { profilePending: true, rosterPending: false }
     });
   });
@@ -270,7 +290,7 @@ describe('system.info', () => {
     const db = await makeTestDb();
     await seedSettings(db, { ringotelRosterPending: 1 });
 
-    expect(await runOperation(db, 'system.info', {}, asUser)).toMatchObject({
+    expect(await runOperation(db, 'system.info', {}, asAdmin)).toMatchObject({
       ringotel: { profilePending: false, rosterPending: true }
     });
   });
@@ -282,7 +302,7 @@ describe('system.info', () => {
     ]);
 
     expect(
-      await runOperation(await tenantDb(), 'system.info', {}, asUser)
+      await runOperation(await tenantDb(), 'system.info', {}, asAdmin)
     ).toMatchObject({
       skippedConfigRows: [
         { type: 'trunk', id: 't1', field: 'trunk.password' },
@@ -297,13 +317,13 @@ describe('system.info', () => {
     vi.stubEnv('FQDN', 'pbx.example.com');
     vi.stubEnv('STACK_IPV4', '203.0.113.34');
     vi.stubEnv('EXTERNAL_IPV4', '');
-    expect(await runOperation(db, 'system.info', {}, asUser)).toMatchObject({
+    expect(await runOperation(db, 'system.info', {}, asAdmin)).toMatchObject({
       stack: { domain: 'pbx.example.com', ipv4: '203.0.113.34' }
     });
 
     vi.stubEnv('STACK_IPV4', '');
     vi.stubEnv('EXTERNAL_IPV4', '198.51.100.7');
-    expect(await runOperation(db, 'system.info', {}, asUser)).toMatchObject({
+    expect(await runOperation(db, 'system.info', {}, asAdmin)).toMatchObject({
       stack: { domain: 'pbx.example.com', ipv4: '198.51.100.7' }
     });
   });

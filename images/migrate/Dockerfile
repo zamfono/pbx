@@ -5,7 +5,7 @@
 # node_modules beside db/ with any of db's own that npm nests under db/node_modules, so every
 # module resolves as in a checkout.
 # Build from the repository root: `docker build -f images/migrate/Dockerfile .`.
-FROM node:26-slim AS build
+FROM node:26-slim@sha256:e6bedef217677b276c591795e169840edd9096dbf13f29df8ef8d1856b8820bc AS build
 
 WORKDIR /app
 
@@ -23,7 +23,7 @@ COPY db/package.json db/
 # migrations in a checkout.
 RUN npm ci --workspace db --omit=dev
 
-FROM node:26-slim
+FROM node:26-slim@sha256:e6bedef217677b276c591795e169840edd9096dbf13f29df8ef8d1856b8820bc
 
 # Links the published package to its repository (§6.3 "Images").
 LABEL org.opencontainers.image.source=https://github.com/zamfono/pbx

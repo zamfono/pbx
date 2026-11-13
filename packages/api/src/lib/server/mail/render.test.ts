@@ -196,6 +196,35 @@ describe('the shipped subjects of the account and update mails (§10.2 "Template
   }
 });
 
+// Every shipped body ends with the footer, the company only where one is set (§10.2 "Templates").
+describe('the shipped footer', () => {
+  for (const kind of BUILTIN_KINDS) {
+    for (const language of BUILTIN_LANGUAGES) {
+      it(`names the company in ${kind}.${language} only where set, with no stray separator`, () => {
+        const source = loadBuiltinTemplate(kind, language);
+        const mail = (
+          companyName: string
+        ): { text: string; html: string | null } =>
+          compileTemplate(
+            kind,
+            source.subject,
+            source.bodyText,
+            source.bodyHtml
+          ).render(
+            { companyName, fqdn: 'pbx.example.com' },
+            { language, timezone: 'UTC' }
+          );
+        const named = mail('Acme');
+        expect(named.text.split('\n').at(-1)).toBe('Acme · pbx.example.com');
+        expect(named.html).toMatch(/<p>Acme · pbx\.example\.com<\/p>$/u);
+        const bare = mail('');
+        expect(bare.text.split('\n').at(-1)).toBe('pbx.example.com');
+        expect(bare.html).toMatch(/<p>pbx\.example\.com<\/p>$/u);
+      });
+    }
+  }
+});
+
 describe('a withheld caller', () => {
   // `core` sends a withheld caller as an empty `callerNumber` with no phone-book name (§10.2
   // "Mail"); the shipped templates say so in the mail's language.

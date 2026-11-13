@@ -6,10 +6,10 @@
 # tests. Build from the repository root: `docker build -f images/proxy/Dockerfile .`.
 #
 # Both tags are pinned exactly here alone (§6.3 "Images": "each pinned to one exact version in
-# `images/proxy/Dockerfile`, which alone names them"); Dependabot bumps them in a pull request
-# that passes CI (the docker ecosystem entry for /images/proxy, .github/dependabot.yaml), the
-# plugin's pin moves by hand.
-FROM caddy:2.11.6-builder AS build
+# `images/proxy/Dockerfile`, which alone names them"), each with its digest; Dependabot bumps
+# tag and digest in a pull request that passes CI (the docker ecosystem entry for /images/proxy,
+# .github/dependabot.yaml), the plugin's pin moves by hand.
+FROM caddy:2.11.6-builder@sha256:f5b1a66449d305280e559dba0ab9f7ce9a2a14c527c79d7c6fb48abc8f895818 AS build
 WORKDIR /build
 # The builder image bakes in CADDY_VERSION matching its FROM tag and XCADDY_SETCAP=1,
 # so `xcaddy build --with …` alone builds that Caddy version with the plugin added and already
@@ -19,7 +19,7 @@ WORKDIR /build
 # — `gh api repos/mholt/caddy-events-exec/tags`); it ships one Go module, `events.handlers.exec`.
 RUN xcaddy build --with github.com/mholt/caddy-events-exec@v0.1.0 --output /build/caddy
 
-FROM caddy:2.11.6 AS runtime
+FROM caddy:2.11.6@sha256:3422ce6de165df66534f9b9ba50efaf457114ec961763cc52f5dbdaac2972d73 AS runtime
 # Links the published package to its repository (§6.3 "Images").
 LABEL org.opencontainers.image.source=https://github.com/zamfono/pbx
 

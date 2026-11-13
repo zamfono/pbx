@@ -40,7 +40,11 @@ export const load = (async event => {
       }
     };
   }
-  const resolved = await resolveClient(kr, event.url.searchParams);
+  const resolved = await resolveClient(
+    kr,
+    event.url.searchParams,
+    event.getClientAddress()
+  );
   return {
     mailConfigured,
     clientName: resolved?.meta.name ?? null,

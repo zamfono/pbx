@@ -42,8 +42,8 @@ esac
 
 echo "==> caddy version"
 # The expected version is the runtime stage's tag, read from the Dockerfile, which alone names it.
-want=$(sed -n 's/^FROM caddy:\([0-9.]*\) AS runtime$/\1/p' images/proxy/Dockerfile)
-[ -n "$want" ] || fail "images/proxy/Dockerfile has no 'FROM caddy:<version> AS runtime' line"
+want=$(sed -n 's/^FROM caddy:\([0-9.]*\)@sha256:[0-9a-f]\{64\} AS runtime$/\1/p' images/proxy/Dockerfile)
+[ -n "$want" ] || fail "images/proxy/Dockerfile has no 'FROM caddy:<version>@sha256:<digest> AS runtime' line"
 run 'caddy version' | grep -Eq "^v${want//./\\.}( |$)" \
   || fail "caddy version does not start with v$want, the runtime stage's tag in images/proxy/Dockerfile"
 

@@ -30,6 +30,31 @@ docker exec "$CONTAINER" grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}
   || fail "the helper's status does not name the empty list"
 docker exec "$CONTAINER" ban-helper-alive || fail "the healthcheck fails on a fresh heartbeat"
 
+# Root writes nothing through a link planted in gen, which uid 1000 writes (§9.1). The heartbeat
+# replaces a link at the status's own name and never opens one at the name an earlier release
+# wrote it through, and api's uid reads the status it leaves.
+docker exec "$CONTAINER" sh -c "ln -sfn /etc/planted-status $GEN/sip_ban_helper.status \
+  && ln -sfn /etc/planted-tmp $GEN/sip_ban_helper.status.tmp"
+put_list <<< '203.0.113.5 udp'
+docker exec "$CONTAINER" sh -c "[ -f $GEN/sip_ban_helper.status ] && [ ! -L $GEN/sip_ban_helper.status ]" \
+  || fail "the heartbeat left the link planted at the status's name"
+docker exec "$CONTAINER" sh -c '[ ! -e /etc/planted-status ] && [ ! -e /etc/planted-tmp ]' \
+  || fail "the ban helper wrote through a link planted in gen"
+docker exec -u 1000 "$CONTAINER" cat "$GEN/sip_ban_helper.status" > /dev/null \
+  || fail "api's uid cannot read the heartbeat"
+docker exec "$CONTAINER" rm "$GEN/sip_ban_helper.status.tmp"
+
+# The entrypoint writes into gen as asterisk: a link planted under the certificate's or a
+# placeholder's name, pointing where only root may write, stops the start rather than being
+# followed. A throwaway container each, without NET_ADMIN: the writes come before the ban table.
+for planted in tls/privkey.pem pjsip_users.conf; do
+  followed=$(docker run --rm --entrypoint sh -e ARI_PASSWORD=x -e AMI_PASSWORD=y "$ASTERISK_IMAGE" -c "
+    mkdir -p /etc/asterisk/gen/tls && ln -s /etc/planted /etc/asterisk/gen/$planted
+    /entrypoint.sh > /dev/null 2>&1
+    [ -e /etc/planted ] && echo yes || echo no")
+  [ "$followed" = no ] || fail "the entrypoint wrote through a link planted at gen/$planted"
+done
+
 in_an_hour=$(date -u -d '+1 hour' +%Y-%m-%dT%H:%M:%S.000Z)
 # The longest ban a step allows, 100 years (§11.4).
 in_a_century=$(date -u -d '+36500 days' +%Y-%m-%dT%H:%M:%SZ)
@@ -112,7 +137,7 @@ fi
 # spin: the image's own helper, in a throwaway container, with an inotifywait that cannot start and
 # an nft that counts its calls. A busy loop would call nft thousands of times in these 9 seconds.
 fallback=$(docker run --rm --entrypoint bash "$ASTERISK_IMAGE" -c '
-  mkdir -p /tmp/gen /tmp/stub
+  mkdir -p /tmp/gen /tmp/stub && chown asterisk: /tmp/gen
   printf "#!/bin/sh\necho \"Couldn'"'"'t initialize inotify: Too many open files\" >&2\nexit 1\n" \
     > /tmp/stub/inotifywait
   printf "#!/bin/sh\necho call >> /tmp/nft.calls\n[ \"\$1\" = -f ] && cat > /dev/null\nexit 0\n" \

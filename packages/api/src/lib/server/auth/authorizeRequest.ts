@@ -89,17 +89,19 @@ function validatedRedirectUri(
  * Every failure is a thrown `error(400)`, the error page on this origin, never a redirect: the
  * person has not acted yet, and a client anyone can register statelessly would otherwise turn
  * this endpoint into an open redirector (§5.2, RFC 9700 §4.11.2). A missing `response_type`
- * fails too, which OAuth 2.1 §4.1.1 makes required.
+ * fails too, which OAuth 2.1 §4.1.1 makes required. A metadata document's fetch counts against
+ * `clientAddress`'s §5.5 limit (`fetchCimd`).
  */
 export async function resolveClient(
   kr: Keyring,
-  params: URLSearchParams
+  params: URLSearchParams,
+  clientAddress: string
 ): Promise<{ meta: ClientMeta; authorize: PendingAuthorize } | null> {
   const clientId = params.get('client_id');
   if (clientId === null) {
     return null;
   }
-  const meta = await clientMetaFor(kr, clientId);
+  const meta = await clientMetaFor(kr, clientId, clientAddress);
   if (meta === null) {
     error(HTTP_BAD_REQUEST, 'oauth/authorize: unknown client');
   }

@@ -3,7 +3,7 @@
 # it once as the `workspace` target and hands it to both as a build context; each compiles its own
 # package on top and prunes the development dependencies before its runtime stage copies
 # node_modules. It is never published.
-FROM node:26-slim
+FROM node:26-slim@sha256:e6bedef217677b276c591795e169840edd9096dbf13f29df8ef8d1856b8820bc
 WORKDIR /app
 # better-sqlite3 (via @zamfono/shared) falls back to compiling from source when no prebuild
 # matches this platform's Node ABI; the toolchain never reaches a runtime stage.

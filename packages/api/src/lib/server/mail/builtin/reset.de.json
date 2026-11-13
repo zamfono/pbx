@@ -1,5 +1,5 @@
 {
   "subject": "Passwort für {{#if companyName}}{{companyName}} ({{fqdn}}){{else}}{{fqdn}}{{/if}} zurücksetzen",
-  "bodyText": "Hallo {{recipientName}},\n\nSetzen Sie Ihr Passwort über diesen Link zurück:\n\n{{link}}\n\nDieser Link läuft am {{date linkExpiresAt}} ab. Falls Sie dies nicht angefordert haben, können Sie diese E-Mail ignorieren.\n\n{{companyName}} · {{fqdn}}",
-  "bodyHtml": "<p>Hallo {{recipientName}},</p><p>Setzen Sie Ihr Passwort über diesen Link zurück:</p><p><a href=\"{{link}}\">{{link}}</a></p><p>Dieser Link läuft am {{date linkExpiresAt}} ab. Falls Sie dies nicht angefordert haben, können Sie diese E-Mail ignorieren.</p><p>{{companyName}} · {{fqdn}}</p>"
+  "bodyText": "Hallo {{recipientName}},\n\nSetzen Sie Ihr Passwort über diesen Link zurück:\n\n{{link}}\n\nDieser Link läuft am {{date linkExpiresAt}} ab. Falls Sie dies nicht angefordert haben, können Sie diese E-Mail ignorieren.\n\n{{#if companyName}}{{companyName}} · {{/if}}{{fqdn}}",
+  "bodyHtml": "<p>Hallo {{recipientName}},</p><p>Setzen Sie Ihr Passwort über diesen Link zurück:</p><p><a href=\"{{link}}\">{{link}}</a></p><p>Dieser Link läuft am {{date linkExpiresAt}} ab. Falls Sie dies nicht angefordert haben, können Sie diese E-Mail ignorieren.</p><p>{{#if companyName}}{{companyName}} · {{/if}}{{fqdn}}</p>"
 }

@@ -7,9 +7,10 @@ import {
 } from 'jose';
 import { z } from 'zod';
 
-import { MS_PER_HOUR, type SsoProvider } from '@zamfono/shared';
+import { isRecord, MS_PER_HOUR, type SsoProvider } from '@zamfono/shared';
 
 import { pkceS256 } from '../hash.js';
+import { cappedJson } from '../json.js';
 import { TtlMap } from '../ttlMap.js';
 
 const DISCOVERY_PATH = '/.well-known/openid-configuration';
@@ -19,6 +20,33 @@ const AUTHORIZATION_SCOPE = 'openid email profile';
 const CODE_CHALLENGE_METHOD = 'S256';
 const GRANT_TYPE_AUTHORIZATION_CODE = 'authorization_code';
 const ID_TOKEN_ALGORITHMS = ['RS256', 'ES256', 'PS256'];
+// §5.2 "Login and SSO": each request to the provider is bounded like a metadata document's fetch,
+// as a person waits on it; the largest body a provider sends, Microsoft's key set, is about 13 KB.
+const OIDC_TIMEOUT_MS = 5000;
+const OIDC_MAX_BYTES = 65_536;
+
+/** `url`'s response through `fetchImpl` within `OIDC_TIMEOUT_MS`, its body parsed as JSON within
+ *  `OIDC_MAX_BYTES`; throws `failure` on a non-2xx status, a body over the bound or one that is not
+ *  JSON, and rejects on the deadline. */
+async function fetchJson(
+  fetchImpl: typeof fetch,
+  url: string,
+  init: RequestInit,
+  failure: string
+): Promise<unknown> {
+  const response = await fetchImpl(url, {
+    ...init,
+    signal: AbortSignal.timeout(OIDC_TIMEOUT_MS)
+  });
+  const body = response.ok
+    ? await cappedJson(response.body, OIDC_MAX_BYTES)
+    : undefined;
+  if (body === undefined) {
+    await response.body?.cancel();
+    throw new Error(failure);
+  }
+  return body;
+}
 
 /** The `/oauth/callback` path this stack registers as every upstream provider's redirect URI. */
 export const SSO_CALLBACK_PATH = '/oauth/callback';
@@ -61,11 +89,14 @@ export async function discover(
   if (cached !== undefined) {
     return cached;
   }
-  const response = await fetchImpl(`${cfg.issuer}${DISCOVERY_PATH}`);
-  if (!response.ok) {
-    throw new Error(`sso: discovery failed for ${cfg.issuer}`);
-  }
-  const parsed = DiscoveryDocumentSchema.parse(await response.json());
+  const parsed = DiscoveryDocumentSchema.parse(
+    await fetchJson(
+      fetchImpl,
+      `${cfg.issuer}${DISCOVERY_PATH}`,
+      {},
+      `sso: discovery failed for ${cfg.issuer}`
+    )
+  );
   // RFC 8414 §3.3: the tenant pinning of §5.2 "Login and SSO" requires this to match.
   if (parsed.issuer !== cfg.issuer) {
     throw new Error(`sso: discovery issuer mismatch for ${cfg.issuer}`);
@@ -120,17 +151,17 @@ export async function exchangeIdToken(
   if (cfg.clientSecret !== null) {
     body.set('client_secret', cfg.clientSecret);
   }
-  const response = await fetchImpl(disc.tokenEndpoint, {
-    method: 'POST',
-    headers: { 'content-type': 'application/x-www-form-urlencoded' },
-    body
-  });
-  if (!response.ok) {
-    throw new Error(`sso: token exchange failed for ${cfg.issuer}`);
-  }
-  const { id_token: idToken } = (await response.json()) as {
-    id_token?: unknown;
-  };
+  const response = await fetchJson(
+    fetchImpl,
+    disc.tokenEndpoint,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body
+    },
+    `sso: token exchange failed for ${cfg.issuer}`
+  );
+  const idToken = isRecord(response) ? response.id_token : undefined;
   if (typeof idToken !== 'string') {
     throw new Error(
       `sso: token response for ${cfg.issuer} carried no id_token`
@@ -171,11 +202,12 @@ export async function verifyIdToken(
 ): Promise<
   { ok: true; payload: JWTPayload } | { ok: false; reason: IdTokenFailure }
 > {
-  const jwksResponse = await fetchImpl(disc.jwksUri);
-  if (!jwksResponse.ok) {
-    throw new Error(`sso: jwks fetch failed for ${disc.jwksUri}`);
-  }
-  const jwks = (await jwksResponse.json()) as JSONWebKeySet;
+  const jwks = (await fetchJson(
+    fetchImpl,
+    disc.jwksUri,
+    {},
+    `sso: jwks fetch failed for ${disc.jwksUri}`
+  )) as JSONWebKeySet;
   try {
     const { payload } = await jwtVerify(idToken, createLocalJWKSet(jwks), {
       issuer: disc.issuer,

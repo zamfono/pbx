@@ -10,7 +10,9 @@ import { makeTestDb } from '#testing/testDb.js';
 import { encrypt, keyringFromEnv, type Keyring } from '../secretbox.js';
 import {
   discover,
+  exchangeIdToken,
   startLogin,
+  verifyIdToken,
   type Discovery,
   type SsoConfig
 } from './oidc.js';
@@ -598,6 +600,59 @@ describe('discover', () => {
     await expect(discover(oidcConfig({ issuer }), fetchImpl)).rejects.toThrow(
       /issuer/u
     );
+  });
+});
+
+// §5.2 "Login and SSO": every request to the provider carries a deadline, and a body over 64 KiB is
+// refused rather than read whole.
+describe('provider requests', () => {
+  const oversized = { padding: 'x'.repeat(65_536) };
+
+  /** A `fetch` answering `body`, recording whether each request carried a signal. */
+  function recordingFetch(body: unknown): {
+    fetchImpl: typeof fetch;
+    signals: boolean[];
+  } {
+    const signals: boolean[] = [];
+    const fetchImpl = ((_url: string, init?: RequestInit) => {
+      signals.push(init?.signal instanceof AbortSignal);
+      return Promise.resolve(jsonResponse(body));
+    }) as typeof fetch;
+    return { fetchImpl, signals };
+  }
+
+  it('refuses an oversized discovery document, with a deadline', async () => {
+    const { fetchImpl, signals } = recordingFetch(oversized);
+    await expect(
+      discover(oidcConfig({ issuer: 'https://big.example.com' }), fetchImpl)
+    ).rejects.toThrow(/discovery failed/u);
+    expect(signals).toEqual([true]);
+  });
+
+  it('refuses an oversized token response, with a deadline', async () => {
+    const { fetchImpl, signals } = recordingFetch({
+      ...oversized,
+      id_token: 'x'
+    });
+    const cfg = oidcConfig();
+    await expect(
+      exchangeIdToken(
+        cfg,
+        discoveryFor(cfg.issuer),
+        { code: AUTH_CODE, codeVerifier: 'verifier', origin: ORIGIN },
+        fetchImpl
+      )
+    ).rejects.toThrow(/token exchange failed/u);
+    expect(signals).toEqual([true]);
+  });
+
+  it('refuses an oversized key set, with a deadline', async () => {
+    const { fetchImpl, signals } = recordingFetch({ ...oversized, keys: [] });
+    const cfg = oidcConfig();
+    await expect(
+      verifyIdToken('x.y.z', cfg, discoveryFor(cfg.issuer), NOW, fetchImpl)
+    ).rejects.toThrow(/jwks fetch failed/u);
+    expect(signals).toEqual([true]);
   });
 });
 

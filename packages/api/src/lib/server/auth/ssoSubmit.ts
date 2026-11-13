@@ -39,7 +39,11 @@ export async function ssoSubmit(
   const db = getDb();
   const kr = keyringFromEnv(env);
   const origin = originFromEnv();
-  const resolved = await resolveClient(kr, paramsFromPayload(payload));
+  const resolved = await resolveClient(
+    kr,
+    paramsFromPayload(payload),
+    event.getClientAddress()
+  );
   const cfg = await ssoConfigFromSettings(db, kr);
   if (cfg === null) {
     error(HTTP_BAD_REQUEST, 'oauth/authorize: SSO is not configured');

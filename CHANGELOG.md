@@ -51,9 +51,30 @@ why the specified behaviour changed; the commit history, how.
   several stacks can be told apart.
 - Only owners write and remove the `updateFailed` and `breakingUpdate` mail templates, which go
   to owners alone; an admin gets 403.
+- `system.info` answers a user only the stack's version (`api.version`) and its address
+  (`stack`); everything else it reports is for admins and owners.
+
+### Fixed
+
+- The shipped mails' last line no longer starts with a stray `·` while no company name is set:
+  it names the FQDN alone.
 
 ### Security
 
+- `/oauth/authorize` fetched any client metadata document URL for anyone, without a limit. A fetch
+  the cache cannot answer now counts against the client address, 240 a minute, which four
+  fetches per sign-in times the login's 60 sign-ins a minute leaves room for; a client whose
+  document may be cached never counts.
+- The SSO provider's discovery, token and key-set requests waited up to five minutes and read a
+  body of any size; each now has 5 seconds and 64 KiB.
+- `system.info` no longer shows a user the stack's commits, the last update's error, the mail
+  relay's error, the configuration rows left out or the host's pending packages and reboot.
+- Root in the `asterisk` container no longer writes through a link in `/etc/asterisk/gen`, the
+  volume `api` and Asterisk write as uid 1000: the entrypoint writes the placeholder certificate
+  and files there as `asterisk`, and the ban helper its status, through a file of its own renamed
+  over it.
+- Every base image is pinned by digest as well as tag, kept current by Dependabot, and the
+  Asterisk repository's keyring package is checked against its SHA-256 before it is installed.
 - A SIP request from anywhere could have any address banned, or keep its own sender from being
   banned, with an escaped CR/LF in its From user, which Asterisk writes unescaped into the AMI
   security event `core` counts. `core` now drops every AMI frame Asterisk could not have written:

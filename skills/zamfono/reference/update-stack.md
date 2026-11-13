@@ -13,7 +13,8 @@ hands it to the host agent, which runs it on the host; it takes only a
 published release that is newer than the running one, a breaking one only when asked to (see
 Breaking releases).
 
-1. Check what is available: `system.info` (`GET /api/v1/system/info`). Its `update` field names the
+1. Check what is available: `system.info` (`GET /api/v1/system/info`), which shows everything below
+   to admins and owners and a user only `api.version` and `stack`. Its `update` field names the
    `current` and the `latest` release. `updatable: true` means `system.update` can install it.
    `breaking: true` means the release needs the operator to read its upgrade notes first (see
    Breaking releases). `unavailable` says why the stack cannot be updated this way at

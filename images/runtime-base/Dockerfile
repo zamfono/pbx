@@ -3,7 +3,7 @@
 # /media mount points, owned by the `node` user. docker-bake.hcl builds it once as the `runtime-base`
 # target and hands it to both as a build context, so the two images share its ~460 MB layer in
 # CI's archive and in an operator's pull. It is never published on its own.
-FROM node:26-slim
+FROM node:26-slim@sha256:e6bedef217677b276c591795e169840edd9096dbf13f29df8ef8d1856b8820bc
 RUN apt-get update \
 	&& apt-get install -y --no-install-recommends ffmpeg \
 	&& rm -rf /var/lib/apt/lists/* \

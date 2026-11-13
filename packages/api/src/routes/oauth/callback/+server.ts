@@ -144,7 +144,11 @@ export async function GET(event: RequestEvent): Promise<Response> {
   }
   // A client re-resolution failure here (an expired CIMD cache entry gone stale mid-flow) cannot
   // name the client on the consent step, so it is reported the same way an expired link is.
-  const meta = await clientMetaFor(kr, pending.authorizeParams.clientId);
+  const meta = await clientMetaFor(
+    kr,
+    pending.authorizeParams.clientId,
+    event.getClientAddress()
+  );
   if (meta === null) {
     toErrorPage(origin, 'expired');
   }

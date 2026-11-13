@@ -35,23 +35,32 @@ const lastGiveUpOut = z
   .object({ at: z.string(), reason: z.string() })
   .nullable();
 
+// §10.3 "System": a user reads only the stack's version and its address; everything else, a
+// diagnosis of the stack, only admins and owners.
+const ADMIN_ONLY = ' Admins and owners only.';
+
 const outputSchema = z.object({
   api: versionOut
-    .extend({ startedAt: z.string() })
+    .partial({ revision: true, display: true })
+    .extend({ startedAt: z.string().optional() })
     .describe(
-      'What api runs, the process answering this call, and since when.'
+      'What api runs, the process answering this call, and since when; a user gets only version.'
     ),
   core: versionOut
     .extend({ startedAt: z.string(), asteriskStartedAt: z.string().nullable() })
     .nullable()
+    .optional()
     .describe(
-      'What core runs, since when, and since when its Asterisk runs (null while ARI is down); null while core does not answer.'
+      `What core runs, since when, and since when its Asterisk runs (null while ARI is down); null while core does not answer.${ADMIN_ONLY}`
     ),
-  update: updateOut,
+  update: updateOut
+    .optional()
+    .describe(`${updateOut.description ?? ''}${ADMIN_ONLY}`),
   autoUpdate: z
     .object({ enabled: z.boolean(), failed: autoUpdateFailureOut.nullable() })
+    .optional()
     .describe(
-      'settings.autoUpdate, and why the last automatic update failed and after how many attempts on its release, until an update succeeds.'
+      `settings.autoUpdate, and why the last automatic update failed and after how many attempts on its release, until an update succeeds.${ADMIN_ONLY}`
     ),
   maintenanceGate: z
     .object({
@@ -61,14 +70,16 @@ const outputSchema = z.object({
         .optional()
         .describe('Present only where .env sets HOST_CONTROL=true.')
     })
+    .optional()
     .describe(
-      'When the maintenance gate last gave up on each work it holds back, and what kept the system busy; null for one it never gave up on.'
+      `When the maintenance gate last gave up on each work it holds back, and what kept the system busy; null for one it never gave up on.${ADMIN_ONLY}`
     ),
-  host: hostOut,
+  host: hostOut.describe(`${hostOut.description ?? ''}${ADMIN_ONLY}`),
   ringotel: z
     .object({ profilePending: z.boolean(), rosterPending: z.boolean() })
+    .optional()
     .describe(
-      'profilePending: a tenant profile change is in force on the PBX but has not reached Ringotel yet; rosterPending: a roster change is, likewise.'
+      `profilePending: a tenant profile change is in force on the PBX but has not reached Ringotel yet; rosterPending: a roster change is, likewise.${ADMIN_ONLY}`
     ),
   mail: z
     .object({
@@ -79,8 +90,9 @@ const outputSchema = z.object({
         .nullable()
     })
     .nullable()
+    .optional()
     .describe(
-      "The mail relay's last check or send: whether it succeeded, when, and on a failure its class (unreachable, tls, authentication or rejected) and the relay's own message; null while no relay is configured or before the first."
+      `The mail relay's last check or send: whether it succeeded, when, and on a failure its class (unreachable, tls, authentication or rejected) and the relay's own message; null while no relay is configured or before the first.${ADMIN_ONLY}`
     ),
   skippedConfigRows: z
     .array(
@@ -90,8 +102,9 @@ const outputSchema = z.object({
         field: z.string()
       })
     )
+    .optional()
     .describe(
-      "The rows the latest config render left out, since a value of theirs cannot be written into Asterisk's configuration: each object's type and id and the field holding that value, as `<object>.<column>`, never the value; empty while none."
+      `The rows the latest config render left out, since a value of theirs cannot be written into Asterisk's configuration: each object's type and id and the field holding that value, as \`<object>.<column>\`, never the value; empty while none.${ADMIN_ONLY}`
     ),
   stack: z
     .object({ domain: z.string(), ipv4: z.string() })
@@ -102,7 +115,9 @@ const outputSchema = z.object({
 type Output = z.infer<typeof outputSchema>;
 
 /** `failed` stays `null` without updates through the API, which automatic updates need; the record is kept. */
-async function autoUpdateStatus(db: Db): Promise<Output['autoUpdate']> {
+async function autoUpdateStatus(
+  db: Db
+): Promise<NonNullable<Output['autoUpdate']>> {
   const [enabled, row] = await Promise.all([
     autoUpdateEnabled(db),
     loadUpdateState(db)
@@ -113,19 +128,25 @@ async function autoUpdateStatus(db: Db): Promise<Output['autoUpdate']> {
 
 /**
  * `GET /system/info` (§7 "Version", §10.3): the version and commit `api` and `core` each run and
- * since when, when Asterisk started, the latest release with how the last update went and who asked for it, whether automatic updates are on and why the last one failed, after how many attempts (§6.3 "Automatic updates"), when and why the maintenance gate last gave up (§6.4), whether a tenant profile or roster change still waits for Ringotel (§10.4), the mail relay's last check or send (§10.2 "Relay check"), the rows the latest config render left out (§3.1 "Config propagation"), and the stack's domain and public IPv4 address (§6.1), for anyone signed in. The MCP `serverInfo.version` carries `api`'s too, but only in the connection
- * handshake, which no tool can read; `/healthz` answers without a login and never shows it.
+ * since when, when Asterisk started, the latest release with how the last update went and who asked for it, whether automatic updates are on and why the last one failed, after how many attempts (§6.3 "Automatic updates"), when and why the maintenance gate last gave up (§6.4), whether a tenant profile or roster change still waits for Ringotel (§10.4), the mail relay's last check or send (§10.2 "Relay check"), the rows the latest config render left out (§3.1 "Config propagation"), and the stack's domain and public IPv4 address (§6.1). A user gets only `api.version` and `stack`:
+ * the rest diagnoses the stack, for admins and owners. The MCP `serverInfo.version` carries `api`'s
+ * too, but only in the connection handshake, which no tool can read; `/healthz` answers without a
+ * login and never shows it.
  */
 export const info = defineOperation({
   name: 'system.info',
   description:
-    'Reads the version, commit and start time of api and core separately, when Asterisk started, the latest release and last update with who asked for it, whether automatic updates are on and why and how often the last one failed, when and why the maintenance gate last gave up, whether the host waits for a reboot and one is scheduled (only with HOST_CONTROL), whether a tenant profile or roster change still waits for Ringotel, how the last check or send of the mail relay went, which rows the latest config render left out, and the domain of the stack and the public IPv4 address its SIP and media use.',
+    'Reads the version, commit and start time of api and core separately, when Asterisk started, the latest release and last update with who asked for it, whether automatic updates are on and why and how often the last one failed, when and why the maintenance gate last gave up, whether the host waits for a reboot and one is scheduled (only with HOST_CONTROL), whether a tenant profile or roster change still waits for Ringotel, how the last check or send of the mail relay went, which rows the latest config render left out, and the domain of the stack and the public IPv4 address its SIP and media use. A user gets only api.version and stack.',
   input: z.object({}).strict(),
   output: outputSchema,
   minRole: 'user',
   scope: 'any',
   readOnly: true,
   run: async ctx => {
+    const stack = { domain: env.FQDN, ipv4: stackIpv4(env) };
+    if (ctx.actor.role === 'user') {
+      return { api: { version: resolveVersion(env).version }, stack };
+    }
     const [
       core,
       update,
@@ -161,7 +182,7 @@ export const info = defineOperation({
       ringotel: { profilePending, rosterPending },
       mail: relayConfigured ? relayState() : null,
       skippedConfigRows: [...skippedConfigRows()],
-      stack: { domain: env.FQDN, ipv4: stackIpv4(env) }
+      stack
     };
   }
 });

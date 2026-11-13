@@ -85,8 +85,15 @@ function takePendingConsent(
 }
 
 /** Writes the client's `oauth_clients` row, `false` when it cannot be written. */
-async function writeClientRow(authorize: Authorize): Promise<boolean> {
-  const meta = await clientMetaFor(keyringFromEnv(env), authorize.clientId);
+async function writeClientRow(
+  authorize: Authorize,
+  clientAddress: string
+): Promise<boolean> {
+  const meta = await clientMetaFor(
+    keyringFromEnv(env),
+    authorize.clientId,
+    clientAddress
+  );
   if (meta === null) {
     logger.warn(
       { clientId: authorize.clientId },
@@ -121,7 +128,7 @@ export async function approveConsentSubmit(
   if ((await loginUser(getDb(), pending.userId, pending.epoch)) === null) {
     error(HTTP_BAD_REQUEST, 'oauth/authorize: consent session expired');
   }
-  if (!(await writeClientRow(pending.authorize))) {
+  if (!(await writeClientRow(pending.authorize, event.getClientAddress()))) {
     authorizationErrorRedirect(pending.authorize, SERVER_ERROR);
   }
   redirect(

@@ -31,8 +31,8 @@ variable "ARCH" { default = "" }
 # FRESH builds every layer anew, reading no cache: ci.yaml sets it on a push to main, whose images
 # `publish` pushes, so each carries the current Debian and Node layers and the packages resolved
 # today. One stage is the exception: proxy's `build`, which compiles Caddy with its plugin from
-# inputs pinned in images/proxy/Dockerfile (the builder image, whose tag's current digest is part
-# of the cache key, Caddy's version, the plugin's), so a cached binary is the one a fresh compile
+# inputs pinned in images/proxy/Dockerfile (the builder image by its digest, Caddy's version, the
+# plugin's), so a cached binary is the one a fresh compile
 # would produce, three minutes sooner. Its runtime stage, which ships, is built fresh like the rest.
 variable "FRESH" { default = false }
 

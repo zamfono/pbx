@@ -1,9 +1,12 @@
 import type { IncomingMessage } from 'node:http';
 import { request } from 'node:https';
+import { error } from '@sveltejs/kit';
 import { z } from 'zod';
 
 import {
+  addressKey,
   HTTP_OK,
+  HTTP_TOO_MANY_REQUESTS,
   isRecord,
   MS_PER_DAY,
   MS_PER_SECOND,
@@ -12,7 +15,8 @@ import {
 } from '@zamfono/shared';
 
 import { attempt } from '../errors.js';
-import { tryParseJson } from '../json.js';
+import { cappedJson } from '../json.js';
+import { limiter } from '../limiter.js';
 import { isNonPublicLiteral, publicLookup } from '../publicHost.js';
 import { decrypt, encrypt, type Keyring } from '../secretbox.js';
 import { TtlMap } from '../ttlMap.js';
@@ -153,22 +157,6 @@ function parseCimdDocument(
   };
 }
 
-/** `response`'s body parsed as JSON, or `undefined` when it is not JSON or exceeds
- *  `CIMD_MAX_BYTES`, which is checked while it streams in rather than once it is all held. */
-async function cappedJson(response: IncomingMessage): Promise<unknown> {
-  const chunks: Buffer[] = [];
-  let size = 0;
-  for await (const chunk of response as AsyncIterable<Buffer>) {
-    size += chunk.byteLength;
-    if (size > CIMD_MAX_BYTES) {
-      response.destroy();
-      return undefined;
-    }
-    chunks.push(chunk);
-  }
-  return tryParseJson(Buffer.concat(chunks).toString('utf8'));
-}
-
 /** The response to a GET of `url`, its host resolved only as the socket connects, through
  *  `publicLookup`; rejects on a refused address, a failed connection or the deadline. */
 function getDocument(url: URL): Promise<IncomingMessage> {
@@ -190,10 +178,13 @@ function getDocument(url: URL): Promise<IncomingMessage> {
  * Fetches a Client ID Metadata Document (§5.2), refusing it unless its own `client_id` equals the
  * URL it was fetched from; caches the result per `Cache-Control`. `null` for a document that
  * cannot be fetched in time, redirects, is not JSON, is too large or does not describe a client,
- * and for a host on a loopback, private or link-local address, which is never connected to.
+ * and for a host on a loopback, private or link-local address, which is never connected to. A
+ * fetch the cache cannot answer counts against `clientAddress`'s §5.5 limit, 429 past it, since
+ * anyone can make the server fetch any URL this way.
  */
 export async function fetchCimd(
-  clientIdUrl: string
+  clientIdUrl: string,
+  clientAddress: string
 ): Promise<ClientMeta | null> {
   const cached = cimdCache.get(clientIdUrl);
   if (cached) {
@@ -203,6 +194,9 @@ export async function fetchCimd(
   if (url === null || isNonPublicLiteral(url)) {
     return null;
   }
+  if (!limiter.check('clientMetadata', addressKey(clientAddress)).ok) {
+    error(HTTP_TOO_MANY_REQUESTS, 'too many requests');
+  }
   try {
     const response = await getDocument(url);
     // A redirect is not followed: it could lead where the address check did not look.
@@ -210,7 +204,10 @@ export async function fetchCimd(
       response.destroy();
       return null;
     }
-    const meta = parseCimdDocument(clientIdUrl, await cappedJson(response));
+    const meta = parseCimdDocument(
+      clientIdUrl,
+      await cappedJson(response as AsyncIterable<Uint8Array>, CIMD_MAX_BYTES)
+    );
     const ttlMs = cacheTtlMs(response.headers['cache-control'] ?? '');
     if (meta && ttlMs !== null) {
       cimdCache.set(clientIdUrl, meta, Date.now() + ttlMs);
@@ -223,14 +220,15 @@ export async function fetchCimd(
   }
 }
 
-/** `clientId`'s metadata, fetched (mechanism 1) or decoded (mechanism 2); `null` for an unknown
- *  or unreachable client (§5.2 "Client registration"). */
+/** `clientId`'s metadata, fetched (mechanism 1, limited per `clientAddress`) or decoded
+ *  (mechanism 2); `null` for an unknown or unreachable client (§5.2 "Client registration"). */
 export async function clientMetaFor(
   kr: Keyring,
-  clientId: string
+  clientId: string,
+  clientAddress: string
 ): Promise<ClientMeta | null> {
   return clientId.startsWith(HTTPS_SCHEME)
-    ? fetchCimd(clientId)
+    ? fetchCimd(clientId, clientAddress)
     : decodeMetadataClientId(kr, clientId);
 }
 
