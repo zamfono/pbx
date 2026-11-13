@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The stack's Compose, as the Podman boot unit runs it (README.md, step 7): `setup/compose.sh up -d`.
 # It runs the compose of the runtime ZAMFONO_RUNTIME names, else of whichever answers, on the files
-# add_stack_files (setup/checks.sh) names, so a compose.dr.yaml in the stack directory is never
+# add_stack_files (setup/checks.sh) names, so the operator's own overlay, compose.local.yaml, is never
 # left out (docs/spec.md §6.5 "Continuous replication").
 set -euo pipefail
 

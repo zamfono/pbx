@@ -1,30 +1,30 @@
 # shellcheck shell=bash
 # Sourced by update-test.sh: how update.sh drives each runtime, Docker, Podman with and without
 # the boot unit, and podman-compose, and that every one of them runs
-# Compose on compose.dr.yaml where the stack holds one, on the stack, the release server and the
+# Compose on compose.local.yaml where the stack holds one, on the stack, the release server and the
 # stub runtime update-test.sh set up (`work`, `port`, `fresh_stack`, `fail`, `update`,
 # `podman_update`).
 
-echo "  - a stack with compose.dr.yaml runs Compose on it, after compose.yaml and the link"
+echo "  - a stack with compose.local.yaml runs Compose on it, after compose.yaml and the link"
 fresh_stack
-printf 'services: {}\n' >"$work/stack/compose.dr.yaml"
-update 1.2.4 >"$work/out" 2>&1 || { cat "$work/out"; fail "the update with compose.dr.yaml failed"; }
-dr_files='-f compose.yaml -f compose.override.yaml -f compose.dr.yaml'
-grep -qx "compose $dr_files pull" "$work/runtime.log" ||
-  fail "the pull left compose.dr.yaml out: $(cat "$work/runtime.log")"
-grep -qx "compose $dr_files up -d --remove-orphans --wait --wait-timeout 180" "$work/runtime.log" ||
-  fail "the up left compose.dr.yaml out: $(cat "$work/runtime.log")"
+printf 'services: {}\n' >"$work/stack/compose.local.yaml"
+update 1.2.4 >"$work/out" 2>&1 || { cat "$work/out"; fail "the update with compose.local.yaml failed"; }
+local_files='-f compose.yaml -f compose.override.yaml -f compose.local.yaml'
+grep -qx "compose $local_files pull" "$work/runtime.log" ||
+  fail "the pull left compose.local.yaml out: $(cat "$work/runtime.log")"
+grep -qx "compose $local_files up -d --remove-orphans --wait --wait-timeout 180" "$work/runtime.log" ||
+  fail "the up left compose.local.yaml out: $(cat "$work/runtime.log")"
 # The boot unit's command, setup/compose.sh, names it too, and nothing more without it.
 (cd "$work/stack" && PATH="$work/bin:$PATH" STUB_LOG="$work/runtime.log" ZAMFONO_RUNTIME=podman \
   setup/compose.sh up -d)
-grep -qx "compose $dr_files up -d" "$work/runtime.log" ||
-  fail "setup/compose.sh left compose.dr.yaml out: $(cat "$work/runtime.log")"
-rm "$work/stack/compose.dr.yaml"
+grep -qx "compose $local_files up -d" "$work/runtime.log" ||
+  fail "setup/compose.sh left compose.local.yaml out: $(cat "$work/runtime.log")"
+rm "$work/stack/compose.local.yaml"
 : >"$work/runtime.log"
 (cd "$work/stack" && PATH="$work/bin:$PATH" STUB_LOG="$work/runtime.log" ZAMFONO_RUNTIME=podman \
   setup/compose.sh up -d)
 grep -qx 'compose up -d' "$work/runtime.log" ||
-  fail "setup/compose.sh named files without compose.dr.yaml: $(cat "$work/runtime.log")"
+  fail "setup/compose.sh named files without compose.local.yaml: $(cat "$work/runtime.log")"
 
 echo "  - on Podman without a boot unit"
 fresh_stack

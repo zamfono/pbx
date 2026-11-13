@@ -19,15 +19,16 @@ start the stack.
   stack, so it restores a broken database or a bad upgrade, but a lost host takes it along; that
   is what a target elsewhere is for. Every `local` target's repository lies under `/backups`, the
   only place `backups.targets.create` takes one; to keep one on a disk of its own, mount the disk
-  into `api` at `/backups/<name>` in `compose.dr.yaml`, the overlay of your own that updates and
+  into `api` at `/backups/<name>` in `compose.local.yaml`, the overlay of your own that updates and
   boots keep (`compose.override.yaml` is the mode's published overlay, which an update replaces).
 - **The restic repository location and password for each other target**, from the operator's own record of
   what was entered in `backups.targets.create` (`POST /api/v1/backups/targets`) when the target was
   created, or an out-of-band copy kept alongside `.env` — a target's encrypted repository password
   lives inside the database itself, so it is not available until after a restic-based restore has
   already produced that database.
-- **The database**, from `litestream restore` (with the optional continuous-replication overlay,
-  `compose.dr.yaml` in the stack directory, running, using that overlay's own bucket credentials)
+- **The database**, from `litestream restore` (with the optional Litestream sidecar in
+  `compose.local.yaml`, your own overlay in the stack directory, running, using its own bucket
+  credentials)
   or from the latest restic snapshot otherwise.
 - **`media/`**, from the latest restic snapshot — voicemail and recording audio, uploaded
   greetings and hold-music files.
@@ -36,7 +37,7 @@ start the stack.
 
 The commands are Docker's; on Podman, `podman compose` takes the same arguments. On a host
 where the stack still runs, stop it first and skip steps 1 to 3: `docker compose down`, which
-keeps every volume, or `./setup/compose.sh down` with `compose.dr.yaml`; on Podman with the boot
+keeps every volume, or `./setup/compose.sh down` with `compose.local.yaml`; on Podman with the boot
 unit of step 7, `systemctl stop zamfono.service`.
 
 1. Provision the new host as `deploy/README.md` steps 1 to 4 describe, with the same mode, FQDN
@@ -48,7 +49,7 @@ unit of step 7, `systemctl stop zamfono.service`.
    `setup.sh`: it refuses a directory whose `.env` holds values, since it would generate new
    secrets. Make the link it would make instead: `ln -s compose.ports.yaml compose.override.yaml`
    when `.env` sets `EXTERNAL_IPV4`, `ln -s compose.macvlan.yaml compose.override.yaml` when it
-   sets `STACK_IPV4`. With continuous replication, put the overlay back as `compose.dr.yaml`.
+   sets `STACK_IPV4`. Put your own overlay back as `compose.local.yaml`, if the stack had one.
 4. Restore the database and the media into the stack's volumes before the first start, with the
    restic and rclone of the `api` image, which runs as the uid the volumes belong to. A restic
    snapshot holds the database as `tmp/zamfono-backup/<targetId>/zamfono.sqlite3` and the media
@@ -83,7 +84,7 @@ unit of step 7, `systemctl stop zamfono.service`.
    `-o "sftp.command=sshpass -e ssh -o StrictHostKeyChecking=accept-new -l <username> <host> -s sftp"`.
 
 5. With continuous replication, replace the database with Litestream's newer copy, through the
-   `litestream` sidecar of `compose.dr.yaml` and its `litestream.yml` (`deploy/README.md`,
+   `litestream` sidecar of `compose.local.yaml` and its `litestream.yml` (`deploy/README.md`,
    "Continuous replication"), which name the bucket and its credentials. The restic step above
    still brings the media. Litestream refuses to restore over an existing database, so the
    restic copy and its `-wal` and `-shm` files go first:
@@ -94,7 +95,7 @@ unit of step 7, `systemctl stop zamfono.service`.
    ./setup/compose.sh run --rm --no-deps litestream restore /data/zamfono.sqlite3
    ```
 
-6. Start the stack: `docker compose up -d`, or `./setup/compose.sh up -d` with `compose.dr.yaml`;
+6. Start the stack: `docker compose up -d`, or `./setup/compose.sh up -d` with `compose.local.yaml`;
    on Podman, install the boot unit of step 7. `migrate` applies the migrations of a newer
    release; the first-boot seed does not run, since the database holds users.
 

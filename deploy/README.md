@@ -467,23 +467,28 @@ and without Litestream's copy, before `up -d`
 address and published ports: each may restart or be recreated alone. Recreate `netns` only with
 the whole stack (`up -d`), since they would stay on the old namespace.
 
-## Continuous replication
+## Your own overlay
 
-The optional Litestream sidecar of `docs/spec.md` §6.5 is an overlay of your own, named
-`compose.dr.yaml` in the stack directory. Where that file exists, `update.sh` and the boot unit
-of step 7 run Compose on `compose.yaml`, `compose.override.yaml` and
-`compose.dr.yaml`, so an update or a reboot keeps the sidecar. By hand, run Compose through
-`setup/compose.sh`, which names the same files:
+Anything you add to the stack goes into an overlay of your own, `compose.local.yaml` in the
+stack directory: the continuous replication below, an extra mount such as a backup disk
+(mounted into `api` at `/backups/<name>`), and so on. Where that file exists, `update.sh` and
+the boot unit of step 7 run Compose on `compose.yaml`, `compose.override.yaml` and
+`compose.local.yaml`, so an update or a reboot keeps it, and no update writes it. Leave
+`compose.override.yaml` alone: it is the link to the mode's published overlay, which an update
+replaces. By hand, run Compose through `setup/compose.sh`, which names the same files:
 
 ```bash
 ./setup/compose.sh up -d
 ```
 
-A starting point, with every `<…>` yours to fill in. The service must be called `litestream`,
+## Continuous replication
+
+The optional Litestream sidecar of `docs/spec.md` §6.5 goes into `compose.local.yaml`. A
+starting point, with every `<…>` yours to fill in. The service must be called `litestream`,
 since `litestream.caddy` routes `/metrics/litestream` to `litestream:9090`:
 
 ```yaml
-# compose.dr.yaml
+# compose.local.yaml
 services:
   litestream:
     image: litestream/litestream:<version> # an exact release, e.g. 0.5.17; a new 0.x minor is a migration

@@ -13,6 +13,9 @@ why the specified behaviour changed; the commit history, how.
 
 ### Changed
 
+- The operator's own Compose overlay, for continuous replication, a backup disk or anything else
+  added to the stack, is `compose.local.yaml`; `update.sh`, the Podman boot unit and
+  `setup/compose.sh` no longer read `compose.dr.yaml`.
 - SIP bans are per protocol, `udp` or `tcp` (TCP and TLS together): failures over UDP ban an
   address over UDP only, and over TCP or TLS only those, each counted, escalated, exempted after a
   successful login and lifted on its own. `sipBans.list` and the `sipBan.added` webhook name the
@@ -64,7 +67,7 @@ why the specified behaviour changed; the commit history, how.
   could name another restic backend or a directory of the stack's own state. It must now be
   `/backups` or a path below it, without `..`, on every write and in each run; a target elsewhere
   fails its runs. To keep one on another disk, mount the disk into `api` at `/backups/<name>` in
-  `compose.dr.yaml`. restic and rclone no longer inherit `api`'s environment, its encryption key
+  `compose.local.yaml`. restic and rclone no longer inherit `api`'s environment, its encryption key
   and JWT secret among it.
 
 ## [0.9.1] - 2026-11-12

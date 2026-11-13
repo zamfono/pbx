@@ -180,22 +180,22 @@ if (cd "$bundle_dir/x" && ./setup.sh </dev/null >/dev/null 2>&1); then
   exit 1
 fi
 
-echo "==> the Podman boot unit and setup/compose.sh, with and without compose.dr.yaml"
+echo "==> the Podman boot unit and setup/compose.sh, with and without compose.local.yaml"
 unit=$(cd "$bundle_dir/x" && bash -c '. setup/boot-unit.sh && unit_text')
 echo "$unit" | grep -qx "ExecStart=$bundle_dir/x/setup/compose.sh up -d"
 echo "$unit" | grep -qx 'Environment=ZAMFONO_RUNTIME=podman'
 services=$(cd "$bundle_dir/x" && ZAMFONO_RUNTIME=docker setup/compose.sh config --services)
 if echo "$services" | grep -qx litestream; then
-  echo "setup/compose.sh ran a litestream service without compose.dr.yaml" >&2
+  echo "setup/compose.sh ran a litestream service without compose.local.yaml" >&2
   exit 1
 fi
-printf 'services:\n  litestream:\n    image: busybox\n' >"$bundle_dir/x/compose.dr.yaml"
+printf 'services:\n  litestream:\n    image: busybox\n' >"$bundle_dir/x/compose.local.yaml"
 services=$(cd "$bundle_dir/x" && ZAMFONO_RUNTIME=docker setup/compose.sh config --services)
 echo "$services" | grep -qx litestream
 echo "$services" | grep -qx asterisk
 # The ports overlay still applies beside it.
 (cd "$bundle_dir/x" && ZAMFONO_RUNTIME=docker setup/compose.sh config) | grep -qF 'published: "5061"'
-rm "$bundle_dir/x/compose.dr.yaml"
+rm "$bundle_dir/x/compose.local.yaml"
 
 echo "==> update.sh (a local release, a stub runtime)"
 bash "$script_dir/update-test.sh" "$bundle_dir/x"
@@ -204,7 +204,7 @@ echo "==> Caddyfile"
 docker run --rm -e FQDN=x -v "$script_dir/Caddyfile:/etc/caddy/Caddyfile:ro" "$PROXY_IMAGE" \
   caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile 2>&1 | grep -q "Valid configuration"
 
-echo "==> Caddyfile with litestream.caddy (the DR overlay's mount)"
+echo "==> Caddyfile with litestream.caddy (compose.local.yaml's mount)"
 # Litestream serves its metrics at /metrics only, so the route hands it that path.
 docker run --rm -e FQDN=x -v "$script_dir/Caddyfile:/etc/caddy/Caddyfile:ro" \
   -v "$script_dir/litestream.caddy:/etc/caddy/conf.d/litestream.caddy:ro" "$PROXY_IMAGE" \

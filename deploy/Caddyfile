@@ -57,7 +57,7 @@
 	handle @metrics {
 		@authorized expression `{env.METRICS_TOKEN} != "" && {header.Authorization} == "Bearer " + {env.METRICS_TOKEN}`
 		handle @authorized {
-			import /etc/caddy/conf.d/*.caddy     # the DR overlay drops litestream.caddy here (§6.5)
+			import /etc/caddy/conf.d/*.caddy     # compose.local.yaml drops litestream.caddy here (§6.5)
 			handle {
 				reverse_proxy api:3000
 			}

@@ -7,7 +7,7 @@
 # `system.update` and automatic updates (setup/agent.sh, §6.3 "Updates"), and --current to report
 # what the directory runs, which needs no container runtime. Compose reads
 # compose.yaml and compose.override.yaml, the link to the mode's overlay setup.sh makes, and
-# compose.dr.yaml where the stack directory holds one (§6.5).
+# the operator's own overlay compose.local.yaml where the stack directory holds one (§6.5).
 #
 #   ./update.sh [--yes] [--check] [VERSION]
 #   ./update.sh --current
