@@ -56,7 +56,7 @@
 | `mailTemplates.delete` | `DELETE /api/v1/mailTemplates/{kind}/{language}` | Removes a tenant's mail template override, so the shipped template applies again | admin | yes |
 | `mailTemplates.get` | `GET /api/v1/mailTemplates/{kind}/{language}` | Reads the effective mail template of a kind and language: the tenant override, else the shipped one | admin | no |
 | `mailTemplates.list` | `GET /api/v1/mailTemplates` | Lists the effective mail templates in the tenant language | admin | no |
-| `mailTemplates.put` | `PUT /api/v1/mailTemplates/{kind}/{language}` | Overrides the shipped mail template of a kind and language, checked against the kind's placeholders | admin | no |
+| `mailTemplates.put` | `PUT /api/v1/mailTemplates/{kind}/{language}` | Overrides the shipped mail template of a kind and language, checked against the kind's placeholders. updateFailed and breakingUpdate are owner-only; an override of any other kind never reaches an owner, who gets the shipped one | admin | no |
 | `mailTemplates.test` | `POST /api/v1/mailTemplates/{kind}/test` | Sends a mail template to the caller with sample values | admin | no |
 | `menus.create` | `POST /api/v1/menus` | Creates an auto-attendant menu: a greeting, a DTMF-to-target map (menus.setTargets) and a fallback. | admin | no |
 | `menus.delete` | `DELETE /api/v1/menus/{id}` | Soft-deletes a menu. | admin | yes |

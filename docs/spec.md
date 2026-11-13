@@ -1322,11 +1322,13 @@ Mail is optional. The relay is `settings.smtp_host`, `smtp_port`, `smtp_security
 
 **Transport.** `settings.smtp_security` is `tls` (implicit TLS on connect) or `starttls` (required upgrade); there is no plaintext mode, and a relay that offers neither is refused, also on the `internal` network. `POST /mailTemplates/{kind}/test` ("Templates") is how an owner checks a changed relay.
 
-**Templates.** Every mail is rendered from a template with a subject, a plain-text body and an optional HTML body. The `api` package ships one template per kind and language (`de`, `en`, `es`, `fr`, `it`, `pl`, `ru`); a tenant overrides any of them through `PUT /mailTemplates/{kind}/{language}`, and `DELETE` removes the override. Resolution per mail: the tenant's template for the kind in `settings.language`, else the shipped template for that language.
+**Templates.** Every mail is rendered from a template with a subject, a plain-text body and an optional HTML body. The `api` package ships one template per kind and language (`de`, `en`, `es`, `fr`, `it`, `pl`, `ru`); a tenant overrides any of them through `PUT /mailTemplates/{kind}/{language}`, and `DELETE` removes the override; an admin writes and removes those of `voicemail`, `missedCall`, `setup`, `reset` and `mfaChanged`, only an owner those of `updateFailed` and `breakingUpdate` (§10.3). Resolution per mail: the tenant's template for the kind in `settings.language`, else the shipped template for that language; but a mail to an owner, by the recipient's role when it is sent, after the operation that sends it, takes the tenant's template only of a kind only owners write, `updateFailed` and `breakingUpdate`, and the shipped one of every other kind. Creating or promoting someone to owner therefore sends them the shipped mail, and a ring-group mailbox's mail with an owner among its members is rendered from the shipped template. Owners are the hosting provider and admins the customer's IT managers, a boundary an admin must not cross: a `setup` or `reset` template carries the recipient's one-time set-password link, which an admin's template could hand to another host, in a link, a form, a `ping` attribute or the plain-text body alike, so no rule for where `{{link}}` may stand closes it; that host would set an owner's password and, since an owner without a second factor sets one up at the next login, enrol its own. Any other user's link an admin gets directly anyway (§10.3 "Users"), so an override is harmless as long as it never reaches an owner; and admins keep editing the mails their users get.
+
+The shipped subjects of `setup`, `reset`, `mfaChanged`, `updateFailed` and `breakingUpdate` name the stack, as `{{companyName}} ({{fqdn}})`, or `{{fqdn}}` alone while no company name is set, since a provider's staff get these mails from many stacks; those of `voicemail` and `missedCall` name the caller, and every shipped body ends with the company name and FQDN.
 
 Templates are Handlebars: `{{placeholder}}` substitution, the built-in `if`, `unless`, `each` and `with` blocks, and one registered helper, `{{date value}}`, which formats a timestamp in the tenant's time zone and language. No other helpers and no partials are available, so a template can only read the values its kind offers and can never run code; values are HTML-escaped in the HTML body.
 
-The API parses a template on write and rejects one that names a placeholder its kind does not offer, calls anything but the allowed helpers, or omits a required placeholder. `POST /mailTemplates/{kind}/test` sends the effective template to the caller with sample values. Every kind offers `companyName`, `recipientName` and `fqdn`; the rest per kind:
+The API parses a template on write and rejects one that names a placeholder its kind does not offer, calls anything but the allowed helpers, or omits a required placeholder. `POST /mailTemplates/{kind}/test` sends the effective template to the caller with sample values, the tenant's even to an owner, since it carries no real link. Every kind offers `companyName`, `recipientName` and `fqdn`; the rest per kind:
 
 Per kind, the placeholders a template may use and the ones it must use:
 
@@ -1340,9 +1342,9 @@ A withheld caller's `callerNumber` is empty, as in the header templates (§9.4),
 
 **`reset`** — placeholders: `link`, `linkExpiresAt`; required: `link`.
 
-**`updateFailed`** — placeholders: `fromVersion` (empty when unknown), `toVersion`, `reason`, `failedAt`.
+**`updateFailed`** — to owners alone, written by owners alone; placeholders: `fromVersion` (empty when unknown), `toVersion`, `reason`, `failedAt`.
 
-**`breakingUpdate`** — placeholders: `currentVersion`, `version`, `releaseUrl`, `publishedAt` (each empty when GitHub names none).
+**`breakingUpdate`** — to owners alone, written by owners alone; placeholders: `currentVersion`, `version`, `releaseUrl`, `publishedAt` (each empty when GitHub names none).
 
 **`mfaChanged`** — placeholders: `added`, `removed`, `reset` (exactly one is true), `passkeyName` (the passkey's name; empty for the authenticator app and for a reset), `changedAt`.
 
@@ -1423,7 +1425,7 @@ Every `DELETE` carries `confirm`, as do `users.erase`, `devices.rotate`, `person
 
 #### REST surface
 
-Base: `https://<host>/api/v1`. JSON only. Bearer auth, on every endpoint but the public OpenAPI document: a JWT access token issued by the OAuth server, or a personal access token (§5.2). RBAC roles: `owner`, `admin`, `user` — any number of owners, at least one; only owners change roles, reset an owner's password, change an owner's e-mail, soft-delete an owner, or create an admin or owner or undo the soft delete of an admin or owner or the creation of an owner (an admin gets 403, before any confirmation), and the last owner with a password (§5.2) cannot be demoted or soft-deleted.
+Base: `https://<host>/api/v1`. JSON only. Bearer auth, on every endpoint but the public OpenAPI document: a JWT access token issued by the OAuth server, or a personal access token (§5.2). RBAC roles: `owner`, `admin`, `user` — any number of owners, at least one; only owners change roles, reset an owner's password, change an owner's e-mail, soft-delete an owner, write or remove the `updateFailed` and `breakingUpdate` mail templates, or create an admin or owner or undo the soft delete of an admin or owner or the creation of an owner (an admin gets 403, before any confirmation), and the last owner with a password (§5.2) cannot be demoted or soft-deleted.
 
 The endpoints by area, as a sketch, each with the minimum role it needs:
 
@@ -1483,7 +1485,7 @@ The time filters of these reads, `from` and `to` of `GET /audit`, `GET /calls`, 
 
 **Webhooks** (min. role: admin) — `GET/POST /webhooks`, `PATCH/DELETE /webhooks/{id}` (URL, secret, event-type filter, active; delivery status: `lastStatus`, `lastDeliveryAt`, `failingSince`, `failedDeliveries`, `lastError`, `lastErrorAt`, §10.6)
 
-**Mail templates** (min. role: admin) — `GET /mailTemplates` (the effective templates in `settings.language`, each marked `builtin` or `tenant`), `GET/PUT/DELETE /mailTemplates/{kind}/{language}`, `POST /mailTemplates/{kind}/test` (sends to the caller with sample values) — §10.2 "Mail"
+**Mail templates** (min. role: admin; `updateFailed` and `breakingUpdate` owner-only to write) — `GET /mailTemplates` (the effective templates in `settings.language`, each marked `builtin` or `tenant`), `GET/PUT/DELETE /mailTemplates/{kind}/{language}` (an override of any other kind never reaches an owner, who gets the shipped mail), `POST /mailTemplates/{kind}/test` (sends the effective template to the caller with sample values, an owner included) — §10.2 "Mail"
 
 **Backups** (min. role: admin) — `GET/POST /backups/targets`, `PATCH/DELETE /backups/targets/{id}`; `GET /backups/runs` (history and status), `POST /backups/runs` (start a run), `GET /backups/runs/{id}`; a target's write-only `secret` is that JSON object, `resticPassword` and the backend credentials its kind takes, `username` and `password` for `sftp`, `ftp`, `ftps` and `webdav`, `accessKeyId` and `secretAccessKey` for `s3`, and nothing else; a run carries `bytesAdded` and `bytesTotal` (§6.5)
 

@@ -123,7 +123,10 @@ export const test = defineOperation({
     // A test send is a pure action on no prior state: nothing to revert (§5.8).
     setUndoable(ctx, false);
     const request = SAMPLE_REQUEST_BUILDERS[input.kind](ctx.actor.id, ctx.now);
-    const status = await sendMail(ctx.db, keyringFromEnv(env), request);
+    // A preview: an owner calling it sees the tenant's override too, with no real link in it.
+    const status = await sendMail(ctx.db, keyringFromEnv(env), request, {
+      preview: true
+    });
     return { status, language };
   }
 });

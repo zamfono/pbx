@@ -1,4 +1,5 @@
 export {
+  OWNER_ONLY_KINDS,
   PLACEHOLDERS,
   loadBuiltinTemplate,
   type TemplateSource

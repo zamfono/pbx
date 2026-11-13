@@ -1,5 +1,5 @@
 {
-  "subject": "Resetowanie hasła do systemu telefonicznego {{companyName}}",
+  "subject": "Resetowanie hasła do systemu telefonicznego {{#if companyName}}{{companyName}} ({{fqdn}}){{else}}{{fqdn}}{{/if}}",
   "bodyText": "Dzień dobry,\n\nUstaw nowe hasło, korzystając z poniższego linku:\n\n{{link}}\n\nLink jest ważny do {{date linkExpiresAt}}. Jeśli ta prośba nie pochodzi od Ciebie, możesz zignorować tę wiadomość.\n\n{{companyName}} · {{fqdn}}",
   "bodyHtml": "<p>Dzień dobry,</p><p>Ustaw nowe hasło, korzystając z poniższego linku:</p><p><a href=\"{{link}}\">{{link}}</a></p><p>Link jest ważny do {{date linkExpiresAt}}. Jeśli ta prośba nie pochodzi od Ciebie, możesz zignorować tę wiadomość.</p><p>{{companyName}} · {{fqdn}}</p>"
 }

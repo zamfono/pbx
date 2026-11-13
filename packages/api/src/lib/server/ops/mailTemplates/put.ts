@@ -1,6 +1,10 @@
 import { z } from 'zod';
 
-import { compileTemplate, PLACEHOLDERS } from '#lib/server/mail/index.js';
+import {
+  compileTemplate,
+  OWNER_ONLY_KINDS,
+  PLACEHOLDERS
+} from '#lib/server/mail/index.js';
 
 import { recordChange } from '../audit.js';
 import { defineOperation } from '../types.js';
@@ -53,10 +57,12 @@ const inputSchema = z
 export const put = defineOperation({
   name: 'mailTemplates.put',
   description:
-    "Overrides the shipped mail template of a kind and language, checked against the kind's placeholders",
+    "Overrides the shipped mail template of a kind and language, checked against the kind's placeholders. updateFailed and breakingUpdate are owner-only; an override of any other kind never reaches an owner, who gets the shipped one",
   input: inputSchema,
   output: mailTemplateWire,
   minRole: 'admin',
+  // The update mails go to owners alone, who receive their override (§10.2 "Templates").
+  ownerOnly: (_ctx, input) => OWNER_ONLY_KINDS.includes(input.kind),
   entity: input => ({
     kind: 'mailTemplate',
     id: `${input.kind}:${input.language}`

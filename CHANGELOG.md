@@ -22,6 +22,11 @@ why the specified behaviour changed; the commit history, how.
   `sipBans.lift`.
 - A trunk's `outbound` hosts are never banned either, as its `inbound` and `both` hosts were not:
   a provider's responses arrive on the SIP ports too.
+- The shipped subjects of the setup, password-reset, two-factor and update mails name the stack,
+  as the company name and FQDN, or the FQDN alone while no company name is set, so mails from
+  several stacks can be told apart.
+- Only owners write and remove the `updateFailed` and `breakingUpdate` mail templates, which go
+  to owners alone; an admin gets 403.
 
 ### Security
 
@@ -40,6 +45,12 @@ why the specified behaviour changed; the commit history, how.
   trunks of outbound-only providers included. Such a forgery can still ban an address over UDP;
   put every address whose UDP must not be blocked, such as an office's, on the allowlist
   (`sipAllowlist.create`).
+- An admin's mail template could send an owner's one-time set-password link to another host,
+  which could then set the owner's password and, for an owner without a second factor, enrol its
+  own: when an owner was created or promoted, when an owner reset another owner's password, or
+  through the forgot-password form. A mail to an owner now always uses the shipped template of
+  every kind an admin can edit (voicemail, missed call, setup, reset, two-factor notice); a
+  template test still sends the tenant's own, as a preview.
 
 ## [0.9.1] - 2026-11-12
 

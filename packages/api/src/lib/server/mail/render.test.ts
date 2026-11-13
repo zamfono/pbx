@@ -12,7 +12,8 @@ const BUILTIN_KINDS: MailKind[] = [
   'setup',
   'reset',
   'updateFailed',
-  'breakingUpdate'
+  'breakingUpdate',
+  'mfaChanged'
 ];
 const BUILTIN_LANGUAGES: Language[] = [
   'de',
@@ -133,7 +134,9 @@ describe('the update mails', () => {
       },
       { language: 'en', timezone: 'UTC' }
     );
-    expect(failedMail.subject).toBe('Automatic update to 0.1.2 failed');
+    expect(failedMail.subject).toBe(
+      'Automatic update of pbx.example.com to 0.1.2 failed'
+    );
     expect(failedMail.text).toContain('from 0.1.1 to 0.1.2');
     expect(failedMail.text).toContain('the backup failed');
 
@@ -145,6 +148,8 @@ describe('the update mails', () => {
       breaking.bodyHtml
     ).render(
       {
+        fqdn: 'pbx.example.com',
+        companyName: 'Acme',
         currentVersion: '0.1.2',
         version: '0.2.0',
         releaseUrl: 'https://example/v0.2.0',
@@ -153,11 +158,42 @@ describe('the update mails', () => {
       { language: 'de', timezone: 'UTC' }
     );
     expect(breakingMail.subject).toBe(
-      'Zamfono 0.2.0 braucht ein manuelles Update'
+      'Zamfono 0.2.0 braucht auf Acme (pbx.example.com) ein manuelles Update'
     );
     expect(breakingMail.text).toContain('https://example/v0.2.0');
     expect(breakingMail.text).not.toContain(', am ');
   });
+});
+
+describe('the shipped subjects of the account and update mails (§10.2 "Templates")', () => {
+  const STACK_KINDS: MailKind[] = [
+    'setup',
+    'reset',
+    'mfaChanged',
+    'updateFailed',
+    'breakingUpdate'
+  ];
+  for (const kind of STACK_KINDS) {
+    for (const language of BUILTIN_LANGUAGES) {
+      it(`name the stack in ${kind}.${language}, with the company where set`, () => {
+        const source = loadBuiltinTemplate(kind, language);
+        const subject = (companyName: string): string =>
+          compileTemplate(kind, source.subject, source.bodyText, null).render(
+            {
+              companyName,
+              fqdn: 'pbx.example.com',
+              toVersion: '1.2.4',
+              version: '2.0.0'
+            },
+            { language, timezone: 'UTC' }
+          ).subject;
+        expect(subject('Acme')).toContain('Acme (pbx.example.com)');
+        const bare = subject('');
+        expect(bare).toContain('pbx.example.com');
+        expect(bare).not.toMatch(/\(|\s{2}|^\s|\s$/u);
+      });
+    }
+  }
 });
 
 describe('a withheld caller', () => {
@@ -257,5 +293,40 @@ describe('resolveTemplate', () => {
     const template = await resolveTemplate(db, 'voicemail', 'en');
     const rendered = template.render({}, { language: 'en', timezone: null });
     expect(rendered.subject).toBe('Tenant override subject');
+  });
+
+  it("gives an owner the shipped template of an admin's kind, and the override of an owner's", async () => {
+    const db = await migratedTestDb();
+    const override = {
+      language: 'en' as const,
+      subject: 'Tenant override subject',
+      bodyText: 'Confirm at https://evil.example/c?u={{link}}',
+      bodyHtml: null,
+      updatedAt: nowIso()
+    };
+    await db
+      .insertInto('mailTemplates')
+      .values([
+        { ...override, kind: 'setup' },
+        { ...override, kind: 'updateFailed', bodyText: 'Overridden' }
+      ])
+      .execute();
+    const subjectOf = async (
+      kind: MailKind,
+      toOwner: boolean
+    ): Promise<string> =>
+      (await resolveTemplate(db, kind, 'en', toOwner)).render(
+        { fqdn: 'pbx.example.com' },
+        { language: 'en', timezone: null }
+      ).subject;
+    await expect(subjectOf('setup', false)).resolves.toBe(
+      'Tenant override subject'
+    );
+    await expect(subjectOf('setup', true)).resolves.toBe(
+      'Set your password for pbx.example.com'
+    );
+    await expect(subjectOf('updateFailed', true)).resolves.toBe(
+      'Tenant override subject'
+    );
   });
 });

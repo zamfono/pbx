@@ -2,7 +2,8 @@ import type { Db, MailboxOwner } from '@zamfono/shared';
 
 import { ringGroupMemberships } from '../ringGroupMembership.js';
 
-export type Recipients = { emails: string[]; name: string };
+/** `toOwner`: an owner is among the addressees, so no admin's template may be used (§10.2). */
+export type Recipients = { emails: string[]; name: string; toOwner: boolean };
 
 /** The addresses mail to `to` goes to; a user without an e-mail (§11.2) is none of them. */
 export async function resolveRecipients(
@@ -12,15 +13,19 @@ export async function resolveRecipients(
   if ('userId' in to) {
     const user = await db
       .selectFrom('users')
-      .select(['email', 'name'])
+      .select(['email', 'name', 'role'])
       .where('id', '=', to.userId)
       .where('email', 'is not', null)
       .where('deletedAt', 'is', null)
       .$narrowType<{ email: string }>()
       .executeTakeFirst();
     return user
-      ? { emails: [user.email], name: user.name }
-      : { emails: [], name: '' };
+      ? {
+          emails: [user.email],
+          name: user.name,
+          toOwner: user.role === 'owner'
+        }
+      : { emails: [], name: '', toOwner: false };
   }
   const group = await db
     .selectFrom('ringGroups')
@@ -32,15 +37,19 @@ export async function resolveRecipients(
     await ringGroupMemberships(db, { ringGroupId: to.ringGroupId })
   ).map(row => row.userId);
   if (userIds.length === 0) {
-    return { emails: [], name: group?.name ?? '' };
+    return { emails: [], name: group?.name ?? '', toOwner: false };
   }
   const users = await db
     .selectFrom('users')
-    .select('email')
+    .select(['email', 'role'])
     .where('id', 'in', userIds)
     .where('email', 'is not', null)
     .where('deletedAt', 'is', null)
     .$narrowType<{ email: string }>()
     .execute();
-  return { emails: users.map(user => user.email), name: group?.name ?? '' };
+  return {
+    emails: users.map(user => user.email),
+    name: group?.name ?? '',
+    toOwner: users.some(user => user.role === 'owner')
+  };
 }

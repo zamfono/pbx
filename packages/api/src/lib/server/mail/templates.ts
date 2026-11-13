@@ -79,6 +79,16 @@ export const PLACEHOLDERS: Record<
   }
 };
 
+/**
+ * The kinds only an owner may override, the update mails that go to owners alone (§10.2
+ * "Templates", §10.3): an override of any other kind is an admin's and never reaches an owner,
+ * who gets the shipped template instead, so no admin can send an owner's one-time link elsewhere.
+ */
+export const OWNER_ONLY_KINDS: readonly MailKind[] = [
+  'updateFailed',
+  'breakingUpdate'
+];
+
 // The shipped templates (§10.2 "Templates"), bundled into the server at build time.
 const BUILTIN_TEMPLATES = import.meta.glob<TemplateSource>('./builtin/*.json', {
   eager: true,

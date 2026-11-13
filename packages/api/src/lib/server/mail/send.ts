@@ -118,15 +118,17 @@ function callIdOf(req: AnyMailRequest): string | undefined {
 
 /**
  * Renders `req`'s template and sends it over the tenant relay (§3.1 "Mail", §10.2 "Mail"),
- * retrying in process on failure. Returns `'skipped'` while no relay is configured or the
- * mailbox has no live recipient, `'sent'` once the relay accepts the message, `'failed'` after
- * the last retry.
+ * retrying in process on failure. A mail to an owner, as the role stands when it is sent, takes
+ * the shipped template of every kind an admin may override (§10.2 "Templates"); `preview`, a
+ * template test to its caller, takes the tenant's effective one whoever that is. Returns
+ * `'skipped'` while no relay is configured or the mailbox has no live recipient, `'sent'` once
+ * the relay accepts the message, `'failed'` after the last retry.
  */
 export async function sendMail(
   db: Db,
   kr: Keyring,
   req: AnyMailRequest,
-  opts?: { attempts?: number; transport?: Transporter }
+  opts?: { attempts?: number; transport?: Transporter; preview?: boolean }
 ): Promise<'failed' | 'sent' | 'skipped'> {
   const relay = await relayFromSettings(db, kr);
   if (relay === null) {
@@ -142,7 +144,12 @@ export async function sendMail(
     .where('id', '=', 1)
     .executeTakeFirstOrThrow();
   const { language } = settings;
-  const template = await resolveTemplate(db, req.kind, language);
+  const template = await resolveTemplate(
+    db,
+    req.kind,
+    language,
+    recipients.toOwner && opts?.preview !== true
+  );
   const values = {
     ...req.values,
     companyName: settings.companyName,

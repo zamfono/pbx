@@ -2,7 +2,11 @@ import Handlebars from 'handlebars';
 
 import type { Db, Language, MailKind } from '@zamfono/shared';
 
-import { loadBuiltinTemplate, PLACEHOLDERS } from './templates.js';
+import {
+  loadBuiltinTemplate,
+  OWNER_ONLY_KINDS,
+  PLACEHOLDERS
+} from './templates.js';
 import { usedPlaceholders } from './templateSyntax.js';
 
 // Handlebars' own `knownHelpersOnly` compile guard (defense in depth next to the helper check
@@ -124,20 +128,26 @@ export function compileTemplate(
 }
 
 /**
- * The effective template for `kind` in `language` (§10.2 "Templates"): the tenant's override
- * (`mail_templates`) when one exists, else the shipped built-in.
+ * The template for `kind` in `language` (§10.2 "Templates"): the tenant's override
+ * (`mail_templates`) when one exists, else the shipped built-in. A mail `toOwner` takes an
+ * override only of a kind only owners may write (`OWNER_ONLY_KINDS`), so no admin's template
+ * reaches an owner.
  */
 export async function resolveTemplate(
   db: Db,
   kind: MailKind,
-  language: Language
+  language: Language,
+  toOwner = false
 ): Promise<CompiledTemplate> {
-  const override = await db
-    .selectFrom('mailTemplates')
-    .select(['subject', 'bodyText', 'bodyHtml'])
-    .where('kind', '=', kind)
-    .where('language', '=', language)
-    .executeTakeFirst();
+  const override =
+    toOwner && !OWNER_ONLY_KINDS.includes(kind)
+      ? undefined
+      : await db
+          .selectFrom('mailTemplates')
+          .select(['subject', 'bodyText', 'bodyHtml'])
+          .where('kind', '=', kind)
+          .where('language', '=', language)
+          .executeTakeFirst();
   const source = override ?? loadBuiltinTemplate(kind, language);
   return compileTemplate(
     kind,

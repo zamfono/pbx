@@ -68,6 +68,8 @@ const USER_OWN_OPS = new Set([
 /** The calls only an owner makes when they name an owner, or create or restore an admin (§10.3). */
 const OWNER_ONLY_OPS = new Set([
   'audit.undo',
+  'mailTemplates.delete',
+  'mailTemplates.put',
   'personalAccessTokens.create',
   'personalAccessTokens.list',
   'personalAccessTokens.revoke',

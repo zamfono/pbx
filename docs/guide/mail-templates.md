@@ -14,7 +14,24 @@ There are seven kinds, `voicemail`, `missedCall`, `setup`, `reset`, `updateFaile
 kind in `settings.language`, else the builtin one for that language. An override in another
 language is kept but used only once `settings.language` is switched to it.
 
-All template operations are `admin`.
+## What owners receive
+
+A mail to an owner uses the builtin template of every kind an admin can edit, `voicemail`,
+`missedCall`, `setup`, `reset` and `mfaChanged`, whatever override exists; users and admins get
+the override. What counts is the recipient's role when the mail is sent, so a new owner, or one
+just promoted, gets the builtin setup or reset mail, and a ring-group mailbox with an owner among
+its members mails the builtin template. Owners are the hosting provider and admins the customer's
+IT managers, and a `setup` or `reset` mail carries a one-time set-password link that an admin's
+template must never be able to send elsewhere. Only `updateFailed` and `breakingUpdate`, which go
+to owners alone, are owners' to edit, and owners receive those overrides.
+
+The builtin subjects of `setup`, `reset`, `mfaChanged`, `updateFailed` and `breakingUpdate` name
+the stack, as `companyName (fqdn)` or the FQDN alone. Staff who get mails from many stacks can tell
+them apart by the sender too: an owner can set `settings.mailFrom` to an address that names the
+stack, such as `pbx-acme@provider.example`, where the relay may send for it.
+
+All template operations are `admin`, but `mailTemplates.put` and `mailTemplates.delete` of
+`updateFailed` and `breakingUpdate` are `owner` (403 for an admin, also through `audit.undo`).
 
 - `mailTemplates.list` (`GET /api/v1/mailTemplates`) returns the effective template of every kind in
   the tenant language, each with `source` `builtin` or `tenant`.
@@ -26,7 +43,8 @@ All template operations are `admin`.
   the builtin template applies again; 404 when there is none. Both writes are undoable
   (`guardrails`).
 - `mailTemplates.test` (`POST /api/v1/mailTemplates/{kind}/test`) sends the effective template, in
-  the tenant language, to the caller's own address with sample values, and answers `status`.
+  the tenant language, to the caller's own address with sample values, and answers `status`; an
+  owner gets the tenant's override too, as a preview.
 
 Read the builtin template with `mailTemplates.get` before writing an override: it is the best
 starting point and shows the branches the kind needs.

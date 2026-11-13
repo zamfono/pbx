@@ -2,6 +2,8 @@ import { z } from 'zod';
 
 import { HTTP_NOT_FOUND } from '@zamfono/shared';
 
+import { OWNER_ONLY_KINDS } from '#lib/server/mail/index.js';
+
 import { recordChange } from '../audit.js';
 import { defineOperation, OpError } from '../types.js';
 import { kindSchema, languageSchema, loadOverride } from './_shared.js';
@@ -22,6 +24,8 @@ export const del = defineOperation({
   output: inputSchema,
   problems: [HTTP_NOT_FOUND],
   minRole: 'admin',
+  // The update mails go to owners alone, who receive their override (§10.2 "Templates").
+  ownerOnly: (_ctx, input) => OWNER_ONLY_KINDS.includes(input.kind),
   confirm: (_ctx, input) =>
     `Remove the ${input.language} override for ${input.kind}?`,
   entity: input => ({

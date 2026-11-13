@@ -32,11 +32,17 @@ import { seedSession } from './testDb.js';
 
 /**
  * Every id a call names is `TARGET_ID`, which is the owner's account, a token of the owner's and
- * the audit entry of an admin's soft delete, and its input asks for an admin, so each owner-only
- * call is one (§10.3).
+ * the audit entry of an admin's soft delete, and its input asks for an admin and names the
+ * owners' `updateFailed` mail template, so each owner-only call is one (§10.3).
  */
 const TARGET_ID = 'owner';
-const TARGET_INPUT = { id: TARGET_ID, userId: TARGET_ID, role: 'admin' };
+const TARGET_KIND = 'updateFailed';
+const TARGET_INPUT = {
+  id: TARGET_ID,
+  userId: TARGET_ID,
+  role: 'admin',
+  kind: TARGET_KIND
+};
 
 const REACHED = { reached: true };
 
@@ -178,7 +184,9 @@ const UPLOAD_BYTES = new Uint8Array([0]);
 
 /** A request to `route` that every stubbed operation accepts: a JSON or multipart body. */
 export function restEvent(route: RouteEntry, token: string): RequestEvent {
-  const path = route.pattern.replaceAll(/\{[^}]+\}/gu, TARGET_ID);
+  const path = route.pattern
+    .replaceAll('{kind}', TARGET_KIND)
+    .replaceAll(/\{[^}]+\}/gu, TARGET_ID);
   const headers: Record<string, string> =
     token === '' ? {} : { authorization: `Bearer ${token}` };
   let body: BodyInit | undefined;
