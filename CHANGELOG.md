@@ -87,6 +87,15 @@ why the specified behaviour changed; the commit history, how.
   of its own there without a credential, intercepting the web traffic with the stack's TLS key,
   and read Caddy's metrics past `METRICS_TOKEN`. A change of the Caddyfile takes a restart of
   `proxy`, as before.
+- A release's bundle, tag and images could be replaced after publication, and `update.sh` would
+  have installed them: it checked the bundle only against `SHA256SUMS` from the same release. From
+  this release on, published releases are immutable on GitHub and their `v*` tags cannot be moved
+  or deleted, and the bundle carries `DIGESTS`, each image's digest for the release, which
+  `SHA256SUMS` covers: `update.sh` checks every release image it pulled against it before it
+  changes anything, and `setup.sh` in a release's bundle pulls the images and checks them before it
+  writes `.env`. An image whose tag was moved stops either, changing nothing. A stack that follows
+  `edge` is not checked, as `edge` has no bundle. The check runs from the update after this
+  release on, as each update runs the `update.sh` of the release it starts from.
 
 ## [0.9.1] - 2026-11-12
 

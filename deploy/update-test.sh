@@ -23,14 +23,25 @@ fail() {
 }
 
 # Releases 1.2.4 (an update), 1.3.0 (a new minor, from 1.0 on no breaking update) and 2.0.0
-# (breaking), served the way GitHub serves release assets.
+# (breaking), served the way GitHub serves release assets, each with the DIGESTS the stub runtime's
+# images match.
+# shellcheck source=test-stubs/docker
+. "$repo_root/deploy/test-stubs/docker"
+stub_digests >"$work/DIGESTS"
 for version in 1.2.4 1.3.0 2.0.0; do
   bash "$repo_root/.github/scripts/deploy-bundle.sh" "$version" \
-    "$work/web/releases/download/v$version" >/dev/null
+    "$work/web/releases/download/v$version" "$work/DIGESTS" >/dev/null
 done
 # 1.2.5's SHA256SUMS names other bytes: a download that does not match must change nothing.
 cp -r "$work/web/releases/download/v1.2.4" "$work/web/releases/download/v1.2.5"
 sed -i 's/^[0-9a-f]\{8\}/00000000/' "$work/web/releases/download/v1.2.5/SHA256SUMS"
+# 1.2.6's bundle names no digest for api, and comes with a SHA256SUMS that matches it.
+mkdir -p "$work/web/releases/download/v1.2.6" "$work/repack"
+tar -xzf "$work/web/releases/download/v1.2.4/zamfono-deploy.tar.gz" -C "$work/repack"
+sed -i 's/1\.2\.4/1.2.6/g' "$work/repack/zamfono/VERSION" "$work/repack/zamfono/compose.yaml"
+sed -i '/^api /d' "$work/repack/zamfono/DIGESTS"
+tar -czf "$work/web/releases/download/v1.2.6/zamfono-deploy.tar.gz" -C "$work/repack" zamfono
+(cd "$work/web/releases/download/v1.2.6" && sha256sum zamfono-deploy.tar.gz >SHA256SUMS)
 
 port=$(python3 -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')
 python3 -m http.server --bind 127.0.0.1 --directory "$work/web" "$port" >/dev/null 2>&1 &
@@ -126,6 +137,9 @@ grep -qx 'compose pull' "$work/runtime.log" ||
   fail "no pull of the whole stack: $(cat "$work/runtime.log")"
 grep -qx 'compose up -d --remove-orphans --wait --wait-timeout 180' \
   "$work/runtime.log" || fail "no up -d --wait of the whole stack"
+# Each of the five release images checked against DIGESTS, after the pull and before the up.
+[[ $(sed -n '/^compose pull$/,/^compose up -d/p' "$work/runtime.log" | grep -c '^image inspect ') == 5 ]] ||
+  fail "the pulled images were not checked between pull and up: $(cat "$work/runtime.log")"
 grep -q 'rm -sf proxy' "$work/runtime.log" && fail "Docker needs no removal of proxy"
 # The images of earlier releases, the stack's own alone, once the stack is up.
 [[ $(tail -n1 "$work/runtime.log") == 'image prune -a -f --filter'\
@@ -192,11 +206,81 @@ rm -f "$work/stack/.update/requests/.keep" && mkdir "$work/stack/.update/request
 update 1.2.4 >"$work/out" 2>&1 || { cat "$work/out"; fail "a directory in .update/requests broke the update"; }
 [[ $(pin) == '1.2.4 ZAMFONO_VERSION:-1.2.4' ]] || fail "the update stopped at the planted directory: $(pin)"
 
+echo "  - an image whose tag no longer names the digest DIGESTS gives changes nothing"
+fresh_stack
+STUB_MOVED_IMAGE=core update 1.2.4 >"$work/out" 2>&1 && fail "an update with a moved image went on"
+grep -q 'ghcr.io/zamfono/core:1.2.4 is not the image the release names' "$work/out" ||
+  fail "no word of the moved image: $(cat "$work/out")"
+[[ $(pin) == '1.2.3 ZAMFONO_VERSION:-1.2.3' ]] || fail "a moved image left the stack at $(pin)"
+grep -q 'up -d' "$work/runtime.log" && fail "a moved image still recreated the stack"
+[[ ! -e $work/stack/.update-pending ]] || fail "a moved image left an update pending"
+record_is "$work/stack/.update/state.json" failed 1.2.3 1.2.4 'is not the image the release names'
+
+echo "  - a release whose DIGESTS names no digest for an image changes nothing"
+fresh_stack
+update 1.2.6 >"$work/out" 2>&1 && fail "an update without api's digest went on"
+grep -q "the release's DIGESTS names no digest for api; nothing was changed" "$work/out" ||
+  fail "no word of the missing digest: $(cat "$work/out")"
+[[ $(pin) == '1.2.3 ZAMFONO_VERSION:-1.2.3' ]] || fail "a missing digest left the stack at $(pin)"
+grep -q 'up -d' "$work/runtime.log" && fail "a missing digest still recreated the stack"
+
+echo "  - Compose's files naming none of the release's images change nothing"
+fresh_stack
+STUB_OWN_IMAGES=1 update 1.2.4 >"$work/out" 2>&1 && fail "an update that checked no image went on"
+grep -q "names none of the 1.2.4 images to check; nothing was changed" "$work/out" ||
+  fail "no word of the unchecked images: $(cat "$work/out")"
+[[ $(pin) == '1.2.3 ZAMFONO_VERSION:-1.2.3' ]] || fail "an unchecked update left the stack at $(pin)"
+grep -q 'up -d' "$work/runtime.log" && fail "an unchecked update still recreated the stack"
+[[ ! -e $work/stack/.update-pending ]] || fail "an unchecked update left an update pending"
+record_is "$work/stack/.update/state.json" failed 1.2.3 1.2.4 'names none of the 1.2.4 images'
+
+echo "  - ZAMFONO_DIGESTS=false, a test harness's, checks nothing and says so"
+fresh_stack
+ZAMFONO_DIGESTS=false STUB_MOVED_IMAGE=api update 1.2.4 >"$work/out" 2>&1 ||
+  { cat "$work/out"; fail "the update with ZAMFONO_DIGESTS=false failed"; }
+grep -q 'ZAMFONO_DIGESTS=false: the 1.2.4 images are not checked' "$work/out" ||
+  fail "no word of the skipped check: $(cat "$work/out")"
+grep -q '^image inspect ' "$work/runtime.log" && fail "ZAMFONO_DIGESTS=false still checked digests"
+[[ $(pin) == '1.2.4 ZAMFONO_VERSION:-1.2.4' ]] || fail "the stack pins $(pin), not 1.2.4"
+
 echo "  - a bundle that does not match SHA256SUMS"
 fresh_stack
 update 1.2.5 >"$work/out" 2>&1 && fail "a mismatching bundle was installed"
 grep -q 'does not match' "$work/out" || fail "no word of the mismatch: $(cat "$work/out")"
 [[ $(pin) == '1.2.3 ZAMFONO_VERSION:-1.2.3' ]] || fail "a mismatching bundle changed the stack's release"
+
+echo "  - setup.sh in a release's bundle pulls its images and checks them against DIGESTS first"
+# setup_stub [NAME=VALUE...] — setup.sh on the stub runtime in a copy of the 1.2.3 bundle without
+# its .env, and without its DIGESTS under no_digests; with no answers given, it stops at the first
+# question once the images passed.
+setup_stub() {
+  fresh_stack
+  rm "$work/stack/.env" "$work/stack/compose.override.yaml"
+  [[ -z ${no_digests:-} ]] || rm "$work/stack/DIGESTS"
+  (cd "$work/stack" && env PATH="$work/bin:$PATH" STUB_LOG="$work/runtime.log" ZAMFONO_RUNTIME=docker \
+    ZAMFONO_AGENT=false SETUP_NONINTERACTIVE=1 "$@" ./setup.sh </dev/null >"$work/out" 2>&1) &&
+    fail "setup.sh without answers succeeded: $(cat "$work/out")"
+  [[ ! -e $work/stack/.env ]] || fail "setup.sh wrote .env: $(cat "$work/out")"
+}
+setup_stub
+grep -q 'ZAMFONO_MODE is not set' "$work/out" || fail "setup.sh stopped before the questions: $(cat "$work/out")"
+for name in asterisk migrate core api proxy; do
+  if ! grep -qx "pull -q ghcr.io/zamfono/$name:1.2.3" "$work/runtime.log" ||
+    ! grep -q "^image inspect .* ghcr.io/zamfono/$name:1.2.3\$" "$work/runtime.log"; then
+    fail "setup.sh did not pull and check $name: $(cat "$work/runtime.log")"
+  fi
+done
+setup_stub STUB_MOVED_IMAGE=migrate
+grep -q 'ghcr.io/zamfono/migrate:1.2.3 is not the image the release names.*; nothing was written' "$work/out" ||
+  fail "setup.sh took a moved image: $(cat "$work/out")"
+no_digests=1 setup_stub
+grep -q "the release's bundle has no DIGESTS; nothing was written" "$work/out" ||
+  fail "setup.sh went on without DIGESTS: $(cat "$work/out")"
+setup_stub ZAMFONO_VERSION=edge
+grep -q "ZAMFONO_VERSION=edge is not this bundle's release" "$work/out" ||
+  fail "setup.sh for edge did not say it skips the check: $(cat "$work/out")"
+grep -q 'ZAMFONO_MODE is not set' "$work/out" || fail "setup.sh for edge stopped early: $(cat "$work/out")"
+grep -q 'pull' "$work/runtime.log" && fail "setup.sh for edge pulled the release's images"
 
 # shellcheck source=update-check-test.sh
 . "$repo_root/deploy/update-check-test.sh"

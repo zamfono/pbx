@@ -3,6 +3,8 @@
 # every secret, hashes the owner's password with the api image, and never overwrites an .env
 # that holds anything — a new SECRETBOX_KEY would make the existing database unreadable. It links
 # the mode's overlay as compose.override.yaml, which Compose reads beside compose.yaml on its own.
+# From a release's bundle it first pulls the release's images and checks each against the
+# bundle's DIGESTS, writing nothing where one differs.
 #
 # Each answer can come from the environment under its .env name, and is then not asked; with
 # SETUP_NONINTERACTIVE=1, or without a terminal, every answer must. Beyond the .env names:
@@ -204,6 +206,27 @@ install_agent() {
   fi
 }
 
+# A release's bundle: its images pulled and checked against its DIGESTS before anything is written
+# (§6.3 "Images"), so the stack's first `up` starts the images the release names, not ones a tag
+# moved in the registry since. Not from a checkout, which has no VERSION, nor with ZAMFONO_VERSION
+# naming another tag than the bundle's, whose images no DIGESTS of it names.
+pull_release_images() {
+  [[ -f VERSION ]] || return 0
+  local version name problem
+  version=$(<VERSION)
+  if [[ -n ${ZAMFONO_VERSION:-} && $ZAMFONO_VERSION != "$version" ]]; then
+    warn "ZAMFONO_VERSION=$ZAMFONO_VERSION is not this bundle's release, $version: its images are" \
+      "not checked against the bundle's DIGESTS"
+    return 0
+  fi
+  while read -r name; do
+    echo "Pulling ghcr.io/zamfono/$name:$version ..." >&2
+    "$runtime" pull -q "ghcr.io/zamfono/$name:$version" >/dev/null </dev/null ||
+      fail "could not pull ghcr.io/zamfono/$name:$version; nothing was written"
+    problem=$(check_digest DIGESTS "$name" "$version") || fail "$problem; nothing was written"
+  done < <(sed -nE 's#^ +image: +ghcr\.io/zamfono/([a-z0-9-]+):.*#\1#p' compose.yaml | sort -u)
+}
+
 main() {
   [[ -f compose.yaml && -f .env.example ]] || fail "run setup.sh from the stack directory it came in"
   if [[ -e .env ]] && ! cmp -s .env .env.example; then
@@ -224,6 +247,7 @@ main() {
   if [[ $runtime == podman && $(id -u) -ne 0 ]]; then
     fail "run setup.sh as root: the stack runs on rootful Podman (README.md, step 2)"
   fi
+  pull_release_images
   [[ -z $interactive ]] || ui_msg "This writes the .env of the stack in $PWD, using $runtime.\n\nEvery secret is generated for you; you are asked only for what the stack cannot know."
 
   ask_mode

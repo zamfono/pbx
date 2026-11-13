@@ -131,6 +131,8 @@ grep -qx 'compose pull' "$work/runtime.log" || fail "no pull of edge: $(cat "$wo
 grep -qx 'compose up -d --remove-orphans --wait --wait-timeout 180' "$work/runtime.log" ||
   fail "no up -d after the edge pull: $(cat "$work/runtime.log")"
 [[ $(pin) == '1.2.3 ZAMFONO_VERSION:-1.2.3' ]] || fail "the edge update installed a bundle: $(pin)"
+# Edge has no bundle, so no DIGESTS: its images are not checked.
+grep -q '^image inspect ' "$work/runtime.log" && fail "the edge update checked digests: $(cat "$work/runtime.log")"
 grep -qx 'ZAMFONO_VERSION=edge' "$work/stack/.env" || fail "the edge update changed ZAMFONO_VERSION"
 record_is "$work/stack/.update/state.json" succeeded edge edge
 update edge >/dev/null 2>&1 || fail "update.sh edge on an edge stack failed"

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Updates this stack to a newer release (README.md, step 8): checks there is room for its images,
-# downloads that release's bundle, checks it against the release's SHA256SUMS, pulls the images,
-# unpacks the bundle over this directory, moves .env's ZAMFONO_VERSION along by its form and lists
+# downloads that release's bundle, checks it against the release's SHA256SUMS, pulls the images
+# and checks them against the bundle's DIGESTS, unpacks the bundle over this directory, moves .env's ZAMFONO_VERSION along by its form and lists
 # the settings a newer .env.example introduced, recreates the stack and, once it is healthy,
 # removes the stack's images no container uses. The host agent runs this same script for api's
 # `system.update` and automatic updates (setup/agent.sh, §6.3 "Updates"), and --current to report
@@ -13,7 +13,8 @@
 #   ./update.sh --current
 #
 # VERSION is X.Y.Z; without it, the latest release; on a stack that follows edge, edge or none,
-# which pulls the newest edge images and recreates the stack, files unchanged. A release that is breaking by RELEASING.md's
+# which pulls the newest edge images and recreates the stack, files unchanged and the images
+# unchecked: main publishes no bundle, so no DIGESTS. A release that is breaking by RELEASING.md's
 # policy (a new major, or a new minor while 0.x) shows its upgrade notes and asks first; --yes
 # answers for a run without a terminal. --check only says what an update would do, and exits
 # with its verdict, which api judges the same way: 0 the update is allowed, or finishes one that stopped
@@ -30,6 +31,8 @@
 #                           host otherwise refreshes, or offers to install in a terminal
 #   ZAMFONO_TRIGGER         who asked, for the run's record: manual (with ZAMFONO_BY, the
 #                           owner) or automatic, as the host agent passes them on; host otherwise
+#   ZAMFONO_DIGESTS=false   checks no image against the release's DIGESTS: only for a test
+#                           harness whose stack runs images of its own build, none of the release's
 set -euo pipefail
 
 cd "$(dirname "$0")"
@@ -70,7 +73,7 @@ for arg in "$@"; do
     --check) check_only=1 ;;
     --current) current_only=1 ;;
     -h | --help)
-      sed -n '2,32p' "$(basename "$0")" | sed 's/^# \{0,1\}//'
+      sed -n '2,35p' "$(basename "$0")" | sed 's/^# \{0,1\}//'
       exit 0
       ;;
     -*) fail "unknown option $arg" ;;
@@ -369,6 +372,26 @@ main() {
   echo "Pulling the $target images ..."
   ZAMFONO_VERSION=$target "${compose[@]}" pull ||
     fail "pulling the $target images failed; nothing was changed, and a rerun retries"
+  # Each of the release's images just pulled is the one its bundle's DIGESTS names (§6.3
+  # "Updates"), or nothing here changes: a tag moved in the registry after the release stops the
+  # update. Compose's own view of the files, so an image the operator's compose.local.yaml puts in
+  # a service's place is not taken for the release's.
+  if [[ ${ZAMFONO_DIGESTS:-} == false ]]; then
+    warn "ZAMFONO_DIGESTS=false: the $target images are not checked against the release's DIGESTS"
+  else
+    echo "Checking the $target images against the release's DIGESTS ..."
+    local config name problem checked=0
+    config=$(ZAMFONO_VERSION=$target "${compose[@]}" config) ||
+      fail "Compose could not read the stack's files; nothing was changed"
+    for name in $(release_images "$target" <<<"$config"); do
+      problem=$(check_digest "$work/x/DIGESTS" "$name" "$target") || fail "$problem; nothing was changed"
+      checked=$((checked + 1))
+    done
+    # The stack runs the release's own images, so finding none means Compose's output was not read
+    # as expected, and the check would pass without checking anything: the update stops instead.
+    ((checked > 0)) ||
+      fail "Compose's view of the stack names none of the $target images to check; nothing was changed"
+  fi
 
   echo "$target" >"$PENDING"
   install_bundle

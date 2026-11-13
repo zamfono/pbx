@@ -4,7 +4,8 @@
 #
 # Usage: promote-release.sh <source tag> <new tag>...
 # Environment: REPOSITORY (e.g. ghcr.io/zamfono), IMAGES (the image names, space-separated),
-# WAIT_TIMEOUT and WAIT_INTERVAL in seconds.
+# WAIT_TIMEOUT and WAIT_INTERVAL in seconds, DIGESTS the file to write each image's index digest
+# to, `<image> <digest>` per line, which the release's bundle carries (deploy-bundle.sh).
 #
 # Waits until every image's <source tag> names main's finished build, the index of its linux/amd64
 # and linux/arm64 images (push-platforms.sh, which pushes each platform's image under that tag
@@ -40,10 +41,12 @@ while :; do
   sleep "$WAIT_INTERVAL"
 done
 
+: >"$DIGESTS"
 for image in "${names[@]}"; do
   ref=$REPOSITORY/$image
   digest=$(crane digest "$ref:$source_tag")
   echo "$ref:$source_tag is $digest"
+  echo "$image $digest" >>"$DIGESTS"
   for tag in "$@"; do
     crane tag "$ref@$digest" "$tag"
     got=$(crane digest "$ref:$tag")

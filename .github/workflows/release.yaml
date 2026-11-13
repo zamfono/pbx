@@ -1,8 +1,9 @@
 # §6.3 "Images", a vX.Y.Z tag: `promote` adds X.Y.Z, X.Y, X and latest to the very manifests main
 # published for that commit (main.yaml), so a release is byte-identical to the edge build it came
-# from and is never rebuilt; then `bundle` publishes the GitHub release with deploy/ attached and
-# the version's CHANGELOG.md section as its description, and `cleanup` drops the sha- images the
-# release contains. RELEASING.md is the maintainer's side of it.
+# from and is never rebuilt; then `bundle` publishes the GitHub release with deploy/ attached,
+# its images' index digests in the bundle's DIGESTS, and the version's CHANGELOG.md section as its
+# description, and `cleanup` drops the sha- images the release contains. RELEASING.md is the
+# maintainer's side of it.
 name: release
 
 on:
@@ -25,6 +26,8 @@ jobs:
     permissions:
       contents: read
       packages: write
+    outputs:
+      digests: ${{ steps.promote.outputs.digests }}
     steps:
       - name: Accept only a vX.Y.Z tag
         id: tags
@@ -74,6 +77,7 @@ jobs:
           echo "$RUNNER_TEMP/crane" >>"$GITHUB_PATH"
           echo "$GITHUB_TOKEN" | "$RUNNER_TEMP/crane/crane" auth login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
       - name: Add the release tags to main's build of that commit
+        id: promote
         env:
           REPOSITORY: ghcr.io/zamfono
           # A commit pushed together with its tag is still in main's CI when this starts.
@@ -81,10 +85,13 @@ jobs:
           WAIT_INTERVAL: 30
           SOURCE_TAG: sha-${{ steps.commit.outputs.short }}
           TAGS: ${{ steps.tags.outputs.tags }}
+          DIGESTS: ${{ runner.temp }}/DIGESTS
         run: |
           # TAGS is split into one argument per tag on purpose.
           # shellcheck disable=SC2086
           bash .github/scripts/promote-release.sh "$SOURCE_TAG" $TAGS
+          # Each image's index digest, which every tag above names, for the bundle's DIGESTS.
+          { echo 'digests<<EOF'; cat "$DIGESTS"; echo EOF; } >>"$GITHUB_OUTPUT"
 
   # The release exists only once its images carry its tags, so a bundle never names a version
   # that cannot be pulled.
@@ -99,8 +106,13 @@ jobs:
       attestations: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Pack deploy/ with compose.yaml pinned to this release
-        run: bash .github/scripts/deploy-bundle.sh "${GITHUB_REF_NAME#v}" "$RUNNER_TEMP/bundle"
+      # A re-run of this job alone reads the same digests, promote's outputs, so packs the same bytes.
+      - name: Pack deploy/ with compose.yaml pinned to this release and its images' digests
+        env:
+          DIGESTS: ${{ needs.promote.outputs.digests }}
+        run: |
+          printf '%s\n' "$DIGESTS" >"$RUNNER_TEMP/DIGESTS"
+          bash .github/scripts/deploy-bundle.sh "${GITHUB_REF_NAME#v}" "$RUNNER_TEMP/bundle" "$RUNNER_TEMP/DIGESTS"
       - name: Cut the release's notes from CHANGELOG.md
         run: bash .github/scripts/changelog-section.sh "${GITHUB_REF_NAME#v}" >"$RUNNER_TEMP/notes.md"
       # Lets an operator check a download came from this workflow at this tag:
@@ -109,21 +121,46 @@ jobs:
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-checksums: ${{ runner.temp }}/bundle/SHA256SUMS
+      # The repository's releases are immutable: once published, a release's tag and assets can
+      # no longer change, while its title and notes still can
+      # (https://docs.github.com/en/code-security/supply-chain-security/understanding-your-software-supply-chain/immutable-releases).
+      # So the assets go onto a draft, which is then published. The description is the version's
+      # CHANGELOG.md section, also on a re-run or a release a maintainer opened by hand first,
+      # whose notes it replaces. A re-run finishes a draft it finds; a published release keeps
+      # its assets, which must be the bytes this run packed, as the bundle is reproducible.
       - name: Publish the GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        # The description is the version's CHANGELOG.md section, also on a re-run or a release a
-        # maintainer opened by hand first, whose notes it replaces; the bundle is reproducible, so
-        # a re-run uploads the same bytes.
         run: |
-          assets=("$RUNNER_TEMP"/bundle/{zamfono-deploy.tar.gz,zamfono-deploy.zip,SHA256SUMS})
-          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release edit "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/notes.md"
-            gh release upload "$GITHUB_REF_NAME" --clobber "${assets[@]}"
-          else
-            gh release create "$GITHUB_REF_NAME" --verify-tag --notes-file "$RUNNER_TEMP/notes.md" \
-              --title "$GITHUB_REF_NAME" "${assets[@]}"
-          fi
+          tag=$GITHUB_REF_NAME notes=$RUNNER_TEMP/notes.md bundle=$RUNNER_TEMP/bundle
+          assets=("$bundle"/{zamfono-deploy.tar.gz,zamfono-deploy.zip,SHA256SUMS})
+          draft=$(gh release view "$tag" --json isDraft --jq .isDraft 2>/dev/null) || draft=none
+          case $draft in
+            none)
+              gh release create "$tag" --draft --verify-tag --title "$tag" --notes-file "$notes" "${assets[@]}"
+              gh release edit "$tag" --draft=false
+              ;;
+            true)
+              gh release edit "$tag" --notes-file "$notes"
+              gh release upload "$tag" --clobber "${assets[@]}"
+              gh release edit "$tag" --draft=false
+              ;;
+            *)
+              published=$RUNNER_TEMP/published
+              mkdir "$published"
+              gh release download "$tag" --dir "$published" \
+                --pattern zamfono-deploy.tar.gz --pattern zamfono-deploy.zip --pattern SHA256SUMS || {
+                echo "::error::$tag is published without its three assets, which an immutable release takes no more: cut the next patch release" >&2
+                exit 1
+              }
+              if ! cmp "$bundle/SHA256SUMS" "$published/SHA256SUMS" ||
+                ! (cd "$published" && sha256sum -c SHA256SUMS); then
+                echo "::error::$tag's published assets are not the bundle this run packed from its tag; they were left as they are. Find out why before anything else." >&2
+                exit 1
+              fi
+              gh release edit "$tag" --notes-file "$notes"
+              ;;
+          esac
 
   cleanup:
     name: Prune the release's sha- images

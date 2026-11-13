@@ -5,6 +5,19 @@
 # without a healthcheck, bar a pull under STUB_FAIL_PULL and an `up` under STUB_FAIL_UP, and
 # `ps -aq`, the host agent's look for an old updater, goes unrecorded. A pull
 # copies the update's record, .update/state.json, to $STUB_LOG.state, as it stands mid-run.
+# `compose config` names the five services' release images at ZAMFONO_VERSION, else VERSION's,
+# or under STUB_OWN_IMAGES images of the operator's own in their place;
+# `image inspect` of ghcr.io/zamfono/<name>:<tag> reports the digest `stub_digests` (sourced)
+# gives <name>, another for the image STUB_MOVED_IMAGE names; `volume inspect` finds no volume.
+stub_digest() {
+  echo "sha256:$(printf %s "$1" | sha256sum | cut -c1-64)"
+}
+# The DIGESTS of every test release: the digest the stub reports for each of the stack's images.
+stub_digests() {
+  local name
+  for name in asterisk migrate core api proxy updater; do echo "$name $(stub_digest "$name")"; done
+}
+[[ ${BASH_SOURCE[0]} == "$0" ]] || return 0
 if [[ $* == compose*' up --help' ]]; then
   [[ -n ${STUB_PODMAN_COMPOSE:-} ]] || echo '      --wait    Wait for services to be running|healthy.'
   exit 0
@@ -17,6 +30,28 @@ fi
 echo "$*" >>"$STUB_LOG"
 case $* in
   compose*' ps -q') printf 'api-1\nmigrate-1\n' && exit 0 ;;
+  compose*' config')
+    echo services:
+    for name in netns asterisk migrate core api proxy; do
+      image=$name
+      [[ $name != netns ]] || image=proxy
+      if [[ -n ${STUB_OWN_IMAGES:-} ]]; then
+        printf '  %s:\n    image: registry.example.com/own/%s:mine\n' "$name" "$image"
+      else
+        printf '  %s:\n    image: ghcr.io/zamfono/%s:%s\n' "$name" "$image" "${ZAMFONO_VERSION:-$(<VERSION)}"
+      fi
+    done
+    exit 0
+    ;;
+  'image inspect --format '*' ghcr.io/zamfono/'*)
+    ref=${!#}
+    name=${ref##*/}
+    name=${name%%:*}
+    [[ $name != "${STUB_MOVED_IMAGE:-}" ]] || name=moved
+    echo "${ref%:*}@$(stub_digest "$name")"
+    exit 0
+    ;;
+  'volume inspect '*) exit 1 ;;
   inspect\ *) printf 'healthy\n\n' && exit 0 ;;
 esac
 [[ $* != *' pull'*|| ! -e .update/state.json ]] || cp .update/state.json "$STUB_LOG.state"

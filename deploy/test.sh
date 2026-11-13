@@ -59,11 +59,20 @@ if (cd "$script_dir" && ZAMFONO_VERSION=1 docker compose --env-file "$env_file" 
 fi
 
 echo "==> release bundle (.github/scripts/deploy-bundle.sh)"
-bash "$repo_root/.github/scripts/deploy-bundle.sh" 1.2.3 "$bundle_dir"
+# With the digests the stub runtime of update-test.sh reports for its images.
+bash -c '. "$1" && stub_digests' _ "$script_dir/test-stubs/docker" >"$bundle_dir/digests"
+# One that misses an image compose.yaml runs is refused.
+grep -v '^core ' "$bundle_dir/digests" >"$bundle_dir/digests-core"
+if bash "$repo_root/.github/scripts/deploy-bundle.sh" 1.2.3 "$bundle_dir/y" "$bundle_dir/digests-core" 2>/dev/null; then
+  echo "deploy-bundle.sh packed a release without core's digest" >&2
+  exit 1
+fi
+bash "$repo_root/.github/scripts/deploy-bundle.sh" 1.2.3 "$bundle_dir" "$bundle_dir/digests"
 (cd "$bundle_dir" && sha256sum -c --quiet SHA256SUMS)
 mkdir "$bundle_dir/x"
 tar -xzf "$bundle_dir/zamfono-deploy.tar.gz" -C "$bundle_dir/x" --strip-components=1
 [ "$(cat "$bundle_dir/x/VERSION")" = 1.2.3 ]
+cmp "$bundle_dir/x/DIGESTS" "$bundle_dir/digests"
 # ZAMFONO_VERSION empty, as .env.example leaves it: every image is the bundle's own release.
 bundle_images=$(cd "$bundle_dir/x" && ZAMFONO_VERSION='' docker compose --env-file "$env_file" \
   -f compose.yaml -f compose.ports.yaml config --images)
@@ -71,6 +80,16 @@ if [ -z "$bundle_images" ] || echo "$bundle_images" | grep -v ':1\.2\.3$'; then
   echo "the bundle's compose.yaml runs an image that is not the release's own" >&2
   exit 1
 fi
+# update.sh checks the release images Compose's config names (setup/checks.sh, release_images):
+# all five, and not one compose.local.yaml puts in place of the release's.
+release_images() {
+  (cd "$bundle_dir/x" && ZAMFONO_VERSION=1.2.4 docker compose --env-file "$env_file" -f compose.yaml \
+    -f compose.ports.yaml "$@" config | bash -c '. setup/checks.sh && release_images 1.2.4' | paste -sd' ')
+}
+[ "$(release_images)" = 'api asterisk core migrate proxy' ]
+printf 'services:\n  api:\n    image: ghcr.io/zamfono/api:mine\n' >"$bundle_dir/x/compose.local.yaml"
+[ "$(release_images -f compose.local.yaml)" = 'asterisk core migrate proxy' ]
+rm "$bundle_dir/x/compose.local.yaml"
 
 echo "==> setup.sh (non-interactive, in the unpacked bundle)"
 [ -x "$bundle_dir/x/setup.sh" ]
@@ -80,7 +99,10 @@ echo "==> setup.sh (non-interactive, in the unpacked bundle)"
 # run_setup [NAME=VALUE...] — setup.sh with every answer from the environment, plus these.
 run_setup() {
   # Never the host agent: its units would be this host's, started on a directory this test removes.
+  # ZAMFONO_VERSION=edge: no image of the bundle's 1.2.3 exists to check against its DIGESTS, which
+  # update-test.sh tests on a stub runtime.
   (cd "$bundle_dir/x" && env SETUP_NONINTERACTIVE=1 ZAMFONO_AGENT=false ZAMFONO_API_IMAGE="$API_IMAGE" \
+    ZAMFONO_VERSION=edge \
     ZAMFONO_MODE=ports EXTERNAL_IPV4=198.51.100.7 \
     FQDN=pbx.example.com COMPANY_NAME="O'Brien & \$ons" MAIN_DID=+4930123456 COUNTRY=de \
     BOOTSTRAP_OWNER_NAME=Owner BOOTSTRAP_OWNER_EMAIL=owner@example.com \

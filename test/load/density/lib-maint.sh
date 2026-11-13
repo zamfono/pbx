@@ -143,7 +143,8 @@ maint_update_prep() {
 maint_update() {
   local word
   ( export "${host_update_env[@]}"
-    ZAMFONO_REPO_URL=$host_update_repo ZAMFONO_RUNTIME=$RUNTIME COMPOSE_PROJECT_NAME=density-$si \
+    # The stacks run local images, which no release's DIGESTS names, as in host_update.
+    ZAMFONO_DIGESTS=false ZAMFONO_REPO_URL=$host_update_repo ZAMFONO_RUNTIME=$RUNTIME COMPOSE_PROJECT_NAME=density-$si \
       COMPOSE_FILE="$STACK_DIR/compose.yaml:$STACK_DIR/compose.override.yaml:$here/compose.density.yaml" \
       bash "$STACK_DIR/update.sh" "$HOST_UPDATE_TO" ) >> "$STACK_DIR/update.log" 2>&1 \
     || { echo "update=failed (see $STACK_DIR/update.log)"; return 1; }

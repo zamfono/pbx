@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
-# §6.3 "Images". Packs the operator files of deploy/ for one release: deploy-bundle.sh X.Y.Z OUTDIR
-# writes OUTDIR/zamfono-deploy.tar.gz, OUTDIR/zamfono-deploy.zip and OUTDIR/SHA256SUMS.
+# §6.3 "Images". Packs the operator files of deploy/ for one release:
+# deploy-bundle.sh X.Y.Z OUTDIR DIGESTS writes OUTDIR/zamfono-deploy.tar.gz, OUTDIR/zamfono-deploy.zip
+# and OUTDIR/SHA256SUMS. DIGESTS is the file promote-release.sh writes, `<image> <index digest>` per
+# line, which the bundle carries as DIGESTS for update.sh and setup.sh to check the pulled images
+# against; it must name every image compose.yaml runs.
 #
 # Both archives hold one directory, zamfono/, so `tar xz -C <stack dir> --strip-components=1`
 # unpacks a first install and an upgrade alike; .env is never in the bundle, so an upgrade keeps it.
@@ -11,10 +14,15 @@
 # version, so releases/latest/download/<name> is a stable URL for the newest release.
 set -euo pipefail
 
-version=${1:?usage: deploy-bundle.sh X.Y.Z OUTDIR}
-out=${2:?usage: deploy-bundle.sh X.Y.Z OUTDIR}
+version=${1:?usage: deploy-bundle.sh X.Y.Z OUTDIR DIGESTS}
+out=${2:?usage: deploy-bundle.sh X.Y.Z OUTDIR DIGESTS}
+digests=${3:?usage: deploy-bundle.sh X.Y.Z OUTDIR DIGESTS}
 if [[ ! $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   echo "deploy-bundle.sh: $version is not X.Y.Z" >&2
+  exit 1
+fi
+if grep -qvE '^[a-z0-9-]+ sha256:[0-9a-f]{64}$' "$digests"; then
+  echo "deploy-bundle.sh: $digests holds a line that is not <image> sha256:<digest>" >&2
   exit 1
 fi
 
@@ -34,8 +42,16 @@ cp "$root/CHANGELOG.md" "$stage/zamfono/CHANGELOG.md"
 # Podman refuses a bind mount whose source is missing, and an update unpacks only files.
 mkdir -p "$stage/zamfono/.update/requests"
 : >"$stage/zamfono/.update/requests/.keep"
-# The release this bundle is, as data.
+# The release this bundle is, as data, and the index digest of each of its images.
 echo "$version" >"$stage/zamfono/VERSION"
+cp "$digests" "$stage/zamfono/DIGESTS"
+sed -nE 's#^ +image: +ghcr\.io/zamfono/([a-z0-9-]+):.*#\1#p' "$root/deploy/compose.yaml" | sort -u |
+  while read -r image; do
+    grep -q "^$image " "$digests" || {
+      echo "deploy-bundle.sh: $digests names no digest for $image" >&2
+      exit 1
+    }
+  done
 # Every file 644 but the ones the operator runs, whatever the checkout's modes were.
 chmod 644 "$stage"/zamfono/{.env.example,*,setup/*} 2>/dev/null || true
 chmod 755 "$stage/zamfono/setup" "$stage/zamfono/setup.sh" "$stage/zamfono/update.sh" \

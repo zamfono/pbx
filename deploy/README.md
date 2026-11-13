@@ -221,6 +221,13 @@ gh attestation verify zamfono-deploy.tar.gz --repo zamfono/pbx
 On the server itself, Debian 13's own `gh` (2.46) has no `attestation` command; GitHub's
 repository has a current one (<https://github.com/cli/cli/blob/trunk/docs/install_linux.md>).
 
+A published release cannot change: its archives, `SHA256SUMS` and tag are locked on GitHub, and
+its bundle's `DIGESTS` names the digest of each of its images, which `setup.sh` and `update.sh`
+check every image they pull against, so an image tag moved in the registry stops them before they
+change anything. Releases published before this protection, 0.9.1 and earlier, are not locked.
+What none of this covers is a new release cut with a maintainer's stolen credentials, as
+`RELEASING.md` says.
+
 The bundle's `compose.yaml` pulls the images of its own release. Leave `ZAMFONO_VERSION` in `.env`
 empty to keep it that way; set it only to follow something else, such as `edge` for testing.
 
@@ -379,9 +386,10 @@ cd /srv/zamfono
 ```
 
 It refuses to start with less than 3 GB free on the stack directory's filesystem, which a
-release's images need. It downloads the release's bundle, checks it against the release's `SHA256SUMS`, unpacks it over
-the stack directory (never touching `.env`), lists the settings a newer `.env.example`
-introduced, pulls the images and recreates the stack: on Podman
+release's images need. It downloads the release's bundle, checks it against the release's `SHA256SUMS`, pulls the
+release's images and checks each against the bundle's `DIGESTS`, changing nothing where one differs
+(a stack on `edge` has no bundle, so its images go unchecked), unpacks the bundle over the stack directory (never touching `.env`), lists the settings a newer
+`.env.example` introduced and recreates the stack: on Podman
 through the boot unit of step 7 if there is one, otherwise taking the stack `down` first. It then
 waits up to three minutes for every service to report healthy; an update that stopped before
 that, a failed `up` or an unhealthy service, is finished by running `update.sh` again once the

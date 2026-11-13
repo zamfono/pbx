@@ -113,9 +113,15 @@ host_update_stop() {
 
 # This checkout's deploy/ packed as release `$1` by .github/scripts/deploy-bundle.sh, under
 # `host_update_work`, and served the way GitHub serves release assets (`host_update_serve`).
+# Its DIGESTS names no real digest: the run's images are the build's own, under tags no release
+# has, which carry no registry digest, so `host_update` runs update.sh with ZAMFONO_DIGESTS=false.
 host_update_publish() {
-  local web=$host_update_work/web
-  bash "$repo/.github/scripts/deploy-bundle.sh" "$1" "$web/releases/download/v$1" >/dev/null \
+  local web=$host_update_work/web name
+  for name in asterisk migrate core api proxy updater; do
+    echo "$name sha256:$(printf '%064d' 0)"
+  done >"$host_update_work/DIGESTS"
+  bash "$repo/.github/scripts/deploy-bundle.sh" "$1" "$web/releases/download/v$1" \
+    "$host_update_work/DIGESTS" >/dev/null \
     || fail "deploy-bundle.sh could not pack $1"
   host_update_serve "$web"
 }
@@ -132,7 +138,8 @@ host_update_serve() {
 
 # `update.sh` in the stack directory, its output kept in the step's own `update.log`.
 host_update() {
-  ZAMFONO_AGENT=false ZAMFONO_REPO_URL=$host_update_repo ZAMFONO_RUNTIME=$RUNTIME \
+  ZAMFONO_AGENT=false ZAMFONO_DIGESTS=false ZAMFONO_REPO_URL=$host_update_repo \
+    ZAMFONO_RUNTIME=$RUNTIME \
     COMPOSE_PROJECT_NAME=$(stack_project "$run_dir") \
     COMPOSE_FILE="$run_dir/compose.yaml:$run_dir/compose.override.yaml:$here/compose.test.yaml" \
     bash "$run_dir/update.sh" "$@" >>"$host_update_work/update.log" 2>&1

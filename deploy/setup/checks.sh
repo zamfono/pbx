@@ -122,3 +122,29 @@ country_supported() {
 hash_password() {
   printf '%s' "$1" | "$runtime" run --rm -i "$(api_image)" node hash-password.mjs
 }
+
+# release_images TAG — the names of the images ghcr.io/zamfono/<name>:TAG in the `compose config`
+# output on stdin, one per line: the release's own images a stack on these files runs, not one
+# the operator's own overlay puts in their place.
+release_images() {
+  sed -nE "s#^ +image: +[\"']?ghcr\.io/zamfono/([a-z0-9-]+):${1//./\\.}[\"']?\$#\1#p" | sort -u
+}
+
+# check_digest DIGESTS NAME TAG — whether the local image ghcr.io/zamfono/NAME:TAG is the one a
+# release's DIGESTS file (`<name> <index digest>` per line, in its bundle) names: Docker and
+# Podman both record the digest of the index a tag was pulled through among the image's
+# RepoDigests. Prints what is wrong otherwise, and changes nothing.
+check_digest() {
+  local ref=ghcr.io/zamfono/$2 digest repo_digests
+  [[ -f $1 ]] || { echo "the release's bundle has no DIGESTS"; return 1; }
+  digest=$(awk -v n="$2" '$1 == n { print $2; exit }' "$1")
+  [[ $digest =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "the release's DIGESTS names no digest for $2"; return 1; }
+  # Read in full before grep: `inspect | grep -q` under pipefail fails whenever grep's early exit
+  # kills inspect with SIGPIPE, reporting a correct image as moved.
+  repo_digests=$("$runtime" image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$ref:$3") ||
+    repo_digests=
+  grep -qxF "$ref@$digest" <<<"$repo_digests" && return 0
+  echo "$ref:$3 is not the image the release names, $ref@$digest: its tag was moved after the" \
+    "release"
+  return 1
+}
