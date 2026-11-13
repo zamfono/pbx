@@ -11,9 +11,10 @@ compose_waits() {
   [[ $help == *--wait* ]]
 }
 
+# Both when the start failed at once and when the services did not report healthy in time.
 unhealthy() {
-  fail "the stack did not report healthy within $((WAIT_SECONDS / 60)) minutes; see:" \
-    "${compose[*]} ps, and its logs"
+  fail "the stack did not come up healthy: its start failed, or it did not report healthy within" \
+    "$((WAIT_SECONDS / 60)) minutes; see: ${compose[*]} ps, and its logs"
 }
 
 # Whether every container of the stack that has a healthcheck, compose.yaml's, reports healthy.
@@ -41,8 +42,14 @@ await_healthy() {
 # `stun` and `proxy` share its network namespace (§6.3), so on Podman the old containers go first: the boot
 # unit's restart does that with `down`, and its `up -d` does not wait, so an `up` that recreates
 # nothing waits for it; without the unit, `down` here, which podman-compose has where it has no
-# `rm`. A service the files no longer name, such as the updater of a release before 0.9.1, is
-# removed.
+# `rm`. The unit's restart is bounded by WAIT_SECONDS too: a oneshot unit's start, an `up -d` that
+# waits for the services `core` depends on, has no timeout of its own, so one still running then is
+# stopped. A service the files no
+# longer name, such as the updater of a release before 0.9.1, is removed.
+#
+#   recreate_stack [down]   down: the old containers go first on Docker too, for a run that
+#                           finishes a stopped update, whose Compose may have been cut off halfway
+#                           through a recreate and left a container under a temporary name
 recreate_stack() {
   local -a wait_args=()
   if compose_waits; then
@@ -53,12 +60,19 @@ recreate_stack() {
   fi
   if [[ $runtime == podman && -n $unit ]]; then
     echo "Restarting $unit ..."
-    systemctl restart "$unit"
+    if ! timeout "$WAIT_SECONDS" systemctl restart "$unit"; then
+      # timeout ends the client alone: systemd's start job runs on, and its up -d would act on the
+      # containers after this run released its lock. A stop cancels the job and ends its
+      # ExecStart, and waits for it; the containers it got to stay, conmon in a scope of its own
+      # (setup/compose.sh), and a rerun's start brings up the rest.
+      systemctl stop "$unit" || true
+      unhealthy
+    fi
     if ((${#wait_args[@]} > 0)); then
       "${compose[@]}" up -d --no-recreate --remove-orphans "${wait_args[@]}" || unhealthy
     fi
   else
-    if [[ $runtime == podman ]]; then
+    if [[ $runtime == podman || ${1:-} == down ]]; then
       "${compose[@]}" down
     fi
     "${compose[@]}" up -d --remove-orphans "${wait_args[@]}" || unhealthy

@@ -3,12 +3,14 @@
 # STUB_PODMAN_COMPOSE, which also has no `rm`, as podman-compose has neither; everything else is
 # recorded and succeeds, `ps -q` naming two containers, which `inspect` reports healthy and
 # without a healthcheck, and `ps -q api` api's, bar a pull under STUB_FAIL_PULL and an `up` under
-# STUB_FAIL_UP, and `ps -aq`, the host agent's look for an old updater, goes unrecorded. A pull
+# STUB_FAIL_UP, and `ps -aq`, the host agent's look for an old updater, goes unrecorded; under
+# STUB_UPDATE_DURING_RM, removing it first runs ./update.sh 1.2.4 and records its exit status. A pull
 # copies the update's record, .update/state.json, to $STUB_LOG.state, as it stands mid-run.
 # `compose config` names the five services' release images at ZAMFONO_VERSION, else VERSION's,
 # or under STUB_OWN_IMAGES=1 images of the operator's own in their place (=<name>: that image's alone);
 # `image inspect` of ghcr.io/zamfono/<name>:<tag> reports the digest `stub_digests` (sourced)
-# gives <name>, another for the image STUB_MOVED_IMAGE names; `volume inspect` finds no volume.
+# gives <name>, another for the image STUB_MOVED_IMAGE names; `volume inspect` finds no volume;
+# - a call with INVOCATION_ID set records it in $STUB_LOG.env.
 stub_digest() {
   echo "sha256:$(printf %s "$1" | sha256sum | cut -c1-64)"
 }
@@ -28,6 +30,12 @@ if [[ $* == 'ps -aq '* ]]; then
   exit 0
 fi
 echo "$*" >>"$STUB_LOG"
+[[ -z ${INVOCATION_ID:-} ]] || echo "INVOCATION_ID=$INVOCATION_ID: $*" >>"$STUB_LOG.env"
+if [[ -n ${STUB_UPDATE_DURING_RM:-} && $* == 'rm -f '* ]]; then
+  status=0
+  STUB_UPDATE_DURING_RM='' ./update.sh 1.2.4 </dev/null >"$STUB_LOG.during" 2>&1 || status=$?
+  echo "update during rm: $status" >>"$STUB_LOG"
+fi
 case $* in
   compose*' ps -q') printf 'api-1\nmigrate-1\n' && exit 0 ;;
   compose*' ps -q api') echo a1 && exit 0 ;;

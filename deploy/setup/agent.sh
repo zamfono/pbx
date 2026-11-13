@@ -148,6 +148,18 @@ update_running() {
   ! flock -n "$LOCK" true
 }
 
+# unless_updating COMMAND... — COMMAND run holding update.sh's lock, so no update starts while it
+# acts on the stack's containers; skipped while an update runs, whose own recreate does it.
+unless_updating() {
+  local fd status=0
+  exec {fd}>"$LOCK"
+  if flock -n "$fd"; then
+    "$@" || status=$?
+  fi
+  exec {fd}>&-
+  return "$status"
+}
+
 # Why the host may not be rebooted from the stack, empty when it may: a Podman stack starts again
 # after a reboot only through its boot unit (README.md, step 7), which must be enabled for that.
 reboot_refused() {
@@ -342,13 +354,16 @@ serve() {
       refuse "the stack directory is not as the host agent needs it; the host's journal says why"
     return 1
   fi
-  rebind_api
+  # While an update runs, its own recreate of the stack does both of these, and Compose aborts
+  # where the agent removes a container at the same time; held for each, the lock keeps an update
+  # from starting meanwhile, and is free again for one the request starts.
+  unless_updating rebind_api
   if ((status == 2)); then
     refuse "$refusal"
   elif ((status == 0)); then
     serve_request
   fi
-  remove_old_updater
+  unless_updating remove_old_updater
   report_host
   # An update's run reports it at its end; read now, it could name the run's pending release.
   update_running || report_stack || warn "could not report what the stack directory runs"

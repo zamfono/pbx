@@ -188,6 +188,18 @@ echo "  - the host agent: removes the updater container a release before 0.9.1 l
 : >"$work/runtime.log"
 agent STUB_OLD_UPDATER=1 || { cat "$work/out"; fail "the agent's run beside an old updater failed"; }
 grep -qx 'rm -f updater-1' "$work/runtime.log" || fail "the old updater was not removed: $(cat "$work/runtime.log")"
+# Not while an update holds the lock, as when update.sh installs the agent, whose first run starts
+# beside it: the update's own recreate removes it, and both at once abort Compose.
+: >"$work/runtime.log"
+(cd "$work/stack" && exec 9>.update/lock && flock 9 && agent STUB_OLD_UPDATER=1) ||
+  { cat "$work/out"; fail "the agent's run beside an update failed"; }
+grep -q 'rm -f' "$work/runtime.log" && fail "the agent removed the old updater during an update: $(cat "$work/runtime.log")"
+# Nor does an update start while the agent removes it: it refuses, as beside another update.
+: >"$work/runtime.log"
+agent STUB_OLD_UPDATER=1 STUB_UPDATE_DURING_RM=1 || { cat "$work/out"; fail "the agent's run beside a starting update failed"; }
+grep -qx 'update during rm: 75' "$work/runtime.log" ||
+  fail "an update started while the agent removed the old updater: $(cat "$work/runtime.log" "$work/runtime.log.during")"
+grep -q 'another update runs' "$work/runtime.log.during" || fail "no word of the agent's lock: $(cat "$work/runtime.log.during")"
 : >"$work/runtime.log"
 ask action=reboot
 agent || { cat "$work/out"; fail "the agent's reboot failed"; }

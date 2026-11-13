@@ -110,6 +110,23 @@ why the specified behaviour changed; the commit history, how.
   but went on running the old local `:0.9` ones, so its `VERSION` named the new release while the
   old one ran and the new release's migrations never ran. `update.sh` now tags the images it
   checked with `.env`'s tag before the stack is recreated.
+- `update.sh` on Podman no longer waits forever for the boot unit's restart, whose `up -d` waits
+  for a service that may never report healthy: it gives up after three minutes, as it does for
+  the healthchecks, stops the unit's start still running then, so it does not act on the stack
+  after the run, and says the stack did not come up healthy. The boot unit at boot is unchanged.
+- On Podman with `podman-compose` as the provider, stopping the boot unit, or its start failing,
+  no longer leaves containers running that Podman can neither stop nor remove ("conmon exited
+  prematurely") and that log nothing: the unit's stop killed each container's `conmon` with it.
+  `setup/compose.sh` now starts them so that `conmon` outlives the unit, as it always did with
+  `docker-compose-plugin`. This affected `update.sh` whenever the boot unit's restart did not
+  finish within three minutes: the rerun said it finished the update while those containers ran on
+  without `conmon` until the next one.
+- An `update.sh` run that installs the host agent no longer fails now and then with "removal of
+  container … is already in progress": the agent's first run removed 0.8.x's `updater` container
+  while `update.sh` was removing it too. The agent now leaves the stack's containers alone while
+  an update runs, and an update started while the agent acts on them refuses to run. A rerun that finishes a stopped update takes the stack `down` first, on Docker
+  too, so a container such a failure left under a temporary name no longer holds it up, and its
+  error no longer says "within 3 minutes" where the start failed at once.
 
 ### Security
 

@@ -411,9 +411,12 @@ missing `METRICS_TOKEN` or `INTERNAL_TOKEN` a generated one, which it does not p
 settings a newer `.env.example` introduced, which keep their defaults until you set them, and
 recreates the stack: on Podman
 through the boot unit of step 7 if there is one, otherwise taking the stack `down` first. It then
-waits up to three minutes for every service to report healthy; an update that stopped before
-that, a failed `up` or an unhealthy service, is finished by running `update.sh` again once the
-cause is fixed. Once the stack is healthy, it removes the Zamfono images no container uses, those
+waits up to three minutes for every service to report healthy, and on Podman as long for
+the boot unit's restart, stopping the unit where its start is still running then; an update that
+stopped before
+that, a failed `up` or an unhealthy service, is finished by running `update.sh`
+again once the
+cause is fixed, which takes the stack `down` first. Once the stack is healthy, it removes the Zamfono images no container uses, those
 of earlier releases; other images on the host stay. It refuses an older release. A breaking one (a new minor while 0.x, a new major from 1.0.0 on) shows the release
 notes in between and asks first; `--yes` answers for a run without a terminal.
 
@@ -505,7 +508,9 @@ stack directory: the continuous replication below, an extra mount such as a back
 the boot unit of step 7 run Compose on `compose.yaml`, `compose.override.yaml` and
 `compose.local.yaml`, so an update or a reboot keeps it, and no update writes it. Leave
 `compose.override.yaml` alone: it is the link to the mode's published overlay, which an update
-replaces. By hand, run Compose through `setup/compose.sh`, which names the same files:
+replaces. By hand, run Compose through `setup/compose.sh`, which names the same files and, as
+root, gives an empty or missing `METRICS_TOKEN` or `INTERNAL_TOKEN` a generated value, as
+`update.sh` does:
 
 ```bash
 ./setup/compose.sh up -d

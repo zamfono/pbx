@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # update-test.sh's stub systemctl, for the boot unit's path, over the units in $STUB_UNIT_DIR: it
 # lists them and shows one's WorkingDirectory, and says every unit is enabled and active; the rest
-# is recorded.
+# is recorded, but a restart under STUB_HANG_RESTART, which never ends, as a oneshot unit's start
+# that waits for a service never healthy: its start job, in $STUB_LOG.job, runs on after this
+# client is killed, until a stop ends it.
 case $1 in
   is-enabled | is-active) exit 0 ;;
   list-unit-files)
@@ -10,5 +12,18 @@ case $1 in
     done
     ;;
   show) sed -n 's/^WorkingDirectory=//p' "$STUB_UNIT_DIR/${*: -1}" ;;
+  restart)
+    if [[ -n ${STUB_HANG_RESTART:-} ]]; then
+      # A session of its own, out of reach of timeout's signal to its process group.
+      setsid sleep 60 </dev/null >/dev/null 2>&1 &
+      echo $! >"$STUB_LOG.job"
+      exec sleep 60
+    fi
+    ;;&
+  stop)
+    if [[ -e $STUB_LOG.job ]] && kill "$(cat "$STUB_LOG.job")" 2>/dev/null; then
+      tail --pid="$(cat "$STUB_LOG.job")" -f /dev/null
+    fi
+    ;;&
   *) echo "systemctl $*" >>"$STUB_LOG" ;;
 esac

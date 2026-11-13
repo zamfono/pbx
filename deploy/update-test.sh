@@ -169,7 +169,9 @@ grep -qx '  "current": "1.2.4",' "$work/stack/.update/stack.json" &&
 echo "  - an update whose stack does not come up healthy is finished by a rerun"
 fresh_stack
 STUB_FAIL_UP=1 update 1.2.4 >"$work/out" 2>&1 && fail "an update whose up failed reported success"
-grep -q 'did not report healthy' "$work/out" || fail "no word of the failed up: $(cat "$work/out")"
+# Whether the up failed at once, as here, or the services did not report healthy in time.
+grep -q 'did not come up healthy: its start failed, or it did not report healthy within 3 minutes' "$work/out" ||
+  fail "no word of the failed up: $(cat "$work/out")"
 grep -q 'image prune' "$work/runtime.log" && fail "an update whose up failed removed images"
 grep -qx '  "pending": "1.2.4"' "$work/stack/.update/stack.json" ||
   fail "the stack report does not name the update to finish: $(cat "$work/stack/.update/stack.json")"
@@ -180,8 +182,11 @@ update 1.2.4 >"$work/out" 2>&1 || { cat "$work/out"; fail "the rerun failed"; }
 grep -q 'finishing it' "$work/out" || fail "the rerun did not finish the update: $(cat "$work/out")"
 grep -qE "^INTERNAL_TOKEN='[0-9a-f]{64}'\$" "$work/stack/.env" || fail "the rerun left INTERNAL_TOKEN missing"
 grep -q ' pull' "$work/runtime.log" && fail "the rerun pulled again"
-grep -qx 'compose up -d --remove-orphans --wait --wait-timeout 180' \
-  "$work/runtime.log" || fail "the rerun did not recreate the stack"
+# The stack down first, on Docker too: a Compose cut off halfway through a recreate leaves a
+# container under a temporary name, which a plain up would wait on.
+[[ $(grep -E '^compose (down|up)' "$work/runtime.log") == "compose down
+compose up -d --remove-orphans --wait --wait-timeout 180" ]] ||
+  fail "the rerun did not take the stack down and recreate it: $(cat "$work/runtime.log")"
 update 1.2.4 | grep -q 'Already on 1.2.4' || fail "the finished update is still pending"
 record_is "$work/stack/.update/state.json" succeeded '' 1.2.4
 

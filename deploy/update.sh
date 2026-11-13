@@ -50,8 +50,9 @@ cd "$(dirname "$0")"
 . setup/boot-unit.sh
 
 REPO=${ZAMFONO_REPO_URL:-https://github.com/zamfono/pbx}
-# How long `up` waits for the recreated services to report healthy.
-WAIT_SECONDS=180
+# How long `up` waits for the recreated services to report healthy; ZAMFONO_WAIT_SECONDS only for
+# update-test.sh.
+WAIT_SECONDS=${ZAMFONO_WAIT_SECONDS:-180}
 # The free space an update needs for its release's images, about 2.5 GB, with room to spare.
 MIN_FREE_GB=3
 # Names the release an update installed until its stack reports healthy, so that a rerun after a
@@ -344,7 +345,7 @@ main() {
       generated_tokens
       offer_host_control || true
       agent_upkeep
-      recreate_stack
+      recreate_stack down
       rm -f "$PENDING"
       echo "Updated to $from. What changed: CHANGELOG.md, or $REPO/releases/tag/v$from"
       exit 0
