@@ -246,7 +246,13 @@ and whether webhooks, voice bots and backup targets may be on private networks
 [Private networks](#private-networks)), and prints the generated `METRICS_TOKEN` once: the bearer
 token of `/metrics` and the full `/healthz` ([Monitoring](#monitoring)), which `.env` keeps. It
 also generates `INTERNAL_TOKEN`, which `api`, `core` and the proxy's certificate hook present to
-each other's internal endpoints, and never prints it.
+each other's internal endpoints, and never prints it. It asks for the Ringotel Admin API key, if
+the stack's users are to have Ringotel's apps (`RINGOTEL_API_TOKEN`; empty for none), without
+showing it as you type or in its summary: the first start stores it encrypted, unchecked, so the
+owner can connect Ringotel right after the first login (`zamfono.help ringotel-setup`); later
+starts ignore it, and the owner changes the key through `settings.update`. Like the mail relay's
+password, it stays in `.env`, which only root reads and which holds `SECRETBOX_KEY`, the key to
+the stored copy, anyway.
 Asked whether to change the ports, it also takes SIP over UDP and TCP, STUN and the RTP range;
 otherwise each keeps its default. Run as root on a host with apt, it offers a checkbox, ticked, to
 keep the host up to date on its own: it installs `unattended-upgrades` for the distribution's
@@ -313,7 +319,8 @@ retained: restoring one needs it as `SECRETBOX_KEY_PREVIOUS`.
 `api` refuses to start while both keys carry the same generation.
 
 Fill in `FQDN`, `COMPANY_NAME`, `MAIN_DID`, `COUNTRY`, `BOOTSTRAP_OWNER_EMAIL`,
-`BOOTSTRAP_OWNER_NAME` and, if you have one, the mail relay (`SMTP_*`, `MAIL_FROM`). The comments
+`BOOTSTRAP_OWNER_NAME` and, if you have them, the mail relay (`SMTP_*`, `MAIL_FROM`) and the
+Ringotel Admin API key (`RINGOTEL_API_TOKEN`). The comments
 in `.env.example` explain each value. For updates through the API, install the host agent (step 8) with `setup/agent.sh install docker`, or `podman`, as root.
 
 The owner's password hash comes from the `api` image itself, so you never type a password into a

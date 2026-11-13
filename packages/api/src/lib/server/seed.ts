@@ -113,6 +113,11 @@ async function createSettings(
           ? null
           : encrypt(kr, 'settings.smtpPasswordEnc', env.SMTP_PASSWORD),
       mailFrom: smtpHost === null ? null : requiredEnv(env, 'MAIL_FROM'),
+      // Stored unchecked: a Ringotel outage must not stop the first boot (§10.4).
+      ringotelApiTokenEnc:
+        env.RINGOTEL_API_TOKEN === undefined
+          ? null
+          : encrypt(kr, 'settings.ringotelApiTokenEnc', env.RINGOTEL_API_TOKEN),
       // A new stack updates itself and reboots its host when that waits for one (with
       // HOST_CONTROL); the columns' default, 0, is what stacks seeded earlier kept.
       autoUpdate: 1,

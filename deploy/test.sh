@@ -182,8 +182,13 @@ for line in 'SIP_UDP_ENABLED: "false"' 'SIP_TCP_ENABLED: "true"' 'STUN_ENABLED: 
     exit 1
   }
 done
+# Unasked, there is no Ringotel API key.
+[ "$(echo "$net_config" | grep -cF 'RINGOTEL_API_TOKEN: ""')" = 1 ] || {
+  echo "setup.sh wrote a Ringotel API key nobody gave" >&2
+  exit 1
+}
 rm -f "$bundle_dir/x/.env" "$bundle_dir/x/compose.override.yaml"
-run_setup TZ=Europe/Vienna MEDIA_STORAGE_MAX=20G
+run_setup TZ=Europe/Vienna MEDIA_STORAGE_MAX=20G RINGOTEL_API_TOKEN='rt-$ecret'
 [ "$(stat -c %a "$bundle_dir/x/.env")" = 600 ]
 # The mode's overlay is linked as compose.override.yaml, which a plain `compose` reads.
 [ "$(readlink "$bundle_dir/x/compose.override.yaml")" = compose.ports.yaml ]
@@ -220,6 +225,15 @@ if grep -qF "$internal_token" "$bundle_dir/setup.out"; then
   echo "setup.sh printed INTERNAL_TOKEN" >&2
   exit 1
 fi
+# The Ringotel API key reaches api alone, and is never printed.
+[ "$(echo "$setup_config" | grep -cF 'RINGOTEL_API_TOKEN: rt-$$ecret')" = 1 ] || {
+  echo "setup.sh did not write RINGOTEL_API_TOKEN for api alone" >&2
+  exit 1
+}
+if grep -qF 'rt-$ecret' "$bundle_dir/setup.out"; then
+  echo "setup.sh printed RINGOTEL_API_TOKEN" >&2
+  exit 1
+fi
 # Unasked, private targets are allowed, in api and core alike (§3.1).
 [ "$(echo "$setup_config" | grep -cF 'ALLOW_PRIVATE_TARGETS: "true"')" = 2 ] || {
   echo "setup.sh did not write ALLOW_PRIVATE_TARGETS=true for api and core" >&2
@@ -230,6 +244,32 @@ if (cd "$bundle_dir/x" && ./setup.sh </dev/null >/dev/null 2>&1); then
   echo "setup.sh overwrote an existing .env" >&2
   exit 1
 fi
+
+# Asked in a terminal, the Ringotel API key is written to .env, an empty answer leaving it empty,
+# and the confirmation says only whether one is set. Every other answer comes from the
+# environment; the questions left: a mail relay (n), the key, other ports (n), and Write (y).
+for key in rt-terminal-key ''; do
+  rm -f "$bundle_dir/x/.env" "$bundle_dir/x/compose.override.yaml"
+  printf 'n\n%s\nn\ny\n' "$key" | (cd "$bundle_dir/x" && env SETUP_PLAIN=1 ZAMFONO_AGENT=false \
+    ZAMFONO_API_IMAGE="$API_IMAGE" ZAMFONO_VERSION=edge ZAMFONO_MODE=ports EXTERNAL_IPV4=198.51.100.7 \
+    FQDN=pbx.example.com COMPANY_NAME=Acme MAIN_DID=+4930123456 COUNTRY=DE EXT_LENGTH=3 \
+    TZ=Europe/Vienna MEDIA_STORAGE_MAX=20G ALLOW_PRIVATE_TARGETS=true UNATTENDED_UPGRADES=false \
+    HOST_CONTROL=false BOOTSTRAP_OWNER_NAME=Owner BOOTSTRAP_OWNER_EMAIL=owner@example.com \
+    BOOTSTRAP_OWNER_PASSWORD_HASH='$argon2id$v=19$m=65536,p=4,t=3$c2FsdA$aGFzaA' \
+    script -qec ./setup.sh /dev/null) >"$bundle_dir/setup.out" 2>&1 || {
+    cat "$bundle_dir/setup.out" >&2
+    echo "setup.sh in a terminal failed" >&2
+    exit 1
+  }
+  shown=none
+  [ -z "$key" ] || shown="set"
+  grep -qx "RINGOTEL_API_TOKEN='$key'" "$bundle_dir/x/.env" &&
+    tr -d '\r' <"$bundle_dir/setup.out" | grep -qx "Ringotel API key: $shown" || {
+    cat "$bundle_dir/setup.out" >&2
+    echo "setup.sh did not take the Ringotel API key '$key' from the terminal, shown as $shown" >&2
+    exit 1
+  }
+done
 
 echo "==> the Podman boot unit and setup/compose.sh, with and without compose.local.yaml"
 unit=$(cd "$bundle_dir/x" && bash -c '. setup/boot-unit.sh && unit_text')

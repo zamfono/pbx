@@ -100,6 +100,7 @@ export const variables = defineEnvVars({
   METRICS_TOKEN: optional,
   MIGRATIONS_DIR: withDefault('/app/db/migrations'),
   MOH_SOURCE_DIR: withDefault('/usr/share/asterisk/moh'),
+  RINGOTEL_API_TOKEN: optional,
   SECRETBOX_KEY: required,
   SECRETBOX_KEY_PREVIOUS: optional,
   SIP_TCP_ENABLED: onUnlessFalse,

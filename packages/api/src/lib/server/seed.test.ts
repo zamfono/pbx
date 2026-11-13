@@ -1,6 +1,7 @@
 import { access, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import * as privateEnv from '$app/env/private';
 import pino from 'pino';
 import {
   afterAll,
@@ -14,9 +15,11 @@ import {
 
 import { migratedTestDb } from '@zamfono/shared/testDb.js';
 
+import { runOperation } from '#lib/server/ops/runner.js';
 import { testKeyring } from '#testing/fixtures.js';
+import { installRingotelFake } from '#testing/ringotelFake.js';
 
-import { decrypt } from './secretbox.js';
+import { decrypt, keyringFromEnv } from './secretbox.js';
 import { seedIfEmpty } from './seed.js';
 import type { SeedEnv } from './seedEnv.js';
 import {
@@ -24,6 +27,10 @@ import {
   MOH_TRACK_BASENAMES,
   MOH_WIDEBAND_EXT
 } from './seedMoh.js';
+
+import '#lib/server/ops/provisioning/index.js';
+
+process.env.FQDN = 'pbx.example.com';
 
 const EXT_LENGTH_TWO = 2;
 
@@ -244,6 +251,101 @@ describe('seedIfEmpty', () => {
         settings.smtpPasswordEnc
       ).toString('utf8')
     ).toBe('relay-secret');
+  });
+
+  it('seeds the Ringotel API key encrypted, which a later start ignores', async () => {
+    const db = await migratedTestDb();
+    const mediaDir = await tempMediaDir();
+    const kr = testKeyring();
+    await seedIfEmpty(
+      db,
+      baseEnv({ RINGOTEL_API_TOKEN: 'ringotel-key' }),
+      kr,
+      mediaDir,
+      silentLogger
+    );
+    const storedKey = async (): Promise<string> => {
+      const { ringotelApiTokenEnc } = await db
+        .selectFrom('settings')
+        .select('ringotelApiTokenEnc')
+        .executeTakeFirstOrThrow();
+      if (ringotelApiTokenEnc === null) {
+        throw new Error('expected ringotel_api_token_enc to be set');
+      }
+      expect(Buffer.from(ringotelApiTokenEnc).includes('ringotel-key')).toBe(
+        false
+      );
+      return decrypt(
+        kr,
+        'settings.ringotelApiTokenEnc',
+        ringotelApiTokenEnc
+      ).toString('utf8');
+    };
+    expect(await storedKey()).toBe('ringotel-key');
+    expect(
+      await seedIfEmpty(
+        db,
+        baseEnv({ RINGOTEL_API_TOKEN: 'another-key' }),
+        kr,
+        mediaDir,
+        silentLogger
+      )
+    ).toBe('skipped');
+    expect(await storedKey()).toBe('ringotel-key');
+  });
+
+  it('seeds no Ringotel API key without RINGOTEL_API_TOKEN', async () => {
+    const db = await migratedTestDb();
+    await seedIfEmpty(
+      db,
+      baseEnv(),
+      testKeyring(),
+      await tempMediaDir(),
+      silentLogger
+    );
+    const { ringotelApiTokenEnc } = await db
+      .selectFrom('settings')
+      .select('ringotelApiTokenEnc')
+      .executeTakeFirstOrThrow();
+    expect(ringotelApiTokenEnc).toBeNull();
+  });
+
+  it('lets the owner run Ringotel setup right after it, with the seeded key (§10.4)', async () => {
+    const db = await migratedTestDb();
+    await seedIfEmpty(
+      db,
+      baseEnv({ RINGOTEL_API_TOKEN: 'ringotel-key' }),
+      keyringFromEnv(privateEnv),
+      await tempMediaDir(),
+      silentLogger
+    );
+    const owner = await db
+      .selectFrom('users')
+      .select(['id', 'name'])
+      .executeTakeFirstOrThrow();
+    const fake = installRingotelFake([]);
+    onTestFinished(fake.restore);
+    const fakeFetch = globalThis.fetch;
+    const bearers: (string | null)[] = [];
+    globalThis.fetch = ((url: string, init?: RequestInit) => {
+      bearers.push(new Headers(init?.headers).get('authorization'));
+      return fakeFetch(url, init);
+    }) as typeof fetch;
+
+    await runOperation(
+      db,
+      'provisioning.ringotelSetup',
+      { domain: 'testco', region: '3', packageid: 1 },
+      {
+        actor: { id: owner.id, name: owner.name, role: 'owner' },
+        channel: 'rest',
+        requestId: 'req-1'
+      }
+    );
+
+    expect(fake.organizations.map(org => org.domain)).toEqual(['testco']);
+    expect(fake.branches).toHaveLength(1);
+    expect(new Set(bearers)).toEqual(new Set(['Bearer ringotel-key']));
   });
 
   it('gives the owner the highest extension less one, leaving all-nines free', async () => {

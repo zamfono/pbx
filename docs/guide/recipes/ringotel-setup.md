@@ -13,7 +13,10 @@ device is pushed to Ringotel, and the employee onboards through Ringotel's activ
 QR code instead of typing SIP credentials. The owner connects the stack once.
 
 1. Store the Ringotel Admin API key: `settings.update` (`PATCH /api/v1/settings`) with
-   `ringotelApiToken`. It is the account's key, so it reaches every organization in that Ringotel
+   `ringotelApiToken`. Where `settings.get` reports `ringotelApiTokenSet: true` already, the
+   operator gave the key to `setup.sh` and the stack's first start stored it: skip this step. The
+   first start does not check it, so a wrong key shows in the next step's refusal. It is the
+   account's key, so it reaches every organization in that Ringotel
    account, other customers' included; Zamfono only ever touches the one it set up or adopted.
 2. Check whether the organization exists already. The domain is unique across Ringotel, so an
    organization created earlier in the Ringotel Shell, or left behind by a setup that failed,

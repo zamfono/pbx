@@ -182,6 +182,7 @@ services:
       SMTP_SECURITY: ${SMTP_SECURITY:-}         # tls | starttls
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      RINGOTEL_API_TOKEN: ${RINGOTEL_API_TOKEN:-}   # the Ringotel Admin API key, seeded into settings.ringotel_api_token_enc (§10.4); empty = none until an owner sets one
       COUNTRY: ${COUNTRY}                       # ISO 3166-1 alpha-2
       EXT_LENGTH: ${EXT_LENGTH:-}
     cap_drop: [ALL]

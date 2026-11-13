@@ -32,6 +32,12 @@ why the specified behaviour changed; the commit history, how.
 
 ### Added
 
+- `setup.sh` asks for the Ringotel Admin API key (`RINGOTEL_API_TOKEN`, optional; empty for no
+  Ringotel), never showing it, and the stack's first start stores it encrypted, unchecked, so the
+  owner connects Ringotel right after the first login without setting the key first. Later starts
+  ignore it; the key stays in `.env`, like `SMTP_PASSWORD`. On an existing stack `update.sh` lists
+  it as a new setting: leave it unset there, since only a first start reads it, and set the key
+  through `settings.update`.
 - `GET /api/v1/personalAccessTokens` (`personalAccessTokens.listAll`, on MCP too) lists every
   user's personal access tokens in one paginated call, never their values, each with its user's
   id, name and e-mail, for an admin or owner; an admin's list leaves out owners' tokens.

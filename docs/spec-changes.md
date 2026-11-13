@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-11-13 · §6.3 Compose stack (listing, Environment, First boot), §10.4 Ringotel (Configuration and lifecycle).** `RINGOTEL_API_TOKEN` in `.env`, which `api` alone receives, is a first-boot seed: the first boot stores it encrypted as `settings.ringotel_api_token_enc` without checking it against Ringotel, and later boots ignore it. `setup.sh` asks for it, optional, without showing it, its confirmation saying only whether a key is set. The key stays in `.env` after the seed.
+*Why:* the key could only be set through the settings after the first login, although the operator has it when running `setup.sh` (TASK-110). The product owner decided on 2026-11-13 that the key stays in `.env`, as `SMTP_PASSWORD` does: `.env` is root's alone and holds `SECRETBOX_KEY`, which decrypts the stored copy on the same host, so the plaintext copy adds no real exposure; and that the first boot does not check the key, since a Ringotel outage must not stop it.
+
 **2026-11-13 · §10.6 Webhooks, §11.1 Schema conventions (Soft delete).** A delivery's row is deleted when its hook is switched off, as when it is deleted, each checked again before every attempt, and switching the hook on again brings none of its dropped deliveries back.
 *Why:* a review (TASK-35) found that only enqueueing checked `active`: a switched-off hook's queued deliveries and retries, and those resumed after a restart, still reached its receiver, so switching off did not stop a receiver that had to be stopped at once, such as a compromised one. Dropping them, rather than holding them until the hook is on again, keeps an old event from reaching whatever URL the hook names by then.
 

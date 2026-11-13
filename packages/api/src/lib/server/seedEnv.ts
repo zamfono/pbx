@@ -34,6 +34,7 @@ type SeedVariable =
   | 'EXT_LENGTH'
   | 'MAIL_FROM'
   | 'MAIN_DID'
+  | 'RINGOTEL_API_TOKEN'
   | 'SMTP_HOST'
   | 'SMTP_PASSWORD'
   | 'SMTP_PORT'

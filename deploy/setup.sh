@@ -127,6 +127,15 @@ ask_mail() {
   ask MAIL_FROM v_email "Sender address" "The From: address of every mail the stack sends."
 }
 
+# The Ringotel Admin API key, which api's first boot stores encrypted (§10.4): asked hidden, never
+# shown, and optional, as an empty answer means no Ringotel; one set in the environment, empty
+# included, is not asked.
+ask_ringotel() {
+  if [[ ! -v RINGOTEL_API_TOKEN && -n $interactive ]]; then
+    RINGOTEL_API_TOKEN=$(ui_password "Ringotel API key" "The Ringotel Admin API key for the mobile and desktop apps; empty for no Ringotel. An owner can set it later through the API.") || ui_cancel
+  fi
+}
+
 # The listeners an operator may switch off, and the RTP range (§6.1, §9.1); unasked, each keeps
 # its default.
 ask_network() {
@@ -276,6 +285,7 @@ main() {
   ask BOOTSTRAP_OWNER_NAME v_nonempty "Owner name" "The first owner's full name."
   ask BOOTSTRAP_OWNER_EMAIL v_email "Owner email" "The first owner's email address, also the login."
   ask_mail
+  ask_ringotel
   ask_network
   ask_password
   ask_host
@@ -290,7 +300,10 @@ main() {
   : "${INTERNAL_TOKEN:=$(random_hex 32)}"
 
   if [[ -n $interactive ]]; then
-    ui_yesno "Write .env with these values?\n\nMode: $ZAMFONO_MODE ($address)\nHost name: $FQDN\nCompany: $COMPANY_NAME\nMain number: $MAIN_DID ($COUNTRY)\nOwner: $BOOTSTRAP_OWNER_NAME <$BOOTSTRAP_OWNER_EMAIL>\nMail relay: ${SMTP_HOST:-none}\nSIP over UDP: ${SIP_UDP_ENABLED:-true}, over TCP: ${SIP_TCP_ENABLED:-true}, STUN: ${STUN_ENABLED:-true}\nRTP: ${RTP_PORT_START:-10000}-${RTP_PORT_END:-10200}/udp\nMedia storage limit: ${MEDIA_STORAGE_MAX:-none}\nTargets on private networks: $ALLOW_PRIVATE_TARGETS\nHost upgrades: $UNATTENDED_UPGRADES, owners control the host: $HOST_CONTROL" Write Abort ||
+    # Whether a key is set, never the key.
+    ringotel=none
+    [[ -z ${RINGOTEL_API_TOKEN:-} ]] || ringotel="set"
+    ui_yesno "Write .env with these values?\n\nMode: $ZAMFONO_MODE ($address)\nHost name: $FQDN\nCompany: $COMPANY_NAME\nMain number: $MAIN_DID ($COUNTRY)\nOwner: $BOOTSTRAP_OWNER_NAME <$BOOTSTRAP_OWNER_EMAIL>\nMail relay: ${SMTP_HOST:-none}\nRingotel API key: $ringotel\nSIP over UDP: ${SIP_UDP_ENABLED:-true}, over TCP: ${SIP_TCP_ENABLED:-true}, STUN: ${STUN_ENABLED:-true}\nRTP: ${RTP_PORT_START:-10000}-${RTP_PORT_END:-10200}/udp\nMedia storage limit: ${MEDIA_STORAGE_MAX:-none}\nTargets on private networks: $ALLOW_PRIVATE_TARGETS\nHost upgrades: $UNATTENDED_UPGRADES, owners control the host: $HOST_CONTROL" Write Abort ||
       { echo "Setup aborted; nothing was written." >&2; exit 1; }
   fi
 
@@ -299,7 +312,7 @@ main() {
     SMTP_PASSWORD MAIL_FROM BOOTSTRAP_OWNER_EMAIL BOOTSTRAP_OWNER_NAME BOOTSTRAP_OWNER_PASSWORD_HASH \
     COMPANY_NAME MAIN_DID COUNTRY EXT_LENGTH TZ SIP_UDP_ENABLED SIP_TCP_ENABLED STUN_ENABLED \
     RTP_PORT_START RTP_PORT_END HOST_CONTROL METRICS_TOKEN MEDIA_STORAGE_MAX INTERNAL_TOKEN \
-    ALLOW_PRIVATE_TARGETS
+    ALLOW_PRIVATE_TARGETS RINGOTEL_API_TOKEN
   ln -sfn "$overlay" compose.override.yaml
 
   echo "Wrote $PWD/.env (readable by root only), and linked compose.override.yaml to $overlay."
