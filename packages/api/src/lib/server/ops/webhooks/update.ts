@@ -47,7 +47,10 @@ function nextEventTypesJson(
   return JSON.stringify(eventTypes);
 }
 
-/** `PATCH /webhooks/{id}` (§10.6): URL, secret, event-type filter and the `active` switch. */
+/**
+ * `PATCH /webhooks/{id}` (§10.6): URL, secret, event-type filter and the `active` switch. A hook
+ * switched off drops its pending deliveries, which switching it on again does not bring back.
+ */
 export const update = defineOperation({
   name: 'webhooks.update',
   description:
@@ -82,6 +85,12 @@ export const update = defineOperation({
       .set({ ...columns, secretEnc })
       .where('id', '=', input.id)
       .execute();
+    if (!active) {
+      await ctx.db
+        .deleteFrom('webhookDeliveries')
+        .where('webhookId', '=', input.id)
+        .execute();
+    }
     const row = await ctx.db
       .selectFrom('webhooks')
       .selectAll()

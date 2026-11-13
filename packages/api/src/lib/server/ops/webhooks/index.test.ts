@@ -70,7 +70,10 @@ describe('webhooks', () => {
     expect(afterDelete.items.map(item => item.id)).not.toContain(created.id);
   });
 
-  it("drops a deleted webhook's pending deliveries", async () => {
+  it.each([
+    ['deleted', 'webhooks.delete', {}],
+    ['switched off', 'webhooks.update', { active: false }]
+  ])("drops a %s webhook's pending deliveries", async (_case, name, change) => {
     const db = await makeTestDb();
     const created = (await runOperation(
       db,
@@ -92,10 +95,53 @@ describe('webhooks', () => {
 
     await runOperation(
       db,
-      'webhooks.delete',
-      { id: created.id },
+      name,
+      { id: created.id, ...change },
       asRun({ confirm: true })
     );
+
+    const pending = await db
+      .selectFrom('webhookDeliveries')
+      .select('id')
+      .execute();
+    expect(pending).toEqual([]);
+  });
+
+  it('brings back no dropped delivery when a hook is switched on again', async () => {
+    const db = await makeTestDb();
+    const created = (await runOperation(
+      db,
+      'webhooks.create',
+      { url: 'https://example.invalid/hook', secret: 'sh-secret' },
+      asRun()
+    )) as WebhookWire;
+    await runOperation(
+      db,
+      'webhooks.update',
+      { id: created.id, active: true },
+      asRun()
+    );
+    await db
+      .insertInto('webhookDeliveries')
+      .values({
+        id: 'delivery-1',
+        webhookId: created.id,
+        bodyJson: '{}',
+        attempts: 1,
+        nextAttemptAt: '2026-10-01T10:00:01.000Z',
+        createdAt: '2026-10-01T10:00:00.000Z'
+      })
+      .execute();
+
+    for (const active of [false, true]) {
+      // eslint-disable-next-line no-await-in-loop -- off, then on again, in that order
+      await runOperation(
+        db,
+        'webhooks.update',
+        { id: created.id, active },
+        asRun()
+      );
+    }
 
     const pending = await db
       .selectFrom('webhookDeliveries')

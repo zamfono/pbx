@@ -108,8 +108,9 @@ the body and an `X-Zamfono-Signature` header.
   Deduplicate on `id`. Events are delivered concurrently, so order them by `at`, not by arrival.
 - Pending deliveries are kept in the database: a delivery queued or between retries when the
   `api` container restarts (an update, a crash) goes on after it, with the attempts it has left,
-  and one cut off mid-request is sent again. Deleting a hook drops its pending deliveries. An
-  event that happens while `api` is down reaches no webhook, so treat a webhook as a
+  and one cut off mid-request is sent again. Deleting a hook or switching it off drops its pending
+  deliveries, a retry already waiting included, and switching it on again brings none of them
+  back. An event that happens while `api` is down reaches no webhook, so treat a webhook as a
   notification and re-read state through the API (`calls.list`, `voicemails.list`, …) after a
   gap.
 

@@ -469,37 +469,71 @@ describe('WebhookDispatcher across a restart', () => {
     expect(await lastStatusOf(db)).toBe('failing');
   });
 
-  it('drops a retrying delivery whose hook is deleted, without a status', async () => {
+  it('drops a resumed delivery whose hook was switched off, without a status', async () => {
     const db = await migratedTestDb();
     const kr = testKeyring();
-    await insertWebhook(db, kr, { url: stub.url });
-    stub.setStatus(FAILING_STATUS);
-    const retry = Promise.withResolvers<undefined>();
-    const retrying = Promise.withResolvers<undefined>();
-    const dispatcher = new WebhookDispatcher({
+    await insertWebhook(db, kr, { url: stub.url, active: 0 });
+    await db
+      .insertInto('webhookDeliveries')
+      .values({
+        id: 'delivery-1',
+        webhookId: 'hook-1',
+        bodyJson: JSON.stringify(sampleEvent()),
+        attempts: 1,
+        nextAttemptAt: '2026-10-01T10:00:00.000Z',
+        createdAt: '2026-10-01T09:59:59.000Z'
+      })
+      .execute();
+
+    await new WebhookDispatcher({
       db,
       kr,
       targetPolicy: null,
-      delay: () => {
-        retrying.resolve(undefined);
-        return retry.promise;
-      }
-    });
-    const delivery = dispatcher.enqueue(sampleEvent());
-    await retrying.promise;
+      delay: noDelay
+    }).resume();
 
-    await db
-      .updateTable('webhooks')
-      .set({ deletedAt: nowIso() })
-      .where('id', '=', 'hook-1')
-      .execute();
-    retry.resolve(undefined);
-    await delivery;
-
-    expect(stub.requests).toHaveLength(1);
+    expect(stub.requests).toEqual([]);
     expect(await pendingDeliveries(db)).toEqual([]);
     expect(await lastStatusOf(db)).toBeNull();
   });
+
+  it.each([
+    ['deleted', { deletedAt: nowIso() }],
+    ['switched off', { active: 0 }]
+  ])(
+    'drops a retrying delivery whose hook is %s, without a status',
+    async (_case, change) => {
+      const db = await migratedTestDb();
+      const kr = testKeyring();
+      await insertWebhook(db, kr, { url: stub.url });
+      stub.setStatus(FAILING_STATUS);
+      const retry = Promise.withResolvers<undefined>();
+      const retrying = Promise.withResolvers<undefined>();
+      const dispatcher = new WebhookDispatcher({
+        db,
+        kr,
+        targetPolicy: null,
+        delay: () => {
+          retrying.resolve(undefined);
+          return retry.promise;
+        }
+      });
+      const delivery = dispatcher.enqueue(sampleEvent());
+      await retrying.promise;
+
+      await db
+        .updateTable('webhooks')
+        .set(change)
+        .where('id', '=', 'hook-1')
+        .execute();
+      retry.resolve(undefined);
+      await delivery;
+
+      expect(stub.requests).toHaveLength(1);
+      expect(await pendingDeliveries(db)).toEqual([]);
+      expect(await lastStatusOf(db)).toBeNull();
+    }
+  );
 
   // §3.1 "Outbound targets": loopback is never delivered to, named by its literal or by a name
   // that resolves to it, and the hook's lastError says so, nothing more.

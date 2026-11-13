@@ -225,7 +225,7 @@ export class WebhookDispatcher {
 
   /**
    * One POST of `row`'s body, signed with its hook's current secret, or `null` when the delivery
-   * is gone or its hook deleted, which ends it with no status. A secret that cannot be decrypted
+   * is gone or its hook deleted or switched off, which ends it with no status. A secret that cannot be decrypted
    * (§5.4: a key replaced without its previous generation, a database restored under another
    * `.env`) fails the delivery for good: no later attempt could read it either.
    */
@@ -235,6 +235,7 @@ export class WebhookDispatcher {
       .innerJoin('webhooks', 'webhooks.id', 'webhookDeliveries.webhookId')
       .select(['webhooks.url', 'webhooks.secretEnc'])
       .where('webhookDeliveries.id', '=', row.id)
+      .where('webhooks.active', '=', 1)
       .where('webhooks.deletedAt', 'is', null)
       .executeTakeFirst();
     if (hook === undefined) {

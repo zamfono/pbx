@@ -259,6 +259,10 @@ why the specified behaviour changed; the commit history, how.
   differs.
 - Deleting a user now revokes their set-password links too, so a link issued before the deletion
   no longer works after an undo.
+- A webhook switched off kept receiving the events queued for it and their retries, also after
+  an `api` restart, so switching it off did not stop a receiver that had to be stopped at once.
+  Switching a hook off now drops its pending deliveries, as deleting it does, and switching it on
+  again brings none of them back.
 
 ## [0.9.1] - 2026-11-12
 
