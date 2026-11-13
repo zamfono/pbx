@@ -53,6 +53,8 @@ const USER_ANY_OPS = new Set([
   'voicemails.list'
 ]);
 const USER_OWN_AREAS = ['hours', 'ooo', 'personalAccessTokens'];
+/** The admin operations in a `USER_OWN_AREAS` area. */
+const ADMIN_OPS = new Set(['personalAccessTokens.listAll']);
 const USER_OWN_OPS = new Set([
   ...['addParty', 'consult', 'get', 'hangup', 'hold', 'list', 'originate']
     .concat(['park', 'resume', 'transfer'])
@@ -91,6 +93,9 @@ function specDeclared(name: string): Declared {
     return 'user:any';
   }
   const area = name.slice(0, name.indexOf('.'));
+  if (ADMIN_OPS.has(name)) {
+    return 'admin';
+  }
   return USER_OWN_OPS.has(name) || USER_OWN_AREAS.includes(area)
     ? 'user:own'
     : 'admin';

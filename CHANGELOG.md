@@ -13,6 +13,9 @@ why the specified behaviour changed; the commit history, how.
 
 ### Added
 
+- `GET /api/v1/personalAccessTokens` (`personalAccessTokens.listAll`, on MCP too) lists every
+  user's personal access tokens in one paginated call, never their values, each with its user's
+  id, name and e-mail, for an admin or owner; an admin's list leaves out owners' tokens.
 - `MEDIA_STORAGE_MAX` in `.env` limits the media volume, so that on a host running several stacks
   one customer cannot fill the disk: bytes with an optional `K`, `M`, `G` or `T`, e.g. `20G`;
   empty, the default, is no limit, and a malformed value stops `api` and `core` at start. It counts

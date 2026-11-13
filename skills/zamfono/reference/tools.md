@@ -77,6 +77,7 @@
 | `personalAccessTokens.create` | `POST /api/v1/users/{id}/personalAccessTokens` | Creates a personal access token, acting as the user, for a server application; its value is returned once. | user | no |
 | `personalAccessTokens.current` | `GET /api/v1/personalAccessTokens/current` | Reads the personal access token the caller authenticated with, e.g. to see when it expires; 404 for a caller without one. | user | no |
 | `personalAccessTokens.list` | `GET /api/v1/users/{id}/personalAccessTokens` | Lists a user's personal access tokens, revoked and expired ones until the daily purge, paginated. | user | no |
+| `personalAccessTokens.listAll` | `GET /api/v1/personalAccessTokens` | Lists every user's personal access tokens, each with its user, revoked and expired ones until the daily purge, paginated; an admin's list leaves out owners' tokens. | admin | no |
 | `personalAccessTokens.revoke` | `POST /api/v1/personalAccessTokens/{id}/revoke` | Revokes a personal access token; the application using it loses access at once. | user | yes |
 | `presenceLog.snapshot` | `GET /api/v1/presence/log` | Snapshots each user's presence state as of a past timestamp. | admin | no |
 | `provisioning.ringotelAdopt` | `POST /api/v1/provisioning/ringotel/adopt` | Adopts an existing, empty Ringotel organization (by id and domain) and one of its connections, or a new one, instead of creating them. | owner | yes |

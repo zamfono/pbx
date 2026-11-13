@@ -31,7 +31,10 @@ OAuth instead: they are told where to log in and continue on their own.
    (`GET /api/v1/personalAccessTokens/current`) the token itself, with its `id` and `expiresAt`;
    a revoked or expired token gets 401.
 4. Check it is in use: `personalAccessTokens.list` (`GET /api/v1/users/{id}/personalAccessTokens`)
-   shows each token's `lastUsedAt`, updated at most once a minute, never the token itself.
+   shows each token's `lastUsedAt`, updated at most once a minute, never the token itself. To see
+   every user's at once, e.g. after a leak or before a credential review, an admin or owner calls
+   `personalAccessTokens.listAll` (`GET /api/v1/personalAccessTokens`), each token with its `user`;
+   an admin's list leaves out owners' tokens.
 5. Replace or withdraw it: create a new token under another name, switch the application over, then
    `personalAccessTokens.revoke` (`POST /api/v1/personalAccessTokens/{id}/revoke`) the old one. It
    stops working at once and cannot be undone. Deleting the user revokes all of their tokens, and so

@@ -149,6 +149,7 @@ const STATIC_ROUTES: RouteTuple[] = [
     'personalAccessTokens.create',
     WITH_USER_ID
   ],
+  ['GET', '/personalAccessTokens', 'personalAccessTokens.listAll'],
   ['GET', '/personalAccessTokens/current', 'personalAccessTokens.current'],
   ['POST', '/personalAccessTokens/{id}/revoke', 'personalAccessTokens.revoke'],
   ['POST', '/provisioning/ringotel/setup', 'provisioning.ringotelSetup'],

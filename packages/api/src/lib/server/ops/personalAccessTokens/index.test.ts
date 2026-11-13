@@ -140,6 +140,76 @@ describe('personalAccessTokens', () => {
     ).rejects.toMatchObject({ status: 403 });
   });
 
+  // §10.3 "Personal access tokens": the tenant-wide list, an owner's tokens owner-only.
+  it("lists every user's tokens with their user, an admin's without owners' ones", async () => {
+    const db = await seededDb();
+    const annas = await create(db, anna, anna.id);
+    const bens = await create(db, admin, ben.id);
+    const owners = await create(db, owner, owner.id);
+    function listAll(actor: Actor): Promise<{
+      items: Record<string, unknown>[];
+      totalSize: number;
+    }> {
+      return runOperation(
+        db,
+        'personalAccessTokens.listAll',
+        {},
+        asRun({ actor })
+      ) as Promise<{ items: Record<string, unknown>[]; totalSize: number }>;
+    }
+    const byOwner = await listAll(owner);
+    expect(byOwner.totalSize).toBe(3);
+    expect(byOwner.items.map(item => item.id).sort()).toEqual(
+      [annas.id, bens.id, owners.id].sort()
+    );
+    for (const item of byOwner.items) {
+      expect(item).not.toHaveProperty('token');
+    }
+    expect(byOwner.items).toContainEqual(
+      expect.objectContaining({
+        id: bens.id,
+        createdBy: admin.id,
+        user: { id: ben.id, name: ben.name, email: 'ben@example.com' }
+      })
+    );
+    const byAdmin = await listAll(admin);
+    expect(byAdmin.totalSize).toBe(2);
+    expect(byAdmin.items.map(item => item.id).sort()).toEqual(
+      [annas.id, bens.id].sort()
+    );
+    await expect(listAll(anna)).rejects.toMatchObject({ status: 403 });
+    // Every token a caller lists, it revokes: an admin theirs, an owner the rest.
+    for (const item of byAdmin.items) {
+      // eslint-disable-next-line no-await-in-loop -- one revocation after another on the same db
+      await revoke(db, admin, item.id as string);
+    }
+    await revoke(db, owner, owners.id);
+    const revoked = await listAll(owner);
+    expect(revoked.items.map(item => item.revokedAt)).not.toContain(null);
+  });
+
+  it('pages the tenant-wide list', async () => {
+    const db = await seededDb();
+    await create(db, anna, anna.id);
+    await create(db, ben, ben.id);
+    const first = (await runOperation(
+      db,
+      'personalAccessTokens.listAll',
+      { pageSize: 1 },
+      asRun({ actor: admin })
+    )) as { items: { id: string }[]; nextPageToken: string | null };
+    const second = (await runOperation(
+      db,
+      'personalAccessTokens.listAll',
+      { pageSize: 1, pageToken: first.nextPageToken },
+      asRun({ actor: admin })
+    )) as { items: { id: string }[]; nextPageToken: string | null };
+    expect(first.items).toHaveLength(1);
+    expect(second.items).toHaveLength(1);
+    expect(second.items[0]?.id).not.toBe(first.items[0]?.id);
+    expect(second.nextPageToken).toBeNull();
+  });
+
   // §5.2: a name is unique among the user's live tokens; an expired token is not live.
   it('takes the name of an expired token again', async () => {
     const db = await seededDb();
