@@ -150,6 +150,7 @@ grep -q 'rm -sf proxy' "$work/runtime.log" && fail "Docker needs no removal of p
 ' label=org.opencontainers.image.source=https://github.com/zamfono/pbx' ]] ||
   fail "no prune of the stack's unused images after up: $(cat "$work/runtime.log")"
 grep -q 'Updated 1.2.3 -> 1.2.4' "$work/out" || fail "no report of the update"
+grep -q '^tag ' "$work/runtime.log" && fail "a pinned stack's images were tagged: $(cat "$work/runtime.log")"
 echo "  - recorded in .update/state.json: running while it runs, then succeeded"
 record_is "$work/runtime.log.state" running 1.2.3 1.2.4
 record_is "$work/stack/.update/state.json" succeeded 1.2.3 1.2.4
@@ -182,6 +183,35 @@ grep -q 'nothing was changed' "$work/out" || fail "no word of the failed pull: $
 [[ $(pin) == '1.2.3 ZAMFONO_VERSION:-1.2.3' ]] || fail "a failed pull left the stack at $(pin)"
 grep -q 'up -d' "$work/runtime.log" && fail "a failed pull still recreated the stack"
 record_is "$work/stack/.update/state.json" failed 1.2.3 1.2.4 'pulling the 1.2.4 images failed'
+
+echo "  - a stack following a line or latest runs the images checked, tagged with .env's tag"
+# tags_are VERSION TAG NAME... — the run tagged exactly NAME's VERSION image as TAG, between the
+# DIGESTS check and the up.
+tags_are() {
+  local version=$1 tag=$2 expected='' name
+  shift 2
+  for name in "$@"; do expected+="tag ghcr.io/zamfono/$name:$version ghcr.io/zamfono/$name:$tag "; done
+  [[ $(sed -n '/^image inspect /,/^compose up -d/p' "$work/runtime.log" | grep '^tag ' | sort | tr '\n' ' ') == \
+    "$expected" ]] || fail "not tagged as $tag: $(cat "$work/runtime.log")"
+}
+# line_stack TAG — a fresh stack whose .env follows TAG.
+line_stack() {
+  fresh_stack
+  sed -i "s/^ZAMFONO_VERSION=.*/ZAMFONO_VERSION=$1/" "$work/stack/.env"
+}
+for tag in 1.2 1 latest; do
+  line_stack "$tag"
+  update 1.2.4 >"$work/out" 2>&1 || { cat "$work/out"; fail "the update of a $tag stack failed"; }
+  tags_are 1.2.4 "$tag" api asterisk core migrate proxy
+  grep -qx "ZAMFONO_VERSION=$tag" "$work/stack/.env" || fail "the update moved .env's $tag"
+  line_stack "$tag"
+  STUB_FAIL_PULL=1 update 1.2.4 >"$work/out" 2>&1 && fail "an update of a $tag stack whose pull failed went on"
+  grep -q '^tag ' "$work/runtime.log" && fail "a failed pull tagged images: $(cat "$work/runtime.log")"
+done
+# The tag the line moves to; an image compose.local.yaml puts in a service's place is left alone.
+line_stack 1.2
+STUB_OWN_IMAGES=core update 1.3.0 >"$work/out" 2>&1 || { cat "$work/out"; fail "the update of a 1.2 stack to 1.3.0 failed"; }
+tags_are 1.3.0 1.3 api asterisk migrate proxy
 
 echo "  - too little free space changes nothing"
 fresh_stack

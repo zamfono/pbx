@@ -11,6 +11,16 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+### Upgrade notes
+
+- A stack whose `.env` follows a release line or `latest` still runs an older release's images
+  after its updates so far, and after the update to this release too, which runs the `update.sh`
+  of the release it starts from (Fixed). Once on this release, pull and recreate it by hand in the
+  stack directory, which runs every migration it missed:
+  `docker compose pull && docker compose up -d` (Podman: `podman compose pull`, then restart the
+  boot unit, or `podman compose down && podman compose up -d` without one). Updates from this
+  release on take the new images.
+
 ### Added
 
 - `GET /api/v1/personalAccessTokens` (`personalAccessTokens.listAll`, on MCP too) lists every
@@ -79,6 +89,11 @@ why the specified behaviour changed; the commit history, how.
   journal: its timer ran the agent at once, before the install had recreated `api` on the new
   request tmpfs, and both recreated it. The install now recreates `api` first and starts the
   agent's units after; `api` ends up bound to the tmpfs as before.
+- A stack whose `.env` follows a release line (`ZAMFONO_VERSION=0.9`, or `0`, or `latest`) now
+  runs the new release's images after `update.sh`: it pulled and checked the new release's images
+  but went on running the old local `:0.9` ones, so its `VERSION` named the new release while the
+  old one ran and the new release's migrations never ran. `update.sh` now tags the images it
+  checked with `.env`'s tag before the stack is recreated.
 
 ### Security
 

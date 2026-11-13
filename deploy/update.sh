@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Updates this stack to a newer release (README.md, step 8): checks there is room for its images,
 # downloads that release's bundle, checks it against the release's SHA256SUMS, pulls the images
-# and checks them against the bundle's DIGESTS, unpacks the bundle over this directory, moves .env's ZAMFONO_VERSION along by its form and lists
+# and checks them against the bundle's DIGESTS, tags them with the line or latest .env follows, unpacks the bundle over this directory, moves .env's ZAMFONO_VERSION along by its form and lists
 # the settings a newer .env.example introduced, recreates the stack and, once it is healthy,
 # removes the stack's images no container uses. The host agent runs this same script for api's
 # `system.update` and automatic updates (setup/agent.sh, §6.3 "Updates"), and --current to report
@@ -146,18 +146,44 @@ latest_version() {
 }
 
 
-# ZAMFONO_VERSION follows the update by its form (tag_kind): a pinned release becomes the new one,
-# a line the new release's line, X.Y or X as before; empty and latest stay. An empty or missing
-# METRICS_TOKEN gets a generated one, which only .env holds: this output reaches the host agent's
-# records. The other settings a newer .env.example added are listed, for the operator to set.
+# The ZAMFONO_VERSION an update to $target leaves in .env, by its form (tag_kind): a pinned
+# release becomes the new one, a line the new release's line, X.Y or X as before; empty and
+# latest stay.
+next_tag() {
+  local tag
+  tag=$(env_tag)
+  case $(tag_kind "$tag") in
+    release) echo "$target" ;;
+    line) [[ $tag == *.* ]] && echo "${target%.*}" || echo "${target%%.*}" ;;
+    *) echo "$tag" ;;
+  esac
+}
+
+# Where .env follows a line or latest, the release images just pulled and checked as X.Y.Z are
+# tagged with the tag .env will name, so that this run's `up`, and every later one (the boot
+# unit's, the host agent's, the operator's), runs exactly those, not an older local image of the
+# tag nor a newer one the registry moved it to since. Only the images Compose's files name at
+# that tag, so one compose.local.yaml puts in a service's place is left alone.
+tag_release_images() {
+  local tag name config
+  tag=$(next_tag)
+  [[ -n $tag && $tag != "$target" ]] || return 0
+  config=$(ZAMFONO_VERSION=$tag "${compose[@]}" config) ||
+    fail "Compose could not read the stack's files; nothing was changed"
+  for name in $(comm -12 <(release_images "$target" <<<"$1") <(release_images "$tag" <<<"$config")); do
+    "$runtime" tag "ghcr.io/zamfono/$name:$target" "ghcr.io/zamfono/$name:$tag" ||
+      fail "could not tag ghcr.io/zamfono/$name:$target as :$tag; the stack still runs as it did," \
+        "and a rerun retries"
+  done
+}
+
+# ZAMFONO_VERSION follows the update (next_tag). An empty or missing METRICS_TOKEN gets a
+# generated one, which only .env holds: this output reaches the host agent's records. The other
+# settings a newer .env.example added are listed, for the operator to set.
 update_env() {
   local name tag new token
   tag=$(env_tag)
-  case $(tag_kind "$tag") in
-    release) new=$target ;;
-    line) [[ $tag == *.* ]] && new=${target%.*} || new=${target%%.*} ;;
-    *) new=$tag ;;
-  esac
+  new=$(next_tag)
   if [[ $new != "$tag" ]]; then
     set_env_line .env ZAMFONO_VERSION "$new"
     echo "  .env: ZAMFONO_VERSION $tag -> $new"
@@ -386,13 +412,13 @@ main() {
   # "Updates"), or nothing here changes: a tag moved in the registry after the release stops the
   # update. Compose's own view of the files, so an image the operator's compose.local.yaml puts in
   # a service's place is not taken for the release's.
+  local config name problem checked=0
+  config=$(ZAMFONO_VERSION=$target "${compose[@]}" config) ||
+    fail "Compose could not read the stack's files; nothing was changed"
   if [[ ${ZAMFONO_DIGESTS:-} == false ]]; then
     warn "ZAMFONO_DIGESTS=false: the $target images are not checked against the release's DIGESTS"
   else
     echo "Checking the $target images against the release's DIGESTS ..."
-    local config name problem checked=0
-    config=$(ZAMFONO_VERSION=$target "${compose[@]}" config) ||
-      fail "Compose could not read the stack's files; nothing was changed"
     for name in $(release_images "$target" <<<"$config"); do
       problem=$(check_digest "$work/x/DIGESTS" "$name" "$target") || fail "$problem; nothing was changed"
       checked=$((checked + 1))
@@ -402,6 +428,7 @@ main() {
     ((checked > 0)) ||
       fail "Compose's view of the stack names none of the $target images to check; nothing was changed"
   fi
+  tag_release_images "$config"
 
   echo "$target" >"$PENDING"
   install_bundle

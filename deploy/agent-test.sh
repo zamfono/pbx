@@ -125,7 +125,9 @@ ask action=reboot && printf 'x=1' >>"$work/stack/.update/requests/request" &&
 ln -s ../../.env "$work/stack/.update/requests/request" && refused '' 'a link'
 grep -q '^SECRETBOX_KEY=' "$work/stack/.env" || fail "the agent removed the file a request linked to"
 head -c 2000 /dev/zero | tr '\0' 'a' >"$work/stack/.update/requests/request" && refused '' 'a big file'
-# What a container leaves beside the request is removed: a setuid file, a directory, a link.
+# What a container leaves beside the request is removed: a setuid file, a directory, a link, and
+# a dotfile over a minute old, as the bundle's .keep is (dated by the commit, which may be recent).
+touch -d '-2 minutes' "$work/stack/.update/requests/.keep"
 touch "$work/stack/.update/requests/planted" && chmod 4755 "$work/stack/.update/requests/planted"
 mkdir "$work/stack/.update/requests/dir" && ln -s / "$work/stack/.update/requests/root"
 agent || fail "the agent's run beside planted files failed"

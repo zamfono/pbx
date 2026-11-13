@@ -6,7 +6,7 @@
 # STUB_FAIL_UP, and `ps -aq`, the host agent's look for an old updater, goes unrecorded. A pull
 # copies the update's record, .update/state.json, to $STUB_LOG.state, as it stands mid-run.
 # `compose config` names the five services' release images at ZAMFONO_VERSION, else VERSION's,
-# or under STUB_OWN_IMAGES images of the operator's own in their place;
+# or under STUB_OWN_IMAGES=1 images of the operator's own in their place (=<name>: that image's alone);
 # `image inspect` of ghcr.io/zamfono/<name>:<tag> reports the digest `stub_digests` (sourced)
 # gives <name>, another for the image STUB_MOVED_IMAGE names; `volume inspect` finds no volume.
 stub_digest() {
@@ -36,7 +36,7 @@ case $* in
     for name in netns asterisk migrate core api proxy; do
       image=$name
       [[ $name != netns ]] || image=proxy
-      if [[ -n ${STUB_OWN_IMAGES:-} ]]; then
+      if [[ ${STUB_OWN_IMAGES:-} == 1 || ${STUB_OWN_IMAGES:-} == "$image" ]]; then
         printf '  %s:\n    image: registry.example.com/own/%s:mine\n' "$name" "$image"
       else
         printf '  %s:\n    image: ghcr.io/zamfono/%s:%s\n' "$name" "$image" "${ZAMFONO_VERSION:-$(<VERSION)}"

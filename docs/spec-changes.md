@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-11-13 · §6.3 Compose stack (Updates).** Where `.env` follows a line (`X.Y`, `X`) or `latest`, `update.sh` tags each release image it pulled and checked as `X.Y.Z` with the tag `.env` names after the update, before anything in the stack directory changes; images the operator's `compose.local.yaml` puts in a service's place keep theirs.
+*Why:* TASK-111 found on Docker and Podman that such a stack kept running the previous release's images after an update: `update.sh` pulled `X.Y.Z`, but `up` ran the local `X.Y` image, which no pull had moved, so the checked images were pruned unused and the new migrations never ran. Pulling with `.env`'s tag could fetch a newer, unchecked release, `pull_policy: always` would pull unchecked at every `up`, the boot's included, and running `X.Y.Z` for the update's `up` alone would revert at the next; the product owner approved the retag on 2026-11-13.
+
 **2026-11-13 · §10.5 MCP interface (Tools).** Where a refusal, a JSON-RPC error the SDK answers with or a tool's refusal of its arguments, would make the response larger than the request body limit with the request's `id` it echoes, its message or text is cut further, as a long error's message is, until the whole response fits; the `id` stays whole.
 *Why:* an independent review found that the bound counted the error alone: a request under 512 KiB whose `id`, a string of any length, took some 510,000 bytes drew a refusal of invalid prompt or tool arguments larger than the limit, 538 KB and 577 KB.
 
