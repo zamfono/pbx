@@ -10,6 +10,29 @@ type Registration = {
   Status: 'Registered' | 'Rejected' | 'Unregistered' | 'Failed';
 };
 
+/**
+ * An `InvalidAccountID` security event as Asterisk 22 writes it to AMI (`security_events.c`):
+ * its fields in order, each value unescaped, so an `accountId` holding CR/LF stands in it as it is.
+ */
+export function invalidAccountIdText(
+  accountId: string,
+  remoteAddress: string
+): string {
+  const lines = [
+    'Event: InvalidAccountID',
+    'Privilege: security,all',
+    'EventTV: 2026-11-13T09:00:00.000+0000',
+    'Severity: Error',
+    'Service: PJSIP',
+    'EventVersion: 1',
+    `AccountID: ${accountId}`,
+    'SessionID: 3f2a9c1e-scan@192.0.2.66',
+    'LocalAddress: IPV4/UDP/198.51.100.10/5060',
+    `RemoteAddress: ${remoteAddress}`
+  ];
+  return `${lines.join('\r\n')}\r\n\r\n`;
+}
+
 export class FakeAmi {
   readonly registrations: Registration[] = [];
   /** Every action received after login, in order. */
@@ -67,9 +90,15 @@ export class FakeAmi {
     }
   }
 
+  /** Writes `event` as Asterisk writes an event: `Event`, then `Privilege`, then the rest. */
   emit(event: AmiEvent): void {
+    this.write(writeFrame({ Event: '', Privilege: 'system,all', ...event }));
+  }
+
+  /** Writes `text` as it stands, for frames Asterisk writes with a field that holds CR/LF. */
+  write(text: string): void {
     for (const socket of this.sockets) {
-      socket.write(writeFrame(event));
+      socket.write(text);
     }
   }
 

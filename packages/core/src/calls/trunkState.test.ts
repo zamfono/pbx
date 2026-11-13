@@ -190,6 +190,7 @@ describe('TrunkState', () => {
 
     fakeAmi.emit({
       Event: 'Registry',
+      ChannelType: 'PJSIP',
       Username: clientUri,
       Domain: serverUri,
       Status: 'Rejected'
@@ -206,6 +207,7 @@ describe('TrunkState', () => {
 
     fakeAmi.emit({
       Event: 'Registry',
+      ChannelType: 'PJSIP',
       Username: 'sip:someone-else@unknown.example.com',
       Domain: 'sip:unknown.example.com',
       Status: 'Rejected'
@@ -213,6 +215,7 @@ describe('TrunkState', () => {
     // Handled in the order they arrive: the stranger's has been judged once this one's landed.
     fakeAmi.emit({
       Event: 'Registry',
+      ChannelType: 'PJSIP',
       Username: clientUri,
       Domain: serverUri,
       Status: 'Registered'
@@ -251,6 +254,7 @@ describe('TrunkState', () => {
     function registry(status: string): void {
       fakeAmi.emit({
         Event: 'Registry',
+        ChannelType: 'PJSIP',
         Username: uris.clientUri,
         Domain: uris.serverUri,
         Status: status

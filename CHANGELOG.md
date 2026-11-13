@@ -11,6 +11,15 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+### Security
+
+- A SIP request from anywhere could have any address banned, or keep its own sender from being
+  banned, with an escaped CR/LF in its From user, which Asterisk writes unescaped into the AMI
+  security event `core` counts. `core` now drops every AMI frame Asterisk could not have written:
+  one that repeats a key, an event that does not open with `Event` then `Privilege`, and a
+  security or `Registry` event missing one of its fields. Such a request is no longer counted
+  as a failed attempt; it names no account that exists.
+
 ## [0.9.1] - 2026-11-12
 
 ### Upgrade notes

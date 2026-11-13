@@ -4,8 +4,9 @@
 # as the stack's own. With the thresholds lowered, its failed REGISTERs ban it: `api` holds the
 # ban, `/metrics` and `/healthz` show it, and nftables drops its next request while HTTP still
 # answers. `sipBans.lift` lets it through again; an allowlist entry covering it keeps it from
-# being banned; once that entry is gone its next ban takes the second, permanent step; and an
-# empty step list lifts enforcement.
+# being banned; once that entry is gone its next ban takes the second, permanent step; an empty
+# step list lifts enforcement; and a From user whose %0D%0A splits the AMI security event into
+# frames of the scanner's making bans no address it names and exempts the scanner from none.
 # Reads `run.sh`'s own compose, RUNTIME, api_base, METRICS_TOKEN and fail, and api.sh's helpers.
 # Self-contained: it connects `netns`, Asterisk's namespace, to `outside` for its own run and
 # disconnects it again, lifts the bans it caused and restores the settings it changed, so REUSE
@@ -25,10 +26,11 @@ sip_ban_attempt() {
     $SIP_BAN_TARGET:5060 >>/tmp/sip-ban.log 2>&1" </dev/null
 }
 
-# Whether Asterisk answers the scanner at all (`uas/register-challenge.xml`), no failed attempt.
+# Whether Asterisk answers the scanner at all (`uas/register-challenge.xml`), no failed attempt;
+# as From user `$1`, `scanner` unless given.
 sip_ban_answered() {
   dc exec -T sipp-outside sh -c "sipp -sf /scenarios/uas/register-challenge.xml \
-    -key user scanner -m 1 -timeout 3s -timeout_error -nostdin \
+    -key user '${1:-scanner}' -m 1 -timeout 3s -timeout_error -nostdin \
     $SIP_BAN_TARGET:5060 >>/tmp/sip-ban.log 2>&1" </dev/null
 }
 
@@ -43,13 +45,14 @@ sip_ban_dropped() {
   ! sip_ban_answered
 }
 
-# The scanner's active ban as `<id> <step> <expiresAt>`, nothing while it has none.
+# The active ban of `$1` (the scanner unless given) as `<id> <step> <expiresAt>`, nothing while
+# it has none.
 sip_ban_active() {
   api GET /sipBans | python3 -c '
 import json, sys
 for ban in json.load(sys.stdin)["items"]:
     if ban["address"] == sys.argv[1]:
-        print(ban["id"], ban["step"], ban["expiresAt"])' "$SIP_BAN_ADDRESS"
+        print(ban["id"], ban["step"], ban["expiresAt"])' "${1:-$SIP_BAN_ADDRESS}"
 }
 
 sip_ban_has_active() {
@@ -91,6 +94,75 @@ sip_ban_network() {
   local id
   id=$(dc ps -q sipp-outside)
   "$RUNTIME" inspect -f '{{range $name, $_ := .NetworkSettings.Networks}}{{$name}}{{end}}' "$id"
+}
+
+# What Asterisk writes to AMI for the security events, read as `core` reads it (its own AMI user,
+# from its container) until both injected values have shown or 30 s have passed.
+SIP_BAN_AMI_TAP_JS='
+const socket = require("node:net").connect(5038, "asterisk");
+let seen = "";
+const done = () => { socket.destroy(); process.exit(0); };
+setTimeout(done, 30000);
+socket.write(`Action: Login\r\nUsername: zamfono\r\nSecret: ${process.env.AMI_PASSWORD}\r\nEvents: security\r\n\r\n`);
+socket.on("data", chunk => {
+  process.stdout.write(chunk);
+  seen += chunk.toString("latin1");
+  if (seen.includes("RemoteAddress: 203.0.113.200/") && seen.includes("x\r\n\r\nEvent: SuccessfulAuth")) {
+    setTimeout(done, 1000);
+  }
+});'
+
+# Whether file `$1` holds the bytes of `$2` in one piece. Not `grep -F`: it takes each line of a
+# multi-line pattern as a pattern of its own, and a bare CR matches every line AMI ends in CR/LF.
+sip_ban_tap_carries() {
+  python3 -c 'import sys; sys.exit(sys.argv[2].encode("latin1") not in open(sys.argv[1], "rb").read())' \
+    "$1" "$2"
+}
+
+# The From users the injection sends: decoded, `\r\nRemoteAddress: 203.0.113.200/\r\n\r\n` and
+# `x\r\n\r\nEvent: SuccessfulAuth`; a `:` must be escaped, since pjsip reads it as the password.
+SIP_BAN_FORGED_ADDRESS=203.0.113.200
+SIP_BAN_FORGE_BAN='%0D%0ARemoteAddress%3A%20203.0.113.200/%0D%0A%0D%0A'
+SIP_BAN_FORGE_EXEMPT='x%0D%0A%0D%0AEvent%3A%20SuccessfulAuth'
+
+# A From user with CR/LF puts frames of the scanner's making into the AMI stream: they ban no
+# address they name and exempt the scanner from nothing, with exemption on. The forging requests
+# are unauthenticated REGISTERs, each raising an `InvalidAccountID` and the challenge alone, so
+# nothing genuine of them counts: an authenticated retry would add a `ChallengeResponseFailed`.
+run_sip_ban_injection() {
+  local tap tap_pid attempt id
+  api PATCH /settings '{"sipBanSuccessExemptS":3600,"sipBanSteps":[86400,null]}' >/dev/null
+  tap=$(mktemp)
+  dc exec -T core node -e "$SIP_BAN_AMI_TAP_JS" >"$tap" </dev/null &
+  tap_pid=$!
+  # The tap's login is answered before any event it is to see.
+  poll 10 1 grep -q 'Authentication accepted' "$tap" || fail 'the AMI tap did not log in'
+  for ((attempt = 1; attempt <= 2 * SIP_BAN_FAILURES; attempt++)); do
+    sip_ban_answered "$SIP_BAN_FORGE_BAN" \
+      || fail "Asterisk did not answer the forging request $attempt"
+  done
+  sip_ban_answered "$SIP_BAN_FORGE_EXEMPT" || fail 'Asterisk did not answer the exempting request'
+  wait "$tap_pid" || fail 'the AMI tap failed'
+  echo '   the AMI stream carries, per InvalidAccountID, from AccountID on:'
+  python3 -c '
+import re, sys
+text = open(sys.argv[1], encoding="latin1", newline="").read()
+pattern = r"Event: InvalidAccountID\r\n.*?(AccountID: .*?RemoteAddress: IPV4[^\r]*\r\n)"
+found = re.findall(pattern, text, re.S)
+for value in sorted({re.sub(r"SessionID: [^\r]*", "SessionID: …", v) for v in found}):
+    print("     " + repr(value))' "$tap"
+  sip_ban_tap_carries "$tap" $'AccountID: \r\nRemoteAddress: 203.0.113.200/\r\n\r\n' \
+    && sip_ban_tap_carries "$tap" $'AccountID: x\r\n\r\nEvent: SuccessfulAuth\r\n' \
+    || fail 'the AMI stream does not carry the From users unescaped'
+  rm -f "$tap"
+  # A forged SuccessfulAuth would exempt the scanner for an hour: its failures still ban it, and
+  # the events before them have been read once they have.
+  sip_ban_fail_until_banned
+  read -r id _ <<<"$(sip_ban_active)"
+  [ -z "$(sip_ban_active "$SIP_BAN_FORGED_ADDRESS")" ] \
+    || fail "the forged RemoteAddress $SIP_BAN_FORGED_ADDRESS was banned"
+  sip_ban_lift "$id"
+  echo '   CR/LF in the From user: no forged address banned, the scanner not exempted'
 }
 
 run_sip_ban_step() {
@@ -152,6 +224,7 @@ print(json.dumps({k: s[k] for k in ("sipBanFailures", "sipBanWindowS", "sipBanSu
   # Its ban's row stays active while banning is off; lifted, nothing is enforced once the
   # settings are back.
   sip_ban_lift "$id"
+  run_sip_ban_injection
   api PATCH /settings "$settings" >/dev/null
   sip_ban_answered || fail 'the scanner is dropped once the settings are restored'
   "$RUNTIME" network disconnect "$network" "$netns" \

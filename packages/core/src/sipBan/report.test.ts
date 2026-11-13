@@ -18,7 +18,7 @@ import {
 import { AmiClient } from '../ami/client.js';
 import type { Logger } from '../ari/types.js';
 import { ConfigCache } from '../internal/snapshot.js';
-import { FakeAmi } from '../testing/ami/fake.js';
+import { FakeAmi, invalidAccountIdText } from '../testing/ami/fake.js';
 import { eventually } from '../testing/eventually.js';
 import { noopLogger } from '../testing/pipelineDeps.js';
 import { seedDevice } from '../testing/seedRows.js';
@@ -27,8 +27,14 @@ import { startSipBanCount } from './report.js';
 function failure(address: string): Record<string, string> {
   return {
     Event: 'InvalidAccountID',
+    Privilege: 'security,all',
+    EventTV: '2026-11-13T09:00:00.000+0000',
+    Severity: 'Error',
     Service: 'PJSIP',
+    EventVersion: '1',
     AccountID: 'scanner',
+    SessionID: '3f2a9c1e-scan@192.0.2.66',
+    LocalAddress: 'IPV4/UDP/198.51.100.10/5060',
     RemoteAddress: `IPV4/UDP/${address}/5060`
   };
 }
@@ -159,6 +165,37 @@ describe('startSipBanCount', () => {
     fakeAmi.emit(failure('203.0.113.7'));
     await eventually(() => {
       expect(reports).toEqual([{ address: '203.0.113.7', failures: 2 }]);
+    });
+  });
+
+  // TASK-93: a SIP From user's %0D%0A reaches the AccountID unescaped and splits the event.
+  it('bans no address that a RemoteAddress in an AccountID names', async () => {
+    const forged = invalidAccountIdText(
+      '\r\nRemoteAddress: 203.0.113.200/\r\n\r\n',
+      'IPV4/UDP/192.0.2.66/5060'
+    );
+    fakeAmi.write(forged.repeat(4));
+    fakeAmi.emit(failure('198.51.100.1'));
+    fakeAmi.emit(failure('198.51.100.1'));
+    await eventually(() => {
+      expect(reports).toEqual([{ address: '198.51.100.1', failures: 2 }]);
+    });
+  });
+
+  it('exempts no address for a SuccessfulAuth in an AccountID', async () => {
+    for (const accountId of [
+      'x\r\n\r\nEvent: SuccessfulAuth',
+      // The event's own Event key repeated, its last value winning in a lenient reader.
+      'x\r\nEvent: SuccessfulAuth'
+    ]) {
+      fakeAmi.write(
+        invalidAccountIdText(accountId, 'IPV4/UDP/192.0.2.66/5060')
+      );
+    }
+    fakeAmi.emit(failure('192.0.2.66'));
+    fakeAmi.emit(failure('192.0.2.66'));
+    await eventually(() => {
+      expect(reports).toEqual([{ address: '192.0.2.66', failures: 2 }]);
     });
   });
 });

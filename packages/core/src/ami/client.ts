@@ -1,4 +1,5 @@
 // AMI text-protocol client over TCP: login, correlated actions and unsolicited events (§9.4).
+import { randomUUID } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import { createConnection, type Socket } from 'node:net';
 
@@ -28,13 +29,14 @@ type PendingAction = {
 
 /**
  * AMI text-protocol client: logs in once connected, resolves `action()` calls by ActionID and
- * re-emits every unsolicited frame as `'event'`.
+ * re-emits every unsolicited frame that opens with `Event` then `Privilege`, as Asterisk writes
+ * every event, as `'event'`. A SIP request can put frames of its sender's making into a security
+ * event's `AccountID` (§5.6): they open otherwise and cannot know an ActionID, which is random.
  */
 export class AmiClient extends EventEmitter {
   private readonly options: AmiClientOptions;
   private socket: Socket | null = null;
   private buffer = '';
-  private actionCounter = 0;
   private readonly pending = new Map<string, PendingAction>();
   private readonly reconnect: ReconnectBackoff;
   private closing = false;
@@ -103,8 +105,7 @@ export class AmiClient extends EventEmitter {
     if (!socket) {
       return Promise.reject(new Error('AMI client is not connected'));
     }
-    this.actionCounter += 1;
-    const actionId = `${this.actionCounter}`;
+    const actionId = randomUUID();
     return new Promise((resolve, reject) => {
       this.pending.set(actionId, { events: [], awaitEvents, resolve, reject });
       socket.write(writeFrame({ Action: name, ActionID: actionId, ...params }));
@@ -168,14 +169,13 @@ export class AmiClient extends EventEmitter {
   }
 
   private routeFrame(frame: AmiEvent): void {
-    if (!('ActionID' in frame)) {
-      this.emit('event', frame);
-      return;
-    }
-    const actionId = frame.ActionID;
+    const actionId = frame.ActionID ?? '';
     const action = this.pending.get(actionId);
     if (!action) {
-      this.emit('event', frame);
+      const [first, second] = Object.keys(frame);
+      if (first === 'Event' && second === 'Privilege') {
+        this.emit('event', frame);
+      }
       return;
     }
     if (frame.Response === 'Error') {
