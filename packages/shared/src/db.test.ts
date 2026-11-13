@@ -1,3 +1,4 @@
+import { sql } from 'kysely';
 import { expect, test } from 'vitest';
 
 import { isDbOpen, migrator, openDb, pendingMigrations } from './db.js';
@@ -5,7 +6,7 @@ import { migrateForTest, MIGRATIONS_DIR, seedSettings } from './testDb.js';
 
 test('migrates and enforces the schema', async () => {
   const db = openDb(':memory:');
-  expect(await pendingMigrations(db, MIGRATIONS_DIR)).toHaveLength(18);
+  expect(await pendingMigrations(db, MIGRATIONS_DIR)).toHaveLength(19);
   await migrateForTest(db);
   expect(await pendingMigrations(db, MIGRATIONS_DIR)).toEqual([]);
 
@@ -129,6 +130,7 @@ test('migrates and enforces the schema', async () => {
       .values({
         id: 'b1',
         address: '2001:DB8::/64',
+        protocol: 'udp',
         step: 1,
         failures: 10,
         createdAt: 't'
@@ -186,4 +188,65 @@ test('the dndToggle migration gives a stack that remapped its codes a code of it
     ...remapped,
     dndToggle: '*93'
   });
+});
+
+test('the sipBanProtocol migration keeps each ban on both protocols, its row as udp and a copy as tcp (§5.6)', async () => {
+  const db = openDb(':memory:');
+  const steps = migrator(db, MIGRATIONS_DIR);
+  await steps.migrateTo('1794474331920_host_control');
+  await sql`INSERT INTO sip_bans (id, address, step, failures, created_at, expires_at)
+    VALUES ('active', '203.0.113.7', 2, 10, '2026-01-01T00:00:00.000Z', '2999-01-01T00:00:00.000Z'),
+           ('ended', '198.51.100.1', 1, 10, '2026-01-01T00:00:00.000Z', '2026-01-02T00:00:00.000Z')`.execute(
+    db
+  );
+  await steps.migrateToLatest();
+  const rows = await db
+    .selectFrom('sipBans')
+    .select(['id', 'address', 'protocol', 'step', 'expiresAt'])
+    .orderBy('address')
+    .orderBy('protocol')
+    .execute();
+  // Per address, the copy (tcp) sorts before the original row (udp).
+  expect(rows).toEqual([
+    expect.objectContaining({
+      address: '198.51.100.1',
+      protocol: 'tcp',
+      step: 1,
+      expiresAt: '2026-01-02T00:00:00.000Z'
+    }),
+    {
+      id: 'ended',
+      address: '198.51.100.1',
+      protocol: 'udp',
+      step: 1,
+      expiresAt: '2026-01-02T00:00:00.000Z'
+    },
+    expect.objectContaining({
+      address: '203.0.113.7',
+      protocol: 'tcp',
+      step: 2,
+      expiresAt: '2999-01-01T00:00:00.000Z'
+    }),
+    {
+      id: 'active',
+      address: '203.0.113.7',
+      protocol: 'udp',
+      step: 2,
+      expiresAt: '2999-01-01T00:00:00.000Z'
+    }
+  ]);
+  expect(rows[2]?.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7/u);
+  await expect(
+    db
+      .insertInto('sipBans')
+      .values({
+        id: 'x',
+        address: '203.0.113.8',
+        protocol: 'tls' as never,
+        step: 1,
+        failures: 10,
+        createdAt: '2026-01-01T00:00:00.000Z'
+      })
+      .execute()
+  ).rejects.toThrow(/CHECK constraint failed/u);
 });

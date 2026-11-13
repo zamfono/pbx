@@ -1,7 +1,7 @@
 /**
  * The ban list (§5.6, §9.1): `sip_bans.list` on the `asterisk-config` volume, a line
- * `<address> <expires_at>` per active ban, `<address>` alone for a permanent one, which the ban
- * helper in the `asterisk` container applies as its nftables sets.
+ * `<address> <protocol> <expires_at>` per active ban, without `<expires_at>` for a permanent one,
+ * which the ban helper in the `asterisk` container applies as its nftables sets.
  */
 import { createHash } from 'node:crypto';
 import { mkdir, readFile } from 'node:fs/promises';
@@ -12,7 +12,8 @@ import {
   MS_PER_MINUTE,
   nowIso,
   sipBanStepsColumn,
-  type Db
+  type Db,
+  type SipBanProtocol
 } from '@zamfono/shared';
 
 import { writeFileAtomically } from './propagation.js';
@@ -22,10 +23,11 @@ export const SIP_BAN_LIST_FILE = 'sip_bans.list';
 const HELPER_STATUS_FILE = 'sip_ban_helper.status';
 // The helper writes its heartbeat every 30 seconds; one older than this means it stopped (§9.1).
 const HELPER_STALE_MS = MS_PER_MINUTE;
-// `<time in ISO 8601 UTC to the second> <hex SHA-256 of the list it applied> <packets> <bytes>`,
-// the last two what the drop rules dropped since the table was loaded (§9.1).
+// `<time in ISO 8601 UTC to the second> <hex SHA-256 of the list it applied> <udp packets>
+// <udp bytes> <tcp packets> <tcp bytes>`, what the drop rules dropped since the table was loaded
+// (§9.1).
 const HELPER_STATUS_LINE =
-  /^(?<time>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z) (?<hash>[0-9a-f]{64}) (?<packets>\d+) (?<bytes>\d+)$/u;
+  /^(?<time>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z) (?<hash>[0-9a-f]{64}) (?<udpPackets>\d+) (?<udpBytes>\d+) (?<tcpPackets>\d+) (?<tcpBytes>\d+)$/u;
 
 /** The `sip_bans` rows of the bans active at `now`: not lifted and not expired (§11.2). */
 export function activeSipBans(db: Db, now: string) {
@@ -47,15 +49,22 @@ async function banningOff(db: Db): Promise<boolean> {
   return sipBanStepsColumn.decode(settings.sipBanStepsJson).length === 0;
 }
 
-/** The number of bans in force, the lines of the rendered list, for `/metrics` (§7). */
-export async function countSipBansInForce(db: Db): Promise<number> {
+/** The bans in force per protocol, the lines of the rendered list, for `/metrics` (§7). */
+export async function countSipBansInForce(
+  db: Db
+): Promise<Record<SipBanProtocol, number>> {
+  const counts = { udp: 0, tcp: 0 };
   if (await banningOff(db)) {
-    return 0;
+    return counts;
   }
-  const row = await activeSipBans(db, nowIso())
-    .select(eb => eb.fn.countAll<number>().as('count'))
-    .executeTakeFirstOrThrow();
-  return row.count;
+  const rows = await activeSipBans(db, nowIso())
+    .select(eb => ['protocol', eb.fn.countAll<number>().as('count')])
+    .groupBy('protocol')
+    .execute();
+  for (const row of rows) {
+    counts[row.protocol] = row.count;
+  }
+  return counts;
 }
 
 /** The list's text: empty while banning is off (§5.6). */
@@ -64,14 +73,15 @@ async function banListText(db: Db): Promise<string> {
     return '';
   }
   const bans = await activeSipBans(db, nowIso())
-    .select(['address', 'expiresAt'])
+    .select(['address', 'protocol', 'expiresAt'])
     .orderBy('address')
+    .orderBy('protocol')
     .execute();
   return bans
     .map(ban =>
       ban.expiresAt === null
-        ? `${ban.address}\n`
-        : `${ban.address} ${ban.expiresAt}\n`
+        ? `${ban.address} ${ban.protocol}\n`
+        : `${ban.address} ${ban.protocol} ${ban.expiresAt}\n`
     )
     .join('');
 }
@@ -99,12 +109,12 @@ export function renderedSipBanListHash(): string | null {
   return renderedHash;
 }
 
-/** Whether the ban helper runs, its last heartbeat and the packets and bytes the drop rules
- * dropped as of it, `null` while none is readable. */
+/** Whether the ban helper runs, its last heartbeat and the packets and bytes each protocol's
+ * drop rules dropped as of it, `null` while none is readable. */
 export type SipBanHelperState = {
   running: boolean;
   heartbeat: string | null;
-  dropped: { packets: number; bytes: number } | null;
+  dropped: Record<SipBanProtocol, { packets: number; bytes: number }> | null;
 };
 
 /**
@@ -119,8 +129,8 @@ export async function sipBanHelperState(
     path.join(env.ASTERISK_GEN_DIR, HELPER_STATUS_FILE),
     'utf8'
   ).catch(() => '');
-  const { time, hash, packets, bytes } =
-    HELPER_STATUS_LINE.exec(text.trim())?.groups ?? {};
+  const groups = HELPER_STATUS_LINE.exec(text.trim())?.groups ?? {};
+  const { time, hash } = groups;
   const heartbeatMs = Date.parse(time ?? '');
   if (time === undefined || Number.isNaN(heartbeatMs)) {
     return { running: false, heartbeat: null, dropped: null };
@@ -128,6 +138,15 @@ export async function sipBanHelperState(
   return {
     running: nowMs - heartbeatMs <= HELPER_STALE_MS && hash === renderedHash,
     heartbeat: time,
-    dropped: { packets: Number(packets), bytes: Number(bytes) }
+    dropped: {
+      udp: {
+        packets: Number(groups.udpPackets),
+        bytes: Number(groups.udpBytes)
+      },
+      tcp: {
+        packets: Number(groups.tcpPackets),
+        bytes: Number(groups.tcpBytes)
+      }
+    }
   };
 }

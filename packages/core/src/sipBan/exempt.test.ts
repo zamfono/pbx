@@ -96,32 +96,29 @@ describe('exemption', () => {
     ).resolves.toBeNull();
   });
 
-  it('exempts the inbound and both hosts of a live trunk, never its outbound ones', async () => {
+  it("exempts a live trunk's hosts of every direction, never a deleted trunk's", async () => {
     const trunks = [{ id: 't1' }];
     await expect(
       check('203.0.113.7', {
         trunks,
-        trunkHosts: [
-          { trunkId: 't1', host: '203.0.113.7', direction: 'outbound' },
-          { trunkId: 'gone', host: '203.0.113.7', direction: 'both' }
-        ]
+        trunkHosts: [{ trunkId: 'gone', host: '203.0.113.7' }]
       })
     ).resolves.toBeNull();
-    await expect(
-      check('203.0.113.7', {
-        trunks,
-        trunkHosts: [
-          { trunkId: 't1', host: '203.0.113.0/28', direction: 'inbound' }
-        ]
-      })
-    ).resolves.toBe('listed');
+    // An outbound-only provider's responses arrive on 5060: a ban would cut the trunk off.
+    for (const host of ['203.0.113.7', '203.0.113.0/28']) {
+      // eslint-disable-next-line no-await-in-loop -- one host after the other
+      await expect(
+        check('203.0.113.7', {
+          trunks,
+          trunkHosts: [{ trunkId: 't1', host }]
+        })
+      ).resolves.toBe('listed');
+    }
   });
 
   it('resolves a trunk FQDN when asked, and a lookup failure exempts nothing', async () => {
     const trunks = [{ id: 't1' }];
-    const trunkHosts = [
-      { trunkId: 't1', host: 'sip.example.com', direction: 'both' as const }
-    ];
+    const trunkHosts = [{ trunkId: 't1', host: 'sip.example.com' }];
     const resolving = (host: string): Promise<{ address: string }[]> =>
       Promise.resolve(
         host === 'sip.example.com'

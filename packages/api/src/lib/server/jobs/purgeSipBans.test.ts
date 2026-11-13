@@ -16,7 +16,12 @@ describe('runPurge: SIP bans (§5.6, §5.9)', () => {
     const db = await makeTestDb();
     // A lookback of 10 days.
     await seedSettings(db, { sipBanLookbackS: 864_000 });
-    const ban = { address: '203.0.113.7', step: 1, failures: 10 };
+    const ban = {
+      address: '203.0.113.7',
+      protocol: 'udp' as const,
+      step: 1,
+      failures: 10
+    };
     await db
       .insertInto('sipBans')
       .values([

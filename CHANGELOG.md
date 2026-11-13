@@ -11,6 +11,18 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+### Changed
+
+- SIP bans are per protocol, `udp` or `tcp` (TCP and TLS together): failures over UDP ban an
+  address over UDP only, and over TCP or TLS only those, each counted, escalated, exempted after a
+  successful login and lifted on its own. `sipBans.list` and the `sipBan.added` webhook name the
+  `protocol`, and `/metrics`' `zamfono_sip_bans_active` and `zamfono_sip_ban_dropped_*_total`
+  carry a `protocol` label, one series per protocol where there was one. A ban in force at the
+  upgrade becomes two, one per protocol, so it keeps blocking both; lifting it takes two
+  `sipBans.lift`.
+- A trunk's `outbound` hosts are never banned either, as its `inbound` and `both` hosts were not:
+  a provider's responses arrive on the SIP ports too.
+
 ### Security
 
 - A SIP request from anywhere could have any address banned, or keep its own sender from being
@@ -23,6 +35,11 @@ why the specified behaviour changed; the commit history, how.
   call can take back: an undo replayed the owner's deletion without the owner-only rule a direct
   delete obeys. Every operation an undo replays now obeys the role, scope and owner-only rules
   of whoever undoes, as a direct call does, so that undo answers 403 for an admin.
+- A sender forging source addresses can no longer get an address banned from TCP and TLS: UDP
+  needs no handshake, so ten forged UDP requests banned their source from all SIP transports,
+  trunks of outbound-only providers included. Such a forgery can still ban an address over UDP;
+  put every address whose UDP must not be blocked, such as an office's, on the allowlist
+  (`sipAllowlist.create`).
 
 ## [0.9.1] - 2026-11-12
 

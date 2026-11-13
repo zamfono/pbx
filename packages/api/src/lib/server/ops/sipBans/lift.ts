@@ -11,35 +11,38 @@ import { renderSipBanListAfterCommit } from './_shared.js';
 
 const inputSchema = z.object({ id: z.string() }).strict();
 
-/** The address of ban `id`, 404 for an unknown one. */
-async function banAddress(db: Db, id: string): Promise<string> {
+/** The address and protocol of ban `id`, 404 for an unknown one. */
+async function bannedSource(
+  db: Db,
+  id: string
+): Promise<{ address: string; protocol: string }> {
   const ban = await db
     .selectFrom('sipBans')
-    .select('address')
+    .select(['address', 'protocol'])
     .where('id', '=', id)
     .executeTakeFirst();
   if (!ban) {
     throw new OpError(HTTP_NOT_FOUND, `SIP ban '${id}' not found`);
   }
-  return ban.address;
+  return ban;
 }
 
 /** `DELETE /sipBans/{id}` (§5.6, §10.3 "SIP bans"): ends an active ban now, its row kept. */
 export const lift = defineOperation({
   name: 'sipBans.lift',
   description:
-    'Ends an active SIP ban now, a permanent one included; the ban stays listed as ended',
+    'Ends an active SIP ban now, a permanent one included, on its protocol alone; the ban stays listed as ended',
   input: inputSchema,
   output: idOutput,
   problems: [HTTP_NOT_FOUND, HTTP_CONFLICT],
   minRole: 'admin',
   confirm: async (ctx, input) => {
-    const address = await banAddress(ctx.db, input.id);
-    return `Lift the SIP ban of ${address}? This cannot be undone.`;
+    const { address, protocol } = await bannedSource(ctx.db, input.id);
+    return `Lift the SIP ban of ${address} over ${protocol}? This cannot be undone.`;
   },
   entity: input => ({ kind: 'sipBan', id: input.id }),
   run: async (ctx, input) => {
-    await banAddress(ctx.db, input.id);
+    await bannedSource(ctx.db, input.id);
     const active = await activeSipBans(ctx.db, ctx.now)
       .select('id')
       .where('id', '=', input.id)

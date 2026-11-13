@@ -1,6 +1,6 @@
 /**
- * Counts the AMI security events and reports each source address that reaches the threshold and
- * is not exempt to `api`'s `/internal/sipBan`, which bans it (§5.6). The thresholds and the
+ * Counts the AMI security events and reports each source address and protocol that reaches the
+ * threshold and is not exempt to `api`'s `/internal/sipBan`, which bans it on that protocol (§5.6). The thresholds and the
  * exemptions' config come from the config cache, which each config propagation refreshes (§3.1).
  */
 import { repeat, type SipBanReport } from '@zamfono/shared';
@@ -23,9 +23,10 @@ const endpointNames = new WeakMap<Snapshot, ReadonlySet<string>>();
 
 /**
  * The endpoints the stack renders (§9.1, §9.4): every live device's, named by its SIP username,
- * and every live `inbound_auth` trunk's, named by its username. A configuration propagation
- * refreshes the cache before it reloads PJSIP (§3.1), so a new device is named here before its
- * endpoint exists in Asterisk.
+ * and every live `inbound_auth` trunk's, named by its username. Endpoints are identified by
+ * `auth_username`, so each one's first request, without credentials, raises `InvalidAccountID`
+ * under its name. A configuration propagation refreshes the cache before it reloads PJSIP (§3.1),
+ * so a new device is named here before its endpoint exists in Asterisk.
  */
 export function ownEndpoints(snapshot: Snapshot): ReadonlySet<string> {
   let names = endpointNames.get(snapshot);

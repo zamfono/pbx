@@ -3,7 +3,7 @@
  * event also carries `id` (uuid v7) and `at` (ISO), added by the emitter, as `Envelope`.
  */
 
-import type { PresenceStatus } from './columnValues.js';
+import type { PresenceStatus, SipBanProtocol } from './columnValues.js';
 import type { LiveLeg, MwiMailbox, TrunkStatus } from './internalApi.js';
 
 export type Scope =
@@ -77,7 +77,12 @@ type EventFields = {
   hours: { scope: Scope; open: boolean };
   'trunk.status': { trunkId: string; status: TrunkStatus['status'] };
   /** `expiresAt` `null`: a permanent ban (§5.6). */
-  'sipBan.added': { banId: string; address: string; expiresAt: string | null };
+  'sipBan.added': {
+    banId: string;
+    address: string;
+    protocol: SipBanProtocol;
+    expiresAt: string | null;
+  };
   'history.appended': { callId: string };
   'backup.started': { targetId: string; runId: string };
   'backup.finished': {

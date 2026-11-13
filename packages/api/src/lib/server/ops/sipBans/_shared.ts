@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { SIP_BAN_PROTOCOLS } from '@zamfono/shared';
+
 import { renderSipBanList } from '#lib/server/sipBanList.js';
 
 import { afterCommit } from '../afterCommit.js';
@@ -9,6 +11,11 @@ import type { Context } from '../types.js';
 export const sipBanWire = z.object({
   id: z.string(),
   address: z.string(),
+  protocol: z
+    .enum(SIP_BAN_PROTOCOLS)
+    .describe(
+      'The transport class the ban drops: udp, or tcp for TCP and TLS.'
+    ),
   step: z.number(),
   failures: z.number(),
   createdAt: z.string(),

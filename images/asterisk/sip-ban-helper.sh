@@ -5,8 +5,9 @@
 # every 30 seconds, with what the drop rules dropped. Runs as root, started by the entrypoint before
 # Asterisk.
 #
-# Every line is parsed as an address and an optional instant; a list with any other line is
-# refused as a whole and the sets keep what they hold, so the file's text never reaches `nft`.
+# Every line is parsed as an address, a protocol (udp or tcp) and an optional instant; a list with
+# any other line is refused as a whole and the sets keep what they hold, so the file's text never
+# reaches `nft`.
 set -uo pipefail
 
 GEN_DIR=${SIP_BAN_GEN_DIR:-/etc/asterisk/gen}  # the variable only for test-ban.sh
@@ -27,18 +28,19 @@ instant_re='^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]{1,9})
 
 # Prints the nft transaction for the list file $1, or fails naming the first bad line.
 transaction() {
-  local now line addr at expires left element n=0
-  local -a v4=() v6=()
+  local now line addr proto at expires left element key n=0
+  # The elements per set, keyed by its name's suffix: v4_udp, v4_tcp, v6_udp, v6_tcp.
+  local -A sets=()
   now=$(date +%s)
   while IFS= read -r line || [ -n "$line" ]; do
     n=$((n + 1))
-    if ! [[ $line =~ ^([^ ]+)( ([^ ]+))?$ ]]; then
-      log "line $n is not '<address> [<expires_at>]'; list refused"
+    if ! [[ $line =~ ^([^ ]+)\ (udp|tcp)( ([^ ]+))?$ ]]; then
+      log "line $n is not '<address> <udp|tcp> [<expires_at>]'; list refused"
       return 1
     fi
-    addr=${BASH_REMATCH[1]} at=${BASH_REMATCH[3]}
+    addr=${BASH_REMATCH[1]} proto=${BASH_REMATCH[2]} at=${BASH_REMATCH[4]}
     if ! [[ $addr =~ $ipv4_re || $addr =~ $ipv6_64_re ]]; then
-      log "line $n is not '<address> [<expires_at>]'; list refused"
+      log "line $n is not '<address> <udp|tcp> [<expires_at>]'; list refused"
       return 1
     fi
     element=$addr
@@ -52,12 +54,13 @@ transaction() {
       # nft refuses a seconds count of nine digits or more, so a ban of years is given in days.
       element="$addr timeout $((left / 86400))d$((left % 86400))s"
     fi
-    if [[ $addr == */64 ]]; then v6+=("$element"); else v4+=("$element"); fi
+    if [[ $addr == */64 ]]; then key=v6_$proto; else key=v4_$proto; fi
+    sets[$key]+=${sets[$key]:+,}$element
   done < "$1"
-  echo "flush set inet zamfono sip_ban_v4"
-  echo "flush set inet zamfono sip_ban_v6"
-  [ "${#v4[@]}" -eq 0 ] || (IFS=,; echo "add element inet zamfono sip_ban_v4 { ${v4[*]} }")
-  [ "${#v6[@]}" -eq 0 ] || (IFS=,; echo "add element inet zamfono sip_ban_v6 { ${v6[*]} }")
+  for key in v4_udp v4_tcp v6_udp v6_tcp; do
+    echo "flush set inet zamfono sip_ban_$key"
+    [ -z "${sets[$key]:-}" ] || echo "add element inet zamfono sip_ban_$key { ${sets[$key]} }"
+  done
 }
 
 snapshot=$(mktemp)
@@ -79,14 +82,15 @@ apply() {
   fi
 }
 
-# The packets and bytes the drop rules' counters hold, summed over both families.
+# The packets and bytes the drop rules' counters hold, per protocol summed over both families:
+# `<udp packets> <udp bytes> <tcp packets> <tcp bytes>`.
 dropped() {
   nft list chain inet zamfono input | awk '/ counter packets / {
     for (i = 1; i < NF; i++) {
-      if ($i == "packets") packets += $(i + 1)
-      if ($i == "bytes") bytes += $(i + 1)
+      if ($i == "packets") packets[$1] += $(i + 1)
+      if ($i == "bytes") bytes[$1] += $(i + 1)
     }
-  } END { print packets + 0, bytes + 0 }'
+  } END { print packets["udp"] + 0, bytes["udp"] + 0, packets["tcp"] + 0, bytes["tcp"] + 0 }'
 }
 
 write_status() {

@@ -40,18 +40,21 @@ async function listText(): Promise<string> {
   );
 }
 
-/** A past ban of `address` that took `step` and ended `endedDaysAgo` days ago, by expiry. */
+/** A past ban of `address` over `protocol` that took `step` and ended `endedDaysAgo` days ago,
+ * by expiry. */
 async function seedEndedBan(
   address: string,
   step: number,
-  endedDaysAgo: number
+  endedDaysAgo: number,
+  protocol: 'udp' | 'tcp' = 'udp'
 ): Promise<void> {
   const now = nowIso();
   await db
     .insertInto('sipBans')
     .values({
-      id: `ban-${step}-${endedDaysAgo}`,
+      id: `ban-${protocol}-${step}-${endedDaysAgo}`,
       address,
+      protocol,
       step,
       failures: 10,
       createdAt: addMsIso(now, -(endedDaysAgo + 1) * DAY_MS),
@@ -64,6 +67,7 @@ describe('recordSipBan (§5.6 "Bans")', () => {
   it('bans a first offender for the first step, audits it, renders the list and emits sipBan.added', async () => {
     const ban = await recordSipBan(db, bus, {
       address: '203.0.113.7',
+      protocol: 'udp',
       failures: 12
     });
     expect(ban).not.toBeNull();
@@ -73,6 +77,7 @@ describe('recordSipBan (§5.6 "Bans")', () => {
       .executeTakeFirstOrThrow();
     expect(row).toMatchObject({
       address: '203.0.113.7',
+      protocol: 'udp',
       step: 1,
       failures: 12
     });
@@ -91,8 +96,13 @@ describe('recordSipBan (§5.6 "Bans")', () => {
       entityId: row.id,
       undoable: 0
     });
+    expect(JSON.parse(audit.changesJson)).toContainEqual({
+      field: 'protocol',
+      from: null,
+      to: 'udp'
+    });
     const text = await listText();
-    expect(text).toBe(`203.0.113.7 ${row.expiresAt}\n`);
+    expect(text).toBe(`203.0.113.7 udp ${row.expiresAt}\n`);
     expect(renderedSipBanListHash()).toBe(
       createHash('sha256').update(text).digest('hex')
     );
@@ -101,17 +111,26 @@ describe('recordSipBan (§5.6 "Bans")', () => {
         type: 'sipBan.added',
         banId: row.id,
         address: '203.0.113.7',
+        protocol: 'udp',
         expiresAt: row.expiresAt
       }
     ]);
     expect(bus.enqueue).toHaveBeenCalledWith(published[0]);
-    expect(await countSipBansInForce(db)).toBe(1);
+    expect(await countSipBansInForce(db)).toEqual({ udp: 1, tcp: 0 });
   });
 
   it('changes nothing for an address with an active ban', async () => {
-    await recordSipBan(db, bus, { address: '203.0.113.7', failures: 10 });
+    await recordSipBan(db, bus, {
+      address: '203.0.113.7',
+      protocol: 'udp',
+      failures: 10
+    });
     expect(
-      await recordSipBan(db, bus, { address: '203.0.113.7', failures: 10 })
+      await recordSipBan(db, bus, {
+        address: '203.0.113.7',
+        protocol: 'udp',
+        failures: 10
+      })
     ).toBeNull();
     expect(await db.selectFrom('sipBans').select('id').execute()).toHaveLength(
       1
@@ -120,14 +139,22 @@ describe('recordSipBan (§5.6 "Bans")', () => {
   });
 
   it('ignores every report while the steps are empty, and renders an empty list with the active bans kept', async () => {
-    await recordSipBan(db, bus, { address: '203.0.113.7', failures: 10 });
+    await recordSipBan(db, bus, {
+      address: '203.0.113.7',
+      protocol: 'udp',
+      failures: 10
+    });
     await db.updateTable('settings').set({ sipBanStepsJson: '[]' }).execute();
     expect(
-      await recordSipBan(db, bus, { address: '198.51.100.1', failures: 10 })
+      await recordSipBan(db, bus, {
+        address: '198.51.100.1',
+        protocol: 'udp',
+        failures: 10
+      })
     ).toBeNull();
     await renderSipBanList(db);
     expect(await listText()).toBe('');
-    expect(await countSipBansInForce(db)).toBe(0);
+    expect(await countSipBansInForce(db)).toEqual({ udp: 0, tcp: 0 });
     expect(await db.selectFrom('sipBans').select('address').execute()).toEqual([
       { address: '203.0.113.7' }
     ]);
@@ -135,7 +162,11 @@ describe('recordSipBan (§5.6 "Bans")', () => {
 
   it('takes the step after a previous ban that ended within the lookback', async () => {
     await seedEndedBan('203.0.113.7', 1, 2);
-    await recordSipBan(db, bus, { address: '203.0.113.7', failures: 10 });
+    await recordSipBan(db, bus, {
+      address: '203.0.113.7',
+      protocol: 'udp',
+      failures: 10
+    });
     const row = await db
       .selectFrom('sipBans')
       .selectAll()
@@ -148,7 +179,11 @@ describe('recordSipBan (§5.6 "Bans")', () => {
 
   it('starts again at the first step once the previous ban ended longer ago than the lookback', async () => {
     await seedEndedBan('203.0.113.7', 2, 31);
-    await recordSipBan(db, bus, { address: '203.0.113.7', failures: 10 });
+    await recordSipBan(db, bus, {
+      address: '203.0.113.7',
+      protocol: 'udp',
+      failures: 10
+    });
     expect(
       await db
         .selectFrom('sipBans')
@@ -166,6 +201,7 @@ describe('recordSipBan (§5.6 "Bans")', () => {
     await seedEndedBan('2001:db8:1:2::/64', 2, 1);
     const ban = await recordSipBan(db, bus, {
       address: '2001:db8:1:2::/64',
+      protocol: 'udp',
       failures: 10
     });
     expect(ban?.expiresAt).toBeNull();
@@ -176,6 +212,57 @@ describe('recordSipBan (§5.6 "Bans")', () => {
         .where('id', '=', ban?.id ?? '')
         .executeTakeFirstOrThrow()
     ).toEqual({ step: 2 });
-    expect(await listText()).toBe('2001:db8:1:2::/64\n');
+    expect(await listText()).toBe('2001:db8:1:2::/64 udp\n');
+  });
+
+  it('bans an address on each protocol on its own: an active UDP ban leaves a TCP report its own ban', async () => {
+    const udp = await recordSipBan(db, bus, {
+      address: '203.0.113.7',
+      protocol: 'udp',
+      failures: 10
+    });
+    const tcp = await recordSipBan(db, bus, {
+      address: '203.0.113.7',
+      protocol: 'tcp',
+      failures: 10
+    });
+    expect(tcp).not.toBeNull();
+    expect(
+      await recordSipBan(db, bus, {
+        address: '203.0.113.7',
+        protocol: 'tcp',
+        failures: 10
+      })
+    ).toBeNull();
+    expect(await listText()).toBe(
+      `203.0.113.7 tcp ${tcp?.expiresAt}\n203.0.113.7 udp ${udp?.expiresAt}\n`
+    );
+    expect(published).toMatchObject([
+      { address: '203.0.113.7', protocol: 'udp' },
+      { address: '203.0.113.7', protocol: 'tcp' }
+    ]);
+  });
+
+  it("escalates from the previous ban on the report's protocol alone", async () => {
+    await seedEndedBan('203.0.113.7', 2, 2, 'udp');
+    const tcp = await recordSipBan(db, bus, {
+      address: '203.0.113.7',
+      protocol: 'tcp',
+      failures: 10
+    });
+    const udp = await recordSipBan(db, bus, {
+      address: '203.0.113.7',
+      protocol: 'udp',
+      failures: 10
+    });
+    const steps = await db
+      .selectFrom('sipBans')
+      .select(['id', 'step'])
+      .where('id', 'in', [tcp?.id ?? '', udp?.id ?? ''])
+      .execute();
+    expect(Object.fromEntries(steps.map(row => [row.id, row.step]))).toEqual({
+      [tcp?.id ?? '']: 1,
+      [udp?.id ?? '']: 3
+    });
   });
 });

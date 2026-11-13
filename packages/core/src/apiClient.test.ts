@@ -93,11 +93,13 @@ describe('ApiClient', () => {
     try {
       await new ApiClient(stub.url).sipBan({
         address: '203.0.113.7',
+        protocol: 'udp',
         failures: 10
       });
       expect(stub.requests[0]?.path).toBe('/internal/sipBan');
       expect(JSON.parse(stub.requests[0]?.body ?? '')).toEqual({
         address: '203.0.113.7',
+        protocol: 'udp',
         failures: 10
       });
     } finally {
@@ -109,7 +111,11 @@ describe('ApiClient', () => {
     const stub = await startStub(400);
     try {
       await expect(
-        new ApiClient(stub.url).sipBan({ address: 'x', failures: 1 })
+        new ApiClient(stub.url).sipBan({
+          address: 'x',
+          protocol: 'udp',
+          failures: 1
+        })
       ).rejects.toThrow('/internal/sipBan responded 400');
     } finally {
       await stub.close();

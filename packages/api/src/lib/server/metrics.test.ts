@@ -295,11 +295,12 @@ describe('renderMetrics', () => {
     expect(parseMetrics(pending).get('zamfono_certificate_sync_ok')).toBe('0');
   });
 
-  it('counts the SIP bans in force, neither a lifted nor an expired one, and none while banning is off (§7)', async () => {
+  it('counts the SIP bans in force per protocol, neither a lifted nor an expired one, and none while banning is off (§7)', async () => {
     const db = await makeTestDb();
     await seedSettings(db);
     const ban = {
       address: '203.0.113.7',
+      protocol: 'udp' as const,
       step: 1,
       failures: 10,
       createdAt: '2026-01-01T00:00:00.000Z'
@@ -309,6 +310,7 @@ describe('renderMetrics', () => {
       .values([
         { ...ban, id: 'permanent' },
         { ...ban, id: 'running', expiresAt: '2999-01-01T00:00:00.000Z' },
+        { ...ban, id: 'tcp', protocol: 'tcp' },
         { ...ban, id: 'expired', expiresAt: '2026-01-02T00:00:00.000Z' },
         {
           ...ban,
@@ -321,16 +323,22 @@ describe('renderMetrics', () => {
 
     const text = await renderMetrics(stubDeps({ db }));
 
-    expect(text).toContain('# TYPE zamfono_sip_bans_active gauge');
-    expect(parseMetrics(text).get('zamfono_sip_bans_active')).toBe('2');
+    expect(text).toContain(
+      '# TYPE zamfono_sip_bans_active gauge\n' +
+        'zamfono_sip_bans_active{protocol="udp"} 2\n' +
+        'zamfono_sip_bans_active{protocol="tcp"} 1\n'
+    );
 
     // Banning off: no ban is in force, as the rendered list holds none (§5.6).
     await db.updateTable('settings').set({ sipBanStepsJson: '[]' }).execute();
     const off = await renderMetrics(stubDeps({ db }));
-    expect(parseMetrics(off).get('zamfono_sip_bans_active')).toBe('0');
+    expect(off).toContain(
+      'zamfono_sip_bans_active{protocol="udp"} 0\n' +
+        'zamfono_sip_bans_active{protocol="tcp"} 0\n'
+    );
   });
 
-  it('counts what the SIP-ban drop rules dropped, from the ban helper status, left out without one (§5.6)', async () => {
+  it('counts what the SIP-ban drop rules dropped per protocol, from the ban helper status, left out without one (§5.6)', async () => {
     const db = await makeTestDb();
     await seedSettings(db);
     const statusFile = path.join(
@@ -340,7 +348,7 @@ describe('renderMetrics', () => {
     await mkdir(path.dirname(statusFile), { recursive: true });
     await writeFile(
       statusFile,
-      `2026-10-05T11:59:01Z ${'0'.repeat(64)} 12 3456\n`
+      `2026-10-05T11:59:01Z ${'0'.repeat(64)} 12 3456 7 420\n`
     );
 
     const text = await renderMetrics(stubDeps({ db }));
@@ -350,11 +358,13 @@ describe('renderMetrics', () => {
     expect(text).toContain(
       '# TYPE zamfono_sip_ban_dropped_packets_total counter'
     );
-    expect(
-      parseMetrics(text).get('zamfono_sip_ban_dropped_packets_total')
-    ).toBe('12');
-    expect(parseMetrics(text).get('zamfono_sip_ban_dropped_bytes_total')).toBe(
-      '3456'
+    expect(text).toContain(
+      'zamfono_sip_ban_dropped_packets_total{protocol="udp"} 12\n' +
+        'zamfono_sip_ban_dropped_packets_total{protocol="tcp"} 7\n'
+    );
+    expect(text).toContain(
+      'zamfono_sip_ban_dropped_bytes_total{protocol="udp"} 3456\n' +
+        'zamfono_sip_ban_dropped_bytes_total{protocol="tcp"} 420\n'
     );
     expect(missing).toContain(
       '# TYPE zamfono_sip_ban_dropped_bytes_total counter'

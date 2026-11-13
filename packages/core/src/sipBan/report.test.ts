@@ -95,7 +95,9 @@ describe('startSipBanCount', () => {
     fakeAmi.emit(failure('203.0.113.7'));
     fakeAmi.emit(failure('203.0.113.7'));
     await eventually(() => {
-      expect(reports).toEqual([{ address: '203.0.113.7', failures: 2 }]);
+      expect(reports).toEqual([
+        { address: '203.0.113.7', protocol: 'udp', failures: 2 }
+      ]);
     });
   });
 
@@ -111,7 +113,9 @@ describe('startSipBanCount', () => {
     fakeAmi.emit(failure('198.51.100.1'));
     fakeAmi.emit(failure('198.51.100.1'));
     await eventually(() => {
-      expect(reports).toEqual([{ address: '198.51.100.1', failures: 2 }]);
+      expect(reports).toEqual([
+        { address: '198.51.100.1', protocol: 'udp', failures: 2 }
+      ]);
     });
   });
 
@@ -122,7 +126,9 @@ describe('startSipBanCount', () => {
     fakeAmi.emit(failure('198.51.100.1'));
     fakeAmi.emit(failure('198.51.100.1'));
     await eventually(() => {
-      expect(reports).toEqual([{ address: '198.51.100.1', failures: 2 }]);
+      expect(reports).toEqual([
+        { address: '198.51.100.1', protocol: 'udp', failures: 2 }
+      ]);
     });
     expect(log.warn).toHaveBeenCalledTimes(1);
     expect(log.warn.mock.calls[0]?.[0]).toMatchObject({
@@ -145,7 +151,9 @@ describe('startSipBanCount', () => {
     fakeAmi.emit(failure('198.51.100.1'));
     fakeAmi.emit(failure('198.51.100.1'));
     await eventually(() => {
-      expect(reports).toEqual([{ address: '198.51.100.1', failures: 2 }]);
+      expect(reports).toEqual([
+        { address: '198.51.100.1', protocol: 'udp', failures: 2 }
+      ]);
     });
   });
 
@@ -164,7 +172,9 @@ describe('startSipBanCount', () => {
     fakeAmi.emit(failure('203.0.113.7'));
     fakeAmi.emit(failure('203.0.113.7'));
     await eventually(() => {
-      expect(reports).toEqual([{ address: '203.0.113.7', failures: 2 }]);
+      expect(reports).toEqual([
+        { address: '203.0.113.7', protocol: 'udp', failures: 2 }
+      ]);
     });
   });
 
@@ -178,7 +188,9 @@ describe('startSipBanCount', () => {
     fakeAmi.emit(failure('198.51.100.1'));
     fakeAmi.emit(failure('198.51.100.1'));
     await eventually(() => {
-      expect(reports).toEqual([{ address: '198.51.100.1', failures: 2 }]);
+      expect(reports).toEqual([
+        { address: '198.51.100.1', protocol: 'udp', failures: 2 }
+      ]);
     });
   });
 
@@ -195,7 +207,9 @@ describe('startSipBanCount', () => {
     fakeAmi.emit(failure('192.0.2.66'));
     fakeAmi.emit(failure('192.0.2.66'));
     await eventually(() => {
-      expect(reports).toEqual([{ address: '192.0.2.66', failures: 2 }]);
+      expect(reports).toEqual([
+        { address: '192.0.2.66', protocol: 'udp', failures: 2 }
+      ]);
     });
   });
 });

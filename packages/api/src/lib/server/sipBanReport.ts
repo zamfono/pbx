@@ -1,6 +1,6 @@
 /**
- * A ban on `core`'s report of an address's failed SIP attempts (§5.6 "Bans"): the escalation
- * step, the `sip_bans` row and its audit entry, then the ban list, `sipBan.added` and the log.
+ * A ban on `core`'s report of an address's failed SIP attempts over one protocol (§5.6 "Bans"):
+ * the escalation step, the `sip_bans` row and its audit entry, then the ban list, `sipBan.added` and the log.
  */
 import pino from 'pino';
 
@@ -12,6 +12,7 @@ import {
   sipBanStepsColumn,
   type Db,
   type Envelope,
+  type SipBanProtocol,
   type SipBanReport
 } from '@zamfono/shared';
 
@@ -22,16 +23,21 @@ import { activeSipBans, renderSipBanList } from './sipBanList.js';
 
 const log = pino({ name: 'sip-ban' });
 
-export type SipBan = { id: string; address: string; expiresAt: string | null };
+export type SipBan = {
+  id: string;
+  address: string;
+  protocol: SipBanProtocol;
+  expiresAt: string | null;
+};
 
 /**
- * The step of a new ban of `address` (1-based, §5.6): the one after its previous ban's when that
- * ban ended within the last `lookbackS` seconds, the last again past the end of `stepCount`, else
- * the first.
+ * The step of a new ban of `report`'s address on its protocol (1-based, §5.6): the one after the
+ * previous ban's on that protocol when that ban ended within the last `lookbackS` seconds, the
+ * last again past the end of `stepCount`, else the first.
  */
 async function nextStep(
   db: Db,
-  address: string,
+  { address, protocol }: SipBanReport,
   now: string,
   lookbackS: number,
   stepCount: number
@@ -40,6 +46,7 @@ async function nextStep(
     .selectFrom('sipBans')
     .select(['step', 'expiresAt', 'liftedAt'])
     .where('address', '=', address)
+    .where('protocol', '=', protocol)
     .orderBy('createdAt', 'desc')
     .executeTakeFirst();
   // A ban that is not active ended when it was lifted, or else when it expired.
@@ -57,7 +64,7 @@ async function nextStep(
 /**
  * Writes the ban `report` asks for and its audit entry, `sipBans.ban` (channel `job`, actor
  * `system`), in one transaction; `null` when banning is off (no steps) or the address already has
- * an active ban, which changes nothing.
+ * an active ban on the protocol, which changes nothing.
  */
 async function writeBan(db: Db, report: SipBanReport): Promise<SipBan | null> {
   return db.transaction().execute(async trx => {
@@ -71,13 +78,14 @@ async function writeBan(db: Db, report: SipBanReport): Promise<SipBan | null> {
     const active = await activeSipBans(trx, now)
       .select('id')
       .where('address', '=', report.address)
+      .where('protocol', '=', report.protocol)
       .executeTakeFirst();
     if (steps.length === 0 || active) {
       return null;
     }
     const step = await nextStep(
       trx,
-      report.address,
+      report,
       now,
       settings.sipBanLookbackS,
       steps.length
@@ -86,6 +94,7 @@ async function writeBan(db: Db, report: SipBanReport): Promise<SipBan | null> {
     const ban: SipBan = {
       id: newId(),
       address: report.address,
+      protocol: report.protocol,
       expiresAt:
         lengthS === null ? null : addMsIso(now, lengthS * MS_PER_SECOND)
     };
@@ -99,6 +108,7 @@ async function writeBan(db: Db, report: SipBanReport): Promise<SipBan | null> {
       entity: { kind: 'sipBan', id: ban.id },
       changes: outcomeChanges({
         address: ban.address,
+        protocol: ban.protocol,
         step,
         failures: report.failures,
         expiresAt: ban.expiresAt
@@ -112,8 +122,9 @@ async function writeBan(db: Db, report: SipBanReport): Promise<SipBan | null> {
 }
 
 /**
- * Bans the address `core` reported (§5.6 "Bans"), renders the ban list, emits `sipBan.added`
- * and logs a warning naming the address; `null` when it changed nothing.
+ * Bans the address `core` reported on its protocol (§5.6 "Bans"), renders the ban list, emits
+ * `sipBan.added` and logs a warning naming the address and protocol; `null` when it changed
+ * nothing.
  */
 export async function recordSipBan(
   db: Db,
@@ -127,6 +138,7 @@ export async function recordSipBan(
   log.warn(
     {
       address: ban.address,
+      protocol: ban.protocol,
       failures: report.failures,
       expiresAt: ban.expiresAt
     },
@@ -140,6 +152,7 @@ export async function recordSipBan(
     type: 'sipBan.added',
     banId: ban.id,
     address: ban.address,
+    protocol: ban.protocol,
     expiresAt: ban.expiresAt,
     id: newId(),
     at: nowIso()

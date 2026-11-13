@@ -8,6 +8,7 @@ import { stat } from 'node:fs/promises';
 
 import {
   MS_PER_SECOND,
+  SIP_BAN_PROTOCOLS,
   type Db,
   type StateResponse,
   type ZamfonoVersion
@@ -77,19 +78,31 @@ function recordingMixFailureLines(state: StateResponse | null): string[] {
   return lines;
 }
 
-/** §5.6 "Enforcement": the packets and bytes the ban list's drop rules dropped since the
- * `asterisk` container loaded them, as of the ban helper's last heartbeat; left out while its
- * status is unreadable, like a mix failure without `core`. */
-async function sipBanDroppedLines(): Promise<string[]> {
+/** §5.6: the bans in force and, as of the ban helper's last heartbeat, the packets and bytes the
+ * ban list's drop rules dropped since the `asterisk` container loaded them, each per protocol; the
+ * dropped ones left out while its status is unreadable, like a mix failure without `core`. */
+async function sipBanLines(db: Db): Promise<string[]> {
+  const active = await countSipBansInForce(db);
   const { dropped } = await sipBanHelperState();
-  return (['packets', 'bytes'] as const).flatMap(unit => {
-    const name = `zamfono_sip_ban_dropped_${unit}_total`;
-    const lines = [`# TYPE ${name} counter`];
-    if (dropped !== null) {
-      lines.push(`${name} ${dropped[unit]}`);
-    }
-    return lines;
-  });
+  return [
+    '# TYPE zamfono_sip_bans_active gauge',
+    ...SIP_BAN_PROTOCOLS.map(
+      protocol =>
+        `zamfono_sip_bans_active{protocol="${protocol}"} ${active[protocol]}`
+    ),
+    ...(['packets', 'bytes'] as const).flatMap(unit => {
+      const name = `zamfono_sip_ban_dropped_${unit}_total`;
+      return [
+        `# TYPE ${name} counter`,
+        ...(dropped === null
+          ? []
+          : SIP_BAN_PROTOCOLS.map(
+              protocol =>
+                `${name}{protocol="${protocol}"} ${dropped[protocol][unit]}`
+            ))
+      ];
+    })
+  ];
 }
 
 async function trunkMetricLines(
@@ -231,11 +244,7 @@ export async function renderMetrics(deps: MetricsDeps): Promise<string> {
       'zamfono_certificate_sync_ok',
       deps.certSyncStatus() === 'ok' ? 1 : 0
     ),
-    ...gaugeLines(
-      'zamfono_sip_bans_active',
-      await countSipBansInForce(deps.db)
-    ),
-    ...(await sipBanDroppedLines()),
+    ...(await sipBanLines(deps.db)),
     ...recordingMixFailureLines(state),
     ...(await configPropagationLines(deps.db)),
     ...(await updateLines(deps.db)),

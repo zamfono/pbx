@@ -1,6 +1,7 @@
 /**
- * The source addresses never banned for failed SIP attempts (§5.6 "Counting"): a trunk's
- * `inbound` or `both` host, a device's `allowed_ips_json`, the allowlist and the stack's own.
+ * The source addresses never banned for failed SIP attempts (§5.6 "Counting"): a trunk's host of
+ * every direction, since an `outbound` host's responses arrive on the SIP ports too, a device's
+ * `allowed_ips_json`, the allowlist and the stack's own.
  */
 import { BlockList, isIP, isIPv6 } from 'node:net';
 import { networkInterfaces, type NetworkInterfaceInfo } from 'node:os';
@@ -19,10 +20,7 @@ export type ExemptConfig = {
   sipAllowlist: Pick<Snapshot['sipAllowlist'][number], 'address'>[];
   devices: Pick<Snapshot['devices'][number], 'allowedIps'>[];
   trunks: Pick<Snapshot['trunks'][number], 'id'>[];
-  trunkHosts: Pick<
-    Snapshot['trunkHosts'][number],
-    'trunkId' | 'host' | 'direction'
-  >[];
+  trunkHosts: Pick<Snapshot['trunkHosts'][number], 'trunkId' | 'host'>[];
 };
 
 /**
@@ -118,9 +116,7 @@ export async function exemption(
   const liveTrunks = new Set(config.trunks.map(trunk => trunk.id));
   const trunkHosts = await Promise.all(
     config.trunkHosts
-      .filter(
-        host => host.direction !== 'outbound' && liveTrunks.has(host.trunkId)
-      )
+      .filter(host => liveTrunks.has(host.trunkId))
       .map(host => hostAddresses(host.host, lookup, log))
   );
   return trunkHosts.flat().some(range => overlaps(key, range))

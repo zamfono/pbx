@@ -31,13 +31,18 @@ const listFile = (): string =>
 async function seedBan(
   id: string,
   address: string,
-  extra: { expiresAt?: string; liftedAt?: string } = {}
+  extra: {
+    protocol?: 'udp' | 'tcp';
+    expiresAt?: string;
+    liftedAt?: string;
+  } = {}
 ): Promise<void> {
   await db
     .insertInto('sipBans')
     .values({
       id,
       address,
+      protocol: 'udp',
       step: 1,
       failures: 10,
       createdAt: CREATED_AT,
@@ -77,6 +82,7 @@ describe('sipBans (§5.6, §10.3)', () => {
     expect(page.items[0]).toEqual({
       id: 'a-permanent',
       address: '203.0.113.1',
+      protocol: 'udp',
       step: 1,
       failures: 10,
       createdAt: CREATED_AT,
@@ -86,8 +92,9 @@ describe('sipBans (§5.6, §10.3)', () => {
     });
   });
 
-  it('lifts an active ban, a permanent one included, and renders the list without it; not undoable', async () => {
+  it('lifts an active ban, a permanent one included, on its protocol alone, and renders the list without it; not undoable', async () => {
     await seedBan('ban-1', '203.0.113.1');
+    await seedBan('ban-1-tcp', '203.0.113.1', { protocol: 'tcp' });
     await seedBan('ban-2', '203.0.113.2', { expiresAt: FUTURE });
     await runOperation(db, 'sipBans.lift', { id: 'ban-1' }, asConfirmedRun());
     const row = await db
@@ -98,7 +105,7 @@ describe('sipBans (§5.6, §10.3)', () => {
     expect(row.liftedBy).toBe('owner');
     expect(row.liftedAt).not.toBeNull();
     await expect(readFile(listFile(), 'utf8')).resolves.toBe(
-      `203.0.113.2 ${FUTURE}\n`
+      `203.0.113.1 tcp\n203.0.113.2 udp ${FUTURE}\n`
     );
     const entry = await db
       .selectFrom('auditLog')
@@ -164,6 +171,7 @@ describe('sipAllowlist (§5.6, §10.3)', () => {
 
   it('ends every active ban a new entry covers, recording its creator, and renders the list', async () => {
     await seedBan('v4', '198.51.100.7');
+    await seedBan('v4-tcp', '198.51.100.7', { protocol: 'tcp' });
     await seedBan('v6', '2001:db8:0:5::/64', { expiresAt: FUTURE });
     await seedBan('other', '203.0.113.9');
     await create('198.51.100.0/24');
@@ -176,9 +184,12 @@ describe('sipAllowlist (§5.6, §10.3)', () => {
       .execute();
     expect(lifted).toEqual([
       { id: 'v4', liftedBy: 'owner' },
+      { id: 'v4-tcp', liftedBy: 'owner' },
       { id: 'v6', liftedBy: 'owner' }
     ]);
-    await expect(readFile(listFile(), 'utf8')).resolves.toBe('203.0.113.9\n');
+    await expect(readFile(listFile(), 'utf8')).resolves.toBe(
+      '203.0.113.9 udp\n'
+    );
   });
 
   it('ends the active bans a restored entry covers when its delete is undone, recording the undoing admin', async () => {

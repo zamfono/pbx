@@ -17,21 +17,30 @@ const URL = 'http://internal/internal/sipBan';
 describe('POST /internal/sipBan', () => {
   it('records the report and answers 204', async () => {
     const response = await POST(
-      jsonPost(URL, { address: '203.0.113.7', failures: 10 })
+      jsonPost(URL, { address: '203.0.113.7', protocol: 'tcp', failures: 10 })
     );
     expect(response.status).toBe(HTTP_NO_CONTENT);
     expect(vi.mocked(recordSipBan).mock.calls[0]?.[2]).toEqual({
       address: '203.0.113.7',
+      protocol: 'tcp',
       failures: 10
     });
   });
 
   it.each([
-    [{ address: '203.0.113.7' }],
-    [{ address: '203.0.113.7', failures: 0 }],
-    [{ failures: 10 }],
-    [{ address: '203.0.113.0/24', failures: 10 }],
-    [{ address: '203.0.113.7\n198.51.100.1', failures: 10 }]
+    [{ address: '203.0.113.7', protocol: 'udp' }],
+    [{ address: '203.0.113.7', protocol: 'udp', failures: 0 }],
+    [{ protocol: 'udp', failures: 10 }],
+    [{ address: '203.0.113.7', failures: 10 }],
+    [{ address: '203.0.113.7', protocol: 'tls', failures: 10 }],
+    [{ address: '203.0.113.0/24', protocol: 'udp', failures: 10 }],
+    [
+      {
+        address: '203.0.113.7\n198.51.100.1',
+        protocol: 'udp',
+        failures: 10
+      }
+    ]
   ])('answers 400 for %j', async body => {
     const response = await POST(jsonPost(URL, body));
     expect(response.status).toBe(HTTP_BAD_REQUEST);

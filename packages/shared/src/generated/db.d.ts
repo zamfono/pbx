@@ -3,7 +3,7 @@
  * Please do not edit it manually.
  */
 
-import type { AudioKind, AuditChannel, BackupRunStatus, BackupTargetKind, CallDirection, CallerIdHeader, CallLogLevel, CallStatus, DeviceKind, DeviceTransport, DiversionPolicy, ForwardedCallerId, HostDirection, Language, LogLevelOverride, MailKind, MaintenanceWork, NumberFormat, OAuthClientKind, PresenceStatus, PromptVoice, QosRole, RingGroupForwardCondition, RingStrategy, SmtpSecurity, SsoProvider, TokenKind, TrunkAuthMode, TrunkTransport, UserForwardCondition, UserRole, WebhookStatus, WebSocketProtocol } from "../columnValues.js";
+import type { AudioKind, AuditChannel, BackupRunStatus, BackupTargetKind, CallDirection, CallerIdHeader, CallLogLevel, CallStatus, DeviceKind, DeviceTransport, DiversionPolicy, ForwardedCallerId, HostDirection, Language, LogLevelOverride, MailKind, MaintenanceWork, NumberFormat, OAuthClientKind, PresenceStatus, PromptVoice, QosRole, RingGroupForwardCondition, RingStrategy, SipBanProtocol, SmtpSecurity, SsoProvider, TokenKind, TrunkAuthMode, TrunkTransport, UserForwardCondition, UserRole, WebhookStatus, WebSocketProtocol } from "../columnValues.js";
 import type { ColumnType } from "kysely";
 import type { CountryCode } from "libphonenumber-js";
 
@@ -441,6 +441,7 @@ export interface SipBans {
   id: string;
   liftedAt: string | null;
   liftedBy: string | null;
+  protocol: SipBanProtocol;
   step: number;
 }
 

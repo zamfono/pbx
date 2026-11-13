@@ -121,6 +121,7 @@ describe('settings: SIP bans (§5.6, §11.4)', () => {
       .values({
         id: 'ban-1',
         address: '203.0.113.7',
+        protocol: 'udp',
         step: 3,
         failures: 10,
         createdAt: '2026-01-01T00:00:00.000Z'
@@ -133,6 +134,6 @@ describe('settings: SIP bans (§5.6, §11.4)', () => {
     await update(db, { sipBanSteps: [] });
     await expect(readFile(listFile, 'utf8')).resolves.toBe('');
     await update(db, { sipBanSteps: [86_400] });
-    await expect(readFile(listFile, 'utf8')).resolves.toBe('203.0.113.7\n');
+    await expect(readFile(listFile, 'utf8')).resolves.toBe('203.0.113.7 udp\n');
   });
 });

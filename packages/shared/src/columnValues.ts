@@ -76,6 +76,10 @@ export const FORWARDED_CALLER_IDS = [
 ] as const;
 export type ForwardedCallerId = (typeof FORWARDED_CALLER_IDS)[number];
 
+/** `sip_bans.protocol` (§5.6): the transport class a ban drops, UDP, or TCP and TLS alike. */
+export const SIP_BAN_PROTOCOLS = ['udp', 'tcp'] as const;
+export type SipBanProtocol = (typeof SIP_BAN_PROTOCOLS)[number];
+
 /** `trunk_hosts.direction` (§9.4 "Hosts"). */
 export const HOST_DIRECTIONS = ['both', 'outbound', 'inbound'] as const;
 export type HostDirection = (typeof HOST_DIRECTIONS)[number];

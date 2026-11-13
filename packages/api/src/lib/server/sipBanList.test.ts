@@ -29,26 +29,29 @@ beforeEach(async () => {
 
 describe('sipBanHelperState (§9.1, §10.3)', () => {
   it('runs with a fresh heartbeat naming the list api last rendered, with the drop counts', async () => {
-    await writeStatus(`2026-10-05T11:59:01Z ${EMPTY_HASH} 12 3456\n`);
+    await writeStatus(`2026-10-05T11:59:01Z ${EMPTY_HASH} 12 3456 7 420\n`);
     expect(await sipBanHelperState(NOW)).toEqual({
       running: true,
       heartbeat: '2026-10-05T11:59:01Z',
-      dropped: { packets: 12, bytes: 3456 }
+      dropped: {
+        udp: { packets: 12, bytes: 3456 },
+        tcp: { packets: 7, bytes: 420 }
+      }
     });
   });
 
   it.each([
     [
       'a heartbeat older than 60 seconds',
-      `2026-10-05T11:58:59Z ${EMPTY_HASH} 0 0\n`,
+      `2026-10-05T11:58:59Z ${EMPTY_HASH} 0 0 0 0\n`,
       '2026-10-05T11:58:59Z',
-      { packets: 0, bytes: 0 }
+      { udp: { packets: 0, bytes: 0 }, tcp: { packets: 0, bytes: 0 } }
     ],
     [
       'another list',
-      `2026-10-05T11:59:30Z ${'0'.repeat(64)} 1 60\n`,
+      `2026-10-05T11:59:30Z ${'0'.repeat(64)} 1 60 0 0\n`,
       '2026-10-05T11:59:30Z',
-      { packets: 1, bytes: 60 }
+      { udp: { packets: 1, bytes: 60 }, tcp: { packets: 0, bytes: 0 } }
     ],
     ['an unreadable line', 'garbage\n', null, null],
     [
@@ -57,7 +60,13 @@ describe('sipBanHelperState (§9.1, §10.3)', () => {
       null,
       null
     ],
-    ['an unparsable time', `yesterday ${EMPTY_HASH} 0 0\n`, null, null]
+    [
+      'a line of an earlier release, its drop counts not per protocol',
+      `2026-10-05T11:59:01Z ${EMPTY_HASH} 12 3456\n`,
+      null,
+      null
+    ],
+    ['an unparsable time', `yesterday ${EMPTY_HASH} 0 0 0 0\n`, null, null]
   ])('does not run for %s', async (_case, text, heartbeat, dropped) => {
     await writeStatus(text);
     expect(await sipBanHelperState(NOW)).toEqual({

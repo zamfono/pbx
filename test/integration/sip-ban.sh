@@ -4,7 +4,8 @@
 # as the stack's own. With the thresholds lowered, its failed REGISTERs ban it: `api` holds the
 # ban, `/metrics` and `/healthz` show it, and nftables drops its next request while HTTP still
 # answers. `sipBans.lift` lets it through again; an allowlist entry covering it keeps it from
-# being banned; once that entry is gone its next ban takes the second, permanent step; an empty
+# being banned; a ban over UDP leaves the scanner's TCP answered (bans are per protocol); once
+# that entry is gone its next ban takes the second, permanent step; an empty
 # step list lifts enforcement; and a From user whose %0D%0A splits the AMI security event into
 # frames of the scanner's making bans no address it names and exempts the scanner from none.
 # Reads `run.sh`'s own compose, RUNTIME, api_base, METRICS_TOKEN and fail, and api.sh's helpers.
@@ -27,10 +28,10 @@ sip_ban_attempt() {
 }
 
 # Whether Asterisk answers the scanner at all (`uas/register-challenge.xml`), no failed attempt;
-# as From user `$1`, `scanner` unless given.
+# as From user `$1`, `scanner` unless given, over UDP, or over the sipp transport `$2` (`t1`: TCP).
 sip_ban_answered() {
   dc exec -T sipp-outside sh -c "sipp -sf /scenarios/uas/register-challenge.xml \
-    -key user '${1:-scanner}' -m 1 -timeout 3s -timeout_error -nostdin \
+    -key user '${1:-scanner}' -t ${2:-u1} -m 1 -timeout 3s -timeout_error -nostdin \
     $SIP_BAN_TARGET:5060 >>/tmp/sip-ban.log 2>&1" </dev/null
 }
 
@@ -45,14 +46,14 @@ sip_ban_dropped() {
   ! sip_ban_answered
 }
 
-# The active ban of `$1` (the scanner unless given) as `<id> <step> <expiresAt>`, nothing while
-# it has none.
+# The active ban of `$1` (the scanner unless given) as `<id> <step> <expiresAt> <protocol>`,
+# nothing while it has none.
 sip_ban_active() {
   api GET /sipBans | python3 -c '
 import json, sys
 for ban in json.load(sys.stdin)["items"]:
     if ban["address"] == sys.argv[1]:
-        print(ban["id"], ban["step"], ban["expiresAt"])' "${1:-$SIP_BAN_ADDRESS}"
+        print(ban["id"], ban["step"], ban["expiresAt"], ban["protocol"])' "${1:-$SIP_BAN_ADDRESS}"
 }
 
 sip_ban_has_active() {
@@ -78,7 +79,8 @@ sip_ban_lift() {
   api_delete "/sipBans/$1"
 }
 
-# `sip_ban_metric <name>` prints the metric's sample.
+# `sip_ban_metric <sample>` prints the value of the sample, its name and labels as `/metrics`
+# writes them.
 sip_ban_metric() {
   curl -fsS "${FWD[@]}" -H "Authorization: Bearer $METRICS_TOKEN" "$api_base/metrics" \
     | awk -v name="$1" '$1 == name { print $2 }'
@@ -86,7 +88,8 @@ sip_ban_metric() {
 
 # The drop rules counted at least one packet, as of the ban helper's last heartbeat (§7).
 sip_ban_counted() {
-  last_read=$(sip_ban_metric zamfono_sip_ban_dropped_packets_total) && [ "${last_read:-0}" -ge 1 ]
+  last_read=$(sip_ban_metric 'zamfono_sip_ban_dropped_packets_total{protocol="udp"}') \
+    && [ "${last_read:-0}" -ge 1 ]
 }
 
 # The `outside` network's name, for the runtime's `network` command.
@@ -167,7 +170,7 @@ for value in sorted({re.sub(r"SessionID: [^\r]*", "SessionID: …", v) for v in 
 
 run_sip_ban_step() {
   echo '== §5.6 failed SIP attempts ban their source, nftables drops it =='
-  local network netns settings id step expires allow attempt
+  local network netns settings id step expires protocol allow attempt
   network=$(sip_ban_network) || fail "could not find sipp-outside's network"
   # Asterisk's namespace is netns's (§6.1).
   netns=$(dc ps -q netns)
@@ -182,14 +185,19 @@ print(json.dumps({k: s[k] for k in ("sipBanFailures", "sipBanWindowS", "sipBanSu
   sip_ban_answered || fail 'Asterisk does not answer the scanner before any failure'
 
   sip_ban_fail_until_banned
-  read -r id step expires <<<"$(sip_ban_active)"
-  [ "$step" = 1 ] && [ "$expires" != None ] \
-    || fail "the first ban is step $step, expiring $expires, not step 1 for a day"
-  reads 1 sip_ban_metric zamfono_sip_bans_active || fail "zamfono_sip_bans_active reads '$last_read', not 1"
+  read -r id step expires protocol <<<"$(sip_ban_active)"
+  [ "$step" = 1 ] && [ "$expires" != None ] && [ "$protocol" = udp ] \
+    || fail "the first ban is step $step over $protocol, expiring $expires, not step 1 over udp for a day"
+  reads 1 sip_ban_metric 'zamfono_sip_bans_active{protocol="udp"}' \
+    || fail "zamfono_sip_bans_active{protocol=\"udp\"} reads '$last_read', not 1"
+  reads 0 sip_ban_metric 'zamfono_sip_bans_active{protocol="tcp"}' \
+    || fail "zamfono_sip_bans_active{protocol=\"tcp\"} reads '$last_read', not 0"
   reads pass healthz_check sipBan:helper || fail '/healthz reports the ban helper stopped'
   poll $SIP_BAN_POLLS 1 sip_ban_dropped || fail "the banned scanner's REGISTER is still answered"
+  # A spoofed UDP source cannot cost an address its TCP and TLS (§5.6).
+  sip_ban_answered scanner t1 || fail "the scanner banned over UDP is not answered over TCP"
   sip_ban_http_answered || fail "the banned scanner's HTTP request is not answered"
-  echo '   banned at step 1: its SIP is dropped, HTTP answers'
+  echo '   banned at step 1 over udp: its UDP SIP is dropped, TCP SIP and HTTP answer'
 
   sip_ban_lift "$id"
   poll $SIP_BAN_POLLS 1 sip_ban_answered || fail 'the lifted scanner is still dropped'
@@ -209,7 +217,7 @@ print(json.dumps({k: s[k] for k in ("sipBanFailures", "sipBanWindowS", "sipBanSu
   echo '   allowlisted: never banned'
 
   sip_ban_fail_until_banned
-  read -r id step expires <<<"$(sip_ban_active)"
+  read -r id step expires _ <<<"$(sip_ban_active)"
   [ "$step" = 2 ] && [ "$expires" = None ] \
     || fail "the next ban is step $step, expiring $expires, not the permanent step 2"
   poll $SIP_BAN_POLLS 1 sip_ban_dropped || fail "the permanently banned scanner is still answered"

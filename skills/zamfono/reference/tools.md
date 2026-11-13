@@ -98,7 +98,7 @@
 | `sipAllowlist.create` | `POST /api/v1/sipAllowlist` | Exempts a source address or range from SIP bans, ending every active ban it covers | admin | no |
 | `sipAllowlist.delete` | `DELETE /api/v1/sipAllowlist/{id}` | Removes a source from the SIP ban allowlist | admin | yes |
 | `sipAllowlist.list` | `GET /api/v1/sipAllowlist` | Lists the source addresses and ranges never banned for failed SIP attempts | admin | no |
-| `sipBans.lift` | `DELETE /api/v1/sipBans/{id}` | Ends an active SIP ban now, a permanent one included; the ban stays listed as ended | admin | yes |
+| `sipBans.lift` | `DELETE /api/v1/sipBans/{id}` | Ends an active SIP ban now, a permanent one included, on its protocol alone; the ban stays listed as ended | admin | yes |
 | `sipBans.list` | `GET /api/v1/sipBans` | Lists the bans of sources of failed SIP attempts, the active ones unless state says otherwise | admin | no |
 | `stats.query` | `GET /api/v1/stats` | Buckets a call metric (answerRate, ringToAnswer, avgCallLength, callVolume) over a time range. | admin | no |
 | `system.checkHost` | `POST /api/v1/system/hostCheck` | Has the host agent read the host now, whether it waits for a reboot among it, and answers with the host block system.info carries; Zamfono's own reading, which /metrics and an automatic reboot follow, is refreshed with it. | admin | no |

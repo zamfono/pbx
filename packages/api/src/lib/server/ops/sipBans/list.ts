@@ -43,6 +43,7 @@ export const list = defineOperation({
       items: page.map(row => ({
         id: row.id,
         address: row.address,
+        protocol: row.protocol,
         step: row.step,
         failures: row.failures,
         createdAt: row.createdAt,
