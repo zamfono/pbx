@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# TASK-68: Asterisk kept forwarding the trunk's audio to the device after the trunk switched RTP
+# Asterisk kept forwarding the trunk's audio to the device after the trunk switched RTP
 # source with a backward sequence step (`inbound-ssrc-switch.xml`). The device's leg, the callee
 # at level `qos`, sent the device about as many packets as the trunk played, 100 before the switch
 # and 200 after: at least 250. An Asterisk that drops the new stream stops at about 100.

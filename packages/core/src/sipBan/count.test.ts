@@ -242,7 +242,7 @@ describe('SipBanCount and the own endpoints of the stack', () => {
 
   it('does not count an InvalidAccountID for an endpoint the stack renders', () => {
     // A device's first request, without credentials, or one before Asterisk has loaded its
-    // endpoint (TASK-54): ten of them behind one office address must not ban it.
+    // endpoint: ten of them behind one office address must not ban it.
     const { count } = rig();
     for (let attempt = 0; attempt < 10; attempt += 1) {
       expect(

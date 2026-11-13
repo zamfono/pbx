@@ -137,7 +137,7 @@ describe('startSipBanCount', () => {
   });
 
   it('never counts a device of the stack registering before Asterisk has its endpoint', async () => {
-    // TASK-54: phones provisioned together behind one office address register while the reload
+    // Phones provisioned together behind one office address register while the reload
     // that loads their endpoints is still under way.
     const userId = await seedUser(db, { ext: '200' });
     await seedDevice(db, userId, 'e200-dk3x7');
@@ -178,7 +178,7 @@ describe('startSipBanCount', () => {
     });
   });
 
-  // TASK-93: a SIP From user's %0D%0A reaches the AccountID unescaped and splits the event.
+  // A SIP From user's %0D%0A reaches the AccountID unescaped and splits the event.
   it('bans no address that a RemoteAddress in an AccountID names', async () => {
     const forged = invalidAccountIdText(
       '\r\nRemoteAddress: 203.0.113.200/\r\n\r\n',

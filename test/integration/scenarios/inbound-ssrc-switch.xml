@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="ISO-8859-1"?>
 <!--
   A transcoded call whose far end switches RTP source mid-call, the new stream's sequence numbers
-  a little below the old one's, as a carrier's media gateway can (TASK-68). The trunk offers
+  a little below the old one's, as a carrier's media gateway can. The trunk offers
   G.711 A-law, the device (`inbound-ssrc-switch.setup.sh`) speaks Opus alone, so the trunk's audio
   reaches the device through Asterisk's translator. An Asterisk whose translator takes the new
   stream's packets for late ones drops them all, silently, and the device hears nothing from the

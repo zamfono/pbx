@@ -126,7 +126,7 @@ describe('AmiClient', () => {
     });
   });
 
-  // TASK-93: a SIP From user's %0D%0A reaches a security event's AccountID unescaped.
+  // A SIP From user's %0D%0A reaches a security event's AccountID unescaped.
   it('drops the frames a CR/LF in an AccountID forges', async () => {
     await client.connect();
     const events: AmiEvent[] = [];
