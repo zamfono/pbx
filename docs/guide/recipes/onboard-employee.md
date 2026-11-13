@@ -35,9 +35,10 @@ arguments:
    (`PUT /api/v1/users/{id}/forwarding`) — the classic unconditional/busy/no-answer/DND/offline
    rules, each a forward target (`mental-model`). The employee can read theirs with
    `users.getForwarding` (`GET /api/v1/users/{id}/forwarding`) and set their own later with the same
-   `PUT`, any target but a new `sip`, `webSocket` or recording one, an admin-set one reading as a
-   `{ "managed": true }` marker they send back to keep it (`guardrails`); an external forward is dialled as their own
-   call, so it reaches only numbers their outbound routes carry.
+   `PUT`, to any target but a new `sip`, `webSocket` or recording one. A target of those kinds that
+   an admin set reads to them as a `{ "managed": true }` marker, which they send back to keep it
+   (`guardrails`). An external forward is dialled as their own call, so it reaches only numbers
+   their outbound routes carry.
 4. Add the employee to any ring group they belong to via `ringGroups.update`
    (`PATCH /api/v1/ringGroups/{id}`) with the group's updated `members` list.
 

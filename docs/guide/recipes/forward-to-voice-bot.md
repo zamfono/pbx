@@ -43,9 +43,10 @@ OpenAI's Realtime API, is `forward-to-ai-agent` instead.
 
    `url` is `wss://` (or `ws://` on a network you trust), at most 2048 characters; the stack sends
    no headers of its own on the handshake, so a token the bot checks goes in the query string.
-   The bot must be on an address the stack connects to: never loopback, link-local or the stack's
-   own internal network (a loopback, link-local or unspecified address in the URL is refused with
-   422), and a private network only where the host's operator allows it, as on premises.
+   The bot must be on an address the stack may connect to: never loopback, link-local or the
+   stack's own internal network, and a private network only while the stack's `.env` allows it
+   (`ALLOW_PRIVATE_TARGETS`, as on premises; a provider's shared host may set it to `false`). A
+   `url` with a loopback, link-local or unspecified address literal is refused with 422.
    `sampleRate` is 8000, 16000 or 24000 for `vonage`, 16000 unless given, and always 8000 for
    `twilio`. The target works wherever a target does, for example
    - a number answered by the bot: `dids.update` (`PATCH /api/v1/dids/{id}`) with it as `target`;
@@ -54,12 +55,14 @@ OpenAI's Realtime API, is `forward-to-ai-agent` instead.
    - an out-of-office rule, closed opening hours, a menu option or a ring group's fallback.
 
    A ring-group member's own forward to a bot skips the member instead of ringing the bot. Only an
-   admin or owner sets one, as for a `sip` target (`guardrails`), since it sends the call's audio
-   to whatever URL it names; a user reads one on their own forwarding, out-of-office rule or
-   opening hours as `{ "managed": true, "kind": "webSocket" }`, never the URL or its token, and
-   keeps it by sending that marker back unchanged. Add `"record": true` to record every call the bot answers, and a
-   `"fallback"` target, such as a ring group, for when the bot cannot be reached; without one the
-   call ends with 503 (`mental-model`).
+   admin or owner sets one, as for a `sip` target, since it sends the call's audio to whatever URL
+   it names. A user reads one in their own forwarding, out-of-office rule or opening hours as
+   `{ "managed": true, "kind": "webSocket" }`, never the URL or its token, and keeps it by sending
+   that marker back unchanged (`guardrails`).
+
+   Add `"record": true` to record every call the bot answers, and a `"fallback"` target, such as a
+   ring group, for when the bot cannot be reached; without one the call ends with 503
+   (`mental-model`).
 
 3. What the bot receives. The stack opens the WebSocket while the caller still waits, and answers
    the caller once it is open. Then:
@@ -121,6 +124,6 @@ OpenAI's Realtime API, is `forward-to-ai-agent` instead.
 8. Test it: call the number, then read the call with `calls.get` (`GET /api/v1/calls/{id}`). Its
    trace has an `answered` line with `"leg": "webSocket"` and the protocol. A `webSocket` line
    with `connectFailed` means the socket did not open (a wrong URL, a refused token, a
-   certificate the stack does not trust); `forbiddenAddress` that the URL's host is on an address
-   the stack does not connect to (above); `mediaFailed` means the stack could not set up the
+   certificate the stack does not trust); `forbiddenAddress` means the URL's host is on an address
+   the stack may not connect to (step 2); `mediaFailed` means the stack could not set up the
    audio, which its logs explain.

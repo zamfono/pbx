@@ -13,69 +13,94 @@ why the specified behaviour changed; the commit history, how.
 
 ### Upgrade notes
 
-- A stack whose `.env` follows a release line or `latest` still runs an older release's images
-  after its updates so far, and after the update to this release too, which runs the `update.sh`
-  of the release it starts from (Fixed). Once on this release, pull and recreate it by hand in the
-  stack directory, which runs every migration it missed:
-  `docker compose pull && docker compose up -d` (Podman: `podman compose pull`, then restart the
-  boot unit, or `podman compose down && podman compose up -d` without one). Updates from this
-  release on take the new images.
-- On a host shared by several customers' stacks, set `ALLOW_PRIVATE_TARGETS=false` in each
-  stack's `.env` and take it in with `docker compose up -d`, so no customer's admin reaches your
-  network through a webhook, voice bot or backup target. On premises, leave it unset.
+A stack set up by `setup.sh` and updated by `update.sh`, by hand or through the API, needs nothing
+beyond the update itself. This release's `api` and `core` require an `INTERNAL_TOKEN` in `.env`,
+which the previous release's `update.sh` only lists as a new setting; this release's own scripts
+add it, and a `METRICS_TOKEN`, where `.env` has none, never printing either (Security). From 0.9.x
+with the host agent, the update adds them itself, as the previous release's `update.sh` calls this
+release's `setup/agent.sh` before it recreates the stack. From 0.8.x, or without the host agent,
+run `./update.sh` twice, the two runs 0.9.0's and 0.9.1's notes ask for. The first, the previous
+release's, stops on Docker with the stack not reporting healthy for want of `INTERNAL_TOKEN`; on
+Podman the boot unit it restarts starts the stack through this release's `setup/compose.sh`,
+which adds the tokens, so it completes. The second, this release's, adds them where still
+missing and finishes the update; from 0.8.x it also offers the host agent and `HOST_CONTROL` and
+removes 0.8.x's `updater` container. Nothing more is needed: 0.9.0's `chown -R root: /srv/zamfono
+&& chmod -R go-w /srv/zamfono` is not, as `setup.sh` made the files root's, and run after the
+second run it takes the group's write permission from the host agent's request directory, so
+`system.checkHost` fails until the agent's next run, within ten minutes; a `CONTAINER_SOCKET` line
+left in `.env` is harmless. The update lists `ALLOW_PRIVATE_TARGETS`, `MEDIA_STORAGE_MAX` and
+`RINGOTEL_API_TOKEN` as new settings, unset; unset, they keep the stack as it was. Leave
+`RINGOTEL_API_TOKEN` unset on an existing stack, since only a first start reads it, and set the key
+through `settings.update` instead.
+
+Only where it applies, in the stack directory, as root:
+
+- On a host shared by several customers' stacks, add `ALLOW_PRIVATE_TARGETS=false` to each
+  stack's `.env` and run `./setup/compose.sh up -d`, so no customer's admin reaches your network
+  through a webhook, voice bot or backup target (Security).
 - A webhook receiver, voice bot or backup server on the Docker host itself, named by the stack
-  network's gateway address, or on `localhost`, is no longer connected to: name it by the host's
+  network's gateway address or by `localhost`, is no longer connected to: name it by the host's
   LAN address instead.
-- Only for a test stack that follows `edge`: its update keeps its files, so replace `compose.yaml`
-  with main's and add `INTERNAL_TOKEN` to `.env` (`openssl rand -hex 32`); until then `api` and
-  `core` do not start.
+- A `local` backup target whose `path` is not `/backups` or below it fails its runs from this
+  release on (Security). To keep it on another disk, mount the disk into `api` at
+  `/backups/<name>` in `compose.local.yaml` and move the target there.
+- A monitor that reads the checks of `/healthz`, not just its `status`, now sends
+  `Authorization: Bearer <METRICS_TOKEN>` (Security).
+- A stack whose `.env` follows a release line or `latest` still runs an older release's images
+  after its updates so far, and after the update to this release too, as that update runs the
+  previous release's `update.sh` (Fixed). Once on this release, pull and recreate it by hand,
+  which runs every migration it missed: `./setup/compose.sh pull && ./setup/compose.sh up -d`; on
+  Podman, `./setup/compose.sh pull`, then `systemctl restart zamfono.service`, or
+  `./setup/compose.sh down && ./setup/compose.sh up -d` without the boot unit. Updates from this
+  release on take the new images.
+- A test stack that follows `edge` keeps its files on update: replace `compose.yaml` with main's
+  and add `INTERNAL_TOKEN` to `.env` (`openssl rand -hex 32`); until then `api` and `core` do not
+  start.
 
 ### Added
 
 - `setup.sh` asks for the Ringotel Admin API key (`RINGOTEL_API_TOKEN`, optional; empty for no
   Ringotel), never showing it, and the stack's first start stores it encrypted, unchecked, so the
   owner connects Ringotel right after the first login without setting the key first. Later starts
-  ignore it; the key stays in `.env`, like `SMTP_PASSWORD`. On an existing stack `update.sh` lists
-  it as a new setting: leave it unset there, since only a first start reads it, and set the key
-  through `settings.update`.
+  ignore it; the key stays in `.env`, like `SMTP_PASSWORD`. On an existing stack, see the upgrade
+  notes.
+- `MEDIA_STORAGE_MAX` in `.env` limits the media volume, so that on a host running several stacks
+  one customer cannot fill the disk: bytes with an optional `K`, `M`, `G` or `T`, e.g. `20G`.
+  Empty, the default, is no limit; a malformed value stops `api` and `core` at start. It counts
+  the space the volume's files take on disk, not their lengths. At or over
+  the limit, uploads (`POST /audio`, `PUT /users/{id}/voicemailGreeting`, upload links) answer
+  507, and an upload that would take the volume over it is refused with 507 after transcoding,
+  its files deleted. No new call recording starts: the call goes on unrecorded, logged and
+  counted in `zamfono_recordings_refused_total`. No voicemail message is taken: the caller hears
+  that the mailbox is full, and the call is missed. No greeting is recorded on the phone: the
+  caller hears that the mailbox is full, and the greeting stays. A recording, message or greeting
+  in progress finishes. `/metrics` reports `zamfono_media_bytes` and, with a limit, `zamfono_media_limit_bytes`; the
+  full `/healthz` warns with `media:storage` while the volume is at or over it. Deleting voicemail
+  or recordings frees space at once; deleted uploaded audio keeps its files until the purge,
+  `settings.soft_delete_retention_days` later. `setup.sh` asks for the limit.
 - `GET /api/v1/personalAccessTokens` (`personalAccessTokens.listAll`, on MCP too) lists every
   user's personal access tokens in one paginated call, never their values, each with its user's
   id, name and e-mail, for an admin or owner; an admin's list leaves out owners' tokens.
-- `MEDIA_STORAGE_MAX` in `.env` limits the media volume, so that on a host running several stacks
-  one customer cannot fill the disk: bytes with an optional `K`, `M`, `G` or `T`, e.g. `20G`;
-  empty, the default, is no limit, and a malformed value stops `api` and `core` at start. It counts
-  the space the volume's files take on disk, not their lengths. At or over it uploads (`POST /audio`, `PUT /users/{id}/voicemailGreeting`, upload links) answer 507,
-  an upload that would take the volume over it is refused with 507 after transcoding and its
-  files deleted, no new call recording starts (the call goes on unrecorded, logged and counted in
-  `zamfono_recordings_refused_total`) and no voicemail message is taken (the caller hears the
-  mailbox is full; the call is missed). No greeting is recorded on the phone: the
-  caller hears that the mailbox is full, and the greeting stays. A recording, message or greeting
-  in progress finishes. `/metrics`
-  reports `zamfono_media_bytes` and, with a limit, `zamfono_media_limit_bytes`; the full
-  `/healthz` warns with `media:storage` while the volume is at or over it. Deleting voicemail or
-  recordings frees space at once; deleted uploaded audio keeps its files until the purge
-  `settings.soft_delete_retention_days` later. `setup.sh` asks for it; on an existing stack
-  `update.sh` lists it as a new setting, unset, which is no limit.
 
 ### Changed
 
 - `setup.sh` generates a random 256-bit `METRICS_TOKEN`, which turns `/metrics` and the full
-  `/healthz` on behind it, and prints it once; `update.sh` gives a stack whose `.env` has none, or
+  `/healthz` on behind it, and prints it once. `update.sh` gives a stack whose `.env` has none, or
   an empty one, a generated token, written only to `.env`, and never replaces one that is set;
-  so does the update to this release, through the host agent.
-- `proxy` runs Caddy 2.11.9, and `api` and `core` take the current releases of their
-  dependencies, among them zod 4.6.7 and nodemailer 10.3.1, past the advisories against zod 4.6.5
-  (GHSA-mrhx-c7xc-m3w5) and nodemailer's address parser up to 10.1.3.
+  so does the update to this release (Upgrade notes).
 - The operator's own Compose overlay, for continuous replication, a backup disk or anything else
   added to the stack, is `compose.local.yaml`; `update.sh`, the Podman boot unit and
   `setup/compose.sh` no longer read `compose.dr.yaml`.
+- `proxy` runs Caddy 2.11.9, and `api` and `core` take the current releases of their
+  dependencies, among them zod 4.6.7 and nodemailer 10.3.1, past the advisories against zod 4.6.5
+  (GHSA-mrhx-c7xc-m3w5) and nodemailer's address parser up to 10.1.3.
 - SIP bans are per protocol, `udp` or `tcp` (TCP and TLS together): failures over UDP ban an
-  address over UDP only, and over TCP or TLS only those, each counted, escalated, exempted after a
-  successful login and lifted on its own. `sipBans.list` and the `sipBan.added` webhook name the
-  `protocol`, and `/metrics`' `zamfono_sip_bans_active` and `zamfono_sip_ban_dropped_*_total`
-  carry a `protocol` label, one series per protocol where there was one. A ban in force at the
-  upgrade becomes two, one per protocol, so it keeps blocking both; lifting it takes two
-  `sipBans.lift`.
+  address over UDP only, and failures over TCP or TLS only over those, each protocol counted,
+  escalated, exempted after a successful login and lifted on its own. `sipBans.list` and the
+  `sipBan.added` webhook name the `protocol`, and `/metrics`' `zamfono_sip_bans_active` and
+  `zamfono_sip_ban_dropped_*_total` carry a `protocol` label, one series per protocol where there
+  was one. A ban in force at the upgrade becomes two, one per protocol, so it keeps blocking both;
+  lifting it takes two `sipBans.lift`.
 - A trunk's `outbound` hosts are never banned either, as its `inbound` and `both` hosts were not:
   a provider's responses arrive on the SIP ports too.
 - The shipped subjects of the setup, password-reset, two-factor and update mails name the stack,
@@ -83,8 +108,6 @@ why the specified behaviour changed; the commit history, how.
   several stacks can be told apart.
 - Only owners write and remove the `updateFailed` and `breakingUpdate` mail templates, which go
   to owners alone; an admin gets 403.
-- `system.info` answers a user only the stack's version (`api.version`) and its address
-  (`stack`); everything else it reports is for admins and owners.
 - A user reading their own forwarding (`users.getForwarding`), out-of-office rules (`ooo.list`)
   or opening hours (`hours.get`), and the answers to writing them, gets a target an admin set
   (`sip`, `webSocket`, or `external` with `record`, anywhere in its fallback chain) as
@@ -98,18 +121,18 @@ why the specified behaviour changed; the commit history, how.
 
 ### Fixed
 
-- The shipped mails' last line no longer starts with a stray `·` while no company name is set:
-  it names the FQDN alone.
+- A stack whose `.env` follows a release line (`ZAMFONO_VERSION=0.9`, or `0`, or `latest`) now
+  runs the new release's images after `update.sh`. It pulled and checked the new release's images
+  but went on running the old local `:0.9` ones, so its `VERSION` named the new release while the
+  old one ran, and the new release's migrations never ran. `update.sh` now tags the images it
+  checked with `.env`'s tag before the stack is recreated.
 - Installing the host agent on a running stack, with `setup/agent.sh install` or by the
   `update.sh` run that offers it, no longer leaves "could not recreate api" in the agent's
   journal: its timer ran the agent at once, before the install had recreated `api` on the new
   request tmpfs, and both recreated it. The install now recreates `api` first and starts the
   agent's units after; `api` ends up bound to the tmpfs as before.
-- A stack whose `.env` follows a release line (`ZAMFONO_VERSION=0.9`, or `0`, or `latest`) now
-  runs the new release's images after `update.sh`: it pulled and checked the new release's images
-  but went on running the old local `:0.9` ones, so its `VERSION` named the new release while the
-  old one ran and the new release's migrations never ran. `update.sh` now tags the images it
-  checked with `.env`'s tag before the stack is recreated.
+- The shipped mails' last line no longer starts with a stray `·` while no company name is set:
+  it names the FQDN alone.
 - `update.sh` on Podman no longer waits forever for the boot unit's restart, whose `up -d` waits
   for a service that may never report healthy: it gives up after three minutes, as it does for
   the healthchecks, stops the unit's start still running then, so it does not act on the stack
@@ -133,39 +156,68 @@ why the specified behaviour changed; the commit history, how.
 - An SSO login no longer binds to an owner by e-mail, for any provider: the customer's identity
   provider administrator could create an account with an owner's address and, on its first SSO
   login, take the owner's account over without the owner's second factor. Such a login is now
-  refused and logged, and the error page tells the owner to sign in with their password. An
-  owner whose SSO login is already bound keeps signing in by SSO until a change of provider,
-  issuer or tenant clears the binding; admins and users bind by e-mail as before.
-
+  refused and logged, and the error page tells the owner to sign in with their password. An owner
+  whose SSO login is already bound keeps signing in by SSO until a change of provider, issuer or
+  tenant clears the binding; admins and users bind by e-mail as before.
+- An admin's mail template could send an owner's one-time set-password link to another host,
+  which could then set the owner's password and, for an owner without a second factor, enrol its
+  own: when an owner was created or promoted, when an owner reset another owner's password, or
+  through the forgot-password form. A mail to an owner now always uses the shipped template of
+  every kind an admin can edit (voicemail, missed call, setup, reset, two-factor notice); a
+  template test still sends the tenant's own, as a preview.
+- A personal access token survived a password reset and a two-factor reset of its user, so one
+  minted with a stolen session kept working without expiry. Redeeming a password reset link,
+  `users.resetMfa` and `reset-mfa.mjs` now revoke every token the user holds. Tokens they created
+  for others stay, so resetting an admin's forgotten password keeps the integrations they set up;
+  the audit log names who created each token.
+- A sign-in that passed shortly before a password reset, a two-factor reset or the user's deletion
+  could still finish afterwards: the security page's 10-minute session, which could still set up
+  an authenticator; a login waiting for its second factor; a consent step, which also replayed for
+  more codes until it expired; an authorization code; and an MCP file link. Each now carries a
+  counter kept with the user, which those three changes increase, and is refused once it differs.
+- Deleting a user now revokes their set-password links too, so a link issued before the deletion
+  no longer works after an undo.
+- An admin could soft-delete an owner created as owner by undoing that creation, which no API
+  call can take back: an undo replayed the owner's deletion without the owner-only rule a direct
+  delete obeys. Every operation an undo replays now obeys the role, scope and owner-only rules of
+  whoever undoes, as a direct call does, so that undo answers 403 for an admin.
+- An admin could have the stack send a backup target's stored password to a host of their own,
+  by changing the target's host, URL or kind and leaving out its secret, and a trunk's digest
+  responses by changing its hosts or outbound proxy. A change of where a stored secret is sent now
+  needs the secret again, 422 without it: a backup target's kind or any field of its `params` but
+  `forget`; a trunk's new outbound or `both` host, or a new outbound proxy, while a password is
+  stored; a new `smtpHost` while a relay password is stored; and a new SSO issuer while a client
+  secret is stored. Renaming, `enabled`, `forget` and every other field change without it.
 - A user who took part in a call no longer reads its SIP messages' secrets in `GET /calls/{id}`'s
   `log`: the values of `X-` headers (such as an API key set on a `sip` target), `Authorization`
   and `Proxy-Authorization` headers (a trunk's digest response) and the SDP `a=crypto` lines (the
   SRTP keys) read `***` for a user; admins and owners still see the full log.
-
-- Anyone could make `api` hold 50 MB in memory per request, without a token, through the
-  upload page's form, which `api` read whole before it checked the link inside it; many such
-  requests at once could take `api`, or the host, down. A submission of that form is now refused
-  before its body is read unless it was sent from a page whose link is valid, and the page then
-  shows that the link has expired. `proxy` no longer lets a body over 512 KiB through for another
-  form posted to an upload link under a name ending in `/upload`.
 - A user read the admin-set forward targets of their own forwarding, out-of-office rules and
   opening hours in full, a voice bot's URL with the token the bot checks, and a SIP target's
   header values, so the user could talk to the bot as the stack does. A user now reads them as a
   marker without those values (see Changed).
-- `/oauth/authorize` fetched any client metadata document URL for anyone, without a limit. A fetch
-  the cache cannot answer now counts against the client address, 240 a minute, which four
-  fetches per sign-in times the login's 60 sign-ins a minute leaves room for; a client whose
-  document may be cached never counts.
-- The SSO provider's discovery, token and key-set requests waited up to five minutes and read a
-  body of any size; each now has 5 seconds and 64 KiB.
 - `system.info` no longer shows a user the stack's commits, the last update's error, the mail
-  relay's error, the configuration rows left out or the host's pending packages and reboot.
-- Root in the `asterisk` container no longer writes through a link in `/etc/asterisk/gen`, the
-  volume `api` and Asterisk write as uid 1000: the entrypoint writes the placeholder certificate
-  and files there as `asterisk`, and the ban helper its status, through a file of its own renamed
-  over it.
-- Every base image is pinned by digest as well as tag, kept current by Dependabot, and the
-  Asterisk repository's keyring package is checked against its SHA-256 before it is installed.
+  relay's error, the configuration rows left out or the host's pending packages and reboot. It
+  answers a user only the stack's version (`api.version`) and its address (`stack`); everything
+  else it reports is for admins and owners.
+- `/healthz` told anyone which protection or job was down, such as a stopped SIP ban helper or a
+  failed automatic update. Without credentials it now answers only the overall `status`, with the
+  HTTP status as before (200 for `pass` and `warn`, 503 for `fail`), so an uptime check keeps
+  working. With `Authorization: Bearer <METRICS_TOKEN>` it answers every check as before; owners
+  and admins read them with the new `system.health` (`GET /api/v1/system/health`).
+- Code running in the `asterisk`, `stun` or `proxy` container, which share a network namespace on
+  the stack's `internal` network, could call `api`'s and `core`'s process-to-process `/internal/*`
+  endpoints, among them having `api` mail any user's voicemail or missed-call notice with a caller
+  name of its choosing from the stack's own sender. Every such request now carries the stack's
+  `INTERNAL_TOKEN` and is refused with 401 without it; `api` and `core` refuse to start without
+  it. `setup.sh` generates it, and `update.sh` and the host agent's `setup/agent.sh` add it to an
+  existing stack's `.env`, the update to this release included, none of them printing it (Upgrade
+  notes).
+- Caddy's admin endpoint, on `localhost:2019` in the network namespace the proxy shares with
+  Asterisk and the STUN server, is off: code running in either could load a Caddy configuration of
+  its own there without a credential, intercepting the web traffic with the stack's TLS key, and
+  read Caddy's metrics past `METRICS_TOKEN`. A change of the Caddyfile takes a restart of `proxy`,
+  as before.
 - Every container drops every Linux capability and runs with `no-new-privileges`. Only `asterisk`
   adds some back, for its root entrypoint and SIP ban helper (`NET_ADMIN`, `CHOWN`,
   `DAC_OVERRIDE`, `SETUID`, `SETGID`), and Asterisk itself now starts with none: it used to keep
@@ -175,18 +227,10 @@ why the specified behaviour changed; the commit history, how.
 - `api` no longer mounts `caddy-data`, which holds the ACME account key and Caddy's private keys:
   it reads the certificate copy from a volume of its own, `cert-copy`, which `proxy` fills on its
   first start after the upgrade.
-- A validation refusal could be far larger than the request that drew it: a 512 KiB body of
-  invalid array elements drew a 422 of some 23 MB listing every issue, over REST and MCP alike. A
-  problem's `errors` now stop at a quarter of the request limit, and `errorsOmitted` counts the
-  issues left out; the MCP SDK's own refusal of invalid tool arguments is bounded the same way.
-- Code running in the `asterisk`, `stun` or `proxy` container, which share a network namespace
-  on the stack's `internal` network, could call `api`'s and `core`'s process-to-process
-  `/internal/*` endpoints, among them having `api` mail any user's voicemail or missed-call notice
-  with a caller name of its choosing from the stack's own sender. Every such request now carries
-  the stack's `INTERNAL_TOKEN` and is refused with 401 without it. `setup.sh` generates it, and
-  `update.sh` and the host agent's `setup/agent.sh` add it to an existing stack's `.env`, the
-  update to this release included, none of them printing it; `api` and `core` refuse to start
-  without it.
+- Root in the `asterisk` container no longer writes through a link in `/etc/asterisk/gen`, the
+  volume `api` and Asterisk write as uid 1000: the entrypoint writes the placeholder certificate
+  and files there as `asterisk`, and the ban helper writes its status as `asterisk` too, through a
+  file of its own renamed over it.
 - An admin could point a webhook, a voice bot (`webSocket` target) or a backup target at the
   stack's own services (`core:3000/internal/*`, `api`, Asterisk's ARI), at `127.0.0.1`, at the
   cloud metadata address `169.254.169.254` or at the provider's network, and read what answered
@@ -194,14 +238,44 @@ why the specified behaviour changed; the commit history, how.
   each connects: never loopback, link-local or the stack's own network, and private networks
   (10/8, 172.16/12, 192.168/16, 100.64/10, fc00::/7) only while the new `ALLOW_PRIVATE_TARGETS`
   in `.env` is not `false`. It defaults to `true`, for an on-premises install whose receivers sit
-  on the LAN; set it to `false` on a host shared by several customers. `setup.sh` asks for it, and
-  `update.sh` lists it as a new setting, unset, which is `true`. A refused address shows as a
-  webhook's `lastError` `forbidden address`, a voice bot's call trace cause `forbiddenAddress` (its
-  fallback takes the call) or a backup run's error `forbidden address`; a URL or host that is a
-  loopback, link-local or unspecified address is refused with 422 when it is saved. A webhook
-  delivery no longer follows a redirect: a 3xx answer is a failed attempt. A webhook receiver or
-  voice bot on the Docker host itself must be named by an address outside the stack's network,
-  such as the host's LAN address, not the network's gateway.
+  on the LAN; set it to `false` on a host shared by several customers. `setup.sh` asks for it. A
+  refused address shows as a webhook's `lastError` `forbidden address`, a voice bot's call trace
+  cause `forbiddenAddress` (its fallback takes the call) or a backup run's error
+  `forbidden address`; a URL or host that is a loopback, link-local or unspecified address is
+  refused with 422 when it is saved. A webhook delivery no longer follows a redirect: a 3xx
+  answer is a failed attempt.
+- A `local` backup target's `path` reached restic as its repository whatever it said, so an admin
+  could name another restic backend or a directory of the stack's own state. It must now be
+  `/backups` or a path below it, without `..`, on every write and in each run; a target elsewhere
+  fails its runs. restic and rclone no longer inherit `api`'s environment, its encryption key and
+  JWT secret among it.
+- A webhook switched off kept receiving the events queued for it and their retries, also after an
+  `api` restart, so switching it off did not stop a receiver that had to be stopped at once.
+  Switching a hook off now drops its pending deliveries, as deleting it does, and switching it on
+  again brings none of them back.
+- `/oauth/authorize` fetched any client metadata document URL for anyone, without a limit. A fetch
+  the cache cannot answer now counts against the client address, 240 a minute, which leaves room
+  for four fetches per sign-in at the login's 60 sign-ins a minute; a client whose document may be
+  cached never counts.
+- The SSO provider's discovery, token and key-set requests waited up to five minutes and read a
+  body of any size; each now has 5 seconds and 64 KiB.
+- Anyone could make `api` hold 50 MB in memory per request, without a token, through the upload
+  page's form, which `api` read whole before it checked the link inside it; many such requests at
+  once could take `api`, or the host, down. A submission of that form is now refused before its
+  body is read unless it was sent from a page whose link is valid, and the page then shows that
+  the link has expired. `proxy` no longer lets a body over 512 KiB through for another form posted
+  to an upload link under a name ending in `/upload`.
+- Any user could fill the media volume with their voicemail greeting: ffmpeg read an upload in
+  whatever format it found and wrote its output without a limit, so an hour of FLAC in 656 KB
+  became 115 MB of WAV, and a day in 17 MB 2.76 GB, kept after being replaced and copied by every
+  backup run. An upload's audio is now at most one hour, read only as its declared WAV or MP3, and
+  a longer or unreadable upload is refused with 422; at most one transcode per CPU runs at a time,
+  the others waiting. A voicemail greeting that a new one replaces or a removal clears, through
+  the API or on `*96`, is deleted at once, row and files, unless another mailbox still uses it.
+- A validation refusal could be far larger than the request that drew it: a 512 KiB body of
+  invalid array elements drew a 422 of some 23 MB listing every issue, over REST and MCP alike. A
+  problem's `errors` now stop at a quarter of the request limit, and `errorsOmitted` counts the
+  issues left out; the MCP SDK's own refusal of invalid tool arguments is bounded the same way.
   The SDK's refusals of a request before any tool or prompt runs, such as 30,000 prompt arguments
   that are not strings, which drew 6.9 MB from a 320 KB request, are cut to a quarter of the
   limit too, their message saying how many characters it left out. A refusal is cut further where
@@ -210,82 +284,24 @@ why the specified behaviour changed; the commit history, how.
   banned, with an escaped CR/LF in its From user, which Asterisk writes unescaped into the AMI
   security event `core` counts. `core` now drops every AMI frame Asterisk could not have written:
   one that repeats a key, an event that does not open with `Event` then `Privilege`, and a
-  security or `Registry` event missing one of its fields. Such a request is no longer counted
-  as a failed attempt; it names no account that exists.
-- An admin could soft-delete an owner created as owner by undoing that creation, which no API
-  call can take back: an undo replayed the owner's deletion without the owner-only rule a direct
-  delete obeys. Every operation an undo replays now obeys the role, scope and owner-only rules
-  of whoever undoes, as a direct call does, so that undo answers 403 for an admin.
+  security or `Registry` event missing one of its fields. Such a request is no longer counted as
+  a failed attempt; it names no account that exists.
 - A sender forging source addresses can no longer get an address banned from TCP and TLS: UDP
   needs no handshake, so ten forged UDP requests banned their source from all SIP transports,
   trunks of outbound-only providers included. Such a forgery can still ban an address over UDP;
   put every address whose UDP must not be blocked, such as an office's, on the allowlist
   (`sipAllowlist.create`).
-- An admin's mail template could send an owner's one-time set-password link to another host,
-  which could then set the owner's password and, for an owner without a second factor, enrol its
-  own: when an owner was created or promoted, when an owner reset another owner's password, or
-  through the forgot-password form. A mail to an owner now always uses the shipped template of
-  every kind an admin can edit (voicemail, missed call, setup, reset, two-factor notice); a
-  template test still sends the tenant's own, as a preview.
-
-- An admin could have the stack send a backup target's stored password to a host of their
-  own, by changing the target's host, URL or kind and leaving out its secret, and a trunk's
-  digest responses by changing its hosts or outbound proxy. A change of where a stored secret is
-  sent now needs the secret again, 422 without it: a backup target's kind or any field of its
-  `params` but `forget`; a trunk's new outbound or `both` host, or a new outbound proxy, while a
-  password is stored; a new `smtpHost` while a relay password is stored and a new SSO issuer
-  while a client secret is stored. Renaming, `enabled`, `forget` and every other field change
-  without it.
-- A `local` backup target's `path` reached restic as its repository whatever it said, so an admin
-  could name another restic backend or a directory of the stack's own state. It must now be
-  `/backups` or a path below it, without `..`, on every write and in each run; a target elsewhere
-  fails its runs. To keep one on another disk, mount the disk into `api` at `/backups/<name>` in
-  `compose.local.yaml`. restic and rclone no longer inherit `api`'s environment, its encryption key
-  and JWT secret among it.
-- `/healthz` told anyone which protection or job was down, such as a stopped SIP ban helper or a
-  failed automatic update. Without credentials it now answers only the overall `status`, with
-  the HTTP status as before (200 for `pass` and `warn`, 503 for `fail`), so an uptime check keeps
-  working. With `Authorization: Bearer <METRICS_TOKEN>` it answers every check as before; owners
-  and admins read them with the new `system.health` (`GET /api/v1/system/health`).
-- Any user could fill the media volume with their voicemail greeting: ffmpeg read an upload in
-  whatever format it found and wrote its output without a limit, so an hour of FLAC in 656 KB
-  became 115 MB of WAV, and a day in 17 MB 2.76 GB, kept after being replaced and copied by every
-  backup run. An upload's audio is now at most one hour, read only as its declared WAV or MP3,
-  and a longer or unreadable upload is refused with 422; at most one transcode per CPU runs at a
-  time, the others waiting. A voicemail greeting that a new one replaces or a removal clears,
-  through the API or on `*96`, is deleted at once, row and files, unless another mailbox still
-  uses it.
-- Caddy's admin endpoint, on `localhost:2019` in the network namespace the proxy shares with
-  Asterisk and the STUN server, is off: code running in either could load a Caddy configuration
-  of its own there without a credential, intercepting the web traffic with the stack's TLS key,
-  and read Caddy's metrics past `METRICS_TOKEN`. A change of the Caddyfile takes a restart of
-  `proxy`, as before.
+- Every base image is pinned by digest as well as tag, kept current by Dependabot, and the
+  Asterisk repository's keyring package is checked against its SHA-256 before it is installed.
 - A release's bundle, tag and images could be replaced after publication, and `update.sh` would
   have installed them: it checked the bundle only against `SHA256SUMS` from the same release. From
   this release on, published releases are immutable on GitHub and their `v*` tags cannot be moved
   or deleted, and the bundle carries `DIGESTS`, each image's digest for the release, which
-  `SHA256SUMS` covers: `update.sh` checks every release image it pulled against it before it
-  changes anything, and `setup.sh` in a release's bundle pulls the images and checks them before it
-  writes `.env`. An image whose tag was moved stops either, changing nothing. A stack that follows
-  `edge` is not checked, as `edge` has no bundle. The check runs from the update after this
-  release on, as each update runs the `update.sh` of the release it starts from.
-- A personal access token survived a password reset and a two-factor reset of its user, so one
-  minted with a stolen session kept working without expiry. Redeeming a password reset link,
-  `users.resetMfa` and `reset-mfa.mjs` now revoke every token the user holds. Tokens they created
-  for others stay, so resetting an admin's forgotten password keeps the integrations they set up;
-  the audit log names who created each token.
-- A sign-in that passed shortly before a password reset, a two-factor reset or the user's deletion
-  could still finish afterwards: the security page's 10-minute session, which could still set up
-  an authenticator, a login waiting for its second factor, a consent step, which also replayed
-  for more codes until it expired, an authorization code and an MCP file link. Each now carries
-  a counter kept with the user, which those three changes increase, and is refused once it
-  differs.
-- Deleting a user now revokes their set-password links too, so a link issued before the deletion
-  no longer works after an undo.
-- A webhook switched off kept receiving the events queued for it and their retries, also after
-  an `api` restart, so switching it off did not stop a receiver that had to be stopped at once.
-  Switching a hook off now drops its pending deliveries, as deleting it does, and switching it on
-  again brings none of them back.
+  `SHA256SUMS` covers. `update.sh` checks every release image it pulled against it before it
+  changes anything, and `setup.sh` in a release's bundle pulls the images and checks them before
+  it writes `.env`; an image whose tag was moved stops either, changing nothing. A stack that
+  follows `edge` is not checked, as `edge` has no bundle. The check runs from the update after
+  this release on, as each update runs the `update.sh` of the release it starts from.
 
 ## [0.9.1] - 2026-11-12
 

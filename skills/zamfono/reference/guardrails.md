@@ -19,11 +19,11 @@ the change would recreate a duplicate (a reused extension, e-mail or DID number)
 would point at a row deleted since (undo that deletion first), or when the entry itself is not
 undoable — a secret-bearing change, a one-shot action such as a manual backup run or a sent e-mail,
 creating or revoking a personal access token, or a hard delete whose file is already gone. Only an
-owner undoes the deletion of an admin or an owner, or an owner's creation; an admin gets 403, as
-an undo obeys the rules of the call it replays. The entries of the six
-operations that record what an effect outside Zamfono answered (`ringotel.push`, `ringotel.profile`,
-`ringotel.roster`, `ringotel.rereg`, `system.autoUpdate`, `system.maintenanceGate`) are never
-undoable and never block an undo. See the `undo` recipe for the full walk-through.
+owner undoes the deletion of an admin or an owner, or an owner's creation; an admin gets 403, as an
+undo obeys the role rules of the call it replays. The entries of the six operations that record what
+an effect outside Zamfono answered (`ringotel.push`, `ringotel.profile`, `ringotel.roster`,
+`ringotel.rereg`, `system.autoUpdate`, `system.maintenanceGate`) are never undoable and never block
+an undo. See the `undo` recipe for the full walk-through.
 
 ## Deletes are soft, then confirmed, then purged
 
@@ -53,19 +53,24 @@ that one of their phones rings or is connected in right now, and ends, transfers
 (`calls.hangup`, `calls.transfer`, `calls.consult`, `calls.hold`, `calls.addParty`) only one they
 placed, while their own phone is in it, or are connected in (`call-control`), as they park one
 (`calls.park`); every user sees the parked calls (`parking.list`), which only an admin ends.
-Recordings are `admin`/`owner` only, including of a user's own calls. A `sip` or `webSocket`
-target, and an `external` one with `"record": true`, is admin-only everywhere, a fallback included: a user's own forwarding, OOO rule
-or hours that names a new one anywhere in its fallback chain is refused with 403. A user may give
-their own forward to an external number a `ringTimeoutS` and a `fallback` of any other kind. A
-user reads such a target an admin set on their own forwarding with `users.getForwarding`
-(`GET /api/v1/users/{id}/forwarding`), OOO rules (`ooo.list`) or hours (`hours.get`) as a marker,
-`{ "managed": true, "kind": "webSocket" }`, never its URL, token, trunk or headers; an admin reads it
-in full. Acting for a user, read, edit and send back: `users.setForwarding`
-(`PUT /api/v1/users/{id}/forwarding`) replaces the rules as a whole, keeps the admin's target where
-the marker comes back unchanged under the same condition, refuses it under another condition, and
-removes the rule when left out; `ooo.update` and `hours.set` keep it the same way in the same rule
-or schedule, as does an `ooo.update` that leaves `target` out. Sending such a target in full,
-rebuilt from fields or changed, is refused with 422, which names the marker to send instead.
+Recordings are `admin`/`owner` only, including of a user's own calls.
+
+A `sip` or `webSocket` target, and an `external` one with `"record": true`, is admin-only
+everywhere, as a fallback too: a user's own forwarding, OOO rule or hours that names a new one
+anywhere in its fallback chain is refused with 403. A user may give their own forward to an
+external number a `ringTimeoutS` and a `fallback` of any other kind.
+
+Where an admin set such a target in a user's own forwarding, OOO rules or hours, the user reads
+it with `users.getForwarding` (`GET /api/v1/users/{id}/forwarding`), `ooo.list` or `hours.get` as
+a marker, such as `{ "managed": true, "kind": "webSocket" }`, never its URL, token, trunk or
+headers; an admin reads it in full. Acting as the user, read the rules, edit them and send them back with the
+marker in place. `users.setForwarding` (`PUT /api/v1/users/{id}/forwarding`) replaces the rules as
+a whole: it keeps the admin's target where the marker comes back unchanged under the same
+condition, refuses the marker under another condition with 422, and removes the rule when it is
+left out. `ooo.update` and `hours.set` keep the target the same way when the marker comes back in
+the same rule or schedule, and so does an `ooo.update` that leaves `target` out. Sending the
+admin's target in full instead, rebuilt from its fields or changed, is refused with 422, naming
+the marker to send.
 
 ## Rate limits protect logins, not the API
 

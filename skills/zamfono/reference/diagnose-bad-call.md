@@ -34,7 +34,8 @@ arguments:
      of the user was registered.
    - `voicemail`: the mailbox and the `reason` the call reached it (`dnd`, `offline`, `busy`,
      `noAnswer`, `unanswered`, `unavailable`, `target`, `hopLimit`, …); `voicemailFailed` why no
-     message was kept (`callerHungUp`, `hangup` during the greeting, `destroyed` when the channel
+     message was kept (`mailboxFull`, `mediaFull` when the media volume is at its storage
+     limit, `callerHungUp`, `hangup` during the greeting, `destroyed` when the channel
      went during the recording without the caller hanging up, `failed`, and `missingDeps`, a
      `core` running without its database or its link to `api`, when the call is released).
    - `rungDevice`, `ringGroupMember`, `declined` (with the Q.850 `cause`), `answered` (the
@@ -54,14 +55,14 @@ arguments:
      the API, a transfer) — with the Q.850 `cause`, `causeTxt` and the `sipCode`.
 3. If the trace does not explain the symptom (a call that never reached a device, dropped audio,
    choppy or one-way audio), raise the diagnostics level for the specific user, trunk or ring
-   group under suspicion to `qos` (adds a per-leg RTCP summary: `jitterMs`, `lossPct` and `rttMs`
-   per leg, the worse of both directions, `rttMs` null until the far end sent an RTCP report,
-   `jitterMs` and `lossPct` null for a leg that received nothing and whose far end never
-   reported, as one-way audio can leave it, and the packets the leg received from its far end and
-   sent to it, `rxPackets` and `txPackets`) or
-   `sip` (adds the SIP messages themselves, HEP-mirrored from Asterisk; a `user` reads the values
-   of their `X-`, `Authorization` and `Proxy-Authorization` headers and their `a=crypto` lines as
-   `***`) rather than raising it tenant-wide. An override without an explicit expiry lapses automatically after 7 days.
+   group under suspicion rather than tenant-wide; an override without an explicit expiry lapses
+   automatically after 7 days. Level `qos` adds a per-leg RTCP summary: `jitterMs`, `lossPct` and
+   `rttMs`, each the worse of both directions, and the packets the leg received from its far end
+   and sent to it, `rxPackets` and `txPackets`. `rttMs` is null until the far end sent an RTCP
+   report; `jitterMs` and `lossPct` are null for a leg that received nothing and whose far end
+   never reported, as one-way audio can leave it. Level `sip` adds the SIP messages themselves,
+   HEP-mirrored from Asterisk; a `user` reads the values of their `X-`, `Authorization` and
+   `Proxy-Authorization` headers and their `a=crypto` lines as `***`.
    - `rxPackets: 0` on a leg of an answered call means no audio ever arrived from that side: its
      RTP was dropped on the way, usually by NAT or a firewall on the device's side, or it was sent
      to a wrong address. At level `sip`, check the `c=` line of the SDP that side sent: a private

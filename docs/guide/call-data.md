@@ -57,16 +57,16 @@ are kept until someone deletes them; no retention job removes them.
 
 ## Storage limit
 
-The hosting provider may cap what the stack keeps on its media volume (`MEDIA_STORAGE_MAX` in
-the stack's `.env`, which no operation changes): uploaded audio, voicemail and call recordings
-together. `system.health` warns `media:storage` while the volume is at or over it, with the space
-its files take, in bytes, as `observedValue`. Until then:
+The hosting provider may cap what the stack keeps on its media volume, uploaded audio, voicemail
+and call recordings together, with `MEDIA_STORAGE_MAX` in the stack's `.env`, which no operation
+changes. While the volume is at or over the limit, `system.health` warns `media:storage`, with
+the space the volume's files take, in bytes, as `observedValue`, and the stack takes no new data:
 
 - `audio.create`, `users.setVoicemailGreeting` and upload links answer 507 Insufficient Storage,
-  also when the upload itself would take the volume over the limit;
+  as they do for an upload that would take the volume over the limit;
 - no new call recording starts: calls go on unrecorded;
-- a caller to voicemail hears that the mailbox is full, and the call is missed, its missed-call
-  mail going out as usual;
+- a caller to voicemail hears that the mailbox is full and the call is missed, with its
+  missed-call mail as usual; the call's trace shows `voicemailFailed` with the reason `mediaFull`;
 - a greeting recorded on the phone (`*96` or `*95<ext>`, then `0`) is not recorded: the caller
   hears that the mailbox is full, the current greeting stays, and the call's trace shows
   `mailboxGreeting` with the reason `mediaFull`.

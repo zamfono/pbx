@@ -82,9 +82,10 @@ systemctl enable --now podman.socket
 reach `asterisk`. `docker-compose-plugin` is the Compose provider `podman compose` hands the
 files to, the same one CI uses; it talks to the root socket enabled above and needs no Docker
 daemon. It comes from Docker's repository because mode B needs Compose 2.33 or newer, and
-Debian's own `docker-compose` package is older. It is the recommended provider. `podman-compose` also works: it has no `up --wait`, so
-`update.sh` checks the services' health itself instead, and no `rm`, so without the boot unit of
-step 7 `update.sh` takes the stack `down` before `up -d`, as it does on Podman anyway.
+Debian's own `docker-compose` package is older. It is the recommended provider. `podman-compose`
+also works: it has no `up --wait`, so `update.sh` checks the services' health itself instead, and
+no `rm`, so without the boot unit of step 7 `update.sh` takes the stack `down` before `up -d`, as
+it does on Podman anyway.
 
 Podman does **not** restart the stack after a reboot on its own: its `podman-restart.service`
 only covers `restart: always`, and the stack uses `unless-stopped`. Step 7 adds a unit for that.
@@ -170,8 +171,8 @@ dedicated server with a vSwitch; any provider that routes a subnet to you works 
 
 Each stack's address is public and untranslated, and no host firewall sits in front of it. The
 ports it answers on are exactly those of the Mode A table; `SIP_UDP_ENABLED`, `SIP_TCP_ENABLED`
-and `STUN_ENABLED` are how such a stack switches those listeners off. The host cannot reach a stack's address from its parent
-interface (a macvlan property), so check a stack from outside.
+and `STUN_ENABLED` are how such a stack switches those listeners off. The host cannot reach a
+stack's address from its parent interface (a macvlan property), so check a stack from outside.
 
 Raise the kernel's inotify limit on a host with more than a few stacks. Every stack's processes
 share it as root, and the Debian default of 128 runs out somewhere between 10 and 25 stacks:
@@ -221,58 +222,71 @@ gh attestation verify zamfono-deploy.tar.gz --repo zamfono/pbx
 On the server itself, Debian 13's own `gh` (2.46) has no `attestation` command; GitHub's
 repository has a current one (<https://github.com/cli/cli/blob/trunk/docs/install_linux.md>).
 
-A published release cannot change: its archives, `SHA256SUMS` and tag are locked on GitHub, and
-its bundle's `DIGESTS` names the digest of each of its images, which `setup.sh` and `update.sh`
-check every image they pull against, so an image tag moved in the registry stops them before they
-change anything. Releases published before this protection, 0.9.1 and earlier, are not locked.
-What none of this covers is a new release cut with a maintainer's stolen credentials, as
-`RELEASING.md` says.
+A published release cannot change: GitHub locks its archives, `SHA256SUMS` and tag. Its images'
+tags live in the registry, which no such lock covers, so the bundle's `DIGESTS` names the digest
+of each image, and `setup.sh` and `update.sh` check every release image they pull against it: an
+image tag moved since the release stops them before they change anything. Releases published
+before this protection, 0.9.1 and earlier, are not locked. What none of this covers is a new
+release cut with a maintainer's stolen credentials, as `RELEASING.md` says.
 
 The bundle's `compose.yaml` pulls the images of its own release. Leave `ZAMFONO_VERSION` in `.env`
-empty to keep it that way; set it only to follow something else, such as `edge` for testing.
+empty to keep it that way; set it only to follow something else, such as `edge` for testing,
+whose images no `DIGESTS` names and neither script checks.
 
-Then run the setup, which asks for everything only you know, generates every secret, hashes the
-owner's password with the `api` image, writes `.env` readable by root only, and warns about DNS,
-busy ports, Docker's userland proxy or a missing `public` network:
+Then run the setup. From a release's bundle it first pulls the release's images and checks them
+against `DIGESTS`, writing nothing where one differs. It then asks for everything only you know,
+generates every secret, hashes the owner's password with the `api` image, writes `.env` readable
+by root only, and warns about DNS, busy ports, Docker's userland proxy or a missing `public`
+network:
 
 ```bash
 ./setup.sh
 ```
 
-It asks for a media storage limit, the most the stack's recordings, voicemail and uploads may take
-(`MEDIA_STORAGE_MAX`, e.g. `20G`; empty for none, see [Media storage limit](#media-storage-limit)),
-and whether webhooks, voice bots and backup targets may be on private networks
-(`ALLOW_PRIVATE_TARGETS`, `true` unless you answer otherwise; see
-[Private networks](#private-networks)), and prints the generated `METRICS_TOKEN` once: the bearer
-token of `/metrics` and the full `/healthz` ([Monitoring](#monitoring)), which `.env` keeps. It
-also generates `INTERNAL_TOKEN`, which `api`, `core` and the proxy's certificate hook present to
-each other's internal endpoints, and never prints it. It asks for the Ringotel Admin API key, if
-the stack's users are to have Ringotel's apps (`RINGOTEL_API_TOKEN`; empty for none), without
-showing it as you type or in its summary: the first start stores it encrypted, unchecked, so the
-owner can connect Ringotel right after the first login (`zamfono.help ringotel-setup`); later
-starts ignore it, and the owner changes the key through `settings.update`. Like the mail relay's
-password, it stays in `.env`, which only root reads and which holds `SECRETBOX_KEY`, the key to
-the stored copy, anyway.
-Asked whether to change the ports, it also takes SIP over UDP and TCP, STUN and the RTP range;
-otherwise each keeps its default. Run as root on a host with apt, it offers a checkbox, ticked, to
-keep the host up to date on its own: it installs `unattended-upgrades` for the distribution's
-packages, Podman among them, and Docker's repository, every night at 04:00 host time after the
-stack's 03:00 backup, since Docker's upgrade restarts every container. It never reboots; a kernel
-update waits until you do (`/run/reboot-required`). The stack's images, Asterisk among them, are
-not host packages: its automatic update (step 8) takes those. A second checkbox writes
-`HOST_CONTROL` to `.env`: with it, the stack's owners switch those upgrades and reboot the host
-through the API, now or at a quiet moment, and a new stack reboots a host that waits for it on
-its own (`zamfono.help update-stack`). It is ticked in mode A and unticked in mode B, and false without a terminal unless set: leave it
+Besides the mode, the stack's names and numbers and the first owner, it asks for:
+
+- a media storage limit, the most the stack's recordings, voicemail and uploads may take
+  (`MEDIA_STORAGE_MAX`, e.g. `20G`; empty for none; see [Media storage limit](#media-storage-limit));
+- whether webhooks, voice bots and backup targets may be on private networks
+  (`ALLOW_PRIVATE_TARGETS`, `true` unless you answer otherwise; see
+  [Private networks](#private-networks));
+- the mail relay, if you have one;
+- the Ringotel Admin API key, if the stack's users are to have Ringotel's apps
+  (`RINGOTEL_API_TOKEN`; empty for none), shown neither as you type nor in the summary. The first
+  start stores it encrypted, unchecked, so the owner can connect Ringotel right after the first
+  login (`zamfono.help ringotel-setup`); later starts ignore it, and the owner changes the key
+  through `settings.update`. Like the mail relay's password it stays in `.env`, which only root
+  reads and which holds `SECRETBOX_KEY`, the key to the stored copy, anyway;
+- if you choose to change the ports, SIP over UDP and TCP, STUN and the RTP range; otherwise each
+  keeps its default.
+
+Of the secrets it generates, it prints one, `METRICS_TOKEN`, once: the bearer token of `/metrics`
+and the full `/healthz` ([Monitoring](#monitoring)), which `.env` keeps. `INTERNAL_TOKEN`, which
+`api`, `core` and the proxy's certificate hook send to each other's internal endpoints, it never
+prints.
+
+Run as root on a host with apt, it offers a checkbox, ticked, to keep the host up to date on its
+own: it installs `unattended-upgrades` for the distribution's packages, Podman among them, and
+Docker's repository, every night at 04:00 host time after the stack's 03:00 backup, since Docker's
+upgrade restarts every container. It never reboots; a kernel update waits until you do
+(`/run/reboot-required`). The stack's images, Asterisk among them, are not host packages: its
+automatic update (step 8) takes those. A second checkbox writes `HOST_CONTROL` to `.env`: with it,
+the stack's owners switch those upgrades and reboot the host through the API, now or at a quiet
+moment, and a new stack reboots a host that waits for it on its own (`zamfono.help update-stack`).
+It is ticked in mode A and unticked in mode B, and false without a terminal unless set: leave it
 off wherever stacks of others share the host, whose calls a reboot would drop too. As root on a
 systemd host it also installs the host agent, which carries out updates through the API (step 8);
 the stack directory and its files must then belong to root, as they do unpacked by root, and
-`ZAMFONO_AGENT=false` leaves the agent out. It uses dialogs where `whiptail` is installed (as on every Debian and Ubuntu) and plain prompts
+`ZAMFONO_AGENT=false` leaves the agent out.
+
+It uses dialogs where `whiptail` is installed (as on every Debian and Ubuntu) and plain prompts
 elsewhere, or with `SETUP_PLAIN=1`. It never overwrites an `.env` that holds values, and refuses
 while the stack's `db` volume from an earlier start exists: for a fresh start, run
-`docker compose down -v` with the old `.env` first. For automation,
-every answer can come from the environment under its `.env` name, plus `ZAMFONO_MODE`
-(`ports`/`macvlan`), `OWNER_PASSWORD`, `UNATTENDED_UPGRADES` and `HOST_CONTROL` (`true`/`false`, false unless set); `SETUP_NONINTERACTIVE=1` makes a missing one an error
-instead of a question. The header of `setup.sh` lists them.
+`docker compose down -v` with the old `.env` first. For automation, every answer can come from the
+environment under its `.env` name, plus `ZAMFONO_MODE` (`ports`/`macvlan`), `OWNER_PASSWORD`,
+`UNATTENDED_UPGRADES` and `HOST_CONTROL` (`true`/`false`, false unless set);
+`SETUP_NONINTERACTIVE=1` makes a missing one an error instead of a question. The header of
+`setup.sh` lists them.
 
 ### Or by hand
 
@@ -320,8 +334,9 @@ retained: restoring one needs it as `SECRETBOX_KEY_PREVIOUS`.
 
 Fill in `FQDN`, `COMPANY_NAME`, `MAIN_DID`, `COUNTRY`, `BOOTSTRAP_OWNER_EMAIL`,
 `BOOTSTRAP_OWNER_NAME` and, if you have them, the mail relay (`SMTP_*`, `MAIL_FROM`) and the
-Ringotel Admin API key (`RINGOTEL_API_TOKEN`). The comments
-in `.env.example` explain each value. For updates through the API, install the host agent (step 8) with `setup/agent.sh install docker`, or `podman`, as root.
+Ringotel Admin API key (`RINGOTEL_API_TOKEN`). The comments in `.env.example` explain each value.
+For updates through the API, install the host agent (step 8) with
+`setup/agent.sh install docker`, or `podman`, as root.
 
 The owner's password hash comes from the `api` image itself, so you never type a password into a
 file:
@@ -355,10 +370,10 @@ curl -sS https://<your FQDN>/healthz | jq .
 ```
 
 Until a trunk carrying emergency calls exists, its check `trunks:emergency` fails, and with it the
-whole document: `{"status":"fail"}` with 503. Which check fails, `system.health` shows an owner or
-admin, and `/healthz` the bearer of `METRICS_TOKEN` (Monitoring below); every other check should
-pass. If the request fails, `docker compose logs proxy api` shows whether the
-certificate or the application is the problem; a certificate failure is almost always DNS or
+whole document: `{"status":"fail"}` with 503. Every other check should pass; which one fails,
+`system.health` shows an owner or admin, and `/healthz` shows the bearer of `METRICS_TOKEN`
+([Monitoring](#monitoring)). If the request fails, `docker compose logs proxy api` shows whether
+the certificate or the application is the problem; a certificate failure is almost always DNS or
 port 80.
 
 ## 7. Podman only: start the stack at boot
@@ -403,48 +418,54 @@ cd /srv/zamfono
 ```
 
 It refuses to start with less than 3 GB free on the stack directory's filesystem, which a
-release's images need. It downloads the release's bundle, checks it against the release's `SHA256SUMS`, pulls the
-release's images and checks each against the bundle's `DIGESTS`, changing nothing where one differs
-(a stack on `edge` has no bundle, so its images go unchecked), unpacks the bundle over the stack directory (never touching `.env` but to give an empty or
-missing `METRICS_TOKEN` or `INTERNAL_TOKEN` a generated one, which it does not print: read it from
-`.env`), lists the
-settings a newer `.env.example` introduced, which keep their defaults until you set them, and
-recreates the stack: on Podman
-through the boot unit of step 7 if there is one, otherwise taking the stack `down` first. It then
-waits up to three minutes for every service to report healthy, and on Podman as long for
+release's images need, and refuses an older release. Then it:
+
+1. downloads the release's bundle and checks it against the release's `SHA256SUMS`;
+2. pulls the release's images and checks each against the bundle's `DIGESTS`, changing nothing
+   where one differs;
+3. unpacks the bundle over the stack directory;
+4. changes `.env` only where it must: it moves `ZAMFONO_VERSION` along (below), and gives an
+   empty or missing `METRICS_TOKEN` or `INTERNAL_TOKEN` a generated value, which it does not
+   print (read it from `.env`). It lists the settings a newer `.env.example` introduced, which
+   keep their defaults until you set them;
+5. recreates the stack: on Podman through the boot unit of step 7 if there is one, otherwise
+   taking the stack `down` first.
+
+It then waits up to three minutes for every service to report healthy, and on Podman as long for
 the boot unit's restart, stopping the unit where its start is still running then; an update that
-stopped before
-that, a failed `up` or an unhealthy service, is finished by running `update.sh`
-again once the
-cause is fixed, which takes the stack `down` first. Once the stack is healthy, it removes the Zamfono images no container uses, those
-of earlier releases; other images on the host stay. It refuses an older release. A breaking one (a new minor while 0.x, a new major from 1.0.0 on) shows the release
-notes in between and asks first; `--yes` answers for a run without a terminal.
+stopped before that, a failed `up` or an unhealthy service, is finished by running `update.sh`
+again once the cause is fixed, which takes the stack `down` first. Once the stack is healthy, it removes the Zamfono images no container uses,
+those of earlier releases; other images on the host stay. A breaking release (a new minor while
+0.x, a new major from 1.0.0 on) shows the release notes in between and asks first; `--yes`
+answers for a run without a terminal.
 
-**From an MCP client or the API**, the owner updates without a shell: `system.info` shows the
-latest release, whether it can be installed this way, and how the last update went, run either
-way, and `system.update` installs it, only to a newer release, a breaking one only when the
-owner sets `breaking: true` after reading its upgrade notes, and only once a backup run finished
-`ok` within the last hour. Notes that ask for work on the host, such as a new `.env` setting,
-still need `update.sh` there. It needs `UPDATER_TOKEN` set in `.env`, which `setup.sh` does
-(empty turns updates through the API off), and the host agent. Since 0.9.1 the stack runs no
-`updater` service: `api` reads the host agent's reports and leaves it its requests itself, and the
-agent removes the `updater` container an earlier release's `update.sh` left running.
+**From an MCP client or the API**, the owner updates without a shell. `system.info` shows the
+latest release, whether it can be installed this way, and how the last update went, whichever way
+it ran. `system.update` installs it: only a newer release, a breaking one only when the owner sets
+`breaking: true` after reading its upgrade notes, and only once a backup run finished `ok` within
+the last hour. Notes that ask for work on the host, such as a new `.env` setting, still need
+`update.sh` there. It needs `UPDATER_TOKEN` set in `.env`, which `setup.sh` does (empty turns
+updates through the API off), and the host agent. With the owner's setting `autoUpdate` on (as it
+is on a new stack), the stack installs a new release on its own, after a backup, at a quiet moment
+with no call in progress, and mails the owners when that fails or when a breaking release waits
+for them, which it never installs on its own (`zamfono.help update-stack`). Since 0.9.1 the stack
+runs no `updater` service: `api` reads the host agent's reports and leaves it its requests itself,
+and the agent removes the `updater` container an earlier release's `update.sh` left running.
 
-**The host agent** runs `update.sh` on the host for `api`, as root, so no container holds
-the runtime's socket. `setup.sh` installs it as root on a systemd host: three units named after
-the stack directory, `<name>-agent.path`, which starts `<name>-agent.service` when `api`
-leaves a request in `.update/requests`, and `<name>-agent.timer`, which runs it every ten
-minutes, and a mount unit that makes `.update/requests` a 1 MB tmpfs of its own, `nosuid`,
-`nodev` and `noexec`. `api` may write there and nowhere else in the stack directory; the agent
-takes nothing but a known request, checks every value, answers it, and reports in `.update/`,
-which only root and root's group, which `api` runs in, may enter (0750), and only it writes. It runs scripts of the
-stack directory as root, so it runs nothing while the directory, anything in it or a directory
-above it could be written by anyone but root. `update.sh`, run as root, keeps its units up to date with
-each release, and where it is missing offers to install it; in a terminal it also asks once
-whether the stack's owners may control the host while `.env` leaves `HOST_CONTROL` empty. By
-hand, and to remove it:
+**The host agent** runs `update.sh` on the host for `api`, as root, so no container holds the
+runtime's socket. `setup.sh` installs it as root on a systemd host, as units named after the stack
+directory: `<name>-agent.path`, which starts `<name>-agent.service` when `api` leaves a request in
+`.update/requests`; `<name>-agent.timer`, which runs it every ten minutes; and a mount unit that
+makes `.update/requests` a 1 MB tmpfs of its own, `nosuid`, `nodev` and `noexec`. `api` may write
+there and nowhere else in the stack directory. The agent takes nothing but a known request, checks
+every value, answers it, and reports in `.update/`, which only it writes and only root and root's
+group, which `api` runs in, may enter (0750). It runs scripts of the stack directory as root, so it
+runs nothing while the directory, anything in it or a directory above it could be written by
+anyone but root. `update.sh`, run as root, keeps its units up to date with each release, and where
+the agent is missing offers to install it; in a terminal it also asks once whether the stack's
+owners may control the host while `.env` leaves `HOST_CONTROL` empty. By hand, and to remove it:
 
-````bash
+```bash
 setup/agent.sh install docker   # or podman: the runtime the stack runs on
 setup/agent.sh uninstall
 journalctl -u zamfono-agent.service   # what it did; the update's own output is in .update/update.log
@@ -458,24 +479,22 @@ network is up. systemd runs the agent through `/usr/local/libexec/zamfono-agent`
 the directory before anything in it runs as root. Should that mount ever fail, systemd stops
 starting the agent and, after many tries, its path unit: once the cause is fixed, run
 `systemctl reset-failed zamfono-agent.path && systemctl start zamfono-agent.path` (the units are
-named after the stack directory). With the owner's setting `autoUpdate` on (as it is on a new stack), the stack installs such a
-release on its own, after a backup, at a quiet moment with no call in progress, and mails the
-owners when that fails or when a breaking release waits for them, which it never installs on its own (`zamfono.help update-stack`).
+named after the stack directory).
 
-**By hand**, the steps `update.sh` takes are: unpack the new bundle over the stack directory, then
-pull and recreate:
+**By hand**, without the checks above: unpack the new bundle over the stack directory, then pull
+and recreate:
 
 ```bash
 curl -fsSL https://github.com/zamfono/pbx/releases/latest/download/zamfono-deploy.tar.gz \
   | tar xz --strip-components=1
 docker compose pull
 docker compose up -d
-````
+```
 
 **Podman** refuses to replace `netns` while `asterisk`, `stun` and `proxy` still share its network
 namespace, so `up -d` after a pull fails with "has dependent containers which must be removed
-before it". Remove the containers first — `down` keeps every volume — or, with the boot unit of step 7,
-restart it, which does the same:
+before it". Remove the containers first — `down` keeps every volume — or, with the boot unit of
+step 7, restart it, which does the same:
 
 ```bash
 podman compose pull
@@ -486,9 +505,11 @@ Read the new release's **Upgrade notes** in `CHANGELOG.md`, which the bundle hol
 page shows: anything an upgrade needs beyond these commands is there. Compare the new
 `.env.example` with your `.env`: a release that adds a setting adds it there, and `update.sh`
 names the ones `.env` lacks. If `ZAMFONO_VERSION` in `.env` pins a release (`0.3.1`) or a line
-(`0.3`), `update.sh` changes it to the new release or its line, as `.env.example` describes; on
-`edge` it pulls the newest edge images instead, and it refuses an immutable `sha-` build; by
-hand, change it yourself.
+(`0.3`), `update.sh` changes it to the new release or its line, as `.env.example` describes; by
+hand, change it yourself. On a line or `latest`, it tags the images it checked with that tag, so
+every later `up` runs them. On `edge` it has no bundle to unpack or check: it pulls the newest
+edge images and recreates the stack, files and images unchecked. It refuses an immutable `sha-`
+build.
 
 Migrations only go forward. A bad release is undone by stopping the stack, unpacking the previous
 release's bundle (`download/vX.Y.Z`) and restoring the snapshot the upgrade began with, by its id
@@ -499,6 +520,46 @@ and without Litestream's copy, before `up -d`
 `asterisk`, `stun` and `proxy` live in the network namespace of `netns`, which holds the stack's
 address and published ports: each may restart or be recreated alone. Recreate `netns` only with
 the whole stack (`up -d`), since they would stay on the old namespace.
+
+## Private networks
+
+Webhooks, voice bots (`webSocket` forward targets) and backup targets are servers the stack's
+admins name, so the stack checks every address it connects them to, as it connects. It never
+connects them to loopback, link-local addresses (the cloud metadata service at
+`169.254.169.254` among them) or the stack's own Docker network, where its services live; a
+receiver on the Docker host itself is reached at the host's LAN address, not that network's
+gateway. Private networks (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `100.64.0.0/10` and
+`fc00::/7`) are allowed while `ALLOW_PRIVATE_TARGETS` in `.env` is empty or `true`, as on premises,
+where a webhook receiver or a NAS for backups sits on the LAN. Where several customers' stacks
+share a host, those networks are yours, not theirs: set it to `false` and take it in with
+`./setup/compose.sh up -d`. A receiver on the host's own LAN address in one of those ranges is then
+refused too, so it needs a public address. A refused address shows as `forbidden address` in a webhook's
+`lastError` or a backup run's error, and as `forbiddenAddress` in a voice bot call's trace.
+
+A backup target's server is checked before restic or rclone starts. sftp and plain ftp then
+connect to the address checked; for s3, webdav and ftps the tool resolves the name again itself,
+so that TLS can check the certificate against it, and a name whose DNS answer changes in that
+moment, or a server that redirects, could still lead it elsewhere.
+
+## Media storage limit
+
+`MEDIA_STORAGE_MAX` in `.env` bounds the stack's `media` volume, all of it: greetings, hold music
+and other uploaded audio, voicemail and call recordings. Set it where several stacks share a host,
+so that one customer's recordings or uploads cannot fill the disk for the others. The value is
+bytes with an optional `K`, `M`, `G` or `T` (powers of 1024), e.g. `20G`; empty, the default, is
+no limit. It is counted against the space the volume's files take on disk, not their lengths, so
+many small files count a whole block each. A malformed value stops `api` and `core` at start with
+a message naming it. Take a change in with `docker compose up -d`.
+
+At or over the limit the stack takes no new data: uploads answer 507, no new call recording
+starts (the call goes on unrecorded, and `core` logs a warning), and a caller to voicemail hears
+that the mailbox is full and is counted as missed, and no greeting is recorded by phone. A
+recording, message or greeting already running finishes, so the volume can pass the limit a little. `zamfono_media_bytes` against
+`zamfono_media_limit_bytes` in `/metrics`, and the warning `media:storage` in the full
+`/healthz` and `system.health`, show where it stands. Deleting voicemail or recordings
+(`voicemails.delete`, `recordings.delete`, or a shorter `recording_retention_days`) frees space at
+once; deleted uploaded audio only once the daily purge removes it,
+`soft_delete_retention_days` later, since it can be restored until then.
 
 ## Your own overlay
 
@@ -561,45 +622,6 @@ dbs:
 The bucket needs server-side encryption: the stream is not encrypted on the client, unlike the
 restic repository. Keep a copy of both files with `.env`, since a restore needs them.
 
-## Private networks
-
-Webhooks, voice bots (`webSocket` forward targets) and backup targets are servers the stack's
-admins name, so the stack checks every address it connects them to, as it connects. It never
-connects them to loopback, link-local addresses (the cloud metadata service at
-`169.254.169.254` among them) or the stack's own Docker network, where its services live; a
-receiver on the Docker host itself is reached at the host's LAN address, not that network's
-gateway. Private networks (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `100.64.0.0/10` and
-`fc00::/7`) are allowed while `ALLOW_PRIVATE_TARGETS` in `.env` is empty or `true`, as on premises,
-where a webhook receiver or a NAS for backups sits on the LAN. Where several customers' stacks
-share a host, those networks are yours, not theirs: set it to `false` and take it in with
-`docker compose up -d`. A refused address shows as `forbidden address` in a webhook's
-`lastError` or a backup run's error, and as `forbiddenAddress` in a voice bot call's trace.
-
-s3, webdav and ftps backup targets are checked before restic or rclone starts, which then resolve
-the name again themselves, so their TLS can check the certificate against it: a name whose DNS
-answer changes in that moment, or a server that redirects, could still lead them elsewhere. sftp
-and plain ftp connect to the address checked.
-
-## Media storage limit
-
-`MEDIA_STORAGE_MAX` in `.env` bounds the stack's `media` volume, all of it: greetings, hold music
-and other uploaded audio, voicemail and call recordings. Set it where several stacks share a host,
-so that one customer's recordings or uploads cannot fill the disk for the others: bytes with an
-optional `K`, `M`, `G` or `T` (powers of 1024), e.g. `20G`; empty, the default, is no limit. It is
-counted against the space the volume's files take on disk, not their lengths, so many small files
-count a whole block each. A malformed value stops `api` and `core` at start with a message naming
-it. Take it in with `docker compose up -d`.
-
-At or over the limit the stack takes no new data: uploads answer 507, no new call recording
-starts (the call goes on unrecorded, and `core` logs a warning), and a caller to voicemail hears
-that the mailbox is full and is counted as missed, and no greeting is recorded by phone. A
-recording, message or greeting already running finishes, so the volume can pass the limit a little. `zamfono_media_bytes` against
-`zamfono_media_limit_bytes` in `/metrics`, and the warning `media:storage` in the full
-`/healthz` and `system.health`, show where it stands. Deleting voicemail or recordings
-(`voicemails.delete`, `recordings.delete`, or a shorter `recording_retention_days`) frees space at
-once; deleted uploaded audio only once the daily purge removes it,
-`soft_delete_retention_days` later, since it can be restored until then.
-
 ## Logs
 
 `compose logs <service>` reads the running container's own log, and an upgrade recreates every
@@ -647,16 +669,17 @@ docker compose exec api node reset-mfa.mjs owner@example.com
 ```
 
 It removes the owner's methods and recovery codes, signs them out everywhere, revokes the personal
-access tokens they hold and writes the reset to the audit log. They then sign in with their password and set up a second factor again.
+access tokens they hold and writes the reset to the audit log. They then sign in with their
+password and set up a second factor again.
 
 ## Monitoring
 
 Point an uptime check at `https://<FQDN>/healthz`; its HTTP status suffices. The body is
-`application/health+json`: a `status` that is the worst of the stack's checks, and only with
-`Authorization: Bearer <METRICS_TOKEN>` also one entry per check under `checks`, since a check
-tells anyone which protection or job is down; owners and admins read them with `system.health`.
-`fail` (a closed or unmigrated database, `core` or its Asterisk down, no emergency
-trunk, no usable certificate, a stopped SIP ban helper) answers 503; `warn` (an owed config
+`application/health+json`: a `status` that is the worst of the stack's checks and, only with
+`Authorization: Bearer <METRICS_TOKEN>`, one entry per check under `checks`, which would tell
+anyone else which protection or job is down; owners and admins read them with `system.health`.
+`fail` (a closed or unmigrated database, `core` or its Asterisk down, no emergency trunk, no
+usable certificate, a stopped SIP ban helper) answers 503; `warn` (an owed config
 propagation or Ringotel push, configuration rows left out of the render, which `system.info`
 names, a failed automatic update, an expiring certificate, secrets left under a retired key, a
 media volume at its limit) answers 200 and is worth an alert of its own.
@@ -665,9 +688,10 @@ media volume at its limit) answers 200 and is worth an alert of its own.
 curl -sS https://pbx.example.com/healthz | jq -e '.status == "pass"'
 ```
 
-For Prometheus, take `METRICS_TOKEN` from `.env`, where `setup.sh` and `update.sh` put one, and scrape `https://<FQDN>/metrics` with
-`Authorization: Bearer <METRICS_TOKEN>`; without the variable `/metrics` answers 404. The
-Litestream overlay adds `/metrics/litestream` under the same token.
+For Prometheus, take `METRICS_TOKEN` from `.env`, where `setup.sh` and `update.sh` put one, and
+scrape `https://<FQDN>/metrics` with `Authorization: Bearer <METRICS_TOKEN>`; with the variable
+empty, `/metrics` answers 404. The Litestream overlay adds `/metrics/litestream` under the same
+token.
 
 ```yaml
 scrape_configs:

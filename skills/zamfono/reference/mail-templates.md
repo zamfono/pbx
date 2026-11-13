@@ -1,10 +1,10 @@
 # Mail templates
 
-Every mail the stack sends is rendered from a template: the voicemail notification, the
-missed-call mail (to users with `notifyMissedCalls` set), the setup mail with a new account's
-set-password link, the password-reset mail, and the two mails to every owner about updates
-(`update-stack`): a failed automatic update and a breaking release to install by hand. Each
-template has a `subject`, a plain-text `bodyText` and an optional `bodyHtml`.
+Every mail the stack sends is rendered from a template: the voicemail notification, the missed-call
+mail (to users with `notifyMissedCalls` set), the setup mail with a new account's set-password link,
+the password-reset mail, the notice to a user that their second factor changed, and the two mails to
+every owner about updates (`update-stack`): a failed automatic update and a breaking release to
+install by hand. Each template has a `subject`, a plain-text `bodyText` and an optional `bodyHtml`.
 
 ## Kinds, languages and which template applies
 
@@ -18,20 +18,22 @@ language is kept but used only once `settings.language` is switched to it.
 
 A mail to an owner uses the builtin template of every kind an admin can edit, `voicemail`,
 `missedCall`, `setup`, `reset` and `mfaChanged`, whatever override exists; users and admins get
-the override. What counts is the recipient's role when the mail is sent, so a new owner, or one
-just promoted, gets the builtin setup or reset mail, and a ring-group mailbox with an owner among
-its members mails the builtin template. Owners are the hosting provider and admins the customer's
-IT managers, and a `setup` or `reset` mail carries a one-time set-password link that an admin's
-template must never be able to send elsewhere. Only `updateFailed` and `breakingUpdate`, which go
-to owners alone, are owners' to edit, and owners receive those overrides.
+the override. Owners are the hosting provider and admins the customer's IT managers, and a
+`setup` or `reset` mail carries a one-time set-password link that an admin's template must never
+be able to send elsewhere. What counts is the recipient's role when the mail is sent: a new
+owner, or one just promoted, gets the builtin setup or reset mail, and a ring-group mailbox with
+an owner among its members mails every member the builtin template. `updateFailed` and
+`breakingUpdate` go to owners alone; only owners edit them, and owners receive those overrides.
 
 The builtin subjects of `setup`, `reset`, `mfaChanged`, `updateFailed` and `breakingUpdate` name
-the stack, as `companyName (fqdn)` or the FQDN alone. Staff who get mails from many stacks can tell
-them apart by the sender too: an owner can set `settings.mailFrom` to an address that names the
-stack, such as `pbx-acme@provider.example`, where the relay may send for it.
+the stack, as `companyName (fqdn)` or the FQDN alone. Staff who get mails from many stacks can
+also tell them apart by the sender: an owner can set `settings.mailFrom` to an address that names
+the stack, such as `pbx-acme@provider.example`, where the relay may send for it.
 
-All template operations are `admin`, but `mailTemplates.put` and `mailTemplates.delete` of
-`updateFailed` and `breakingUpdate` are `owner` (403 for an admin, also through `audit.undo`).
+## Operations
+
+All template operations are `admin`, except that `mailTemplates.put` and `mailTemplates.delete`
+of `updateFailed` and `breakingUpdate` are `owner`: an admin gets 403, also through `audit.undo`.
 
 - `mailTemplates.list` (`GET /api/v1/mailTemplates`) returns the effective template of every kind in
   the tenant language, each with `source` `builtin` or `tenant`.
@@ -43,8 +45,9 @@ All template operations are `admin`, but `mailTemplates.put` and `mailTemplates.
   the builtin template applies again; 404 when there is none. Both writes are undoable
   (`guardrails`).
 - `mailTemplates.test` (`POST /api/v1/mailTemplates/{kind}/test`) sends the effective template, in
-  the tenant language, to the caller's own address with sample values, and answers `status`; an
-  owner gets the tenant's override too, as a preview.
+  the tenant language, to the caller's own address with sample values, and answers `status`. An
+  owner calling it gets the tenant's override too, as a preview, although owners otherwise
+  receive the builtin one.
 
 Read the builtin template with `mailTemplates.get` before writing an override: it is the best
 starting point and shows the branches the kind needs.

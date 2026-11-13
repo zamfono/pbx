@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # The stack's Compose, as the Podman boot unit runs it (README.md, step 7): `setup/compose.sh up -d`.
 # It runs the compose of the runtime ZAMFONO_RUNTIME names, else of whichever answers, on the files
-# add_stack_files (setup/checks.sh) names, so the operator's own overlay, compose.local.yaml, is never
-# left out (docs/spec.md §6.5 "Continuous replication").
+# add_stack_files (setup/checks.sh) names, so the operator's own overlay, compose.local.yaml, is
+# never left out (docs/spec.md §6.5 "Continuous replication").
 #
 # Where it may write .env, as root, it first gives an empty or missing METRICS_TOKEN or
 # INTERNAL_TOKEN there a generated one, as update.sh does (generated_tokens, setup/envfile.sh),

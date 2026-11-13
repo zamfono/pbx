@@ -20,11 +20,11 @@
 #
 # The copy this hook makes is what `api` reads instead of Caddy's own store, whose layout is
 # undocumented (§6.4: "`api` reads only the hook's copy, never Caddy's own certificate store").
-# It lands at a fixed pair on a volume of its own, `cert-copy`, mounted at /cert-copy, so `api`
-# mounts that volume and never `caddy-data` with its ACME account key: /cert-copy/cert.pem and
-# privkey.pem, written atomically (temp file, then `mv` within the same directory,
-# so the rename is atomic) and left owned by this image's own uid (1000, the `caddy` user this
-# image runs as, and the uid `api` also runs as — §6.3 "Migrations"). Caddy-events-exec runs
+# It lands at a fixed pair, /cert-copy/cert.pem and privkey.pem, on a volume of its own,
+# `cert-copy`, so `api` mounts that volume and never `caddy-data` with its ACME account key. Both
+# are written atomically (temp file, then `mv` within the same directory, so the rename is atomic)
+# and left owned by this image's own uid (1000, the `caddy` user this image runs as, and the uid
+# `api` also runs as — §6.3 "Migrations"). Caddy-events-exec runs
 # handlers in the background by default (its own README), so a hook that hangs never blocks
 # certificate issuance; each step below still logs one line to stderr, which lands in the
 # container's own logs (§7 "Logs").
@@ -95,8 +95,8 @@ log "copy complete"
 # can issue before `api` listens, after its start sync has already found no copy, so the
 # notification is retried for a minute (caddy-events-exec runs this in the background); a
 # notification still missed after that is not fatal: the hourly poll picks the copy up. It carries
-# INTERNAL_TOKEN, which api requires of every /internal/* request (§3.1); without one api refuses
-# it, the hourly poll still picking the copy up.
+# INTERNAL_TOKEN, which api requires of every /internal/* request (§3.1); one without it api
+# refuses, and the hourly poll picks the copy up all the same.
 log "notifying api"
 notified=false
 for _ in $(seq 1 30); do

@@ -4,7 +4,7 @@ For maintainers. A release is a signed `vX.Y.Z` tag on a commit of `main` that C
 `.github/workflows/release.yaml` does the rest: it adds the release's tags to the images `main`
 already built and tested for that commit, never rebuilding them (`docs/spec.md` §6.3 "Images"),
 and publishes the GitHub release with the deploy bundle and its `CHANGELOG.md` section as the
-description: as a draft first, with the bundle attached, then published, since a published
+description. It attaches the bundle to a draft and only then publishes it, since a published
 release takes no more assets (below).
 
 ## Choosing the version
@@ -82,9 +82,9 @@ already run it, and `latest` names it until the next release does. GitHub enforc
 only the release's title and notes can still be edited.
 
 If the tag's run fails after `promote`, re-run its failed jobs. A re-run of `bundle` finishes a
-draft it finds; against a release already published it uploads nothing, checks that the published
-assets are the bytes it packed again (the bundle is reproducible) and replaces the notes only, and
-it fails where they differ, which needs looking into before anything else.
+draft it finds. Against a release already published it uploads nothing: it checks that the
+published assets are the bytes it has just packed again (the bundle is reproducible) and replaces
+only the notes. Where they differ it fails, which needs looking into before anything else.
 
 ## What protects a published release
 
@@ -99,11 +99,11 @@ what a release contains must not change once published:
 - **`SHA256SUMS`** of the same release: `update.sh` checks the bundle against it, and since
   neither can change after publication, nor can the pair.
 - **`DIGESTS`** in the bundle, which `SHA256SUMS` covers: each image's index digest for the
-  release, the one `promote` gave every tag. Registry tags are protected by neither of the above,
+  release, the one `promote` gave every tag. Registry tags are protected by none of the above,
   so `update.sh` checks every release image it pulled against it before it changes anything, and
   `setup.sh` in a release's bundle before it writes `.env`. A stack on `edge` is not checked.
 - **The provenance attestation** of the two archives, which an operator can check by hand
-  (deploy/README.md, step 4); `update.sh` does not, since Debian's `gh` cannot.
+  (deploy/README.md, step 5); `update.sh` does not, since Debian's `gh` cannot.
 
 What remains: whoever holds a maintainer's token or session with write access can push a commit to
 `main`, tag it and cut an ordinary release through `release.yaml`, with a valid attestation and

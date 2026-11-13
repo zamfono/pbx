@@ -1,15 +1,19 @@
 #!/usr/bin/env bash
-# update-test.sh's stub runtime: `docker compose version` answers, `up --help` names --wait unless
-# STUB_PODMAN_COMPOSE, which also has no `rm`, as podman-compose has neither; everything else is
-# recorded and succeeds, `ps -q` naming two containers, which `inspect` reports healthy and
-# without a healthcheck, and `ps -q api` api's, bar a pull under STUB_FAIL_PULL and an `up` under
-# STUB_FAIL_UP, and `ps -aq`, the host agent's look for an old updater, goes unrecorded; under
-# STUB_UPDATE_DURING_RM, removing it first runs ./update.sh 1.2.4 and records its exit status. A pull
-# copies the update's record, .update/state.json, to $STUB_LOG.state, as it stands mid-run.
-# `compose config` names the five services' release images at ZAMFONO_VERSION, else VERSION's,
-# or under STUB_OWN_IMAGES=1 images of the operator's own in their place (=<name>: that image's alone);
-# `image inspect` of ghcr.io/zamfono/<name>:<tag> reports the digest `stub_digests` (sourced)
-# gives <name>, another for the image STUB_MOVED_IMAGE names; `volume inspect` finds no volume;
+# update-test.sh's stub runtime. Sourced, it only defines stub_digest and stub_digests. Run:
+# - `docker compose version` answers; `up --help` names --wait unless STUB_PODMAN_COMPOSE, which
+#   also has no `rm`, as podman-compose has neither;
+# - `ps -aq`, the host agent's look for an old updater, goes unrecorded and finds one only under
+#   STUB_OLD_UPDATER; under STUB_UPDATE_DURING_RM, removing it first runs ./update.sh 1.2.4 and
+#   records its exit status;
+# - everything else is recorded and succeeds, bar a pull under STUB_FAIL_PULL and an `up` under
+#   STUB_FAIL_UP: `ps -q` names two containers, which `inspect` reports healthy and without a
+#   healthcheck, and `ps -q api` api's; a pull copies the update's record, .update/state.json, to
+#   $STUB_LOG.state, as it stands mid-run;
+# - `compose config` names the five services' release images at ZAMFONO_VERSION, else VERSION's,
+#   or under STUB_OWN_IMAGES=1 images of the operator's own in their place (=<name>: that image's
+#   alone);
+# - `image inspect` of ghcr.io/zamfono/<name>:<tag> reports the digest stub_digests gives <name>,
+#   another for the image STUB_MOVED_IMAGE names; `volume inspect` finds no volume;
 # - a call with INVOCATION_ID set records it in $STUB_LOG.env.
 stub_digest() {
   echo "sha256:$(printf %s "$1" | sha256sum | cut -c1-64)"

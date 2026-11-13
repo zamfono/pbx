@@ -15,7 +15,7 @@ All webhook operations are `admin`.
   **inactive**, so nothing is POSTed to a receiver that is not deployed yet.
 - `webhooks.update` (`PATCH /api/v1/webhooks/{id}`) changes `url`, `secret` or `eventTypes`, and
   switches delivery on and off with `active`. `{ "active": true }` once the receiver verifies
-  signatures.
+  signatures; switching a hook off drops the deliveries still pending for it (Delivery).
 - `webhooks.list` (`GET /api/v1/webhooks`) lists the hooks with `eventTypes`, `active`,
   `lastStatus`, `lastDeliveryAt` and the failure fields below; the secret never appears in a read,
   only `secretSet`.
@@ -82,21 +82,22 @@ the body and an `X-Zamfono-Signature` header.
 - A delivery succeeds on any `2xx` answer within 5 seconds. A connection error, another status or
   a timeout fails the attempt; after three attempts, 1 s and then 4 s apart, the delivery is
   given up. A redirect is not followed: a `3xx` answer fails the attempt like any other.
-- The receiver must be on an address the stack connects to, checked as each delivery connects:
-  never loopback (`127.0.0.1`, `localhost`), link-local (`169.254.x.x`) or the stack's own
-  internal network, and a private network (`10.x`, `172.16–31.x`, `192.168.x`, `100.64–127.x`,
-  `fc00::/7`) only while the host's operator allows it, as an on-premises install does and a
-  provider's shared host does not. A `url` with a loopback, link-local or unspecified address
-  literal is refused with 422 when saved; a name resolving to a refused address fails each
-  delivery with `forbidden address`.
+- The receiver must be on an address the stack may connect to, checked as each delivery
+  connects. Loopback (`127.0.0.1`, `localhost`), link-local (`169.254.x.x`, the cloud metadata
+  address among them) and the stack's own internal network are never allowed. Private networks
+  (`10.x`, `172.16–31.x`, `192.168.x`, `100.64–127.x`, `fc00::/7`) are allowed unless the host's
+  operator set `ALLOW_PRIVATE_TARGETS=false` in the stack's `.env`, as on a provider's host shared
+  by several customers; on premises they are allowed. A `url` with a loopback, link-local or
+  unspecified address literal is refused with 422 when saved; a name that resolves to a refused
+  address fails each delivery with `forbidden address`.
 - `lastStatus` in `webhooks.list` is `ok` after a delivery that succeeded and `failing` after one
   that gave up, with `lastDeliveryAt` its time; `null` before the first. A failing hook stays
   active and keeps receiving new events: it is never switched off automatically.
-- `lastError` is why the last delivery that gave up failed, with `lastErrorAt` its time: the
-  status, such as `HTTP 404` or `HTTP 403`, or the kind of error, `timeout`, `DNS lookup failed`,
-  `forbidden address`, `TLS error <code>`, `connection refused`, `connection reset`. While the hook is failing,
-  `failingSince` is when it turned so and `failedDeliveries` how many deliveries gave up since; a
-  delivery that succeeds sets them back to `null` and 0, and `lastError` stays as a record.
+  - `lastError` is why the last delivery that gave up failed, with `lastErrorAt` its time: the
+    status, such as `HTTP 404` or `HTTP 403`, or the kind of error, `timeout`, `DNS lookup failed`,
+    `forbidden address`, `TLS error <code>`, `connection refused`, `connection reset`. While the hook
+    is failing, `failingSince` is when it turned so and `failedDeliveries` how many deliveries gave up
+    since; a delivery that succeeds sets them back to `null` and 0, and `lastError` stays as a record.
 - `api` logs a warning when a hook turns `failing`, again whenever the reason changes while it
   stays failing (a `404` fixed by a new `url` that now answers `403` for a wrong `secret`), and
   once a day while it keeps failing for the same reason; it logs when the hook delivers again.
@@ -109,8 +110,8 @@ the body and an `X-Zamfono-Signature` header.
 - Pending deliveries are kept in the database: a delivery queued or between retries when the
   `api` container restarts (an update, a crash) goes on after it, with the attempts it has left,
   and one cut off mid-request is sent again. Deleting a hook or switching it off drops its pending
-  deliveries, a retry already waiting included, and switching it on again brings none of them
-  back. An event that happens while `api` is down reaches no webhook, so treat a webhook as a
+  deliveries, a retry already waiting included; switching it on again brings none of them back.
+  An event that happens while `api` is down reaches no webhook, so treat a webhook as a
   notification and re-read state through the API (`calls.list`, `voicemails.list`, …) after a
   gap.
 

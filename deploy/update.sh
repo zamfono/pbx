@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Updates this stack to a newer release (README.md, step 8): checks there is room for its images,
-# downloads that release's bundle, checks it against the release's SHA256SUMS, pulls the images
-# and checks them against the bundle's DIGESTS, tags them with the line or latest .env follows, unpacks the bundle over this directory, moves .env's ZAMFONO_VERSION along by its form and lists
-# the settings a newer .env.example introduced, recreates the stack and, once it is healthy,
-# removes the stack's images no container uses. The host agent runs this same script for api's
-# `system.update` and automatic updates (setup/agent.sh, §6.3 "Updates"), and --current to report
-# what the directory runs, which needs no container runtime. Compose reads
-# compose.yaml and compose.override.yaml, the link to the mode's overlay setup.sh makes, and
-# the operator's own overlay compose.local.yaml where the stack directory holds one (§6.5).
+# downloads that release's bundle and checks it against the release's SHA256SUMS, pulls the images,
+# checks them against the bundle's DIGESTS and tags them with the line or latest .env follows,
+# unpacks the bundle over this directory, updates .env (ZAMFONO_VERSION by its form, an empty
+# METRICS_TOKEN or INTERNAL_TOKEN generated) and lists the settings a newer .env.example added,
+# recreates the stack and, once it is healthy, removes the stack's images no container uses. The
+# host agent runs this script for api's `system.update` and automatic updates (setup/agent.sh,
+# §6.3 "Updates"), and --current, needing no runtime, to report what the directory runs. Compose
+# reads compose.yaml, the compose.override.yaml link and the operator's compose.local.yaml (§6.5).
 #
 #   ./update.sh [--yes] [--check] [VERSION]
 #   ./update.sh --current
@@ -17,9 +17,9 @@
 # unchecked: main publishes no bundle, so no DIGESTS. A release that is breaking by RELEASING.md's
 # policy (a new major, or a new minor while 0.x) shows its upgrade notes and asks first; --yes
 # answers for a run without a terminal. --check only says what an update would do, and exits
-# with its verdict, which api judges the same way: 0 the update is allowed, or finishes one that stopped
-# before its stack reported healthy, 10 it is breaking, 11 VERSION is not newer than the release
-# this directory runs, 12 the directory runs no release (setup/versions.sh, tag_kind);
+# with its verdict, which api judges the same way: 0 the update is allowed, or finishes one that
+# stopped before its stack reported healthy, 10 it is breaking, 11 VERSION is not newer than the
+# release this directory runs, 12 the directory runs no release (setup/versions.sh, tag_kind);
 # any other status is a failure. --current prints the release this directory runs, which the
 # host agent reports to api, and exits 12 where it runs none.
 #

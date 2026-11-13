@@ -43,11 +43,11 @@
 
 	# Request bodies (§10.2): 512 KiB, refused with 413 once api has read past it, except an
 	# audio upload — the REST upload endpoints, an upload link and its page's `upload` remote
-	# form — which api caps at 50 MB, each authenticated before api reads the body. A post to an
-	# upload link is one only while its `/remote` query, SvelteKit's remote form posted without
-	# JavaScript, is absent or names that form: `<id>/upload`, with no further segment, which
-	# would name a keyed instance of another form (`<id>/login/"k/upload"`). `*` in `path` spans
-	# one segment, so the enhanced call's id is exactly `<id>/upload` too.
+	# form — which api caps at 50 MB and authenticates before it reads the body. A post to an
+	# upload link counts as one only while its `/remote` query, SvelteKit's remote form posted
+	# without JavaScript, is absent or names that form: `<id>/upload`, the id one segment, since
+	# `<id>/login/"k/upload"`, a keyed instance of another form, ends in `/upload` too. `*` in
+	# `path` spans one segment, so the enhanced call's id is exactly `<id>/upload` as well.
 	@notUpload {
 		not expression `method('POST') && path('/api/v1/audio') || method('PUT') && path('/api/v1/users/*/voicemailGreeting') || path('/_app/remote/*/upload')`
 		not {

@@ -4,7 +4,7 @@ Zamfono clients work from the office and from home without a VPN: devices carry 
 settings (`rewrite_contact`, `rtp_symmetric`, `force_rport`), and media always flows through
 Asterisk, which recording, presence and internal routing depend on either way.
 
-Two things to tell a remote worker before they treat their extension as their only phone:
+Three things to tell a remote worker before they treat their extension as their only phone:
 
 - **Emergency calls from a desktop app or desk phone reach the office, not them.** Dialling an
   emergency number from a home-office softphone on a computer, or from a desk phone, is answered
@@ -18,12 +18,12 @@ Two things to tell a remote worker before they treat their extension as their on
   register at all from home unless that address is added.
 - **Repeated failed SIP attempts ban their source address, per protocol.** A phone with a stale
   password, or a scanner, that fails often enough (`sipBanFailures` within `sipBanWindowS` in
-  `settings.get`) over UDP, or over TCP and TLS, has its address dropped from the SIP ports on that
-  protocol for the next step of `sipBanSteps`; an address that authenticated recently over the
-  same protocol is exempt, and so is every trunk host. A UDP sender can forge its source, so a
-  forged flood can ban an innocent address over UDP (never over TCP or TLS). `sipBans.list` shows
-  the bans with their `protocol` and `sipBans.lift` ends one; an office or provider address that
-  must never be banned goes on `sipAllowlist.create`, which also ends the bans it covers. The web
-  API stays reachable from a banned address.
+  `settings.get`) has its address dropped from the SIP ports for the next step of `sipBanSteps`,
+  over UDP or over TCP and TLS, whichever it failed on. An address that authenticated recently
+  over the same protocol is exempt, and so is every trunk host. A UDP sender can forge its
+  source, so a forged flood can ban an innocent address over UDP, never over TCP or TLS.
+  `sipBans.list` shows the bans with their `protocol`, and `sipBans.lift` ends one; an office or
+  provider address that must never be banned goes on `sipAllowlist.create`, which also ends the
+  bans it covers. The web API stays reachable from a banned address.
 
 For device recommendations, see `tested-softphones`.

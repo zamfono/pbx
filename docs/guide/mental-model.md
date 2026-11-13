@@ -96,6 +96,10 @@ fallback; a party added with `*5` doesn't either.
 }
 ```
 
+A `user` reading their own forwarding, out-of-office rules or opening hours sees a target an admin
+set there that is admin-only (`sip`, `webSocket`, or `external` with `"record": true`), anywhere
+in its fallback chain, as a marker such as `{ "managed": true, "kind": "sip" }` (`guardrails`).
+
 ## Where to look next
 
 - `routing-order` — the order every call is decided in, inbound and outbound.
@@ -106,6 +110,6 @@ fallback; a party added with `*5` doesn't either.
 - `parking` — parking slots, park and retrieve, the ring-back to the parker.
 - `click-to-dial` — placing a call on a user's phones from outside, a slot or one call's CLIR.
 - `directory` — the phone book, caller names and the type-ahead search.
-- `call-data` — voicemails, the presence history and the call statistics.
+- `call-data` — voicemails, the media storage limit, the presence history and the call statistics.
 - `mail-templates` — the mails the stack sends, their languages and placeholders.
 - `webhooks` — the realtime events, their delivery and how to verify the signature.

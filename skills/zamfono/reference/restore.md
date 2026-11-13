@@ -18,18 +18,17 @@ start the stack.
   on the `backups` volume and its password is `BACKUP_PASSWORD`. It lives on the same host as the
   stack, so it restores a broken database or a bad upgrade, but a lost host takes it along; that
   is what a target elsewhere is for. Every `local` target's repository lies under `/backups`, the
-  only place `backups.targets.create` takes one; to keep one on a disk of its own, mount the disk
-  into `api` at `/backups/<name>` in `compose.local.yaml`, the overlay of your own that updates and
+  only place `backups.targets.create` takes one. To keep one on a disk of its own, mount the disk
+  into `api` at `/backups/<name>` in `compose.local.yaml`, your own overlay, which updates and
   boots keep (`compose.override.yaml` is the mode's published overlay, which an update replaces).
 - **The restic repository location and password for each other target**, from the operator's own record of
   what was entered in `backups.targets.create` (`POST /api/v1/backups/targets`) when the target was
   created, or an out-of-band copy kept alongside `.env` — a target's encrypted repository password
   lives inside the database itself, so it is not available until after a restic-based restore has
   already produced that database.
-- **The database**, from `litestream restore` (with the optional Litestream sidecar in
-  `compose.local.yaml`, your own overlay in the stack directory, running, using its own bucket
-  credentials)
-  or from the latest restic snapshot otherwise.
+- **The database**, from `litestream restore` where the stack ran the optional Litestream sidecar
+  (continuous replication, in `compose.local.yaml`, with its own bucket credentials), or from the
+  latest restic snapshot otherwise.
 - **`media/`**, from the latest restic snapshot — voicemail and recording audio, uploaded
   greetings and hold-music files.
 

@@ -128,6 +128,7 @@ fi
 # `api` renders these onto the shared volume; an empty placeholder keeps the #include valid
 # until then.
 for f in pjsip_users.conf pjsip_trunks.conf extensions_hints.conf musiconhold.conf; do
+  # shellcheck disable=SC2016 # $1 is the inner shell's argument, expanded there
   [ -f "$GEN_DIR/$f" ] || as_asterisk sh -c ': > "$1"' sh "$GEN_DIR/$f"
 done
 
@@ -139,7 +140,8 @@ chown asterisk:asterisk "$ASTDB_DIR"
 
 # The ban list (spec §5.6 "Enforcement", §9.1): a set per family and protocol, whose elements time
 # out on their own, and a rule counting and dropping their packets of that protocol to the SIP
-# ports in this network namespace alone, so a ban over UDP leaves TCP and TLS open and vice versa. The ban helper fills the sets from sip_bans.list; it and this load need the container's
+# ports in this network namespace alone, so a ban over UDP leaves TCP and TLS open and vice versa.
+# The ban helper fills the sets from sip_bans.list; it and this load need the container's
 # CAP_NET_ADMIN, which Asterisk, running as user `asterisk`, does not hold. The namespace outlives
 # this container (§6.1), so a restart finds the table it loaded: one transaction creates it where
 # it is missing, deletes it and loads it anew, and the helper fills the empty sets again.
