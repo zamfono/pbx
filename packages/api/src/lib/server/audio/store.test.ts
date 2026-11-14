@@ -414,6 +414,9 @@ describe('storeAudio', () => {
     });
 
     it('refuses with 507 and deletes the master, WAV and MoH copy once the volume with them is over the limit', async () => {
+      // storeAudio creates prompts/ before its first check; made here first, so the limit one
+      // byte over the usage counts its blocks too, which a real filesystem allocates (tmpfs: none).
+      await mkdir(path.join(limitedDir, 'prompts'));
       await expect(
         storeAudio(
           'moh',
