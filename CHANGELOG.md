@@ -56,6 +56,9 @@ Only where it applies, in the stack directory, as root:
 - A test stack that follows `edge` keeps its files on update: replace `compose.yaml` with main's
   and add `INTERNAL_TOKEN` to `.env` (`openssl rand -hex 32`); until then `api` and `core` do not
   start.
+- `podman-compose` does not work as the Compose provider at present: the 1.3.0 that Debian 13
+  ships turns the services' healthchecks into shell commands that fail, so `api` and `core` never
+  report healthy. Use `docker-compose-plugin`, as `deploy/README.md` step 2 says.
 
 ### Added
 

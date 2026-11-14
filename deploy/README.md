@@ -82,10 +82,10 @@ systemctl enable --now podman.socket
 reach `asterisk`. `docker-compose-plugin` is the Compose provider `podman compose` hands the
 files to, the same one CI uses; it talks to the root socket enabled above and needs no Docker
 daemon. It comes from Docker's repository because mode B needs Compose 2.33 or newer, and
-Debian's own `docker-compose` package is older. It is the recommended provider. `podman-compose`
-also works: it has no `up --wait`, so `update.sh` checks the services' health itself instead, and
-no `rm`, so without the boot unit of step 7 `update.sh` takes the stack `down` before `up -d`, as
-it does on Podman anyway.
+Debian's own `docker-compose` package is older. Use it as the provider: `podman-compose` does not
+work at present, as the 1.3.0 that Debian 13 ships turns the services' healthchecks into shell
+commands that fail, so `api` and `core` never report healthy and the stack never finishes coming
+up.
 
 Podman does **not** restart the stack after a reboot on its own: its `podman-restart.service`
 only covers `restart: always`, and the stack uses `unless-stopped`. Step 7 adds a unit for that.
