@@ -11,14 +11,16 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-11-14
+
 ### Fixed
 
-- `stun`, `proxy` and `api` run without `no-new-privileges`, as `asterisk` already did, and the api
-  image has no setuid or setgid file instead, as the asterisk image, which `stun` runs, and the
-  proxy image already had none: under Podman with crun on Ubuntu, `no-new-privileges` stacks crun's
-  AppArmor profile onto the container's, which refused the signals with which the Go runtime of
-  Caddy, restic and rclone preempts a goroutine and glibc applies coturn's change of groups to all
-  its threads, each refusal logged by the kernel. `netns`, `migrate` and `core` keep it.
+- `stun`, `proxy` and `api` run without `no-new-privileges`, as `asterisk` already did; their
+  images hold no setuid or setgid file instead. Under Podman with crun on Ubuntu,
+  `no-new-privileges` stacks crun's AppArmor profile onto the container's, which refused the
+  signals with which the Go runtime of Caddy, restic and rclone preempts a goroutine and with which
+  glibc applies coturn's change of groups to all its threads, each refusal logged by the kernel.
+  `netns`, `migrate` and `core` keep it.
 
 ## [0.10.0] - 2026-11-14
 
@@ -1369,7 +1371,8 @@ The first 0.2 release; its `v0.2.0` tag was never published.
 
 The first tagged version, before any deployment.
 
-[Unreleased]: https://github.com/zamfono/pbx/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/zamfono/pbx/compare/v0.10.1...HEAD
+[0.10.1]: https://github.com/zamfono/pbx/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/zamfono/pbx/compare/v0.9.1...v0.10.0
 [0.9.1]: https://github.com/zamfono/pbx/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/zamfono/pbx/compare/v0.8.6...v0.9.0
