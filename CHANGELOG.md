@@ -11,10 +11,15 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-11-14
+
 ### Upgrade notes
 
-A stack set up by `setup.sh` and updated by `update.sh`, by hand or through the API, needs nothing
-beyond the update itself. This release's `api` and `core` require an `INTERNAL_TOKEN` in `.env`,
+This release is breaking, as its security fixes refuse some set-ups that worked before (below), so
+automatic updates do not install it: an owner installs it through `system.update` with
+`breaking: true`, which needs a backup run finished `ok` within the last hour, or with `./update.sh`
+on the host, which asks first. A stack set up by `setup.sh` and updated by `update.sh`, by hand or
+through the API, needs nothing beyond the update itself. This release's `api` and `core` require an `INTERNAL_TOKEN` in `.env`,
 which the previous release's `update.sh` only lists as a new setting; this release's own scripts
 add it, and a `METRICS_TOKEN`, where `.env` has none, never printing either (Security). From 0.9.x
 with the host agent, the update adds them itself, as the previous release's `update.sh` calls this
@@ -46,6 +51,11 @@ Only where it applies, in the stack directory, as root:
   `/backups/<name>` in `compose.local.yaml` and move the target there.
 - A monitor that reads the checks of `/healthz`, not just its `status`, now sends
   `Authorization: Bearer <METRICS_TOKEN>` (Security).
+- A REST or MCP client acting as a user: `system.info` answers such a caller with the version and
+  `stack` alone, and a forward target an admin set reads as `{ "managed": true, "kind": … }`,
+  which the client sends back to keep it (Changed, Security).
+- A webhook receiver that answered with a redirect gets nothing at the redirect's target: a 3xx
+  counts as a failed delivery (Security).
 - A stack whose `.env` follows a release line or `latest` still runs an older release's images
   after its updates so far, and after the update to this release too, as that update runs the
   previous release's `update.sh` (Fixed). Once on this release, pull and recreate it by hand,
@@ -1346,7 +1356,8 @@ The first 0.2 release; its `v0.2.0` tag was never published.
 
 The first tagged version, before any deployment.
 
-[Unreleased]: https://github.com/zamfono/pbx/compare/v0.9.1...HEAD
+[Unreleased]: https://github.com/zamfono/pbx/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/zamfono/pbx/compare/v0.9.1...v0.10.0
 [0.9.1]: https://github.com/zamfono/pbx/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/zamfono/pbx/compare/v0.8.6...v0.9.0
 [0.8.6]: https://github.com/zamfono/pbx/compare/v0.8.5...v0.8.6
