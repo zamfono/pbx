@@ -37,8 +37,8 @@ host_update_work=
 host_update_restore() {
   host_update_stop
   [ -n "$host_update_work" ] || return 0
-  (cd "$run_dir" && find . -mindepth 1 | sort) \
-    | comm -13 "$host_update_work/files" - | sort -r | (cd "$run_dir" && xargs -r rm -rf --)
+  (cd "$run_dir" && find . -mindepth 1 | LC_ALL=C sort) \
+    | LC_ALL=C comm -13 "$host_update_work/files" - | sort -r | (cd "$run_dir" && xargs -r rm -rf --)
   tar -C "$run_dir" -xf "$host_update_work/dir.tar"
   rm -rf "$host_update_work"
   host_update_work=
@@ -149,10 +149,13 @@ run_host_update_step() {
   echo "== §6.3 Updates: update.sh on the host, $HOST_UPDATE_FROM -> $HOST_UPDATE_TO =="
   local verdict=0
   host_update_work=$(mktemp -d "${TMPDIR:-/tmp}/zamfono-host-update.XXXXXX")
-  (cd "$run_dir" && find . -mindepth 1 | sort) >"$host_update_work/files"
+  # Byte order for the snapshot and host_update_restore's comm alike, whatever the locale: under
+  # en_US.UTF-8, comm refused the listing as unsorted and failed the step without a word.
+  (cd "$run_dir" && find . -mindepth 1 | LC_ALL=C sort) >"$host_update_work/files"
   tar -C "$run_dir" -cf "$host_update_work/dir.tar" .
   # run.sh's `cleanup` on exit, after the directory is put back should a check fail.
-  trap 'host_update_restore; cleanup; host_update_drop_images' EXIT
+  trap 'host_update_restore || echo "FAIL: could not put $run_dir back as it was" >&2
+    cleanup; host_update_drop_images' EXIT
   echo "$HOST_UPDATE_FROM" >"$run_dir/VERSION"
   host_update_publish "$HOST_UPDATE_TO"
   host_update_images
