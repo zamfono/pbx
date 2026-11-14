@@ -13,7 +13,7 @@ LABEL org.opencontainers.image.source=https://github.com/zamfono/pbx
 # (§6.1). The `asterisk` package pulls in Debian's English sounds, kept as the safety net for a
 # prompt not yet generated (§9.1). ca-certificates stays installed:
 # transport-tls checks a trunk provider's certificate against its bundle (§9.4 "Signaling"). No file
-# keeps a setuid or setgid bit (su, passwd, mount and the like): `asterisk` runs without
+# keeps a setuid or setgid bit (su, passwd, mount and the like): `asterisk` and `stun` run without
 # no-new-privileges (§6.3 "Capabilities"), and Asterisk, user `asterisk`, must not gain root or the
 # capabilities the entrypoint holds through one.
 RUN apt-get update \

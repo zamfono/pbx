@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Builds the proxy image (or takes the one PROXY_IMAGE names) and asserts what the image itself has
-# to carry (docs/spec.md §6.3 "Images", §6.4): uid 1000, no file capability on Caddy (which the
-# stack's dropped capabilities would make unexecutable), the `caddy-events-exec` plugin, the shipped
+# to carry (docs/spec.md §6.3 "Images", §6.4): uid 1000, no setuid or setgid file, no file capability
+# on Caddy (which the stack's dropped capabilities would make unexecutable), the `caddy-events-exec` plugin, the shipped
 # Caddyfile validated inside the image (the production one and the test harness's global.d
 # seam, test/integration/Caddyfile.local-ca), and the hook script itself. Run from the repository
 # root's build context, which is what the Dockerfile expects.
@@ -38,6 +38,10 @@ echo "==> the caddy binary carries no file capability"
 # With every capability dropped (deploy/compose.yaml), executing a binary with one fails.
 caps=$(docker run --rm --user root --entrypoint getcap "$PROXY_IMAGE" /usr/bin/caddy)
 [ -z "$caps" ] || fail "getcap reports '$caps'; Caddy would not start with cap_drop ALL"
+
+echo "==> no file is setuid or setgid, as proxy runs without no-new-privileges (§6.3)"
+setid=$(docker run --rm --user root --entrypoint find "$PROXY_IMAGE" / -xdev -type f -perm /6000)
+[ -z "$setid" ] || fail "setuid or setgid files in the image: $setid"
 
 echo "==> caddy version"
 # The expected version is the runtime stage's tag, read from the Dockerfile, which alone names it.
@@ -143,7 +147,7 @@ docker run -d --name "$tag-api" --network "$tag" --network-alias api --entrypoin
 # Hardened as deploy/compose.yaml runs proxy, and binding 80 and 443 by the sysctl compose sets on
 # netns (here the proxy's own namespace), stated even where the runtime's default (Docker's 0)
 # would do.
-hardened=(--cap-drop ALL --security-opt no-new-privileges:true --read-only --tmpfs /config:mode=1777
+hardened=(--cap-drop ALL --read-only --tmpfs /config:mode=1777
   -v /data -v /cert-copy)
 docker run -d --name "$tag-proxy" --network "$tag" -e FQDN=localhost "${hardened[@]}" \
   --sysctl net.ipv4.ip_unprivileged_port_start=80 -p 127.0.0.1::80 -p 127.0.0.1::443 \

@@ -14,11 +14,11 @@ WORKDIR /build
 # The builder image bakes in CADDY_VERSION matching its FROM tag, so `xcaddy build --with …` alone
 # builds that Caddy version with the plugin added. XCADDY_SETCAP=0 overrides the builder's 1, which
 # would give the binary `cap_net_bind_service=+ep` as upstream's carries: the stack runs proxy with
-# every capability dropped and no-new-privileges (§6.3), where executing a binary with a file
-# capability fails ("operation not permitted"), and binds :80/:443 by netns's
-# net.ipv4.ip_unprivileged_port_start instead (deploy/compose.yaml). The plugin is pinned to its
-# one released tag (v0.1.0, commit 3a351bf9c023b8f9305aaceaa5bf004b31a0ca3d —
-# `gh api repos/mholt/caddy-events-exec/tags`); it ships one Go module, `events.handlers.exec`.
+# every capability dropped (§6.3), where executing a binary with a file capability fails
+# ("operation not permitted"), and binds :80/:443 by netns's net.ipv4.ip_unprivileged_port_start
+# instead (deploy/compose.yaml). The plugin is pinned to its one released tag (v0.1.0, commit
+# 3a351bf9c023b8f9305aaceaa5bf004b31a0ca3d — `gh api repos/mholt/caddy-events-exec/tags`); it
+# ships one Go module, `events.handlers.exec`.
 RUN XCADDY_SETCAP=0 xcaddy build --with github.com/mholt/caddy-events-exec@v0.1.0 --output /build/caddy
 
 FROM caddy:2.11.9@sha256:4e2425f6009577e7c651010f16679c28f7d12df3e7b1914f941a7a3370746b3c AS runtime

@@ -7,9 +7,10 @@
 # (§6.1), which requires it; this file alone runs the stack with no public reachability.
 # api's and core's healthcheck: GET /readyz on the internal port answers 200 (§6.3 "Health"). The
 # script holds no space, since Podman's Docker-compatible API splits a CMD argument at its spaces.
-# Every service drops every capability, and all but asterisk run with no-new-privileges; asterisk
-# adds back what its root entrypoint and ban helper need (§6.3 "Capabilities"). read_only where a service
-# writes only to its volumes and tmpfs.
+# Every service drops every capability, and netns, migrate and core run with no-new-privileges;
+# asterisk, stun, proxy and api, whose images hold no setuid or setgid file, run without it, and
+# asterisk adds back what its root entrypoint and ban helper need (§6.3 "Capabilities"). read_only
+# where a service writes only to its volumes and tmpfs.
 x-readyz: &readyz ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/readyz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
 
 networks:
@@ -56,9 +57,9 @@ services:
       - SETUID                                  # starts Asterisk as user asterisk
       - SETGID
     # no no-new-privileges: with it, Podman's crun stacks its own AppArmor profile onto the container's
-    # where the host has one for crun, as Ubuntu does, and the stack refuses the SIGURG Asterisk wakes
-    # an AMI session with, so core's events wait for its next action; the image has no setuid or setgid
-    # file instead (§6.3 "Capabilities")
+    # where the host has one for crun, as Ubuntu does, and the stack refuses the signals a container's
+    # threads send each other, here the SIGURG Asterisk wakes an AMI session with, so core's events
+    # wait for its next action; the image has no setuid or setgid file instead (§6.3 "Capabilities")
     # not read_only: the entrypoint renders the configuration into /etc/asterisk on every start
     healthcheck:                                # the ban helper's heartbeat in sip_ban_helper.status is fresh (§9.1)
       test: ["CMD", "/usr/local/bin/ban-helper-alive"]
@@ -95,7 +96,8 @@ services:
       - stun
     stop_signal: SIGKILL
     cap_drop: [ALL]
-    security_opt: [no-new-privileges:true]
+    # no no-new-privileges, as asterisk, whose image it runs (§6.3 "Capabilities"): the signal glibc
+    # applies coturn's setgroups to its threads with
     read_only: true
     restart: unless-stopped
 
@@ -189,7 +191,8 @@ services:
       COUNTRY: ${COUNTRY}                       # ISO 3166-1 alpha-2
       EXT_LENGTH: ${EXT_LENGTH:-}
     cap_drop: [ALL]
-    security_opt: [no-new-privileges:true]
+    # no no-new-privileges, as asterisk (§6.3 "Capabilities"): the signals restic's and rclone's Go
+    # runtime preempts a goroutine with; the image has no setuid or setgid file instead
     # not read_only: a backup writes its database snapshot to /tmp and restic its cache under HOME,
     # which a tmpfs would hold in memory (§6.5)
     volumes:
@@ -216,7 +219,8 @@ services:
       METRICS_TOKEN: ${METRICS_TOKEN:-}         # Caddyfile refuses /metrics while unset (§7)
       INTERNAL_TOKEN: ${INTERNAL_TOKEN}         # the cert_obtained hook's notification of api (§3.1, §6.4)
     cap_drop: [ALL]
-    security_opt: [no-new-privileges:true]
+    # no no-new-privileges, as asterisk (§6.3 "Capabilities"): the signals Caddy's Go runtime preempts
+    # a goroutine with; the image has no setuid or setgid file
     read_only: true
     tmpfs:
       - /config:mode=1777                       # Caddy's autosave of the config it runs; uid 1000 writes it

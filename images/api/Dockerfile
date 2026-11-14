@@ -32,12 +32,15 @@ WORKDIR /app
 # process that seeds them into the media volume and the `audio_assets` table on first boot
 # (§6.3 "First boot"), so its image is where they have to be readable. restic's native sftp
 # backend (§6.5) spawns `ssh` from openssh-client, wrapped in `sshpass` to feed it the target's
-# password (`backupBackends.ts`).
+# password (`backupBackends.ts`). No file keeps a setuid or setgid bit (su, passwd, mount and the
+# like): `api` runs without no-new-privileges (§6.3 "Capabilities"), and its processes, user `node`,
+# must not gain root through one.
 RUN apt-get update \
 	&& apt-get install -y --no-install-recommends restic rclone \
 	   openssh-client sshpass \
 	   asterisk-moh-opsound-wav asterisk-moh-opsound-g722 \
 	&& rm -rf /var/lib/apt/lists/* \
+	&& find / -xdev -type f -perm /6000 -exec chmod ug-s {} + \
 	&& mkdir -p /etc/asterisk/gen /backups \
 	&& chown node:node /etc/asterisk/gen /backups
 COPY --from=build /app/node_modules node_modules

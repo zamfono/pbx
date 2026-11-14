@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-11-14 · §6.3 Compose stack (listing, Capabilities).** `stun`, `proxy` and `api` run without `no-new-privileges` too, and the `api` image holds no setuid or setgid file instead; `netns`, `migrate` and `core` keep it.
+*Why:* the CI runs that found Asterisk's refused signal also logged AppArmor's refusals for Caddy's and restic's Go runtime, which preempts a goroutine with a signal, and for coturn, whose threads glibc signals to apply a change of groups (setgroups at start-up) to them all. Nothing failed for it, as Go falls back to preempting at function calls and coturn's setgroups fails for want of a capability either way, but each is the same stacked profile, and keeping a refused signal on one host type only for the Go runtime to work around was not wanted. A runtime option turning Go's signal preemption off everywhere was considered and refused by the product owner, who did not want the stack to change a runtime's internal parameters. The product owner agreed on 2026-11-14.
+
 **2026-11-14 · §6.3 Compose stack (listing, Capabilities).** `asterisk` runs without `no-new-privileges`, and its image holds no setuid or setgid file instead; every other service keeps it.
 *Why:* CI's Podman runs on Ubuntu 26.04 found that no `registration` trunk ever left `unknown`: with `no-new-privileges`, crun, which Ubuntu confines with an AppArmor profile of its own, stacks that profile onto the container's, and the stack refuses the SIGURG with which Asterisk wakes the thread of an AMI session for a new event, so `core` read no `Registry` or security event until it next sent an action.
 

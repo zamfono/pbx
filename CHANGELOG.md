@@ -11,6 +11,15 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+### Fixed
+
+- `stun`, `proxy` and `api` run without `no-new-privileges`, as `asterisk` already did, and the api
+  image has no setuid or setgid file instead, as the asterisk image, which `stun` runs, and the
+  proxy image already had none: under Podman with crun on Ubuntu, `no-new-privileges` stacks crun's
+  AppArmor profile onto the container's, which refused the signals with which the Go runtime of
+  Caddy, restic and rclone preempts a goroutine and glibc applies coturn's change of groups to all
+  its threads, each refusal logged by the kernel. `netns`, `migrate` and `core` keep it.
+
 ## [0.10.0] - 2026-11-14
 
 ### Upgrade notes

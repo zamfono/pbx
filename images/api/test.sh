@@ -3,8 +3,9 @@
 # code does with it: the admin guide bundled at build time (spec §10.5), the hold-music tracks
 # that first boot seeds into the media volume (§6.3, §10.2), the ssh client restic's sftp backend
 # spawns (§6.5), the Argon2id generator for BOOTSTRAP_OWNER_PASSWORD_HASH and setup.sh's COUNTRY
-# check (§6.3 "First boot"), and the owner second-factor reset (§5.2). Run from the repository root's build
-# context, which is what the Dockerfile expects.
+# check (§6.3 "First boot"), the owner second-factor reset (§5.2), and no setuid or setgid file
+# (§6.3 "Capabilities"). Run from the repository root's build context, which is what the Dockerfile
+# expects.
 set -euo pipefail
 repo_root=$(CDPATH='' cd -- "$(dirname -- "$0")/../.." && pwd)
 cd "$repo_root"
@@ -36,6 +37,10 @@ for topic in docs/guide/mental-model.md docs/guide/recipes/undo.md; do
   run "grep -rqF --include='*.js' '$topic' packages/api/build" \
     || fail "$topic is absent from the server bundle, so zamfono.help cannot serve it"
 done
+
+# No file is setuid or setgid, as api runs without no-new-privileges (§6.3 "Capabilities").
+setid=$(docker run --rm --user root --entrypoint find "$API_IMAGE" / -xdev -type f -perm /6000)
+[ -z "$setid" ] || fail "setuid or setgid files in the image: $setid"
 
 # Both opsound packages, so a wideband call gets music without transcoding (§10.2).
 for ext in wav g722; do

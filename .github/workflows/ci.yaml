@@ -264,6 +264,15 @@ jobs:
             echo "::error::Podman $version is older than the 5 that §4 requires" >&2
             exit 1
           fi
+          # crun, which Ubuntu confines with an AppArmor profile of its own, is what the AppArmor
+          # check below is about; runc, which Podman takes when it alone is installed, has none.
+          # The kernel logs at most ten refusals in a burst; the check has to see them all.
+          runtime=$(sudo podman info --format '{{.Host.OCIRuntime.Name}}')
+          if [ "$runtime" != crun ]; then
+            echo "::error::Podman runs $runtime, not crun" >&2
+            exit 1
+          fi
+          sudo sysctl -w kernel.printk_ratelimit=0
       - name: Serve the rootful Podman socket, with Docker out of the way
         run: |
           # The image runs Docker too. Stopping it proves nothing below falls back to Docker's
@@ -297,6 +306,17 @@ jobs:
           COMPOSE: podman compose
           SHARD: ${{ matrix.shard }}
           DIAG_DIR: ${{ runner.temp }}/diagnostics
+      - name: AppArmor refused the stack nothing
+        # Ubuntu confines crun with an AppArmor profile of its own, which a container's
+        # no-new-privileges stacks onto the container's, refusing the signals its threads send each
+        # other (§6.3 "Capabilities"); a test notices that late or never, the kernel log at once.
+        run: |
+          # The kernel log, or auditd's where it runs and takes the records instead.
+          if { sudo dmesg; sudo cat /var/log/audit/audit.log 2>/dev/null; } \
+            | grep 'apparmor="DENIED"' | grep -E 'containers-default|crun'; then
+            echo "::error::AppArmor refused a container of the stack something (above)" >&2
+            exit 1
+          fi
       - name: Keep the failure's diagnostics
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
