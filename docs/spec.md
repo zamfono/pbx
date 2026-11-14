@@ -502,9 +502,9 @@ Clients and trunks see the VPS address in SIP and SDP; the host forwards each po
 # (§6.1), which requires it; this file alone runs the stack with no public reachability.
 # api's and core's healthcheck: GET /readyz on the internal port answers 200 (§6.3 "Health"). The
 # script holds no space, since Podman's Docker-compatible API splits a CMD argument at its spaces.
-# Every service drops every capability and runs with no-new-privileges; asterisk adds back what its
-# root entrypoint and ban helper need (§6.3 "Capabilities"). read_only where a service writes only
-# to its volumes and tmpfs.
+# Every service drops every capability, and all but asterisk run with no-new-privileges; asterisk
+# adds back what its root entrypoint and ban helper need (§6.3 "Capabilities"). read_only where a service
+# writes only to its volumes and tmpfs.
 x-readyz: &readyz ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/readyz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
 
 networks:
@@ -550,7 +550,10 @@ services:
       - DAC_OVERRIDE                            # renders into /etc/asterisk, user asterisk's; a root exec reaches Asterisk's CLI socket
       - SETUID                                  # starts Asterisk as user asterisk
       - SETGID
-    security_opt: [no-new-privileges:true]
+    # no no-new-privileges: with it, Podman's crun stacks its own AppArmor profile onto the container's
+    # where the host has one for crun, as Ubuntu does, and the stack refuses the SIGURG Asterisk wakes
+    # an AMI session with, so core's events wait for its next action; the image has no setuid or setgid
+    # file instead (§6.3 "Capabilities")
     # not read_only: the entrypoint renders the configuration into /etc/asterisk on every start
     healthcheck:                                # the ban helper's heartbeat in sip_ban_helper.status is fresh (§9.1)
       test: ["CMD", "/usr/local/bin/ban-helper-alive"]
@@ -910,7 +913,7 @@ A pull request that a maintainer has labelled `publish-image` after reading it h
 
 **Runtimes.** The file is written to the Compose Specification and is run with `docker compose` or `podman compose`; every command in this document accepts either prefix. CI brings the stack up on both (§8). Four features of the file are the ones that differ between runtimes and are therefore what that test guards: the network namespace `asterisk`, `stun` and `proxy` share with `netns` (`network_mode: service:`), the health-gated `depends_on`, the `service_completed_successfully` condition on the one-shot `migrate` service, and the static address on the `public` network. Podman needs a systemd host, since it runs healthchecks and restart policies through systemd.
 
-**Capabilities.** Every service runs with every capability dropped (`cap_drop: [ALL]`) and with `no-new-privileges`, so no process gains a capability or another user through a setuid or file-capability binary. Only `asterisk` adds any back, for its entrypoint and the ban helper, which run as root:
+**Capabilities.** Every service runs with every capability dropped (`cap_drop: [ALL]`) and, except `asterisk`, with `no-new-privileges`, so no process gains a capability or another user through a setuid or file-capability binary. The `asterisk` image holds no setuid or setgid file and no file capability instead: with `no-new-privileges`, Podman's crun stacks its own AppArmor profile onto the container's on a host that has one for crun, as Ubuntu does, and the stack refuses the signal with which Asterisk wakes the thread of an AMI session, so `core` would read no event until its next action. Only `asterisk` adds any capability back, for its entrypoint and the ban helper, which run as root:
 
 - `NET_ADMIN` for the ban list's nftables table in the stack's namespace (§5.6, §9.1);
 - `CHOWN` to hand `asterisk-config` and the `astdb` volume to user `asterisk`;

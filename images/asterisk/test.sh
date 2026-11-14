@@ -29,9 +29,16 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# The capabilities and no-new-privileges deploy/compose.yaml runs asterisk with (§6.3).
+# The capabilities deploy/compose.yaml runs asterisk with, without no-new-privileges (§6.3).
 HARDENED=(--cap-drop ALL --cap-add NET_ADMIN --cap-add CHOWN --cap-add DAC_OVERRIDE
-  --cap-add SETUID --cap-add SETGID --security-opt no-new-privileges:true)
+  --cap-add SETUID --cap-add SETGID)
+
+# What stands in for no-new-privileges there: no file in the image is setuid or setgid.
+setid=$(docker run --rm --entrypoint find "$ASTERISK_IMAGE" / -xdev -type f -perm /6000)
+if [ -n "$setid" ]; then
+  echo "FAIL: setuid or setgid files in the image: $setid" >&2
+  exit 1
+fi
 
 docker run -d --name "$NETNS_CONTAINER" --entrypoint sleep "$ASTERISK_IMAGE" infinity > /dev/null
 # EXTERNAL_IPV4 as in the ports mode (§6.1), for the TLS transports' Contact and Via below.

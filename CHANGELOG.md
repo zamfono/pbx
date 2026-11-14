@@ -231,12 +231,16 @@ Only where it applies, in the stack directory, as root:
   its own there without a credential, intercepting the web traffic with the stack's TLS key, and
   read Caddy's metrics past `METRICS_TOKEN`. A change of the Caddyfile takes a restart of `proxy`,
   as before.
-- Every container drops every Linux capability and runs with `no-new-privileges`. Only `asterisk`
-  adds some back, for its root entrypoint and SIP ban helper (`NET_ADMIN`, `CHOWN`,
-  `DAC_OVERRIDE`, `SETUID`, `SETGID`), and Asterisk itself now starts with none: it used to keep
-  `NET_ADMIN`, enough to change the ban list's packet filter. `proxy` binds 80 and 443 through
-  `netns`'s `net.ipv4.ip_unprivileged_port_start`, no longer through a file capability on Caddy.
-  `netns`, `stun`, `migrate`, `core` and `proxy` run with a read-only root filesystem.
+- Every container drops every Linux capability, and every one but `asterisk` runs with
+  `no-new-privileges`; the asterisk image has no setuid or setgid file instead, since under Podman
+  with crun on Ubuntu `no-new-privileges` stacks crun's AppArmor profile onto the container's, which
+  keeps Asterisk from waking its AMI session and so `core` from reading trunk registrations and
+  failed SIP attempts as they happen. Only `asterisk` adds capabilities back, for its root
+  entrypoint and SIP ban helper (`NET_ADMIN`, `CHOWN`, `DAC_OVERRIDE`, `SETUID`, `SETGID`), and
+  Asterisk itself now starts with none: it used to keep `NET_ADMIN`, enough to change the ban list's
+  packet filter. `proxy` binds 80 and 443 through `netns`'s `net.ipv4.ip_unprivileged_port_start`,
+  no longer through a file capability on Caddy. `netns`, `stun`, `migrate`, `core` and `proxy` run
+  with a read-only root filesystem.
 - `api` no longer mounts `caddy-data`, which holds the ACME account key and Caddy's private keys:
   it reads the certificate copy from a volume of its own, `cert-copy`, which `proxy` fills on its
   first start after the upgrade.

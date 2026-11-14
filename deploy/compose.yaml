@@ -7,9 +7,9 @@
 # (§6.1), which requires it; this file alone runs the stack with no public reachability.
 # api's and core's healthcheck: GET /readyz on the internal port answers 200 (§6.3 "Health"). The
 # script holds no space, since Podman's Docker-compatible API splits a CMD argument at its spaces.
-# Every service drops every capability and runs with no-new-privileges; asterisk adds back what its
-# root entrypoint and ban helper need (§6.3 "Capabilities"). read_only where a service writes only
-# to its volumes and tmpfs.
+# Every service drops every capability, and all but asterisk run with no-new-privileges; asterisk
+# adds back what its root entrypoint and ban helper need (§6.3 "Capabilities"). read_only where a service
+# writes only to its volumes and tmpfs.
 x-readyz: &readyz ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/readyz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
 
 networks:
@@ -55,7 +55,10 @@ services:
       - DAC_OVERRIDE                            # renders into /etc/asterisk, user asterisk's; a root exec reaches Asterisk's CLI socket
       - SETUID                                  # starts Asterisk as user asterisk
       - SETGID
-    security_opt: [no-new-privileges:true]
+    # no no-new-privileges: with it, Podman's crun stacks its own AppArmor profile onto the container's
+    # where the host has one for crun, as Ubuntu does, and the stack refuses the SIGURG Asterisk wakes
+    # an AMI session with, so core's events wait for its next action; the image has no setuid or setgid
+    # file instead (§6.3 "Capabilities")
     # not read_only: the entrypoint renders the configuration into /etc/asterisk on every start
     healthcheck:                                # the ban helper's heartbeat in sip_ban_helper.status is fresh (§9.1)
       test: ["CMD", "/usr/local/bin/ban-helper-alive"]

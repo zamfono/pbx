@@ -12,7 +12,10 @@ LABEL org.opencontainers.image.source=https://github.com/zamfono/pbx
 # the ban helper (§5.6), and coturn for the STUN server the `stun` service runs from this image
 # (§6.1). The `asterisk` package pulls in Debian's English sounds, kept as the safety net for a
 # prompt not yet generated (§9.1). ca-certificates stays installed:
-# transport-tls checks a trunk provider's certificate against its bundle (§9.4 "Signaling").
+# transport-tls checks a trunk provider's certificate against its bundle (§9.4 "Signaling"). No file
+# keeps a setuid or setgid bit (su, passwd, mount and the like): `asterisk` runs without
+# no-new-privileges (§6.3 "Capabilities"), and Asterisk, user `asterisk`, must not gain root or the
+# capabilities the entrypoint holds through one.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates curl \
     && curl -fsSL -o /tmp/zamfono-archive-keyring.deb \
@@ -38,7 +41,8 @@ RUN apt-get update \
        inotify-tools \
        nftables \
        openssl \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && find / -xdev -type f -perm /6000 -exec chmod ug-s {} +
 
 # The prompt sets (spec §9.1), committed audio that scripts/generate-prompts.mjs made from
 # prompts/<language>.json, one per voice; each holds every prompt the core can play in its

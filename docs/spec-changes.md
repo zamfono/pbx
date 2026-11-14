@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-11-14 · §6.3 Compose stack (listing, Capabilities).** `asterisk` runs without `no-new-privileges`, and its image holds no setuid or setgid file instead; every other service keeps it.
+*Why:* CI's Podman runs on Ubuntu 26.04 found that no `registration` trunk ever left `unknown`: with `no-new-privileges`, crun, which Ubuntu confines with an AppArmor profile of its own, stacks that profile onto the container's, and the stack refuses the SIGURG with which Asterisk wakes the thread of an AMI session for a new event, so `core` read no `Registry` or security event until it next sent an action.
+
 **2026-11-13 · §10.5 MCP interface (Tools).** Where a refusal, a JSON-RPC error the SDK answers with or a tool's refusal of its arguments, would make the response larger than the request body limit with the request's `id` it echoes, its message or text is cut further, as a long error's message is, until the whole response fits; the `id` stays whole.
 *Why:* an independent review found that the bound counted the error alone: a request under 512 KiB whose `id`, a string of any length, took some 510,000 bytes drew a refusal of invalid prompt or tool arguments larger than the limit, 538 KB and 577 KB.
 
