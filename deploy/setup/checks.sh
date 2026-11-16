@@ -4,6 +4,7 @@
 
 # color ARGS — `tput ARGS` when stderr is a terminal, else nothing, so logs carry no escapes.
 color() {
+  # shellcheck disable=SC2015 # no colour is no failure either way
   [[ -t 2 ]] && tput "$@" 2>/dev/null || true
 }
 

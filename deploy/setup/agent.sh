@@ -288,6 +288,7 @@ check_tree() {
     "the host agent may run anything as root from here: chown -R root: $PWD && chmod -R go-w $PWD"
   while [[ $dir != / ]]; do
     dir=$(dirname "$dir")
+    # shellcheck disable=SC2015 # fails when either test does
     [[ $(stat -c %u "$dir") == 0 ]] && (((8#$(stat -c %a "$dir") & 8#022) == 0)) ||
       fail "$dir, above the stack directory, must belong to root and be writable by no one else" \
         "before the host agent may run anything as root from $PWD"

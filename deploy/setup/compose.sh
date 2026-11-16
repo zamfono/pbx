@@ -19,9 +19,9 @@ set -euo pipefail
 unset INVOCATION_ID
 
 cd "$(dirname "$0")/.."
-# shellcheck source=checks.sh
+# shellcheck source=setup/checks.sh
 . setup/checks.sh
-# shellcheck source=envfile.sh
+# shellcheck source=setup/envfile.sh
 . setup/envfile.sh
 if [[ -f .env && -w .env && -w . ]]; then
   generated_tokens >&2

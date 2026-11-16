@@ -233,6 +233,7 @@ ask_network() {
 ask_password() {
   local first second
   if [[ -n ${BOOTSTRAP_OWNER_PASSWORD_HASH:-} ]]; then
+    # shellcheck disable=SC2016 # a literal prefix
     [[ $BOOTSTRAP_OWNER_PASSWORD_HASH == '$argon2id$'* ]] ||
       fail "BOOTSTRAP_OWNER_PASSWORD_HASH is not an Argon2id hash (\$argon2id\$...)"
     return 0

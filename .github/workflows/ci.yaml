@@ -37,6 +37,11 @@ jobs:
       - run: npm test
       - run: npm run typecheck
       - run: npm run lint
+      # The scripts that run as root on the operator's host, and what they source; the runner
+      # image ships shellcheck.
+      - name: ShellCheck setup.sh, update.sh and setup/
+        working-directory: deploy
+        run: shellcheck -x setup.sh update.sh setup/*.sh
       # The git tag is the only version source (§6.3 "Images", §7 "Version"); a package.json
       # "version" would be a second one nothing keeps in step with it.
       - name: No tracked package.json carries a "version" field
