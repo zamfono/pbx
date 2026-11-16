@@ -65,7 +65,9 @@ function sequence(language, query) {
     parking: () => digitsMedia(first.replace(/\D/gu, '')),
     clips: () => first.split(/[\s,]+/u).filter(name => name !== '')
   };
-  const media = kinds[query.get('kind') ?? '']?.() ?? [];
+  const kind = query.get('kind') ?? '';
+  const media =
+    (Object.hasOwn(kinds, kind) ? kinds[kind]?.() : undefined) ?? [];
   return media.map(entry => entry.replace(/^sound:/u, ''));
 }
 

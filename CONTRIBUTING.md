@@ -35,22 +35,26 @@ caught and pulled within days. `.npmrc` (`min-release-age=7`, at the root and in
 npm resolve nothing newer, and Dependabot waits the same seven days (`cooldown`,
 `.github/dependabot.yaml`).
 
-The one exception is a fix for a known vulnerability that this code can actually reach. It goes in
-at once, exempting only that package, at the lowest release that fixes it (its own dependencies
-stay gated):
+The one exception is a fix for a known vulnerability, whether or not this code can reach it: the
+gate is there for security, so it must not keep a fix out. It goes in at once, exempting only that
+package, at the lowest release that fixes it (its own dependencies stay gated):
 
     npm install --min-release-age-exclude=<package> <package>@<fixed version>
 
 once all of these hold:
 
-- the advisory names that release as the fix;
+- the advisory names that release as the fix, or the release notes say it moves to the release
+  the advisory names;
 - it is published by the package's usual maintainer, with provenance if the package normally
   ships it, and its tag in the source repository points at the commit npm records;
-- the diff from the previous release is small and matches the advisory, with no new install
-  scripts or dependencies.
+- the diff from the previous release matches its release notes, which name the fix, with no new
+  install scripts or dependencies (a fix that ships in a regular release comes with the rest of
+  it).
 
-The commit message says which advisory the exception is for and why it is reachable. A
-vulnerability the code cannot reach waits out the seven days like any other update.
+The commit message says which advisory the exception is for. Where the fixed release is already
+past the seven days but a dependant's range keeps it out, an `overrides` entry in the root
+`package.json` pins it instead, once the dependant's code is checked against the fixed release's
+breaking changes; it goes once every dependant's own range admits the fix.
 
 A package that a root dev dependency peers on, such as `vite` (vitest) or `svelte` (the eslint and
 prettier plugins), is declared in the root `package.json` only, never also in a workspace. When a

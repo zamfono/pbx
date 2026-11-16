@@ -907,9 +907,9 @@ describe('Pipeline', () => {
     const draining = pipeline.drain().then(() => {
       drained = true;
     });
-    const newCall = delivered(ari, 'StasisStart', 'next-caller');
+    const nextCallStarted = delivered(ari, 'StasisStart', 'next-caller');
     fakeAri.emit(inboundEvent(defaultChannel({ id: 'next-caller' }), '100'));
-    await newCall;
+    await nextCallStarted;
     // The refusal hangs the new caller up over ARI; under load that request is still in flight
     // well after the event was delivered.
     await eventually(() => {

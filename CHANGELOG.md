@@ -18,6 +18,11 @@ why the specified behaviour changed; the commit history, how.
   first and checks again on request; while the stack's name does not resolve to its address alone,
   Enter answers Later.
 
+### Changed
+
+- `api` and `core` take the current releases of their dependencies: @simplewebauthn/server
+  14.1.0, jose 6.2.16, nodemailer 10.4.0 and ws 8.22.2.
+
 ## [0.10.2] - 2026-11-16
 
 ### Changed
