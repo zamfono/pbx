@@ -35,6 +35,13 @@ ui_height() {
   echo $((lines + ${2:-7}))
 }
 
+# The terminal's lines less two, the most a dialog may take.
+ui_max_height() {
+  local size
+  size=$(stty size </dev/tty 2>/dev/null) || size=24
+  echo $((${size% *} - 2))
+}
+
 # ui_msg TEXT
 ui_msg() {
   if [[ $ui_kind == whiptail ]]; then
@@ -74,10 +81,13 @@ ui_password() {
 ui_yesno() {
   if [[ $ui_kind == whiptail ]]; then
     local -a opts=()
+    local height max
     [[ ${4:-} != no ]] || opts=(--defaultno)
     [[ -z ${5:-} ]] || opts+=(--title "$5")
+    height=$(ui_height "$1") max=$(ui_max_height)
+    ((height <= max)) || { height=$max; opts+=(--scrolltext); }
     whiptail --backtitle "$ui_backtitle" "${opts[@]}" --yes-button "${2:-Yes}" \
-      --no-button "${3:-No}" --yesno "$1" "$(ui_height "$1")" "$ui_width"
+      --no-button "${3:-No}" --yesno "$1" "$height" "$ui_width"
     return
   fi
   local answer prompt="[y/n]: "
@@ -99,12 +109,11 @@ ui_menu() {
   local title=$1 text=$2 default=$3
   shift 3
   if [[ $ui_kind == whiptail ]]; then
-    local rows height list=$(($# / 2))
-    rows=$(stty size </dev/tty 2>/dev/null) || rows=24
-    height=$(ui_height "$text" $((list + 8)))
-    if ((height > ${rows% *} - 2)); then
-      list=$((list - height + ${rows% *} - 2))
-      height=$((${rows% *} - 2))
+    local max height list=$(($# / 2))
+    height=$(ui_height "$text" $((list + 8))) max=$(ui_max_height)
+    if ((height > max)); then
+      list=$((list - height + max))
+      height=$max
     fi
     ui_whiptail --title "$title" --default-item "$default" --menu "$text" "$height" "$ui_width" \
       "$list" "$@"

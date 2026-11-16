@@ -11,6 +11,13 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+### Added
+
+- `setup.sh` offers to start the stack once it has written `.env`, in a terminal only, through the
+  Podman boot unit where it installed one. It shows what its checks of DNS and ports warned about
+  first and checks again on request; while the stack's name does not resolve to its address alone,
+  Enter answers Later.
+
 ## [0.10.2] - 2026-11-16
 
 ### Changed

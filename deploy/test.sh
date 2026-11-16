@@ -247,10 +247,11 @@ fi
 
 # Asked in a terminal, the Ringotel API key is written to .env, an empty answer leaving it empty,
 # and the confirmation says only whether one is set. Every other answer comes from the
-# environment; the questions left: a mail relay (n), the key, other ports (n), and Write (y).
+# environment; the questions left: a mail relay (n), the key, other ports (n), Write (y), the
+# checks' warnings where there are any (n: go on) and Start (n).
 for key in rt-terminal-key ''; do
   rm -f "$bundle_dir/x/.env" "$bundle_dir/x/compose.override.yaml"
-  printf 'n\n%s\nn\ny\n' "$key" | (cd "$bundle_dir/x" && env SETUP_PLAIN=1 ZAMFONO_AGENT=false \
+  printf 'n\n%s\nn\ny\nn\nn\n' "$key" | (cd "$bundle_dir/x" && env SETUP_PLAIN=1 ZAMFONO_AGENT=false \
     ZAMFONO_API_IMAGE="$API_IMAGE" ZAMFONO_VERSION=edge ZAMFONO_MODE=ports EXTERNAL_IPV4=198.51.100.7 \
     FQDN=pbx.example.com COMPANY_NAME=Acme MAIN_DID=+4930123456 COUNTRY=DE EXT_LENGTH=3 \
     TZ=Europe/Vienna MEDIA_STORAGE_MAX=20G ALLOW_PRIVATE_TARGETS=true UNATTENDED_UPGRADES=false \

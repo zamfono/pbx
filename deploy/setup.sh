@@ -295,6 +295,38 @@ pull_release_images() {
   done < <(sed -nE 's#^ +image: +ghcr\.io/zamfono/([a-z0-9-]+):.*#\1#p' compose.yaml | sort -u)
 }
 
+# The checks that tell whether the stack can start: sets `start_warnings` to what they found, and
+# `dns` to empty where the name does not point at the stack, which fails Let's Encrypt's first
+# certificate.
+start_checks() {
+  warnings=() dns=ok
+  check_dns "$FQDN" "$address" || dns=
+  if [[ $ZAMFONO_MODE == ports ]]; then
+    check_ports_free
+    check_userland_proxy
+  else
+    check_public_network
+  fi
+  start_warnings=("${warnings[@]}")
+}
+
+# Whether to start the stack now. A dialog hides the warnings start_checks printed, so the first
+# shows them again, and checks again on request until they are gone or the operator goes on.
+offer_start() {
+  local text warning rc
+  while ((${#start_warnings[@]})); do
+    text="The checks found:"
+    for warning in "${start_warnings[@]}"; do text+="\n\n- $warning"; done
+    text+="\n\nFix this and check again, or go on."
+    rc=0
+    ui_yesno "$text" "Check again" "Go on" "" Checks || rc=$?
+    ((rc == 0)) || break
+    start_checks 2>/dev/null
+  done
+  ui_yesno "Start the stack now?\n\nThe firewall must let its ports in first (README.md, step 3)." \
+    Start Later "$([[ -n $dns ]] || echo no)"
+}
+
 main() {
   [[ -f compose.yaml && -f .env.example ]] || fail "run setup.sh from the stack directory it came in"
   if [[ -e .env ]] && ! cmp -s .env .env.example; then
@@ -381,23 +413,33 @@ main() {
   echo "and BACKUP_PASSWORD the only way to open the local backups."
   echo "METRICS_TOKEN, the bearer token of https://$FQDN/metrics and the full /healthz, is"
   echo "  $METRICS_TOKEN"
-  check_dns "$FQDN" "$address"
-  if [[ $ZAMFONO_MODE == ports ]]; then
-    check_ports_free
-    check_userland_proxy
-  else
-    check_public_network
-  fi
+  start_checks
   [[ $UNATTENDED_UPGRADES != true ]] || setup_host_updates || true
   install_agent
   boot_unit=
   [[ $runtime != podman || -z $interactive ]] || offer_boot_unit
   echo
-  echo "Open the firewall (README.md, step 3), then start the stack:"
-  if [[ -n $boot_unit ]]; then
-    print_unit_usage
+  local start=("${compose[@]}" up -d)
+  [[ -z $boot_unit ]] || start=(systemctl start "$boot_unit")
+  if [[ -n $interactive ]] && offer_start; then
+    if "${start[@]}"; then
+      echo
+      echo "The stack is up. Its first certificate takes a minute; then check it (README.md, step 6):"
+      echo "  curl -sS https://$FQDN/healthz"
+    else
+      warn "the stack did not start; fix the above, then run \`${start[*]}\` in $PWD"
+    fi
   else
-    echo "  cd $PWD && ${compose[*]} up -d"
+    echo "Open the firewall (README.md, step 3), then start the stack:"
+    if [[ -n $boot_unit ]]; then
+      echo "  ${start[*]}"
+    else
+      echo "  cd $PWD && ${start[*]}"
+    fi
+  fi
+  if [[ -n $boot_unit ]]; then
+    echo
+    print_unit_usage
   fi
 }
 

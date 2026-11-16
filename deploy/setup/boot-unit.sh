@@ -10,8 +10,6 @@
 # How to run the stack once systemd owns it: independent of the SSH session, and again at boot.
 print_unit_usage() {
   cat <<EOF
-  systemctl start $boot_unit
-
 systemd runs the stack from then on, whether or not you stay logged in, and starts it at boot:
   systemctl status $boot_unit     whether the stack is up
   systemctl stop $boot_unit       stop it (systemctl start brings it back)

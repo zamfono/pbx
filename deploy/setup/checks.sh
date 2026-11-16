@@ -8,7 +8,9 @@ color() {
   [[ -t 2 ]] && tput "$@" 2>/dev/null || true
 }
 
+# Keeps the message in `warnings` too, which setup.sh shows again in its last dialog.
 warn() {
+  warnings+=("$*")
   printf '%swarning:%s %b\n' "$(color setaf 3)" "$(color sgr0)" "$*" >&2
 }
 
@@ -64,21 +66,26 @@ detect_tz() {
   echo "${tz:-UTC}"
 }
 
-# check_dns FQDN ADDRESS — warns unless the name resolves to exactly that IPv4 and has no AAAA.
+# check_dns FQDN ADDRESS — warns, and fails, unless the name resolves to exactly that IPv4 and has
+# no AAAA.
 # DNS only (`-s dns`): Let's Encrypt sees the public records, while /etc/hosts maps a server's own
 # name to 127.0.1.1 on Debian. `ahostsv6` also lists every IPv4 address as `::ffff:a.b.c.d`,
 # which is no AAAA record.
 check_dns() {
-  local found
+  local found rc=0
   found=$({ getent -s dns ahostsv4 "$1" 2>/dev/null || true; } | awk '{print $1}' | sort -u | tr '\n' ' ')
   if [[ -z $found ]]; then
     warn "$1 does not resolve yet. Let's Encrypt needs its A record pointing at $2 before the first start."
+    rc=1
   elif [[ $found != "$2 " ]]; then
     warn "$1 resolves to ${found% }, not $2. Let's Encrypt will fail until the A record is fixed."
+    rc=1
   fi
   if { getent -s dns ahostsv6 "$1" 2>/dev/null || true; } | awk '{print $1}' | grep -qv '^::ffff:'; then
     warn "$1 has an AAAA record. The stack listens on IPv4 only; remove it."
+    rc=1
   fi
+  return "$rc"
 }
 
 # Mode A publishes these on the host, so nothing else may hold them.

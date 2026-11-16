@@ -909,6 +909,7 @@ Once the tags are added, the same `vX.Y.Z` tag publishes a GitHub release. It at
 - writes `HOST_CONTROL` (Host control), a checkbox ticked in the ports mode and unticked in the macvlan mode, false without a terminal unless set;
 - asks for `MEDIA_STORAGE_MAX` (§11.6 "Media storage limit"), empty for no limit, and for `ALLOW_PRIVATE_TARGETS` (§3.1 "Outbound targets"), `true` unless answered otherwise, as for an on-premises install;
 - installs the host agent (Updates) as root on a systemd host unless `ZAMFONO_AGENT=false`;
+- last, in a terminal, offers to start the stack, through the Podman boot unit where it installed one, Enter answering no while `FQDN` does not resolve to the stack's address alone; what its checks of DNS, ports and the `public` network warned about it shows first, checking again on request until they pass or the operator goes on; without a terminal it starts nothing;
 - generates every secret, checks `COUNTRY` and hashes the owner's password (at least 8 characters, or a given Argon2id hash) with the `api` image;
 - never overwrites an `.env` that holds values, and refuses while the stack's `db` volume from an earlier start exists;
 - in a release's bundle, first pulls the release's images and checks each against `DIGESTS`, writing nothing where one differs or has no entry, unless `ZAMFONO_VERSION` names another tag than the bundle's.

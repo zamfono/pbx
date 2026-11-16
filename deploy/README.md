@@ -288,6 +288,12 @@ environment under its `.env` name, plus `ZAMFONO_MODE` (`ports`/`macvlan`), `OWN
 `SETUP_NONINTERACTIVE=1` makes a missing one an error instead of a question. The header of
 `setup.sh` lists them.
 
+Last, in a terminal, it offers to start the stack (step 6), through the boot unit where it
+installed one (step 7). Where its checks of DNS and ports warned, it shows the warnings first and
+checks again on request, so you can fix DNS or the ports while it waits. Open the firewall
+(step 3) first. While the stack's name does not resolve to its address alone, Enter answers Later,
+since Let's Encrypt would fail the first certificate. Without a terminal it starts nothing.
+
 ### Or by hand
 
 ```bash
@@ -356,6 +362,8 @@ BOOTSTRAP_OWNER_PASSWORD_HASH='$argon2id$v=19$m=65536,p=4,t=3$...'
 It is required: `api` refuses its first boot without it.
 
 ## 6. Start it
+
+Unless `setup.sh` started it already:
 
 ```bash
 docker compose up -d
