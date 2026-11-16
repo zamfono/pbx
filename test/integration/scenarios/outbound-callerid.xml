@@ -3,8 +3,9 @@
   §9.4 "Caller-ID", "Anonymous calls (CLIR)", placed by the phone: 101's device dials the numbers
   of `outbound-callerid.csv` one call after the other, each routed to a trunk of one header layout
   (`from`, `pai`, `both`), once showing and once withholding its number with the `#31#` prefix
-  (sent escaped, `%2331%23`, as a phone sends it). The trunk side answers every INVITE that
-  reaches it (`uas/answer-outbound.xml`) and traces it for the check. A withheld call over the
+  (sent escaped, `%2331%23`, as a phone sends it). The trunk side rings and answers every INVITE that
+  reaches it (`uas/ring-answer-outbound.xml`) and traces it for the check; the phone must hear
+  that ringing as a 180 before the answer, the one outbound scenario that checks it. A withheld call over the
   `from` trunk has nowhere to carry the identity and is refused 403 without an INVITE, which the
   run accepts and acknowledges. The device's SIP username arrives as `-key user`, its credentials
   through `-au`/`-ap`.
@@ -75,7 +76,8 @@
 
   <recv response="100" optional="true" />
   <recv response="403" optional="true" next="refused" />
-  <!-- The core rings the phone once the trunk side alerts (§10.1 "Outbound"). -->
+  <!-- The core rings the phone once the trunk side alerts (§10.1 "Outbound"): the trunk side
+       rings for 500 ms before it answers, so the ringing always comes first. -->
   <recv response="180" />
   <recv response="200" rtd="true" timeout="20000" />
 

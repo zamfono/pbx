@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="ISO-8859-1"?>
 <!--
   §8: the trunk side answering. The stack dials an external number out through the trunk, so the
-  INVITE arrives on the trunk container's SIP port. It rings briefly, answers, and waits for the
-  caller to hang up.
+  INVITE arrives on the trunk container's SIP port. It rings and answers at once, and waits for the
+  caller to hang up; `ring-answer-outbound.xml` rings for a while first.
 -->
 <scenario name="answer-outbound">
   <!-- Asterisk's qualify probe opens a call of its own on this run: answered and ended here, it
