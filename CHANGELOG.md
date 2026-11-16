@@ -11,6 +11,15 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+### Changed
+
+- `setup.sh` asks whether to allow private targets as yes or no instead of as text, fits the host
+  checklist's lines into its dialog, and suggests the host name from the address's reverse DNS
+  (PTR) record when asked in a terminal. The extension length and the mail relay's security are
+  chosen from a menu, the time zone from a menu of regions and then of their zones, the host's
+  preselected. The relay's security is asked before its port, which defaults to 587 for
+  `starttls`, also when `SMTP_SECURITY=starttls` comes from the environment without `SMTP_PORT`.
+
 ## [0.10.1] - 2026-11-14
 
 ### Fixed

@@ -50,6 +50,12 @@ detect_ipv4() {
   ip -4 route get 1.1.1.1 2>/dev/null | sed -nE 's/.* src ([0-9.]+).*/\1/p'
 }
 
+# detect_fqdn ADDRESS — the name its PTR record gives, from DNS only (see check_dns); nothing
+# without one.
+detect_fqdn() {
+  timeout 5 getent -s dns hosts "$1" 2>/dev/null | awk '{print $2; exit}' || true
+}
+
 detect_tz() {
   local tz
   tz=$(timedatectl show -p Timezone --value 2>/dev/null || true)

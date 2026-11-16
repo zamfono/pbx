@@ -66,12 +66,12 @@ ask_host() {
   # Offered unless they are Zamfono's already; a host the API switched off is offered again.
   if [[ -z ${UNATTENDED_UPGRADES:-} ]] && ! grep -qs Origins-Pattern "$host_updates_conf" &&
     host_updates_possible; then
-    items+=(updates "unattended upgrades: system packages, Docker or Podman, 04:00" ON)
+    items+=(updates "system packages and Docker at 04:00, no reboot" ON)
   fi
-  [[ -n ${HOST_CONTROL:-} ]] || items+=(control "the stack's owners switch upgrades and reboot the host" "$([[ $control_default == true ]] && echo ON || echo OFF)")
+  [[ -n ${HOST_CONTROL:-} ]] || items+=(control "owners may switch upgrades and reboot the host" "$([[ $control_default == true ]] && echo ON || echo OFF)")
   if [[ -n $interactive && ${#items[@]} -gt 0 ]]; then
     local on tag
-    until on=$(ui_checklist Host "Look after this host? Upgrades never reboot it: a kernel update waits for a reboot, which owners can schedule when they may control the host. Leave control off where stacks of others share this host." "${items[@]}"); do
+    until on=$(ui_checklist Host "Look after this host? Leave control off where others' stacks share it." "${items[@]}"); do
       ui_cancel
     done
     [[ -n ${UNATTENDED_UPGRADES:-} || ${items[0]} != updates ]] || UNATTENDED_UPGRADES=false

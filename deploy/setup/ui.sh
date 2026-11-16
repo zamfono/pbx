@@ -69,13 +69,14 @@ ui_password() {
   printf '%s' "$answer"
 }
 
-# ui_yesno TEXT [YES_LABEL NO_LABEL [no]] — 0 for yes, 1 for no; `no` makes no the answer Enter
-# gives. Plain prompts have no cancel.
+# ui_yesno TEXT [YES_LABEL NO_LABEL [no [TITLE]]] — 0 for yes, 1 for no, 255 for Esc; `no` makes
+# no the answer Enter gives. Plain prompts have no cancel.
 ui_yesno() {
   if [[ $ui_kind == whiptail ]]; then
-    local -a defaultno=()
-    [[ ${4:-} != no ]] || defaultno=(--defaultno)
-    whiptail --backtitle "$ui_backtitle" "${defaultno[@]}" --yes-button "${2:-Yes}" \
+    local -a opts=()
+    [[ ${4:-} != no ]] || opts=(--defaultno)
+    [[ -z ${5:-} ]] || opts+=(--title "$5")
+    whiptail --backtitle "$ui_backtitle" "${opts[@]}" --yes-button "${2:-Yes}" \
       --no-button "${3:-No}" --yesno "$1" "$(ui_height "$1")" "$ui_width"
     return
   fi
@@ -92,25 +93,42 @@ ui_yesno() {
   done
 }
 
-# ui_menu TITLE TEXT TAG DESCRIPTION [TAG DESCRIPTION ...] — prints the chosen tag.
+# ui_menu TITLE TEXT DEFAULT TAG DESCRIPTION [TAG DESCRIPTION ...] — prints the chosen tag;
+# DEFAULT, when one of the tags, is the one Enter takes. A list longer than the terminal scrolls.
 ui_menu() {
-  local title=$1 text=$2
-  shift 2
+  local title=$1 text=$2 default=$3
+  shift 3
   if [[ $ui_kind == whiptail ]]; then
-    ui_whiptail --title "$title" --menu "$text" "$(ui_height "$text" $(($# / 2 + 8)))" \
-      "$ui_width" $(($# / 2)) "$@"
+    local rows height list=$(($# / 2))
+    rows=$(stty size </dev/tty 2>/dev/null) || rows=24
+    height=$(ui_height "$text" $((list + 8)))
+    if ((height > ${rows% *} - 2)); then
+      list=$((list - height + ${rows% *} - 2))
+      height=$((${rows% *} - 2))
+    fi
+    ui_whiptail --title "$title" --default-item "$default" --menu "$text" "$height" "$ui_width" \
+      "$list" "$@"
     return
   fi
   local -a tags=()
-  local answer i
+  local answer i prompt=
   printf '\n%b\n' "$text" >/dev/tty
   while (($#)); do
     tags+=("$1")
-    printf '  %d) %s\n' "${#tags[@]}" "$2" >/dev/tty
+    if [[ $1 == "$default" ]]; then
+      printf '  %d) %s %s (Enter)\n' "${#tags[@]}" "$1" "$2" >/dev/tty
+      prompt=1
+    else
+      printf '  %d) %s %s\n' "${#tags[@]}" "$1" "$2" >/dev/tty
+    fi
     shift 2
   done
   while true; do
     read -r -p "$title [1-${#tags[@]}]: " answer </dev/tty || return 1
+    if [[ -z $answer && -n $prompt ]]; then
+      printf '%s' "$default"
+      return 0
+    fi
     if [[ $answer =~ ^[0-9]+$ ]] && ((answer >= 1 && answer <= ${#tags[@]})); then
       i=$((answer - 1))
       printf '%s' "${tags[$i]}"

@@ -74,10 +74,12 @@ v_tz() {
     [[ ! -d /usr/share/zoneinfo || -f /usr/share/zoneinfo/$1 ]]
 }
 
-# ask VAR VALIDATOR TITLE TEXT [DEFAULT] — sets VAR, from the environment when it holds a valid
-# value, else by asking until the answer is valid or the user aborts.
+# ask VAR VALIDATOR TITLE TEXT [DEFAULT [TAG DESCRIPTION ...]] — sets VAR, from the environment
+# when it holds a valid value, else by asking until the answer is valid or the user aborts. v_bool
+# asks yes or no; the TAGs make a menu, whose tag `other` asks for any other value.
 ask() {
   local var=$1 check=$2 title=$3 text=$4 default=${5:-} answer
+  local -a items=("${@:6}")
   if [[ -n ${!var:-} ]] && "$check" "${!var}"; then
     return 0
   fi
@@ -91,9 +93,26 @@ ask() {
     fi
     fail "$var is not set, and there is no terminal to ask for it"
   fi
+  if [[ $check == v_bool ]]; then
+    local rc
+    while true; do
+      rc=0
+      ui_yesno "$text" Yes No "$([[ $default == false ]] && echo no)" "$title" || rc=$?
+      case $rc in
+        0) printf -v "$var" true && return 0 ;;
+        1) printf -v "$var" false && return 0 ;;
+        *) ui_cancel ;;
+      esac
+    done
+  fi
   answer=${!var:-$default}
   while true; do
-    answer=$(ui_input "$title" "$text" "$answer") || { ui_cancel; continue; }
+    if ((${#items[@]})); then
+      answer=$(ui_menu "$title" "$text" "${!var:-$default}" "${items[@]}") || { ui_cancel; continue; }
+      [[ $answer == other ]] && { items=() answer=; continue; }
+    else
+      answer=$(ui_input "$title" "$text" "$answer") || { ui_cancel; continue; }
+    fi
     if "$check" "$answer"; then
       printf -v "$var" '%s' "$answer"
       return 0
@@ -102,10 +121,46 @@ ask() {
   done
 }
 
+# TZ from the environment, else from a menu of regions and then of their zones, with the host's
+# as the default; asked as text with plain prompts or without the tz database's zone.tab.
+ask_tz() {
+  local zones=/usr/share/zoneinfo/zone.tab countries=/usr/share/zoneinfo/iso3166.tab
+  [[ -n ${TZ:-} ]] && v_tz "$TZ" && return 0
+  if [[ -z $interactive || $ui_kind != whiptail || ! -f $zones || ! -f $countries ]]; then
+    ask TZ v_tz "Time zone" "The stack's IANA time zone, e.g. Europe/Berlin." "$(detect_tz)"
+    return
+  fi
+  local guess region city
+  local -a regions=() cities=()
+  guess=$(detect_tz)
+  # The zone, then its countries' names, region by region.
+  while read -r region; do regions+=("$region" ""); done < <(
+    awk -F'\t' '!/^#/ { sub("/.*", "", $3); print $3 }' "$zones" | sort -u)
+  while true; do
+    region=$(ui_menu "Time zone" "The stack's time zone: its region." "${guess%%/*}" \
+      UTC "" "${regions[@]}") || { ui_cancel; continue; }
+    if [[ $region == UTC ]]; then
+      TZ=UTC
+      return 0
+    fi
+    cities=()
+    while IFS=$'\t' read -r city name; do cities+=("$city" "$name"); done < <(
+      awk -F'\t' -v r="$region/" 'NR == FNR { if (!/^#/) country[$1] = $2; next }
+        !/^#/ && index($3, r) == 1 { print substr($3, length(r) + 1) "\t" country[$1] }' \
+        "$countries" "$zones" | sort)
+    # Cancel goes back to the regions.
+    city=$(ui_menu "Time zone" "The stack's time zone in $region." "${guess#*/}" "${cities[@]}") ||
+      continue
+    TZ=$region/$city
+    v_tz "$TZ" && return 0
+    ui_msg "$TZ is not in this host's time zone database."
+  done
+}
+
 ask_mode() {
   [[ -n ${ZAMFONO_MODE:-} ]] && v_mode "$ZAMFONO_MODE" && return 0
   [[ -n $interactive ]] || fail "ZAMFONO_MODE is not set (ports or macvlan)"
-  until ZAMFONO_MODE=$(ui_menu Mode "How does this stack reach its public address?" \
+  until ZAMFONO_MODE=$(ui_menu Mode "How does this stack reach its public address?" "" \
     ports "one IP: the host's own address, published ports" \
     macvlan "one IP per stack: its own address on the \`public\` network"); do
     ui_cancel
@@ -118,8 +173,9 @@ ask_mail() {
     ui_yesno "Set up a mail relay now?\n\nWithout one the stack sends no mail (voicemail to email, password resets) until an owner sets one through the API." || return 0
   fi
   ask SMTP_HOST v_nonempty "SMTP host" "The mail relay's host name."
-  ask SMTP_PORT v_port "SMTP port" "Its port: 465 for TLS, 587 for STARTTLS." 465
-  ask SMTP_SECURITY v_security "SMTP security" "tls or starttls." tls
+  ask SMTP_SECURITY v_security "SMTP security" "How the relay encrypts the connection." tls \
+    tls "TLS from the start, usually on port 465" starttls "STARTTLS, usually on port 587"
+  ask SMTP_PORT v_port "SMTP port" "The relay's port." "$([[ $SMTP_SECURITY == tls ]] && echo 465 || echo 587)"
   ask SMTP_USER v_any "SMTP user" "The relay's user name (empty for none)."
   if [[ -z ${SMTP_PASSWORD:-} && -n $interactive && -n $SMTP_USER ]]; then
     SMTP_PASSWORD=$(ui_password "SMTP password" "The relay's password.") || ui_cancel
@@ -166,9 +222,9 @@ ask_network() {
     RTP_PORT_START=${range%-*} RTP_PORT_END=${range#*-}
   fi
   # From the environment, or asked one by one where it holds some of them only or an invalid one.
-  ask SIP_UDP_ENABLED v_bool "SIP over UDP" "true or false: SIP on 5060/udp, for trunks and allowlisted desk phones." true
-  ask SIP_TCP_ENABLED v_bool "SIP over TCP" "true or false: SIP on 5060/tcp, for the same." true
-  ask STUN_ENABLED v_bool "STUN" "true or false: the STUN server on 3478/udp, for phones that ask for their public address." true
+  ask SIP_UDP_ENABLED v_bool "SIP over UDP" "SIP on 5060/udp, for trunks and allowlisted desk phones." true
+  ask SIP_TCP_ENABLED v_bool "SIP over TCP" "SIP on 5060/tcp, for the same." true
+  ask STUN_ENABLED v_bool "STUN" "The STUN server on 3478/udp, for phones that ask for their public address." true
   ask RTP_PORT_START v_rtp_start "RTP start" "The first UDP port of the media range, 1024 or above." 10000
   ask RTP_PORT_END v_rtp_end "RTP end" "The last UDP port of the media range, above $RTP_PORT_START; the range leaves out 3478 and 5060." 10200
 }
@@ -271,17 +327,21 @@ main() {
     EXTERNAL_IPV4=
     address=$STACK_IPV4 overlay=compose.macvlan.yaml
   fi
-  ask FQDN v_fqdn "Host name" "The name the stack is reached at; its A record points at $address."
+  # Suggested from the address's PTR record, only in a terminal: automation names the stack itself.
+  ask FQDN v_fqdn "Host name" "The name the stack is reached at; its A record points at $address." \
+    "$([[ -z $interactive ]] || detect_fqdn "$address")"
   # Lower case, the form Caddy names the stack's certificate by.
   FQDN=${FQDN,,}
   ask COMPANY_NAME v_nonempty "Company" "The company name."
   ask MAIN_DID v_e164 "Main number" "The company's main number in E.164, e.g. +4930123456."
   ask COUNTRY v_country "Country" "The ISO 3166-1 country code, e.g. DE."
   COUNTRY=${COUNTRY^^}
-  ask EXT_LENGTH v_extlen "Extension length" "Digits per internal extension (at least 2)." 3
-  ask TZ v_tz "Time zone" "The stack's IANA time zone, e.g. Europe/Berlin." "$(detect_tz)"
+  ask EXT_LENGTH v_extlen "Extension length" "Digits per internal extension; fixed once the stack runs." 3 \
+    2 "extensions such as 21" 3 "extensions such as 201" 4 "extensions such as 2001" \
+    5 "extensions such as 20001" other "another length, at least 2"
+  ask_tz
   ask MEDIA_STORAGE_MAX v_size "Media storage limit" "The most the stack's recordings, voicemail and uploads may take, e.g. 20G; empty for none."
-  ask ALLOW_PRIVATE_TARGETS v_bool "Private targets" "Allow webhooks, bot targets and backup targets on private networks? true for an on-premises install; false on a host shared by several customers." true
+  ask ALLOW_PRIVATE_TARGETS v_bool "Private targets" "Allow webhooks, bot targets and backup targets on private networks? Yes on premises, no on a host shared by several customers." true
   ask BOOTSTRAP_OWNER_NAME v_nonempty "Owner name" "The first owner's full name."
   ask BOOTSTRAP_OWNER_EMAIL v_email "Owner email" "The first owner's email address, also the login."
   ask_mail
