@@ -88,7 +88,8 @@ describe('audit.undo of a settings.update', () => {
       external: '+491111111',
       record: false,
       ringTimeoutS: null,
-      fallback: null
+      fallback: null,
+      announcementAudioId: null
     };
     await updateSettings(db, { fallbackTarget: first });
     await updateSettings(db, {

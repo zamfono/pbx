@@ -22,8 +22,18 @@ describe('users.setForwarding, self-service', () => {
     const anna = await createUserActor(db, 'Anna Huber', '101');
     const ben = await createUserActor(db, 'Ben Roth', '102');
     const rules: Rule[] = [
-      { condition: 'unconditional', target: { kind: 'user', userId: ben.id } },
-      { condition: 'busy', target: { kind: 'mailboxUser', userId: anna.id } },
+      {
+        condition: 'unconditional',
+        target: { kind: 'user', userId: ben.id, announcementAudioId: null }
+      },
+      {
+        condition: 'busy',
+        target: {
+          kind: 'mailboxUser',
+          userId: anna.id,
+          announcementAudioId: null
+        }
+      },
       {
         condition: 'noAnswer',
         target: {
@@ -31,7 +41,8 @@ describe('users.setForwarding, self-service', () => {
           external: '+4915112345678',
           record: false,
           ringTimeoutS: null,
-          fallback: null
+          fallback: null,
+          announcementAudioId: null
         }
       }
     ];
@@ -62,7 +73,14 @@ describe('users.setForwarding, self-service', () => {
     const anna = await createUserActor(db, 'Anna Huber', '101');
     const ben = await createUserActor(db, 'Ben Roth', '102');
     const rules: Rule[] = [
-      { condition: 'busy', target: { kind: 'mailboxUser', userId: ben.id } }
+      {
+        condition: 'busy',
+        target: {
+          kind: 'mailboxUser',
+          userId: ben.id,
+          announcementAudioId: null
+        }
+      }
     ];
     await expect(setForwarding(db, ben.id, rules, anna)).rejects.toMatchObject({
       status: 403

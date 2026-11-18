@@ -84,6 +84,7 @@ describe('forward-target fallbacks', () => {
       external: '+4366412345',
       ringTimeoutS: 15,
       record: false,
+      announcementAudioId: null,
       fallback: {
         kind: 'sip',
         trunkId,
@@ -91,13 +92,19 @@ describe('forward-target fallbacks', () => {
         headers: expect.any(Array) as unknown,
         ringTimeoutS: null,
         record: false,
+        announcementAudioId: null,
         fallback: {
           kind: 'webSocket',
           protocol: 'vonage',
           url: BOT_URL,
           sampleRate: 16000,
           record: false,
-          fallback: { kind: 'mailboxUser', userId: 'owner' }
+          announcementAudioId: null,
+          fallback: {
+            kind: 'mailboxUser',
+            userId: 'owner',
+            announcementAudioId: null
+          }
         }
       }
     };

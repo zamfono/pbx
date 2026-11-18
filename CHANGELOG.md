@@ -11,8 +11,24 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+### Upgrade notes
+
+- This release is breaking: install it with `./update.sh` on the host, or with `system.update`
+  and `breaking: true`. The forward-target kind `announcement` is gone (below). Targets already
+  stored keep working and read back as `hangup` with their announcement; a script or client that
+  writes `{ "kind": "announcement", "audioId": … }` is refused with 422 until it sends
+  `{ "kind": "hangup", "announcementAudioId": … }`, and one that reads targets finds
+  `announcementAudioId` on every kind.
+
 ### Added
 
+- Every forward target takes an optional `announcementAudioId`, an audio asset of kind
+  `announcement` that plays to the caller before the call goes on to the target: a welcome before
+  a ring group or a user, "we are closed, please leave a message" before a mailbox, a notice
+  before a call is forwarded to an external number. The caller is answered for it, so their call
+  is charged from the announcement on.
+- The forward-target kind `hangup` ends the call: after its announcement, or without one
+  unanswered with 480, for a rule that should neither ring anyone nor fall to a mailbox.
 - `setup.sh` offers to start the stack once it has written `.env`, in a terminal only, through the
   Podman boot unit where it installed one. It shows what its checks of DNS and ports warned about
   first and checks again on request; while the stack's name does not resolve to its address alone,
@@ -20,6 +36,8 @@ why the specified behaviour changed; the commit history, how.
 
 ### Changed
 
+- **Breaking:** the forward-target kind `announcement` is removed in favour of the two additions
+  above: `{ "kind": "hangup", "announcementAudioId": … }` is what it was.
 - `api` and `core` take the current releases of their dependencies: @simplewebauthn/server
   14.1.0, jose 6.2.16, nodemailer 10.4.0 and ws 8.22.2.
 

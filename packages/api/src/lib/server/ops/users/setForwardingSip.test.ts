@@ -34,12 +34,20 @@ async function withAdminSipRule(): Promise<Fixture> {
       headers: [{ name: 'X-Ext', value: '{{calledExtension}}' }],
       record: false,
       ringTimeoutS: null,
-      fallback: null
+      fallback: null,
+      announcementAudioId: null
     }
   };
   await setForwarding(db, anna.id, [
     sipRule,
-    { condition: 'busy', target: { kind: 'mailboxUser', userId: anna.id } }
+    {
+      condition: 'busy',
+      target: {
+        kind: 'mailboxUser',
+        userId: anna.id,
+        announcementAudioId: null
+      }
+    }
   ]);
   return { db, anna, sipRule };
 }
@@ -75,7 +83,8 @@ describe('users.setForwarding, an admin-set sip rule', () => {
         external: '+4915112345678',
         record: false,
         ringTimeoutS: null,
-        fallback: null
+        fallback: null,
+        announcementAudioId: null
       }
     };
     const marked: Rule = { condition: 'noAnswer', target: SIP_MARKER };
@@ -107,7 +116,11 @@ describe('users.setForwarding, an admin-set sip rule', () => {
         from: [
           {
             condition: 'busy',
-            target: { kind: 'mailboxUser', userId: anna.id }
+            target: {
+              kind: 'mailboxUser',
+              userId: anna.id,
+              announcementAudioId: null
+            }
           },
           sipRule
         ],
@@ -197,7 +210,16 @@ describe('users.setForwarding, an admin-set sip rule', () => {
     await setForwarding(
       db,
       anna.id,
-      [{ condition: 'busy', target: { kind: 'mailboxUser', userId: anna.id } }],
+      [
+        {
+          condition: 'busy',
+          target: {
+            kind: 'mailboxUser',
+            userId: anna.id,
+            announcementAudioId: null
+          }
+        }
+      ],
       anna
     );
     expect(await storedConditions(db, anna.id)).toEqual(['busy']);

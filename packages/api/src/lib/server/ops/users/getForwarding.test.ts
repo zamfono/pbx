@@ -45,7 +45,14 @@ describe('users.getForwarding', () => {
         condition: 'noAnswer',
         target: { kind: 'sip', trunkId, user: 'proj_abc123', headers }
       },
-      { condition: 'busy', target: { kind: 'mailboxUser', userId: anna.id } },
+      {
+        condition: 'busy',
+        target: {
+          kind: 'mailboxUser',
+          userId: anna.id,
+          announcementAudioId: null
+        }
+      },
       {
         condition: 'unconditional',
         target: { kind: 'sip', trunkId, user: 'proj_def456' }
@@ -59,7 +66,8 @@ describe('users.getForwarding', () => {
       headers: sipHeaders,
       record: false,
       ringTimeoutS: null,
-      fallback: null
+      fallback: null,
+      announcementAudioId: null
     });
     const rules = (
       unconditional: unknown,
@@ -68,7 +76,14 @@ describe('users.getForwarding', () => {
       id: anna.id,
       rules: [
         { condition: 'unconditional', target: unconditional },
-        { condition: 'busy', target: { kind: 'mailboxUser', userId: anna.id } },
+        {
+          condition: 'busy',
+          target: {
+            kind: 'mailboxUser',
+            userId: anna.id,
+            announcementAudioId: null
+          }
+        },
         { condition: 'noAnswer', target: noAnswer },
         {
           condition: 'offline',
@@ -77,7 +92,8 @@ describe('users.getForwarding', () => {
             external: '+4915112345678',
             record: false,
             ringTimeoutS: null,
-            fallback: null
+            fallback: null,
+            announcementAudioId: null
           }
         }
       ]
@@ -103,7 +119,14 @@ describe('users.getForwarding', () => {
     const anna = await createUserActor(db, 'Anna Huber', '101');
     const ben = await createUserActor(db, 'Ben Roth', '102');
     const rules: Rule[] = [
-      { condition: 'busy', target: { kind: 'mailboxUser', userId: ben.id } }
+      {
+        condition: 'busy',
+        target: {
+          kind: 'mailboxUser',
+          userId: ben.id,
+          announcementAudioId: null
+        }
+      }
     ];
     await setForwarding(db, ben.id, rules);
     await expect(getForwarding(db, ben.id, anna)).rejects.toMatchObject({
@@ -128,7 +151,14 @@ describe('users.getForwarding', () => {
         condition: 'noAnswer',
         target: { kind: 'sip', trunkId, user: 'proj_abc123' }
       },
-      { condition: 'busy', target: { kind: 'mailboxUser', userId: anna.id } }
+      {
+        condition: 'busy',
+        target: {
+          kind: 'mailboxUser',
+          userId: anna.id,
+          announcementAudioId: null
+        }
+      }
     ]);
     const before = await getForwarding(db, anna.id, anna);
     const idsBefore = await storedTargetIds(db, anna.id);

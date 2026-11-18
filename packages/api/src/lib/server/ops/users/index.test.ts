@@ -192,7 +192,11 @@ describe('users', () => {
         rules: [
           {
             condition: 'unconditional',
-            target: { kind: 'user', userId: userB.user.id }
+            target: {
+              kind: 'user',
+              userId: userB.user.id,
+              announcementAudioId: null
+            }
           }
         ]
       },
@@ -223,7 +227,11 @@ describe('users', () => {
         rules: [
           {
             condition: 'unconditional',
-            target: { kind: 'user', userId: userB.user.id }
+            target: {
+              kind: 'user',
+              userId: userB.user.id,
+              announcementAudioId: null
+            }
           }
         ]
       },
@@ -249,7 +257,11 @@ describe('users', () => {
     expect(change?.from).toEqual([
       {
         condition: 'unconditional',
-        target: { kind: 'user', userId: userB.user.id }
+        target: {
+          kind: 'user',
+          userId: userB.user.id,
+          announcementAudioId: null
+        }
       }
     ]);
   });
@@ -763,7 +775,11 @@ describe('users', () => {
         rules: [
           {
             condition: 'unconditional',
-            target: { kind: 'user', userId: userB.user.id }
+            target: {
+              kind: 'user',
+              userId: userB.user.id,
+              announcementAudioId: null
+            }
           }
         ]
       },

@@ -44,7 +44,8 @@ describe('menus', () => {
       external: '+490000000',
       record: false,
       ringTimeoutS: null,
-      fallback: null
+      fallback: null,
+      announcementAudioId: null
     });
   });
 
@@ -249,7 +250,8 @@ describe('menus', () => {
       external: '+491111111',
       record: false,
       ringTimeoutS: null,
-      fallback: null
+      fallback: null,
+      announcementAudioId: null
     });
     const targets = await db.selectFrom('forwardTargets').selectAll().execute();
     expect(targets).toHaveLength(1);

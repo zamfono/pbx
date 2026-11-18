@@ -71,7 +71,7 @@ function followOwnDids(
 }
 
 /** An own DID dialled as `*5`'s target (§10.1 Outbound step 5): its user or ring-group target is
- * rung like that extension, an external or SIP one dialled; a mailbox, an announcement or a menu is
+ * rung like that extension, an external or SIP one dialled; a mailbox, a menu or `hangup` is
  * no party that could join a conversation, so it is refused like an unowned number, and DIDs
  * forwarding to each other past the hop limit with 480, as their mailbox-less last target is. */
 function didTarget(

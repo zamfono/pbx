@@ -62,12 +62,12 @@ nine target kinds:
 | `webSocket`        | hands the call to a voice bot over a WebSocket (admin-only)        |
 | `mailboxUser`      | deposits the caller directly in a user's mailbox, no ringing       |
 | `mailboxRingGroup` | deposits the caller directly in a ring group's mailbox, no ringing |
-| `announcement`     | plays an audio asset and ends the call                             |
 | `menu`             | plays a menu's greeting and collects DTMF                          |
+| `hangup`           | ends the call                                                      |
 
 A `user` or `ringGroup` target re-enters the routing pipeline and counts a hop toward the
 three-hop forwarding limit (`routing-order`); a `menu` target re-enters without counting a hop.
-`mailboxUser`, `mailboxRingGroup` and `announcement` end the pipeline; `external` dials out
+`mailboxUser`, `mailboxRingGroup` and `hangup` end the pipeline; `external` dials out
 through the outbound routes, and `sip`, `{ "kind": "sip", "trunkId": "…", "user": "…" }`, dials
 `sip:<user>@<host>` at the trunk's own hosts, such as an AI agent's endpoint
 (`forward-to-ai-agent`). A `sip` leg tells the far end who called through the target's
@@ -75,6 +75,15 @@ headers; either leg tells it who forwarded only as far as the trunk's `diversion
 `webSocket`, `{ "kind": "webSocket", "protocol": "twilio", "url": "wss://…" }`, hands the call to
 a voice bot that takes calls over a WebSocket, in the Twilio Media Streams or the Vonage protocol
 (`forward-to-voice-bot`); like `external` and `sip` it neither counts a hop nor re-enters.
+
+A target of any kind may carry an `announcementAudioId`, an audio asset of kind `announcement`
+that plays to the caller before the call goes on to the target:
+`{ "kind": "ringGroup", "ringGroupId": "…", "announcementAudioId": "…" }` plays it and then rings
+the group, and `{ "kind": "hangup", "announcementAudioId": "…" }` plays it and ends the call.
+The caller is answered for the announcement, so their call is charged from then on, and a target
+that turns out busy or unreachable afterwards can no longer refuse the call as such. A `hangup`
+without an announcement releases the call unanswered with 480. A ring-group member's own forward
+that the group follows plays nothing.
 
 An `external`, `sip` or `webSocket` target may carry a `fallback`, any target, which may carry a
 fallback of its own: where the call goes when the target does not work, for any reason but the

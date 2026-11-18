@@ -36,13 +36,15 @@ function external(number: string): {
   record: boolean;
   ringTimeoutS: null;
   fallback: null;
+  announcementAudioId: null;
 } {
   return {
     kind: 'external',
     external: number,
     record: false,
     ringTimeoutS: null,
-    fallback: null
+    fallback: null,
+    announcementAudioId: null
   };
 }
 

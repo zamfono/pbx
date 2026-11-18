@@ -15,7 +15,7 @@ import type { Pipeline } from './pipeline.js';
  * Posts the notification for `call` when it went unanswered and the user it rang wants to hear
  * about it. The mail is "one per missed inbound call" (§10.2 "Mail"), so a colleague's internal
  * call notifies no one, and neither does a call that reached nobody in particular — no callee,
- * an announcement, a menu the caller abandoned.
+ * a `hangup` target, a menu the caller abandoned.
  */
 export async function notifyMissedCall(
   pipeline: Pipeline,

@@ -71,7 +71,7 @@ const references: [string, AudioKind, string, (id: string) => object][] = [
     'forward_targets.announcement_audio_id',
     'announcement',
     'settings.update',
-    id => ({ fallbackTarget: { kind: 'announcement', audioId: id } })
+    id => ({ fallbackTarget: { kind: 'hangup', announcementAudioId: id } })
   ]
 ];
 

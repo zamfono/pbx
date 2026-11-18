@@ -79,6 +79,28 @@ describe('targetFromRow', () => {
     ).toEqual({ kind: 'external', number: '+15557777', record: true });
   });
 
+  // §11.2: a row naming none of the eight targets ends the call, and any row may hold the
+  // announcement that plays first.
+  it('reads a row with no target as hangup, and the announcement of any kind', () => {
+    const emptyRow = {
+      ...sipRow,
+      sipTrunkId: null,
+      sipUser: null,
+      sipHeaders: null
+    };
+    expect(targetFromRow(emptyRow)).toEqual({ kind: 'hangup' });
+    expect(
+      targetFromRow({ ...emptyRow, announcementAudioId: 'audio-1' })
+    ).toEqual({ kind: 'hangup', announcementAudioId: 'audio-1' });
+    expect(
+      targetFromRow({
+        ...emptyRow,
+        userId: 'u1',
+        announcementAudioId: 'audio-1'
+      })
+    ).toEqual({ kind: 'user', userId: 'u1', announcementAudioId: 'audio-1' });
+  });
+
   // §10.1 step 7: a target's ring timeout, and its fallback chain from the rows naming it.
   it('reads a ring timeout and the fallback chain the rows hold', () => {
     const externalRow = {

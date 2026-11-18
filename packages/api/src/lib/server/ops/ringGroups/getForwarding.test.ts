@@ -19,7 +19,10 @@ describe('ringGroups.getForwarding', () => {
       asRun()
     )) as { id: string };
     const rules = [
-      { condition: 'unanswered', target: { kind: 'user', userId: 'owner' } },
+      {
+        condition: 'unanswered',
+        target: { kind: 'user', userId: 'owner', announcementAudioId: null }
+      },
       {
         condition: 'unavailable',
         target: {
@@ -27,7 +30,8 @@ describe('ringGroups.getForwarding', () => {
           external: '+491111111',
           record: false,
           ringTimeoutS: null,
-          fallback: null
+          fallback: null,
+          announcementAudioId: null
         }
       }
     ];

@@ -14,9 +14,9 @@ import { liveRow } from './rows.js';
 import { udpHeadersWarning } from './sipHeaders.js';
 import { type Context } from './types.js';
 
-/** The one column `spec` sets on its `forward_targets` row, `sip`'s and `webSocket`'s column sets
- * among them, with an `external`, `sip` or `webSocket` target's `record_calls` and an `external` or
- * `sip` one's `ring_timeout_s`; every other column stays `null`. */
+/** The one column `spec`'s kind sets on its `forward_targets` row, `sip`'s and `webSocket`'s column
+ * sets among them and `hangup` none, with a target's `record_calls` and `ring_timeout_s`; every
+ * other column stays `null`, but for the announcement any kind may have (`insertForwardTarget`). */
 function forwardTargetColumns(
   spec: TargetSpec
 ): Record<string, string | number | null> {
@@ -56,10 +56,10 @@ function forwardTargetColumns(
   if (spec.kind === 'mailboxRingGroup') {
     return { mailboxRingGroupId: spec.ringGroupId };
   }
-  if (spec.kind === 'announcement') {
-    return { announcementAudioId: spec.audioId };
+  if (spec.kind === 'menu') {
+    return { menuId: spec.menuId };
   }
-  return { menuId: spec.menuId };
+  return {};
 }
 
 type ForwardTargetColumns = {
@@ -90,7 +90,7 @@ function storedSampleRate(rate: number | null): WebSocketSampleRate {
 }
 
 /** The inverse of `forwardTargetColumns`: the wire target a `forward_targets` row represents,
- * an `external`, `sip` or `webSocket` one with `fallback` still `null` (`rowToTarget`). */
+ * `hangup` for none of the eight targets set (§11.2), `fallback` still `null` (`rowToTarget`). */
 function baseTarget(row: ForwardTargetColumns): TargetSpec {
   if (row.userId !== null) {
     return { kind: 'user', userId: row.userId };
@@ -140,13 +140,10 @@ function baseTarget(row: ForwardTargetColumns): TargetSpec {
   if (row.mailboxRingGroupId !== null) {
     return { kind: 'mailboxRingGroup', ringGroupId: row.mailboxRingGroupId };
   }
-  if (row.announcementAudioId !== null) {
-    return { kind: 'announcement', audioId: row.announcementAudioId };
-  }
   if (row.menuId !== null) {
     return { kind: 'menu', menuId: row.menuId };
   }
-  throw new Error('forwardTargets: row has no owner column set');
+  return { kind: 'hangup' };
 }
 
 /** The wire target a `forward_targets` row represents, with its fallback chain, the rows whose
@@ -155,7 +152,10 @@ export async function rowToTarget(
   db: Db,
   row: ForwardTargetColumns
 ): Promise<TargetSpec> {
-  const target = baseTarget(row);
+  const target = {
+    ...baseTarget(row),
+    announcementAudioId: row.announcementAudioId
+  };
   if (
     target.kind !== 'external' &&
     target.kind !== 'sip' &&
@@ -205,20 +205,21 @@ async function assertLiveRow(
 }
 
 /**
- * Throws 404 when `spec`'s referenced id names no live row (§5.9: routing never depends on a
- * soft-deleted row, so a rule can only ever target one); `external` names no row and needs none.
+ * Throws 404 when an id `spec` references names no live row (§5.9: routing never depends on a
+ * soft-deleted row, so a rule can only ever target one), its announcement's included, which is
+ * of that kind (422); `external` names no row and needs none.
  */
 async function assertTargetAvailable(db: Db, spec: TargetSpec): Promise<void> {
+  const audioId = spec.announcementAudioId ?? null;
+  if (audioId !== null) {
+    await assertAudioOfKind(db, audioId, 'announcement');
+  }
   if (spec.kind === 'user' || spec.kind === 'mailboxUser') {
     await assertLiveRow(db, 'users', spec.userId, 'user');
     return;
   }
   if (spec.kind === 'ringGroup' || spec.kind === 'mailboxRingGroup') {
     await assertLiveRow(db, 'ringGroups', spec.ringGroupId, 'ring group');
-    return;
-  }
-  if (spec.kind === 'announcement') {
-    await assertAudioOfKind(db, spec.audioId, 'announcement');
     return;
   }
   if (spec.kind === 'menu') {
@@ -275,7 +276,7 @@ export async function insertForwardTarget(
       webSocketSampleRate: null,
       mailboxUserId: null,
       mailboxRingGroupId: null,
-      announcementAudioId: null,
+      announcementAudioId: spec.announcementAudioId ?? null,
       menuId: null,
       fallbackOfId,
       ...forwardTargetColumns(spec)

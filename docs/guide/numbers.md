@@ -64,7 +64,7 @@ lists those DIDs.
   "base": "+498912347",
   "digits": null,
   "label": "Head office",
-  "fallbackTarget": { "kind": "announcement", "audioId": "…" }
+  "fallbackTarget": { "kind": "hangup", "announcementAudioId": "…" }
 }
 ```
 
@@ -85,8 +85,8 @@ block around it. Every fallback decision appears in the call's routing trace at 
 
 ## Fallbacks
 
-Both fallbacks are ordinary forward targets (`mental-model`). An `announcement` ("this number does
-not exist") suits mis-dials; a reception ring group or a menu suits a block whose callers should
+Both fallbacks are ordinary forward targets (`mental-model`). A `hangup` with an announcement ("this number
+does not exist") suits mis-dials; a reception ring group or a menu suits a block whose callers should
 still reach someone. The tenant-wide fallback is set with `settings.update`
 (`PATCH /api/v1/settings`) as `fallbackTarget`, `null` clears it; while it is `null`, a call no DID
 or block fallback catches is released with 404.

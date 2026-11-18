@@ -19,32 +19,39 @@ type Fallback = { fallback?: ForwardTarget };
 /** An `external` or `sip` target's ring timeout in seconds (§10.1 step 7); set only when it has one. */
 type RingTimeout = { ringTimeoutS?: number };
 
-export type ForwardTarget =
-  | { kind: 'user'; userId: string }
-  | { kind: 'ringGroup'; ringGroupId: string }
-  | ({ kind: 'external'; number: string; record?: true } & RingTimeout &
-      Fallback)
-  | ({
-      kind: 'sip';
-      trunkId: string;
-      user: string;
-      headers: SipHeaderTemplate[];
-      record?: true;
-    } & RingTimeout &
-      Fallback)
-  | ({
-      kind: 'webSocket';
-      protocol: WebSocketProtocol;
-      url: string;
-      sampleRate: WebSocketSampleRate;
-      record?: true;
-    } & Fallback)
-  | { kind: 'mailboxUser'; userId: string }
-  | { kind: 'mailboxRingGroup'; ringGroupId: string }
-  | { kind: 'announcement'; audioId: string }
-  | { kind: 'menu'; menuId: string };
+/** The announcement a target of any kind plays to the caller before the call goes where it sends
+ * it (§10.1 step 7); set only when it has one. */
+type Announcement = { announcementAudioId?: string };
 
-/** A `forward_targets` row: exactly one target is set, `sip`'s and `webSocket`'s being their
+export type ForwardTarget = Announcement &
+  (
+    | { kind: 'user'; userId: string }
+    | { kind: 'ringGroup'; ringGroupId: string }
+    | ({ kind: 'external'; number: string; record?: true } & RingTimeout &
+        Fallback)
+    | ({
+        kind: 'sip';
+        trunkId: string;
+        user: string;
+        headers: SipHeaderTemplate[];
+        record?: true;
+      } & RingTimeout &
+        Fallback)
+    | ({
+        kind: 'webSocket';
+        protocol: WebSocketProtocol;
+        url: string;
+        sampleRate: WebSocketSampleRate;
+        record?: true;
+      } & Fallback)
+    | { kind: 'mailboxUser'; userId: string }
+    | { kind: 'mailboxRingGroup'; ringGroupId: string }
+    | { kind: 'menu'; menuId: string }
+    /** Ends the call, the row naming none of the eight targets (§11.2). */
+    | { kind: 'hangup' }
+  );
+
+/** A `forward_targets` row: at most one target is set, `sip`'s and `webSocket`'s being their
  * column sets, enforced by the table's CHECK, which also allows `record_calls` on an `external`,
  * `sip` or `webSocket` target alone. */
 type ForwardTargetsRow = {
@@ -91,16 +98,12 @@ function sampleRateOf(row: ForwardTargetsRow): WebSocketSampleRate {
   );
 }
 
-/** Reads the one set column of `row` into the `ForwardTarget` union it represents, an `external`,
- * `sip` or `webSocket` one with its fallback chain from `rows` (the snapshot's). */
-export function targetFromRow(
+/** `targetFromRow` without the announcement: the one set column's kind, `hangup` for none, an
+ * `external`, `sip` or `webSocket` one with `fallback`. */
+function kindFromRow(
   row: ForwardTargetsRow,
-  rows: readonly ForwardTargetsRow[] = []
+  fallback: Fallback
 ): ForwardTarget {
-  // The row whose `fallbackOfId` names this one holds its fallback, read down its own chain.
-  const next = rows.find(candidate => candidate.fallbackOfId === row.id);
-  const fallback: Fallback =
-    next === undefined ? {} : { fallback: targetFromRow(next, rows) };
   if (row.userId !== null) {
     return { kind: 'user', userId: row.userId };
   }
@@ -152,13 +155,27 @@ export function targetFromRow(
       ringGroupId: row.mailboxRingGroupId
     };
   }
-  if (row.announcementAudioId !== null) {
-    return { kind: 'announcement', audioId: row.announcementAudioId };
-  }
   if (row.menuId !== null) {
     return { kind: 'menu', menuId: row.menuId };
   }
-  throw new Error(`forwardTargets: row ${row.id} sets no target column`);
+  return { kind: 'hangup' };
+}
+
+/** Reads `row` into the `ForwardTarget` it represents, with its announcement, an `external`, `sip`
+ * or `webSocket` one with its fallback chain from `rows` (the snapshot's). */
+export function targetFromRow(
+  row: ForwardTargetsRow,
+  rows: readonly ForwardTargetsRow[] = []
+): ForwardTarget {
+  // The row whose `fallbackOfId` names this one holds its fallback, read down its own chain.
+  const next = rows.find(candidate => candidate.fallbackOfId === row.id);
+  const target = kindFromRow(
+    row,
+    next === undefined ? {} : { fallback: targetFromRow(next, rows) }
+  );
+  return row.announcementAudioId === null
+    ? target
+    : { ...target, announcementAudioId: row.announcementAudioId };
 }
 
 /** The `ForwardTarget` a `forward_targets` row represents; throws on a dangling id (FK-guaranteed present). */

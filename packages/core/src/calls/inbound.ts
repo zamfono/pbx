@@ -1,6 +1,7 @@
 /** Inbound call entry (§10.1 step 1; §9.2 `inbound,<exten>`) and pipeline steps 2-4, 6 and 7
  * (ring groups are `ringGroup.ts`'s): OOO, opening hours, the target-user and target-menu steps,
- * reject-anonymous, and each target kind's dispatch; hop counting is `runTarget.ts`'s. */
+ * reject-anonymous, a target's announcement, and each target kind's dispatch; hop counting is
+ * `runTarget.ts`'s. */
 import { newId } from '@zamfono/shared';
 
 import type { AriEventOf } from '../ari/events.js';
@@ -14,7 +15,7 @@ import {
 } from '../routing/entry.js';
 import { targetFromRow, type ForwardTarget } from '../routing/targets.js';
 import { SIP_DECLINE, SIP_SERVER_ERROR } from '../sipCodes.js';
-import { announce } from './announce.js';
+import { announce, hangUp } from './announce.js';
 import { newCall, type Call } from './call.js';
 import { raiseLogLevel } from './callLogLevel.js';
 import { noteNumberForward } from './forwardContext.js';
@@ -31,16 +32,11 @@ import { runUserStep } from './userStep.js';
 import { deposit } from './voicemail.js';
 import { dialWebSocketTarget } from './webSocketTarget.js';
 
-/** Step 1 "Entry" for an already-resolved target (§10.1): reject-anonymous, OOO/hours, then the
- * target's own step. Exported for outbound dialling of an internal extension or own DID, which
- * enters here directly, without `runTarget`'s hop counting (§10.1 Outbound steps 3 and 5).
- * `forwarder` is the user whose own rule forwarded here, whose call an external target is dialled
- * as (§10.1 step 7), or `null` when a DID, menu, ring group or tenant rule forwards; no other
- * target kind reads it. */
-export async function enterTarget(
+/** `enterTarget` once the target's announcement has played: what its kind does. */
+async function enterKind(
   pipeline: Pipeline,
   call: Call,
-  target: ForwardTarget,
+  target: Exclude<ForwardTarget, { kind: 'hangup' }>,
   forwarder: Forwarder | null
 ): Promise<void> {
   if (target.kind === 'mailboxUser') {
@@ -54,10 +50,6 @@ export async function enterTarget(
       { ringGroupId: target.ringGroupId },
       'target'
     );
-    return;
-  }
-  if (target.kind === 'announcement') {
-    await announce(pipeline, call, target.audioId);
     return;
   }
   if (target.kind === 'external' || target.kind === 'sip') {
@@ -114,9 +106,33 @@ export async function enterTarget(
     await playMenu(pipeline, call, target.menuId);
     return;
   }
-  // The last of `ForwardTarget`'s kinds: the two mailboxes, the announcement, the outward targets,
-  // the user and the menu each returned above.
+  // The last of `ForwardTarget`'s kinds: `hangup`, the two mailboxes, the outward targets, the user
+  // and the menu each returned above.
   await ringGroup(pipeline, call, target.ringGroupId);
+}
+
+/** Step 1 "Entry" for an already-resolved target (§10.1): reject-anonymous, OOO/hours, then the
+ * target's own step. Exported for outbound dialling of an internal extension or own DID, which
+ * enters here directly, without `runTarget`'s hop counting (§10.1 Outbound steps 3 and 5).
+ * `forwarder` is the user whose own rule forwarded here, whose call an external target is dialled
+ * as (§10.1 step 7), or `null` when a DID, menu, ring group or tenant rule forwards; no other
+ * target kind reads it. */
+export async function enterTarget(
+  pipeline: Pipeline,
+  call: Call,
+  target: ForwardTarget,
+  forwarder: Forwarder | null
+): Promise<void> {
+  // §10.1 step 7: the target's announcement plays first, whatever its kind.
+  const audioId = target.announcementAudioId;
+  if (audioId !== undefined && !(await announce(pipeline, call, audioId))) {
+    return;
+  }
+  if (target.kind === 'hangup') {
+    await hangUp(pipeline, call, audioId !== undefined);
+    return;
+  }
+  await enterKind(pipeline, call, target, forwarder);
 }
 
 /** Entry's DID lookup for an inbound call (§10.1 step 1, §11.3): the called number's DID, else

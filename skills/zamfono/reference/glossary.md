@@ -27,9 +27,8 @@ block's `fallbackTarget`, else the tenant-wide `settings.fallbackTarget`, else a
 `numbers`.
 
 **Forward target** — the nine-kind vocabulary (`user`, `ringGroup`, `external`, `sip`,
-`webSocket`, `mailboxUser`, `mailboxRingGroup`, `announcement`, `menu`) every routing rule points
-at. See
-`mental-model`.
+`webSocket`, `mailboxUser`, `mailboxRingGroup`, `menu`, `hangup`) every routing rule points at,
+each with an optional announcement that plays first. See `mental-model`.
 
 **Hop** — one re-entry of the routing pipeline through a `user` or `ringGroup` forward target. A
 call is released to a mailbox after the third hop.

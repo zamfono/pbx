@@ -64,7 +64,12 @@ async function arrange(): Promise<Fixture> {
     url: BOT_URL,
     sampleRate: 8000,
     record: false,
-    fallback: { kind: 'mailboxUser', userId: anna.id }
+    fallback: {
+      kind: 'mailboxUser',
+      userId: anna.id,
+      announcementAudioId: null
+    },
+    announcementAudioId: null
   };
   const sip = {
     kind: 'sip',
@@ -73,14 +78,16 @@ async function arrange(): Promise<Fixture> {
     headers: [{ name: 'X-Auth', value: HEADER_VALUE }],
     ringTimeoutS: 20,
     record: false,
-    fallback: null
+    fallback: null,
+    announcementAudioId: null
   };
   const recorded = {
     kind: 'external',
     external: '+4319999',
     ringTimeoutS: null,
     record: true,
-    fallback: null
+    fallback: null,
+    announcementAudioId: null
   };
   await runOperation(
     db,
@@ -92,7 +99,11 @@ async function arrange(): Promise<Fixture> {
         { condition: 'noAnswer', target: webSocket },
         {
           condition: 'offline',
-          target: { kind: 'mailboxUser', userId: anna.id }
+          target: {
+            kind: 'mailboxUser',
+            userId: anna.id,
+            announcementAudioId: null
+          }
         }
       ]
     },
@@ -198,7 +209,14 @@ const scopePath = (): string => `/users/${fx.anna.id}`;
 const markedRules = (): unknown[] => [
   { condition: 'busy', target: { managed: true, kind: 'sip' } },
   { condition: 'noAnswer', target: { managed: true, kind: 'webSocket' } },
-  { condition: 'offline', target: { kind: 'mailboxUser', userId: fx.anna.id } }
+  {
+    condition: 'offline',
+    target: {
+      kind: 'mailboxUser',
+      userId: fx.anna.id,
+      announcementAudioId: null
+    }
+  }
 ];
 
 describe('a user reads admin-set targets masked', () => {
@@ -250,7 +268,11 @@ describe('a user reads admin-set targets masked', () => {
         { condition: 'noAnswer', target: fx.webSocket },
         {
           condition: 'offline',
-          target: { kind: 'mailboxUser', userId: fx.anna.id }
+          target: {
+            kind: 'mailboxUser',
+            userId: fx.anna.id,
+            announcementAudioId: null
+          }
         }
       ]);
       // eslint-disable-next-line no-await-in-loop -- one actor after the other
@@ -275,7 +297,14 @@ describe('a user sends the marker back', () => {
       .execute();
     const rules = [
       ...markedRules().slice(0, 2),
-      { condition: 'dnd', target: { kind: 'mailboxUser', userId: fx.anna.id } }
+      {
+        condition: 'dnd',
+        target: {
+          kind: 'mailboxUser',
+          userId: fx.anna.id,
+          announcementAudioId: null
+        }
+      }
     ];
     const put = await rest(fx.anna, 'PUT', `${scopePath()}/forwarding`, {
       rules
@@ -320,7 +349,14 @@ describe('a user sends the marker back', () => {
     expect(full.body.rules).toEqual([
       { condition: 'busy', target: fx.sip },
       { condition: 'noAnswer', target: fx.webSocket },
-      { condition: 'dnd', target: { kind: 'mailboxUser', userId: fx.anna.id } }
+      {
+        condition: 'dnd',
+        target: {
+          kind: 'mailboxUser',
+          userId: fx.anna.id,
+          announcementAudioId: null
+        }
+      }
     ]);
   });
 
@@ -469,10 +505,18 @@ describe('an admin undoing a user’s change', () => {
   it('restores the admin-set targets in full', async () => {
     await rest(fx.anna, 'PUT', `${scopePath()}/forwarding`, { rules: [] });
     await rest(fx.anna, 'PATCH', `/ooo/${fx.oooId}`, {
-      target: { kind: 'mailboxUser', userId: fx.anna.id }
+      target: {
+        kind: 'mailboxUser',
+        userId: fx.anna.id,
+        announcementAudioId: null
+      }
     });
     await rest(fx.anna, 'PUT', `${scopePath()}/hours`, {
-      closedTarget: { kind: 'mailboxUser', userId: fx.anna.id },
+      closedTarget: {
+        kind: 'mailboxUser',
+        userId: fx.anna.id,
+        announcementAudioId: null
+      },
       intervals: []
     });
     const entries = await fx.db
@@ -497,7 +541,11 @@ describe('an admin undoing a user’s change', () => {
       { condition: 'noAnswer', target: fx.webSocket },
       {
         condition: 'offline',
-        target: { kind: 'mailboxUser', userId: fx.anna.id }
+        target: {
+          kind: 'mailboxUser',
+          userId: fx.anna.id,
+          announcementAudioId: null
+        }
       }
     ]);
     const ooo = await rest(admin, 'GET', `${scopePath()}/ooo`);

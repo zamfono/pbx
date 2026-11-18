@@ -59,7 +59,8 @@ describe('webSocket forward targets', () => {
       url: BOT_URL,
       sampleRate: 8000,
       record: false,
-      fallback: null
+      fallback: null,
+      announcementAudioId: null
     });
     const vonage = (await runOperation(
       db,
@@ -71,7 +72,8 @@ describe('webSocket forward targets', () => {
           protocol: 'vonage',
           url: 'ws://10.0.0.5:8080/bot',
           record: true,
-          fallback: null
+          fallback: null,
+          announcementAudioId: null
         }
       },
       asRun()
@@ -82,7 +84,8 @@ describe('webSocket forward targets', () => {
       url: 'ws://10.0.0.5:8080/bot',
       sampleRate: 16000,
       record: true,
-      fallback: null
+      fallback: null,
+      announcementAudioId: null
     });
     const row = await db
       .selectFrom('dids')

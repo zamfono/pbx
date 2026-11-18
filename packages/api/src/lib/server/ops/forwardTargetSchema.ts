@@ -10,11 +10,11 @@ import {
   WEB_SOCKET_PROTOCOLS,
   WEB_SOCKET_SAMPLE_RATES,
   WEB_SOCKET_URL_MAX_LENGTH,
-  type SipHeaderTemplate,
   type WebSocketProtocol,
   type WebSocketSampleRate
 } from '@zamfono/shared';
 
+import type { TargetSpec } from './forwardTargetType.js';
 import { sipHeadersSchema } from './sipHeaders.js';
 import { timeoutSeconds } from './timeoutInput.js';
 
@@ -35,6 +35,15 @@ const recordSchema = z
   .default(false)
   .describe(
     'Records every call this target answers, whatever forwarded it; admin-only, left out false.'
+  );
+
+/** The announcement any target may play before the call goes where it sends it (§10.1 step 7). */
+const announcementSchema = z
+  .string()
+  .nullable()
+  .default(null)
+  .describe(
+    'An audio asset of kind announcement (audio.list) played to the caller, who is answered for it, before the call goes on to this target; null plays nothing.'
   );
 
 /** How long an `external` or `sip` target rings before it counts as not working (§10.1 step 7). */
@@ -93,6 +102,7 @@ const webSocketTargetSchema = z.strictObject({
       'The PCM sample rate in Hz: 8000, 16000 or 24000 for vonage, left out 16000; always 8000 for twilio.'
     ),
   record: recordSchema,
+  announcementAudioId: announcementSchema,
   get fallback(): FallbackSchema {
     // eslint-disable-next-line no-use-before-define -- a fallback nests the union this kind is in
     return fallbackSchema();
@@ -122,7 +132,8 @@ function fallbackSchema(): FallbackSchema {
 /**
  * The shared target vocabulary a ring group's forwarding rule or a menu's fallback/DTMF option
  * points at (§11.2 `forward_targets`). One of the union's kinds maps to exactly one of the
- * table's nine exclusive targets, `sip`'s and `webSocket`'s being their column sets; each is
+ * table's eight exclusive targets, `sip`'s and `webSocket`'s being their column sets, and `hangup`
+ * to none of them; each takes the announcement that plays before it (§10.1 step 7). Each is
  * strict, so a field of another kind, such as `record` on a `user` target, is refused rather
  * than dropped.
  */
@@ -132,13 +143,15 @@ export const targetSpecSchema: z.ZodType<TargetSpec> = z
       kind: z
         .literal('user')
         .describe('Rings a user through the routing pipeline.'),
-      userId: z.string()
+      userId: z.string(),
+      announcementAudioId: announcementSchema
     }),
     z.strictObject({
       kind: z
         .literal('ringGroup')
         .describe('Rings a ring group through the routing pipeline.'),
-      ringGroupId: z.string()
+      ringGroupId: z.string(),
+      announcementAudioId: announcementSchema
     }),
     z
       .strictObject({
@@ -151,6 +164,7 @@ export const targetSpecSchema: z.ZodType<TargetSpec> = z
           .describe('The number to dial, E.164 such as +4930123456.'),
         ringTimeoutS: ringTimeoutSchema,
         record: recordSchema,
+        announcementAudioId: announcementSchema,
         get fallback(): FallbackSchema {
           return fallbackSchema();
         }
@@ -178,6 +192,7 @@ export const targetSpecSchema: z.ZodType<TargetSpec> = z
         ),
       ringTimeoutS: ringTimeoutSchema,
       record: recordSchema,
+      announcementAudioId: announcementSchema,
       get fallback(): FallbackSchema {
         return fallbackSchema();
       }
@@ -187,7 +202,8 @@ export const targetSpecSchema: z.ZodType<TargetSpec> = z
       kind: z
         .literal('mailboxUser')
         .describe("Deposits the caller in a user's mailbox without ringing."),
-      userId: z.string()
+      userId: z.string(),
+      announcementAudioId: announcementSchema
     }),
     z.strictObject({
       kind: z
@@ -195,19 +211,23 @@ export const targetSpecSchema: z.ZodType<TargetSpec> = z
         .describe(
           "Deposits the caller in a ring group's mailbox without ringing."
         ),
-      ringGroupId: z.string()
-    }),
-    z.strictObject({
-      kind: z
-        .literal('announcement')
-        .describe('Plays an audio asset and ends the call.'),
-      audioId: z.string().describe('The audio asset to play (audio.list).')
+      ringGroupId: z.string(),
+      announcementAudioId: announcementSchema
     }),
     z.strictObject({
       kind: z
         .literal('menu')
         .describe("Plays a menu's greeting and collects DTMF."),
-      menuId: z.string()
+      menuId: z.string(),
+      announcementAudioId: announcementSchema
+    }),
+    z.strictObject({
+      kind: z
+        .literal('hangup')
+        .describe(
+          'Ends the call: once its announcement has played, or unanswered (480) without one.'
+        ),
+      announcementAudioId: announcementSchema
     })
   ])
   // A `twilio` target at a rate other than 8000 is refused, and one without a rate gets its
@@ -252,37 +272,4 @@ export type ManagedTarget = z.infer<typeof managedTargetSchema>;
 export const ownTargetSchema = z.union([managedTargetSchema, targetSpecSchema]);
 export type OwnTarget = ManagedTarget | TargetSpec;
 
-/** What `targetSpecSchema` parses to, written out since its fallback nests it (`fallbackSchema`).
- * `ringTimeoutS` and `fallback` are always set on a parsed or read target; a target built in code
- * may leave them out for `null`. */
-export type TargetSpec =
-  | { kind: 'user'; userId: string }
-  | { kind: 'ringGroup'; ringGroupId: string }
-  | {
-      kind: 'external';
-      external: string;
-      ringTimeoutS?: number | null;
-      record: boolean;
-      fallback?: TargetSpec | null;
-    }
-  | {
-      kind: 'sip';
-      trunkId: string;
-      user: string;
-      headers: SipHeaderTemplate[];
-      ringTimeoutS?: number | null;
-      record: boolean;
-      fallback?: TargetSpec | null;
-    }
-  | {
-      kind: 'webSocket';
-      protocol: WebSocketProtocol;
-      url: string;
-      sampleRate?: WebSocketSampleRate;
-      record: boolean;
-      fallback?: TargetSpec | null;
-    }
-  | { kind: 'mailboxUser'; userId: string }
-  | { kind: 'mailboxRingGroup'; ringGroupId: string }
-  | { kind: 'announcement'; audioId: string }
-  | { kind: 'menu'; menuId: string };
+export type { TargetSpec } from './forwardTargetType.js';

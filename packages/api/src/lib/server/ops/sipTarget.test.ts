@@ -70,7 +70,8 @@ describe('sip forward targets', () => {
       headers: DEFAULT_SIP_HEADERS,
       record: false,
       ringTimeoutS: null,
-      fallback: null
+      fallback: null,
+      announcementAudioId: null
     };
     expect(did.target).toEqual(stored);
     const row = await db
@@ -182,11 +183,19 @@ describe('sip forward targets', () => {
       'ooo.update',
       {
         id: ooo.id,
-        target: { kind: 'mailboxUser', userId: 'owner' }
+        target: {
+          kind: 'mailboxUser',
+          userId: 'owner',
+          announcementAudioId: null
+        }
       },
       asRun({ actor: self })
     )) as { target: unknown };
-    expect(replaced.target).toEqual({ kind: 'mailboxUser', userId: 'owner' });
+    expect(replaced.target).toEqual({
+      kind: 'mailboxUser',
+      userId: 'owner',
+      announcementAudioId: null
+    });
   });
 
   it('refuses to delete a trunk a live sip target dials over, listing its owners, until retargeted', async () => {
