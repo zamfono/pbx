@@ -1,30 +1,21 @@
 import { z } from 'zod';
 
 import {
-  ALWAYS_FORBIDDEN_REASON,
   DEFAULT_SIP_HEADERS,
   DEFAULT_VONAGE_SAMPLE_RATE,
-  isAlwaysForbiddenLiteral,
   isE164,
+  SIP_USER_PATTERN,
   TWILIO_SAMPLE_RATE,
   WEB_SOCKET_PROTOCOLS,
   WEB_SOCKET_SAMPLE_RATES,
-  WEB_SOCKET_URL_MAX_LENGTH,
   type WebSocketProtocol,
   type WebSocketSampleRate
 } from '@zamfono/shared';
 
+import { templatedField, webSocketUrlSchema } from './forwardTargetFields.js';
 import type { TargetSpec } from './forwardTargetType.js';
 import { sipHeadersSchema } from './sipHeaders.js';
 import { timeoutSeconds } from './timeoutInput.js';
-
-/**
- * A `sip` target's request-URI user part (§9.4 "SIP targets"): RFC 3261's unreserved `.`, `_`,
- * `~`, `-` and the user-unreserved `+` beside letters and digits, a subset that needs no escaping
- * and cannot reach into the `PJSIP/<user>@<endpoint>` dial string; `forward_targets`' CHECK holds
- * the same.
- */
-const SIP_USER_PATTERN = /^[A-Za-z0-9._~+-]{1,64}$/u;
 
 /**
  * Whether an `external`, `sip` or `webSocket` target records the leg it answers on (§10.2
@@ -52,19 +43,6 @@ const ringTimeoutSchema = timeoutSeconds
   .default(null)
   .describe(
     'Seconds the target may ring, across every route and host it is tried on, before the call goes to its fallback, else ends unanswered (480); null rings until the far end decides.'
-  );
-
-/** The URL a `webSocket` target connects to (§9.4 "WebSocket targets"); `forward_targets`' CHECK
- * holds the same. An address literal no connection could reach is refused at once (§3.1
- * "Outbound targets"). */
-const webSocketUrlSchema = z
-  .url({ protocol: /^wss?$/u, hostname: z.regexes.hostname })
-  .max(WEB_SOCKET_URL_MAX_LENGTH)
-  .refine(url => !isAlwaysForbiddenLiteral(URL.parse(url)?.hostname ?? ''), {
-    message: ALWAYS_FORBIDDEN_REASON
-  })
-  .describe(
-    "The bot's WebSocket URL, wss:// (or ws://), at most 2048 characters; a token the bot checks goes in its query string."
   );
 
 /** The sample rate a `webSocket` target speaks at (§9.4 "WebSocket targets"): `twilio` always 8000,
@@ -109,7 +87,7 @@ const webSocketTargetSchema = z.strictObject({
   }
 });
 
-/** An `external`, `sip` or `webSocket` target's `fallback`: where the call goes when the target
+/** An `external`, `sip`, `webSocket` or `extension` target's `fallback`: where the call goes when the target
  * does not work, any target, itself with a fallback of its own (§10.1 step 7). */
 type FallbackSchema = z.ZodType<TargetSpec | null>;
 
@@ -123,7 +101,7 @@ function fallbackSchema(): FallbackSchema {
     .nullable()
     .default(null)
     .describe(
-      'Where the call goes when this target does not work (no route or trunk, a failure or refusal, the ring timeout, a bot that cannot be reached): any target, which may have a fallback of its own; null ends the call as without one.'
+      'Where the call goes when this target does not work (no route or trunk, a failure or refusal, the ring timeout, a bot that cannot be reached, a template rendering no usable value): any target, which may have a fallback of its own; null ends the call as without one.'
     )
     .meta({ id: 'ForwardTargetFallback' });
   return builtFallbackSchema;
@@ -132,7 +110,7 @@ function fallbackSchema(): FallbackSchema {
 /**
  * The shared target vocabulary a ring group's forwarding rule or a menu's fallback/DTMF option
  * points at (§11.2 `forward_targets`). One of the union's kinds maps to exactly one of the
- * table's nine exclusive targets, `sip`'s and `webSocket`'s being their column sets, and `hangup`
+ * table's ten exclusive targets, `sip`'s and `webSocket`'s being their column sets, and `hangup`
  * to none of them; each takes the announcement that plays before it (§10.1 step 7). Each is
  * strict, so a field of another kind, such as `record` on a `user` target, is refused rather
  * than dropped.
@@ -158,10 +136,13 @@ export const targetSpecSchema: z.ZodType<TargetSpec> = z
         kind: z
           .literal('external')
           .describe('Dials an external number through the outbound routes.'),
-        external: z
-          .string()
-          .refine(isE164, 'external must be E.164')
-          .describe('The number to dial, E.164 such as +4930123456.'),
+        external: templatedField(
+          'external',
+          isE164,
+          'external must be E.164'
+        ).describe(
+          'The number to dial, E.164 such as +4930123456, or, admin-only, a template rendering one, such as +43123456{{slice did -2}} (see zamfono.help templates).'
+        ),
         ringTimeoutS: ringTimeoutSchema,
         record: recordSchema,
         announcementAudioId: announcementSchema,
@@ -179,10 +160,13 @@ export const targetSpecSchema: z.ZodType<TargetSpec> = z
       trunkId: z
         .string()
         .describe('The trunk whose outbound hosts are dialled.'),
-      user: z
-        .string()
-        .regex(SIP_USER_PATTERN, 'user must be 1-64 of A-Z a-z 0-9 . _ ~ + -')
-        .describe('The request URI user part: sip:<user>@<trunk host>.'),
+      user: templatedField(
+        'user',
+        value => SIP_USER_PATTERN.test(value),
+        'user must be 1-64 of A-Z a-z 0-9 . _ ~ + -'
+      ).describe(
+        'The request URI user part: sip:<user>@<trunk host>; may be a template (see zamfono.help templates).'
+      ),
       // §9.4 "Header templates": left out on a write, the defaults, which the write returns as
       // every read does.
       headers: sipHeadersSchema
@@ -232,6 +216,24 @@ export const targetSpecSchema: z.ZodType<TargetSpec> = z
     }),
     z.strictObject({
       kind: z
+        .literal('extension')
+        .describe(
+          'Sends the call to the extension a template renders for it, as if that extension had been dialled; admin-only.'
+        ),
+      extension: templatedField(
+        'extension',
+        () => false,
+        'extension must be a template; name a fixed user, ring group, menu or decision by its own kind'
+      ).describe(
+        "A template rendering an extension's digits, such as {{slice did -2}} (see zamfono.help templates)."
+      ),
+      announcementAudioId: announcementSchema,
+      get fallback(): FallbackSchema {
+        return fallbackSchema();
+      }
+    }),
+    z.strictObject({
+      kind: z
         .literal('hangup')
         .describe(
           'Ends the call: once its announcement has played, or unanswered (480) without one.'
@@ -257,19 +259,19 @@ export const targetSpecSchema: z.ZodType<TargetSpec> = z
   // which the OpenAPI document lifts into its components (`openapi.ts`).
   .meta({ id: 'ForwardTarget' })
   .describe(
-    'Where the call goes: one of ten kinds, chosen by `kind` (see zamfono.help mental-model).'
+    'Where the call goes: one of eleven kinds, chosen by `kind` (see zamfono.help mental-model).'
   );
 /**
  * What a `user` reads in place of a target an admin set on their own forwarding rule, OOO rule or
- * opening hours (§10.3 "Forward targets"), a chain holding a `sip`, `webSocket` or `decision`
- * target, or an `external` one that records, anywhere in it: its kind alone, never its number,
- * URL, token, headers or cases. Sent back unchanged in the same place, it keeps the admin's target
+ * opening hours (§10.3 "Forward targets"), a chain holding a `sip`, `webSocket`, `decision` or
+ * `extension` target, or an `external` one that records or is a template, anywhere in it: its
+ * kind alone, never its number, URL, token, headers, cases or template. Sent back unchanged in the same place, it keeps the admin's target
  * as it is.
  */
 export const managedTargetSchema = z
   .strictObject({
     managed: z.literal(true),
-    kind: z.enum(['external', 'sip', 'webSocket', 'decision'])
+    kind: z.enum(['external', 'sip', 'webSocket', 'decision', 'extension'])
   })
   .meta({ id: 'ManagedForwardTarget' })
   .describe(

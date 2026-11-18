@@ -1,5 +1,6 @@
 /** Pipeline step 7 "Forward targets" (§10.1): hop counting, the hop a forward records for its
  * forwarded leg (§9.4 "Forwarded calls"), then `inbound.ts`'s dispatch of the target. */
+import type { Resolution } from '../routing/decision.js';
 import { nextHop, type ForwardTarget } from '../routing/targets.js';
 import { SIP_TEMPORARILY_UNAVAILABLE } from '../sipCodes.js';
 import { type Call } from './call.js';
@@ -8,7 +9,7 @@ import { noteDiversion, type Diversion } from './forwardContext.js';
 import type { Forwarder } from './forwardLeg.js';
 import { enterResolved, enterTarget } from './inbound.js';
 import type { Pipeline } from './pipeline.js';
-import { endTargetOwner, type Owner } from './release.js';
+import { endTargetOwner, release, type Owner } from './release.js';
 
 /** Past the hop limit (`settings.max_forward_hops`): the last target's mailbox, else 480 (§10.1
  * step 7), `trace` saying why. */
@@ -42,6 +43,30 @@ export async function endAtDecisionLoop(
   await endAtHopLimit(pipeline, call, { event: 'decisionLoop', decisionId });
 }
 
+/**
+ * A resolution that is no target to apply ends here (§10.1 step 7): a decision met again ends the
+ * call as at the hop limit, and a target whose template rendered no value of its field counts as
+ * not working, with a `templateInvalid` trace line naming the field and what it rendered, so the
+ * call goes to its fallback, else is released with 480.
+ */
+export async function endUnresolved(
+  pipeline: Pipeline,
+  call: Call,
+  resolution: Exclude<Resolution, { kind: 'resolved' }>,
+  forwarder: Forwarder | null
+): Promise<void> {
+  if (resolution.kind === 'loop') {
+    await endAtDecisionLoop(pipeline, call, resolution.decisionId);
+    return;
+  }
+  const { target, field, value } = resolution;
+  call.log.event({ event: 'templateInvalid', kind: target.kind, field, value });
+  // eslint-disable-next-line no-use-before-define -- falling back applies a target again
+  if (!(await failOver(pipeline, call, target, forwarder, 'templateInvalid'))) {
+    await release(pipeline, call, SIP_TEMPORARILY_UNAVAILABLE, 'missed');
+  }
+}
+
 /** What a target is applied for: the forward hop it is, `null` for a forward that diverts nobody
  * (a menu's fallback, a parked call's, a fallback), recorded once the hop limit let it through;
  * and whether an OOO rule, a closed schedule, a user's or a group's rule forwards, which clears
@@ -65,8 +90,8 @@ export async function runTarget(
     call.decisionsSeen.clear();
   }
   const resolution = await resolveOnCall(pipeline, call, target);
-  if (resolution.kind === 'loop') {
-    await endAtDecisionLoop(pipeline, call, resolution.decisionId);
+  if (resolution.kind !== 'resolved') {
+    await endUnresolved(pipeline, call, resolution, forwarder);
     return;
   }
   const snapshot = await pipeline.deps.cache.get();
@@ -88,7 +113,7 @@ export async function runTarget(
 }
 
 /**
- * §10.1 step 7: an `external`, `sip` or `webSocket` target that did not work, for `cause` (the
+ * §10.1 step 7: an `external`, `sip`, `webSocket` or `extension` target that did not work, for `cause` (the
  * far end's final SIP status, or what kept it from answering), hands
  * the call to its fallback as if the rule had named that one: a user or ring group counts a hop
  * and re-enters, and `forwarder` still dials an external or SIP fallback as their own call. The

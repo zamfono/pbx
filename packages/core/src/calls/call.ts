@@ -84,6 +84,11 @@ export type Call = {
   /** The decisions evaluated since the last clearing event (§10.1 step 7 "Loops"): a hop, a rule
    * forwarding, a menu key matching an option. One met again ends the call as at the hop limit. */
   decisionsSeen: Set<string>;
+  /** The call's own template values beside the placeholders (§9.4 "Templates"): each HTTP
+   * request's answer under the request's name, in memory only. */
+  variables: Record<string, unknown>;
+  /** The caller's name as `{{callerName}}` renders it, once looked up (`forwardValues.ts`). */
+  callerName?: Promise<string>;
   menuAttempts: number;
   /** The bridge this call's next answer joins in place of a bridge of its own: the parked
    * party's for the parking ring-back (§10.2 "Call parking"), the running call's for `*5`
@@ -174,6 +179,7 @@ export function newCall(params: NewCallParams): Call {
     parentCallId: null,
     evaluated: new Set(),
     decisionsSeen: new Set(),
+    variables: {},
     menuAttempts: 0
   };
 }

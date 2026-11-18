@@ -12,7 +12,7 @@ import {
 
 import type { Snapshot } from '../internal/snapshot.js';
 
-/** An `external`, `sip` or `webSocket` target's own fallback, where the call goes when it does
+/** An `external`, `sip`, `webSocket` or `extension` target's own fallback, where the call goes when it does
  * not work (§10.1 step 7); set only when it has one. */
 type Fallback = { fallback?: ForwardTarget };
 
@@ -47,6 +47,9 @@ export type ForwardTarget = Announcement &
     | { kind: 'mailboxUser'; userId: string }
     | { kind: 'mailboxRingGroup'; ringGroupId: string }
     | { kind: 'menu'; menuId: string }
+    /** Sends the call to the extension its template renders to for the call, as if the rule had
+     * named that extension's user, ring group, menu or decision (§10.1 step 7 "Templates"). */
+    | ({ kind: 'extension'; extension: string } & Fallback)
     /** Sends the call to the first of the decision's cases whose conditions match, else its
      * default (§10.1 step 7 "Decisions"), resolved before the call goes anywhere. */
     | { kind: 'decision'; decisionId: string }
@@ -74,6 +77,7 @@ type ForwardTargetsRow = {
   announcementAudioId: string | null;
   menuId: string | null;
   decisionId: string | null;
+  extension: string | null;
   ringTimeoutS: number | null;
   /** The target this row is the fallback of (§10.1 step 7), `null` for a chain's first row. */
   fallbackOfId: string | null;
@@ -103,7 +107,7 @@ function sampleRateOf(row: ForwardTargetsRow): WebSocketSampleRate {
 }
 
 /** `targetFromRow` without the announcement: the one set column's kind, `hangup` for none, an
- * `external`, `sip` or `webSocket` one with `fallback`. */
+ * `external`, `sip`, `webSocket` or `extension` one with `fallback`. */
 function kindFromRow(
   row: ForwardTargetsRow,
   fallback: Fallback
@@ -164,6 +168,9 @@ function kindFromRow(
   }
   if (row.decisionId !== null) {
     return { kind: 'decision', decisionId: row.decisionId };
+  }
+  if (row.extension !== null) {
+    return { kind: 'extension', extension: row.extension, ...fallback };
   }
   return { kind: 'hangup' };
 }
@@ -257,4 +264,27 @@ export function nextHop(
     return { ok: false };
   }
   return { ok: true, hops: next };
+}
+
+/** The target the live extension `ext` leads to, as a dialled extension does (§10.1 "Outbound"
+ * step 3): its user, ring group, decision or menu; `null` for an extension nobody owns and for a
+ * parking slot. */
+export function extensionTarget(
+  snapshot: Snapshot,
+  ext: string
+): ForwardTarget | null {
+  const row = snapshot.extensions.find(candidate => candidate.ext === ext);
+  if (row === undefined) {
+    return null;
+  }
+  if (row.userId !== null) {
+    return { kind: 'user', userId: row.userId };
+  }
+  if (row.ringGroupId !== null) {
+    return { kind: 'ringGroup', ringGroupId: row.ringGroupId };
+  }
+  if (row.decisionId !== null) {
+    return { kind: 'decision', decisionId: row.decisionId };
+  }
+  return row.menuId === null ? null : { kind: 'menu', menuId: row.menuId };
 }

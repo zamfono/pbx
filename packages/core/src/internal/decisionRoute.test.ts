@@ -33,6 +33,7 @@ describe('a decision\'s dry run (§10.3 "Decisions")', () => {
         caller: { number: '+436991234567' },
         direction: 'inbound',
         presence: {},
+        values: {},
         ...over
       }
     );
@@ -86,6 +87,7 @@ describe('a decision\'s dry run (§10.3 "Decisions")', () => {
         }
       ],
       loop: null,
+      invalid: null,
       // The tenant's OOO rule applies to Anna as the call's target, overriding the decision.
       ooo: { scope: { kind: 'tenant' }, oooRuleId, targetId: oooTarget },
       hours: null
@@ -142,5 +144,40 @@ describe('a decision\'s dry run (§10.3 "Decisions")', () => {
       .execute();
     expect(await run(looping)).toMatchObject({ loop: looping, ooo: null });
     expect(await run(newId())).toBeNull();
+  });
+  it('renders templates with the values given, and names a target whose template renders no value', async () => {
+    const anna = await seedUser(db);
+    const decisionId = await seedDecision(db, {
+      cases: [
+        {
+          when: [
+            { type: 'template', template: '{{slice did -2}}', equals: '17' }
+          ],
+          targetId: await seedForwardTarget(db, { userId: anna })
+        }
+      ],
+      defaultTargetId: await seedForwardTarget(db, {
+        external: '{{crm.number}}'
+      })
+    });
+
+    const branch = await run(decisionId, { values: { did: '+4312345617' } });
+    expect(branch).toMatchObject({
+      evaluations: [
+        {
+          decisionCase: 0,
+          cases: [[{ type: 'template', matched: true, value: '17' }]]
+        }
+      ],
+      invalid: null
+    });
+    // Without an answer to read the number from, no call would dial it.
+    expect(await run(decisionId)).toMatchObject({
+      evaluations: [{ decisionCase: null }],
+      invalid: { field: 'external', value: '' }
+    });
+    expect(
+      await run(decisionId, { values: { crm: { number: '+4319918' } } })
+    ).toMatchObject({ evaluations: [{ decisionCase: null }], invalid: null });
   });
 });

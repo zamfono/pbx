@@ -20,7 +20,9 @@ import { resolveAddedTarget } from './addPartyTarget.js';
 import { linkParent, newCall, type Call } from './call.js';
 import { effectiveStatus, tenantClock } from './callDecisions.js';
 import { ownBridge, transferrerChannel } from './callLookup.js';
+import { callerNumber } from './contactName.js';
 import { extensionOf } from './extensionOwner.js';
+import { templateValues } from './forwardValues.js';
 import { settleStatus } from './missedCall.js';
 import { userOfChannel } from './onwardCall.js';
 import type { Pipeline } from './pipeline.js';
@@ -54,7 +56,13 @@ export async function newAddedLeg(
   };
   const resolved = resolveAddedTarget(snapshot, req.target, {
     ...inputs,
-    statusOf: effectiveStatus(snapshot, pipeline.deps.state.presence, inputs)
+    statusOf: effectiveStatus(snapshot, pipeline.deps.state.presence, inputs),
+    // A template on the way renders with the running call's values, the caller's being the
+    // leg's own (§9.4 "Templates").
+    values: {
+      ...(await templateValues(pipeline, running, snapshot)),
+      callerNumber: callerNumber(from)
+    }
   });
   if (resolved.kind === 'refuse') {
     running.log.event({

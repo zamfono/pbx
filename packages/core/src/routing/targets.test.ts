@@ -49,6 +49,7 @@ describe('targetFromRow', () => {
     announcementAudioId: null,
     menuId: null,
     decisionId: null,
+    extension: null,
     ringTimeoutS: null,
     fallbackOfId: null,
     recordCalls: 0

@@ -195,7 +195,7 @@ export async function ringGroup(
     now: pipeline.deps.now(),
     busy,
     hops: call.hops,
-    inputs: callDecisionInputs(snapshot, pipeline.deps, call)
+    inputs: await callDecisionInputs(snapshot, pipeline, call)
   });
   const legs = ringable(members, group.skipBusy === 1);
 

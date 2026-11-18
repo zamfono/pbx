@@ -6,6 +6,7 @@
  * `forwardLeg.ts`'s `forwardVariables`.
  */
 import {
+  cutUtf8,
   isE164,
   type CountryCode,
   type DiversionPolicy
@@ -20,7 +21,6 @@ import type {
   DivertingParty,
   RedirectingReason
 } from './forwardContext.js';
-import { cutUtf8 } from './forwardHeaders.js';
 
 /** The `reason` RFC 5806 §4 names for each hop's `REDIRECTING` reason. */
 const DIVERSION_REASONS = {

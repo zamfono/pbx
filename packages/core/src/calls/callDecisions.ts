@@ -22,6 +22,7 @@ import { buildOooRules, buildSchedules } from '../routing/scheduleRows.js';
 import type { ForwardTarget } from '../routing/targets.js';
 import type { Call } from './call.js';
 import { presentCallerUserId } from './callLookup.js';
+import { templateValues } from './forwardValues.js';
 import type { Pipeline } from './pipeline.js';
 
 /** `userId`'s effective status at `now`: tenant-wide OOO and hours are the tenant's, not the
@@ -67,21 +68,19 @@ export function tenantClock(
   };
 }
 
-/** What a decision reached by `call` reads: the user on its caller channel, else its number. */
-export function callDecisionInputs(
+/** What a decision reached by `call` reads, and a target's templates: the user on its caller
+ * channel, else its number, and the call's template values (§9.4 "Templates"). */
+export async function callDecisionInputs(
   snapshot: Snapshot,
-  deps: {
-    now: () => string;
-    stackTz: string;
-    state: { presence: ReadonlyMap<string, Presence> };
-  },
+  pipeline: Pipeline,
   call: Call
-): DecisionInputs {
-  const clock = tenantClock(snapshot, deps);
+): Promise<DecisionInputs> {
+  const clock = tenantClock(snapshot, pipeline.deps);
   return {
     ...clock,
     caller: { userId: presentCallerUserId(call), number: call.from },
-    statusOf: effectiveStatus(snapshot, deps.state.presence, clock)
+    statusOf: effectiveStatus(snapshot, pipeline.deps.state.presence, clock),
+    values: await templateValues(pipeline, call, snapshot)
   };
 }
 
@@ -89,7 +88,7 @@ export function callDecisionInputs(
  * §10.1 step 7: `target` resolved through the decisions it leads to on `call`'s path, the one place
  * a decision is evaluated for a call: met again since the last clearing event (`call.decisionsSeen`,
  * "Loops"), or evaluated, one trace line each, and its chosen target taken as if the rule had
- * named it.
+ * named it; and the one place a target's templates are rendered for it ("Templates").
  */
 export async function resolveOnCall(
   pipeline: Pipeline,
@@ -100,7 +99,7 @@ export async function resolveOnCall(
   return resolveDecisions(
     snapshot,
     target,
-    callDecisionInputs(snapshot, pipeline.deps, call),
+    await callDecisionInputs(snapshot, pipeline, call),
     call.decisionsSeen,
     evaluation => {
       call.log.event({

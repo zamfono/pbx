@@ -65,7 +65,15 @@ const dryRunOut = z.object({
     ),
   target: targetSpecSchema
     .nullable()
-    .describe('Where the decisions send the call; null on a loop.'),
+    .describe(
+      'Where the decisions send the call, a template in it as written; null on a loop.'
+    ),
+  invalid: z
+    .object({ field: z.string(), value: z.string() })
+    .nullable()
+    .describe(
+      "The target's templated field and what it rendered to for these values, where that is no usable value: a call would take the target's fallback, else end."
+    ),
   ooo: z
     .object({
       scope: scopeOut,
@@ -128,6 +136,12 @@ export const dryRunDecision = defineOperation({
         .default({})
         .describe(
           "A status per user id standing in for the user's effective status (away, closed, busy, dnd, offline, available)."
+        ),
+      values: z
+        .record(z.string(), z.unknown())
+        .default({})
+        .describe(
+          'The values templates render with, by placeholder or HTTP request name, such as { "did": "+4312345617" }; left out, only the caller number, direction, language and time are known (see zamfono.help templates).'
         )
     })
     .strict(),
@@ -155,7 +169,8 @@ export const dryRunDecision = defineOperation({
       caller: input.caller,
       direction:
         input.direction ?? ('userId' in input.caller ? 'internal' : 'inbound'),
-      presence: input.presence
+      presence: input.presence,
+      values: input.values
     });
     const names = new Map(
       (
@@ -179,6 +194,7 @@ export const dryRunDecision = defineOperation({
           : { decisionId: result.loop, name: names.get(result.loop) ?? '' },
       target:
         result.loop === null ? (evaluations.at(-1)?.target ?? null) : null,
+      invalid: result.invalid,
       ooo:
         result.ooo === null
           ? null

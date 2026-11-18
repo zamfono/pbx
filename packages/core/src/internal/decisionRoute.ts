@@ -23,7 +23,8 @@ import { effectiveStatus } from '../calls/callDecisions.js';
 import { extensionOf } from '../calls/extensionOwner.js';
 import {
   resolveDecisions,
-  type DecisionEvaluation
+  type DecisionEvaluation,
+  type DecisionInputs
 } from '../routing/decision.js';
 import { inEffectOoo, isOpen, scheduleFor } from '../routing/schedule.js';
 import { buildOooRules, buildSchedules } from '../routing/scheduleRows.js';
@@ -89,6 +90,45 @@ function downstream(
   };
 }
 
+/** What the dry run's decisions read: the request's time, caller and presence, and for a
+ * template what is known of a call that does not exist, then the values given for it. */
+function dryRunInputs(
+  deps: DecisionDeps,
+  snapshot: Snapshot,
+  request: DecisionDryRunRequest,
+  timezone: string
+): DecisionInputs {
+  const clock = { now: request.at, timezone };
+  const caller =
+    'userId' in request.caller
+      ? {
+          userId: request.caller.userId,
+          // An internal caller's number is their extension, as a call from them has it.
+          number:
+            extensionOf(snapshot, { userId: request.caller.userId }) ??
+            ANONYMOUS
+        }
+      : { userId: null, number: request.caller.number ?? ANONYMOUS };
+  return {
+    ...clock,
+    caller,
+    statusOf: effectiveStatus(
+      snapshot,
+      deps.state.presence,
+      clock,
+      request.presence
+    ),
+    // What is known of a call that does not exist, then the values given for it.
+    values: {
+      callerNumber: caller.number === ANONYMOUS ? '' : caller.number,
+      direction: request.direction,
+      language: snapshot.settings.language,
+      startedAt: request.at,
+      ...request.values
+    }
+  };
+}
+
 /** The dry run of decision `decisionId`, `null` for one that is not live. */
 export async function dryRun(
   deps: DecisionDeps,
@@ -103,31 +143,12 @@ export async function dryRun(
     snapshot.settings.timezone,
     deps.stackTz
   );
-  const clock = { now: request.at, timezone };
-  const caller =
-    'userId' in request.caller
-      ? {
-          userId: request.caller.userId,
-          // An internal caller's number is their extension, as a call from them has it.
-          number:
-            extensionOf(snapshot, { userId: request.caller.userId }) ??
-            ANONYMOUS
-        }
-      : { userId: null, number: request.caller.number ?? ANONYMOUS };
+  const inputs = dryRunInputs(deps, snapshot, request, timezone);
   const evaluations: DecisionEvaluation[] = [];
   const resolution = resolveDecisions(
     snapshot,
     { kind: 'decision', decisionId },
-    {
-      ...clock,
-      caller,
-      statusOf: effectiveStatus(
-        snapshot,
-        deps.state.presence,
-        clock,
-        request.presence
-      )
-    },
+    inputs,
     new Set(),
     evaluation => evaluations.push(evaluation)
   );
@@ -137,10 +158,14 @@ export async function dryRun(
     targetId: evaluation.targetId,
     cases: evaluation.cases
   }));
-  if (resolution.kind === 'loop') {
+  if (resolution.kind !== 'resolved') {
     return {
       evaluations: steps,
-      loop: resolution.decisionId,
+      loop: resolution.kind === 'loop' ? resolution.decisionId : null,
+      invalid:
+        resolution.kind === 'invalid'
+          ? { field: resolution.field, value: resolution.value }
+          : null,
       ooo: null,
       hours: null
     };
@@ -157,6 +182,7 @@ export async function dryRun(
   return {
     evaluations: steps,
     loop: null,
+    invalid: null,
     ...(scope === null
       ? { ooo: null, hours: null }
       : downstream(snapshot, scope, request, timezone))

@@ -41,5 +41,6 @@ export type TargetSpec = Announcement &
     | { kind: 'mailboxRingGroup'; ringGroupId: string }
     | { kind: 'menu'; menuId: string }
     | { kind: 'decision'; decisionId: string }
+    | { kind: 'extension'; extension: string; fallback?: TargetSpec | null }
     | { kind: 'hangup' }
   );

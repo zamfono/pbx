@@ -210,6 +210,7 @@ export interface Extensions {
 export interface ForwardTargets {
   announcementAudioId: string | null;
   decisionId: string | null;
+  extension: string | null;
   external: string | null;
   fallbackOfId: string | null;
   id: string;

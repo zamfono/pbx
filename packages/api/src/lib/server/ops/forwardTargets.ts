@@ -1,4 +1,8 @@
-import { HTTP_FORBIDDEN, HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
+import {
+  HTTP_FORBIDDEN,
+  HTTP_UNPROCESSABLE_CONTENT,
+  isTemplate
+} from '@zamfono/shared';
 
 import { findForwardTargetOwners } from './forwardTargetOwners.js';
 import type {
@@ -13,15 +17,19 @@ import { OpError, type Context } from './types.js';
  * Whether only an `admin` or `owner` sets or keeps `target` (§10.3 "Forward targets"): a `sip`
  * target, which sends calls to whatever host its trunk names (§9.4 "SIP targets"), a `webSocket`
  * one, which sends a call's audio to whatever URL it names (§9.4 "WebSocket targets"), a
- * `decision`, whose cases may hold either (§10.1 step 7 "Decisions"), and an `external` one that
- * records (§10.2 "Recording semantics").
+ * `decision`, whose cases may hold either (§10.1 step 7 "Decisions"), an `external` one that
+ * records (§10.2 "Recording semantics"), and a template, an `extension` target or an `external`
+ * number built from the call (§9.4 "Templates"), since a number built from caller data is a way
+ * to place calls at the tenant's cost.
  */
 export function isAdminTarget(target: TargetSpec): boolean {
   return (
     target.kind === 'sip' ||
     target.kind === 'webSocket' ||
     target.kind === 'decision' ||
-    (target.kind === 'external' && target.record)
+    target.kind === 'extension' ||
+    (target.kind === 'external' &&
+      (target.record || isTemplate(target.external)))
   );
 }
 
@@ -42,7 +50,12 @@ function adminTargetRefusal(target: TargetSpec): string {
   if (target.kind === 'decision') {
     return 'a decision target is set by an admin';
   }
-  return 'a recording target is set by an admin';
+  if (target.kind === 'extension') {
+    return 'an extension target is set by an admin';
+  }
+  return target.kind === 'external' && isTemplate(target.external)
+    ? 'a templated target is set by an admin'
+    : 'a recording target is set by an admin';
 }
 
 /** Whether `target` holds an admin target (`isAdminTarget`) anywhere in its fallback chain, so

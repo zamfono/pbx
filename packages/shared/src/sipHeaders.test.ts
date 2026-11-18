@@ -3,8 +3,9 @@ import { describe, expect, it } from 'vitest';
 
 import {
   DEFAULT_SIP_HEADERS,
+  isCallPlaceholder,
+  lineTemplateProblem,
   maxRenderedBytes,
-  parseSipHeaderValue,
   SIP_HEADER_NAME_PATTERN,
   SIP_HEADER_PLACEHOLDERS,
   sipHeadersSize
@@ -78,66 +79,57 @@ describe('SIP_HEADER_NAME_PATTERN', () => {
   });
 });
 
-describe('parseSipHeaderValue', () => {
-  it('reads literal text and placeholders, spaces inside the braces allowed', () => {
-    expect(
-      parseSipHeaderValue('ext {{calledExtension}}, {{ hopCount }}')
-    ).toEqual({
-      ok: true,
-      parts: [
-        { text: 'ext ' },
-        { placeholder: 'calledExtension' },
-        { text: ', ' },
-        { placeholder: 'hopCount' }
-      ]
-    });
-    expect(parseSipHeaderValue('')).toEqual({ ok: true, parts: [] });
-    expect(parseSipHeaderValue('a } b }} {c}')).toEqual({
-      ok: true,
-      parts: [{ text: 'a } b }} {c}' }]
-    });
+describe('lineTemplateProblem', () => {
+  it('takes literal text, placeholders with spaces inside the braces, paths and helpers', () => {
+    for (const value of [
+      'ext {{calledExtension}}, {{ hopCount }}',
+      '',
+      'a } b }} {c}',
+      '${CALLERID(num)}',
+      '{{slice did -2}}',
+      '{{crm.data.tier}}'
+    ]) {
+      expect(lineTemplateProblem(value), value).toBeNull();
+    }
   });
 
-  it('keeps a dialplan expression as literal text', () => {
-    expect(parseSipHeaderValue('${CALLERID(num)}')).toEqual({
-      ok: true,
-      parts: [{ text: '${CALLERID(num)}' }]
-    });
+  it('refuses a name the field does not take', () => {
+    expect(lineTemplateProblem('{{caller}}', isCallPlaceholder)).toMatch(
+      /unknown placeholder 'caller'/u
+    );
+    expect(lineTemplateProblem('{{did}}', isCallPlaceholder)).toBeNull();
   });
 
-  it('refuses unknown placeholders, malformed braces, blocks, helpers and control characters', () => {
+  it('refuses malformed braces, blocks, unknown helpers, unescaped output and control characters', () => {
     const refused = {
-      '{{caller}}': /unknown placeholder 'caller'/u,
       '{{callerNumber': /opens no/u,
       '{{': /opens no/u,
-      '{{#if did}}x{{/if}}': /opens no/u,
-      '{{date startedAt}}': /opens no/u,
-      '{{{callerNumber}}}': /opens no/u,
+      '{{#if did}}x{{/if}}': /block/u,
+      '{{> partial}}': /block/u,
+      '{{date startedAt}}': /unknown helper 'date'/u,
+      '{{lookup this "did"}}': /unknown helper 'lookup'/u,
+      '{{{callerNumber}}}': /unescaped/u,
       '\\{{callerNumber}}x{{': /opens no/u,
       'a\r\nVia: x': /control character/u,
       'a\tb': /control character/u,
       'a\u0085b': /control character/u
     };
     for (const [value, reason] of Object.entries(refused)) {
-      const parsed = parseSipHeaderValue(value);
-      expect(parsed.ok, value).toBe(false);
-      expect(parsed.ok ? '' : parsed.reason, value).toMatch(reason);
+      expect(lineTemplateProblem(value) ?? '', value).toMatch(reason);
     }
   });
 });
 
 describe('sizes', () => {
   it('counts literal bytes of UTF-8 and each placeholder at its maximum, capped at 256', () => {
-    const parse = (value: string) => {
-      const parsed = parseSipHeaderValue(value);
-      if (!parsed.ok) {
-        throw new Error(parsed.reason);
-      }
-      return parsed.parts;
-    };
-    expect(maxRenderedBytes(parse('{{callerNumber}}'))).toBe(32);
-    expect(maxRenderedBytes(parse('ü:{{did}}'))).toBe(3 + 16);
-    expect(maxRenderedBytes(parse('{{callerName}}'.repeat(5)))).toBe(256);
+    expect(maxRenderedBytes('{{callerNumber}}')).toBe(32);
+    expect(maxRenderedBytes('ü:{{did}}')).toBe(3 + 16);
+    expect(maxRenderedBytes('{{callerName}}'.repeat(5))).toBe(256);
+  });
+
+  it("counts any other mustache at the value's own cap", () => {
+    expect(maxRenderedBytes('{{slice did -2}}')).toBe(256);
+    expect(maxRenderedBytes('{{crm.tier}}')).toBe(256);
   });
 
   it('sizes the default headers at name, colon and space, and value maximum', () => {

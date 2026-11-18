@@ -395,6 +395,7 @@ describe('decisions (§10.3 "Decisions")', () => {
           }
         ],
         loop: null,
+        invalid: null,
         ooo: null,
         hours: null
       })
@@ -419,7 +420,8 @@ describe('decisions (§10.3 "Decisions")', () => {
       at: '2026-11-18T18:05:00.000Z',
       caller: { number: '+436991234567' },
       direction: 'inbound',
-      presence: {}
+      presence: {},
+      values: {}
     });
     expect(result).toMatchObject({
       evaluations: [

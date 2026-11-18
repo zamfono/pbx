@@ -6,8 +6,9 @@
  * result.
  */
 import type { Snapshot } from '../internal/snapshot.js';
-import { resolvePure, type DecisionInputs } from '../routing/decision.js';
+import type { DecisionInputs } from '../routing/decision.js';
 import { resolveDialed } from '../routing/outbound.js';
+import { resolvePure } from '../routing/resolvePure.js';
 import { findForwardTarget, type ForwardTarget } from '../routing/targets.js';
 import { SIP_NOT_FOUND, SIP_TEMPORARILY_UNAVAILABLE } from '../sipCodes.js';
 import { extensionOf } from './extensionOwner.js';

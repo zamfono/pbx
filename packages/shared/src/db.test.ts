@@ -6,7 +6,7 @@ import { migrateForTest, MIGRATIONS_DIR, seedSettings } from './testDb.js';
 
 test('migrates and enforces the schema', async () => {
   const db = openDb(':memory:');
-  expect(await pendingMigrations(db, MIGRATIONS_DIR)).toHaveLength(22);
+  expect(await pendingMigrations(db, MIGRATIONS_DIR)).toHaveLength(23);
   await migrateForTest(db);
   expect(await pendingMigrations(db, MIGRATIONS_DIR)).toEqual([]);
 
@@ -338,5 +338,126 @@ test('the decisions migration ties a condition naming a user to its type, and co
     await db.selectFrom('decisionConditions').selectAll().execute()
   ).toEqual([]);
   expect(await db.selectFrom('extensions').select('ext').execute()).toEqual([]);
+  await db.destroy();
+});
+
+test('takes templates in forward targets and decisions, and keeps the rows it migrates (§9.4 "Templates")', async () => {
+  const db = openDb(':memory:');
+  // The rows as they were before templates: an external, a recording sip and a plain target.
+  await migrator(db, MIGRATIONS_DIR).migrateTo('1795003925117_decisions');
+  await sql`insert into trunks (id, name, priority, emergency, auth_mode, inbound_auth, created_at)
+    values ('t1', 'T', 1, 1, 'ip', 0, 't')`.execute(db);
+  await sql`insert into forward_targets (id, external, ring_timeout_s, record_calls) values ('e1', '+4312345', 20, 1)`.execute(
+    db
+  );
+  await sql`insert into forward_targets (id, sip_trunk_id, sip_user, sip_headers_json) values ('s1', 't1', 'proj_1', '[]')`.execute(
+    db
+  );
+  await sql`insert into forward_targets (id) values ('h1')`.execute(db);
+  await sql`insert into decisions (id, name, default_target_id, created_at) values ('d1', 'Main', 'h1', 't')`.execute(
+    db
+  );
+  await sql`insert into decision_cases (id, decision_id, position, target_id) values ('c1', 'd1', 0, 'e1')`.execute(
+    db
+  );
+  await sql`insert into decision_conditions (id, decision_id, case_id, position, type) values ('k1', 'd1', 'c1', 0, 'callerUser')`.execute(
+    db
+  );
+  await migrateForTest(db);
+  expect(
+    await db
+      .selectFrom('forwardTargets')
+      .select(['id', 'external', 'sipUser', 'ringTimeoutS', 'recordCalls'])
+      .orderBy('id')
+      .execute()
+  ).toEqual([
+    {
+      id: 'e1',
+      external: '+4312345',
+      sipUser: null,
+      ringTimeoutS: 20,
+      recordCalls: 1
+    },
+    {
+      id: 'h1',
+      external: null,
+      sipUser: null,
+      ringTimeoutS: null,
+      recordCalls: 0
+    },
+    {
+      id: 's1',
+      external: null,
+      sipUser: 'proj_1',
+      ringTimeoutS: null,
+      recordCalls: 0
+    }
+  ]);
+  expect(
+    await db.selectFrom('decisionConditions').select('type').execute()
+  ).toEqual([{ type: 'callerUser' }]);
+
+  // A template in place of a number or a user part, and the kind `extension`.
+  for (const row of [
+    { id: 'e2', external: '+431{{slice did -2}}', ringTimeoutS: 10 },
+    {
+      id: 's2',
+      sipTrunkId: 't1',
+      sipUser: 'q-{{callerNumber}}',
+      sipHeadersJson: '[]',
+      recordCalls: 1
+    },
+    { id: 'x1', extension: '{{slice did -2}}' }
+  ]) {
+    // eslint-disable-next-line no-await-in-loop -- one row after the other, each with its own columns
+    await db.insertInto('forwardTargets').values(row).execute();
+  }
+  const refused = [
+    [{ id: 'r1', external: '0043123' }, /forward_targets_external/u],
+    [
+      { id: 'r2', sipTrunkId: 't1', sipUser: 'a@b', sipHeadersJson: '[]' },
+      /forward_targets_sip_user/u
+    ],
+    [{ id: 'r3', extension: '17' }, /forward_targets_extension/u],
+    [
+      { id: 'r4', extension: '{{did}}', userId: 'u1' },
+      /forward_targets_one_kind/u
+    ],
+    [
+      { id: 'r5', extension: '{{did}}', recordCalls: 1 },
+      /forward_targets_record_calls/u
+    ],
+    [
+      { id: 'r6', extension: '{{did}}', ringTimeoutS: 5 },
+      /forward_targets_ring_timeout/u
+    ]
+  ] as const;
+  for (const [row, check] of refused) {
+    // eslint-disable-next-line no-await-in-loop -- one refusal after the other
+    await expect(
+      db.insertInto('forwardTargets').values(row).execute()
+    ).rejects.toThrow(check);
+  }
+  const condition = { decisionId: 'd1', caseId: 'c1', parentId: null };
+  await db
+    .insertInto('decisionConditions')
+    .values({
+      id: 'k2',
+      ...condition,
+      position: 1,
+      type: 'template',
+      valueJson: '{"template":"{{did}}","equals":"+43"}'
+    })
+    .execute();
+  await expect(
+    sql`insert into decision_conditions (id, decision_id, case_id, position, type) values ('k3', 'd1', 'c1', 2, 'nope')`.execute(
+      db
+    )
+  ).rejects.toThrow(/decision_conditions_type/u);
+  await expect(
+    sql`insert into decision_conditions (id, decision_id, case_id, position) values ('k4', 'd1', 'c1', 2)`.execute(
+      db
+    )
+  ).rejects.toThrow(/NOT NULL/u);
   await db.destroy();
 });

@@ -2,12 +2,13 @@
  * A `sip` target's custom headers on write (§10.3 "Forward targets", §9.4 "Header templates"): the
  * schema that refuses a bad name, a duplicate, a value that does not parse and headers too large
  * to send, and the warning for headers that could push an INVITE over UDP past a safe size. The
- * placeholders and the value syntax are `@zamfono/shared`'s, which `core` renders with.
+ * placeholders and the template syntax are `@zamfono/shared`'s, which `core` renders with; the
+ * names a value reads are checked as the target is written (`templateNames.ts`).
  */
 import { z } from 'zod';
 
 import {
-  parseSipHeaderValue,
+  lineTemplateProblem,
   SIP_HEADER_NAME_PATTERN,
   SIP_HEADER_PLACEHOLDERS,
   SIP_HEADERS_MAX_BYTES,
@@ -41,13 +42,13 @@ const headerSchema = z.object({
   value: z
     .string()
     .superRefine((value, ctx) => {
-      const parsed = parseSipHeaderValue(value);
-      if (!parsed.ok) {
-        ctx.addIssue({ code: 'custom', message: `value has ${parsed.reason}` });
+      const problem = lineTemplateProblem(value);
+      if (problem !== null) {
+        ctx.addIssue({ code: 'custom', message: `value has ${problem}` });
       }
     })
     .describe(
-      `Literal text with {{placeholder}} substitutions, no blocks or helpers; the placeholders: ${PLACEHOLDER_LIST} (see zamfono.help forward-to-ai-agent).`
+      `Literal text with {{placeholder}} substitutions (see zamfono.help templates); the placeholders: ${PLACEHOLDER_LIST}.`
     )
 });
 

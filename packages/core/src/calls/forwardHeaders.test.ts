@@ -1,18 +1,14 @@
-/* eslint-disable no-template-curly-in-string -- a literal ${…} is what these tests send and expect back */
+/* eslint-disable no-template-curly-in-string -- a literal ${…} is what this test sends and expects back */
 import { describe, expect, it } from 'vitest';
 
-import { DEFAULT_SIP_HEADERS } from '@zamfono/shared';
+import { renderSipHeaders, type CallValues } from '@zamfono/shared';
 
-import {
-  cutUtf8,
-  renderForwardHeaders,
-  type ForwardValues
-} from './forwardHeaders.js';
 import { forwardVariables } from './forwardLeg.js';
 
-// §9.4 "Header templates": a sip target's headers as its forwarded leg sends them.
+// §9.4 "Header templates": a sip target's rendered headers as its forwarded leg's originate
+// variables; the rendering itself is `@zamfono/shared`'s (`sipHeaderRender.test.ts`).
 
-const VALUES: ForwardValues = {
+const VALUES: CallValues = {
   callerNumber: '+15559999',
   callerName: 'Dana Caller',
   did: '+15551077',
@@ -28,79 +24,9 @@ const VALUES: ForwardValues = {
   startedAt: '2026-09-30T12:00:00.000Z'
 };
 
-describe('renderForwardHeaders', () => {
-  it('renders the defaults as the fixed headers were: the caller and the DID', () => {
-    expect(renderForwardHeaders(DEFAULT_SIP_HEADERS, VALUES)).toEqual([
-      { name: 'X-Zamfono-Caller', value: '+15559999' },
-      { name: 'X-Zamfono-Did', value: '+15551077' }
-    ]);
-  });
-
-  it("leaves out a header that renders empty, as a withheld caller's number does (CLIR)", () => {
-    expect(
-      renderForwardHeaders(DEFAULT_SIP_HEADERS, {
-        ...VALUES,
-        callerNumber: '',
-        did: ''
-      })
-    ).toEqual([]);
-    expect(
-      renderForwardHeaders([{ name: 'X-Who', value: ' {{callerNumber}} ' }], {
-        ...VALUES,
-        callerNumber: ''
-      })
-    ).toEqual([]);
-  });
-
-  it('substitutes placeholders into literal text, in order and repeated', () => {
-    expect(
-      renderForwardHeaders(
-        [
-          {
-            name: 'X-Route',
-            value:
-              '{{calledName}} ({{calledExtension}}) via {{ forwardedByName }}: {{forwardReason}}/{{hopCount}}'
-          },
-          { name: 'X-Twice', value: '{{language}}-{{language}}' }
-        ],
-        VALUES
-      )
-    ).toEqual([
-      { name: 'X-Route', value: 'Bea (177) via AI Agent: unconditional/2' },
-      { name: 'X-Twice', value: 'en-en' }
-    ]);
-  });
-
-  it('strips CR, LF and every other control character from a substituted value', () => {
-    expect(
-      renderForwardHeaders([{ name: 'X-Name', value: 'n={{callerName}}' }], {
-        ...VALUES,
-        callerName: 'Eve\r\nVia: SIP/2.0/UDP evil\t\u0000\u007f\u0085!'
-      })
-    ).toEqual([{ name: 'X-Name', value: 'n=EveVia: SIP/2.0/UDP evil!' }]);
-  });
-
-  it("cuts a value to its placeholder's maximum and the whole to 256 bytes", () => {
-    const [name] = renderForwardHeaders(
-      [{ name: 'X-Name', value: '{{callerName}}' }],
-      { ...VALUES, callerName: 'x'.repeat(100) }
-    );
-    expect(name?.value).toBe('x'.repeat(64));
-    const [long] = renderForwardHeaders(
-      [{ name: 'X-Long', value: `${'a'.repeat(250)}{{callerName}}` }],
-      VALUES
-    );
-    expect(long?.value).toBe(`${'a'.repeat(250)}Dana C`);
-    // A cut never splits a character: 'ü' is two bytes, so 32 of them fill 64.
-    const [umlaut] = renderForwardHeaders(
-      [{ name: 'X-Name', value: '{{callerName}}' }],
-      { ...VALUES, callerName: `a${'ü'.repeat(40)}` }
-    );
-    expect(umlaut?.value).toBe(`a${'ü'.repeat(31)}`);
-  });
-
+describe('headerVariables', () => {
   it('passes a dialplan expression through literally, as the originate variable is set', () => {
-    const headers = renderForwardHeaders(
+    const headers = renderSipHeaders(
       [
         { name: 'X-Literal', value: '${CALLERID(num)} $[1+1] {{callerNumber}}' }
       ],
@@ -115,28 +41,5 @@ describe('renderForwardHeaders', () => {
     ).toEqual({
       'PJSIP_HEADER(add,X-Literal)': '${CALLERID(num)} $[1+1] ${SHELL(id)}'
     });
-  });
-
-  it('leaves out a header whose value api would have refused', () => {
-    expect(
-      renderForwardHeaders(
-        [
-          { name: 'X-Bad', value: '{{nope}}' },
-          { name: 'X-Bad2', value: 'a\r\nb' },
-          { name: 'X-Good', value: '{{did}}' }
-        ],
-        VALUES
-      )
-    ).toEqual([{ name: 'X-Good', value: '+15551077' }]);
-  });
-});
-
-describe('cutUtf8', () => {
-  it('keeps whole characters within the byte budget', () => {
-    expect(cutUtf8('abc', 2)).toBe('ab');
-    expect(cutUtf8('a€b', 3)).toBe('a');
-    expect(cutUtf8('a€b', 4)).toBe('a€');
-    expect(cutUtf8('😀x', 3)).toBe('');
-    expect(cutUtf8('😀x', 5)).toBe('😀x');
   });
 });

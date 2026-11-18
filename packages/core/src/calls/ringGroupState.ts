@@ -4,7 +4,8 @@
  * an unconditional forward — and its `ring_group_forward_rules`, for `ringGroup.ts`.
  */
 import { userById, type Snapshot } from '../internal/snapshot.js';
-import { resolvePure, type DecisionInputs } from '../routing/decision.js';
+import type { DecisionInputs } from '../routing/decision.js';
+import { resolvePure } from '../routing/resolvePure.js';
 import type { MemberState } from '../routing/ringGroup.js';
 import { ownInEffectOoo } from '../routing/schedule.js';
 import { buildOooRules } from '../routing/scheduleRows.js';

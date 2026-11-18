@@ -30,7 +30,7 @@ import { isLocalDiallingHalf } from './pendingTransfer.js';
 import type { Pipeline } from './pipeline.js';
 import { endTargetOwner, release } from './release.js';
 import { ringGroup } from './ringGroup.js';
-import { endAtDecisionLoop } from './runTarget.js';
+import { endUnresolved } from './runTarget.js';
 import { runUserStep } from './userStep.js';
 import { deposit } from './voicemail.js';
 import { dialWebSocketTarget } from './webSocketTarget.js';
@@ -145,8 +145,8 @@ export async function enterTarget(
   number?: TenantNumber
 ): Promise<void> {
   const resolution = await resolveOnCall(pipeline, call, target);
-  if (resolution.kind === 'loop') {
-    await endAtDecisionLoop(pipeline, call, resolution.decisionId);
+  if (resolution.kind !== 'resolved') {
+    await endUnresolved(pipeline, call, resolution, forwarder);
     return;
   }
   if (number !== undefined) {

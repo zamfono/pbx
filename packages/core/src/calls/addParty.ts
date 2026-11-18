@@ -121,7 +121,7 @@ export async function dialAddPartyTarget(
   const target = resolveAddedTarget(
     snapshot,
     rest,
-    callDecisionInputs(snapshot, pipeline.deps, call)
+    await callDecisionInputs(snapshot, pipeline, call)
   );
   call.log.event({ event: 'addPartyTarget', target: target.kind });
   if (target.kind === 'refuse') {

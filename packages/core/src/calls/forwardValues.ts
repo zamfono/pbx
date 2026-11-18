@@ -1,9 +1,14 @@
 /**
- * The values a `sip` target's header placeholders stand for on one forwarded leg (§9.4 "Header
- * templates"), read from the call, its forward hops and the config snapshot, and the headers the
- * leg sends with them. `forwardHeaders.ts` renders them; this gathers them.
+ * The values a call's placeholders stand for (§9.4 "Templates"), read from the call, its forward
+ * hops and the config snapshot, as a `sip` target's headers on one forwarded leg and every other
+ * template of the call render with them. `@zamfono/shared` renders; this gathers.
  */
-import { isE164 } from '@zamfono/shared';
+import {
+  isE164,
+  renderSipHeaders,
+  type CallValues,
+  type SipHeader
+} from '@zamfono/shared';
 
 import { logFailure } from '../ari/failures.js';
 import { userById, type Snapshot } from '../internal/snapshot.js';
@@ -11,11 +16,6 @@ import type { ForwardTarget } from '../routing/targets.js';
 import type { Call } from './call.js';
 import { callerNumber, contactName } from './contactName.js';
 import type { Diversion, RedirectingReason } from './forwardContext.js';
-import {
-  renderForwardHeaders,
-  type ForwardValues,
-  type SipHeader
-} from './forwardHeaders.js';
 import type { ForwardLeg } from './forwardLeg.js';
 import type { Pipeline } from './pipeline.js';
 
@@ -41,7 +41,7 @@ export function forwardValues(
   diversions: Diversion[],
   snapshot: Snapshot,
   callerName: string
-): ForwardValues {
+): CallValues {
   const called = diversions.find(
     hop => hop.party === 'user' || hop.party === 'ringGroup'
   );
@@ -81,6 +81,35 @@ export async function callerNameOf(
   return userById(snapshot, call.callerUserId)?.name ?? '';
 }
 
+/** The caller's name, looked up once per call. */
+function cachedCallerName(
+  pipeline: Pipeline,
+  call: Call,
+  snapshot: Snapshot
+): Promise<string> {
+  call.callerName ??= callerNameOf(pipeline, call, snapshot);
+  return call.callerName;
+}
+
+/** What `call`'s templates render with right now (§9.4 "Templates"): its placeholders after the
+ * forward hops taken so far, and its variables, a placeholder winning over a variable of its
+ * name. */
+export async function templateValues(
+  pipeline: Pipeline,
+  call: Call,
+  snapshot: Snapshot
+): Promise<Record<string, unknown>> {
+  return {
+    ...call.variables,
+    ...forwardValues(
+      call,
+      call.diversions,
+      snapshot,
+      await cachedCallerName(pipeline, call, snapshot)
+    )
+  };
+}
+
 /** The headers a leg to `target` sends after `diversions` (§9.4 "Header templates"). */
 async function sipTargetHeaders(
   pipeline: Pipeline,
@@ -92,10 +121,11 @@ async function sipTargetHeaders(
   if (target.headers.length === 0) {
     return [];
   }
-  const callerName = await callerNameOf(pipeline, call, snapshot);
-  return renderForwardHeaders(
+  const callerName = await cachedCallerName(pipeline, call, snapshot);
+  return renderSipHeaders(
     target.headers,
-    forwardValues(call, diversions, snapshot, callerName)
+    forwardValues(call, diversions, snapshot, callerName),
+    call.variables
   );
 }
 

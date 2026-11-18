@@ -86,7 +86,7 @@ describe('field descriptions reach tools/list and the OpenAPI document', () => {
         ? (defs[variant.$ref.replace('#/$defs/', '')] ?? variant)
         : variant;
     const variants = (schema.properties?.target?.oneOf ?? []).map(resolve);
-    expect(variants).toHaveLength(10);
+    expect(variants).toHaveLength(11);
     for (const variant of variants) {
       expect(variant.properties?.kind?.description).toEqual(DESCRIBED);
     }

@@ -122,6 +122,89 @@ describe('a decision on the call path (§10.1 step 7 "Decisions")', () => {
     );
   });
 
+  it('sends a DID to the extension built from its last digits, counting the hop of a user (§10.1 step 7 "Templates")', async () => {
+    const anna = await mailboxUser();
+    await seedExtension(db, '00', { userId: anna });
+    const call = makeCall();
+
+    await runTarget(
+      pipeline,
+      call,
+      { kind: 'extension', extension: '{{slice did -2}}' },
+      null,
+      PLAIN_FORWARD
+    );
+
+    expect(call.calleeUserId).toBe(anna);
+    expect(call.hops).toBe(1);
+    expect(traced(call, 'templateInvalid')).toEqual([]);
+  });
+
+  it('takes the fallback of a target whose template renders no usable value, else ends with 480', async () => {
+    const anna = await mailboxUser();
+    const call = makeCall();
+
+    await runTarget(
+      pipeline,
+      call,
+      {
+        kind: 'extension',
+        extension: '9{{slice did -2}}',
+        fallback: { kind: 'mailboxUser', userId: anna }
+      },
+      null,
+      PLAIN_FORWARD
+    );
+
+    expect(traced(call, 'templateInvalid')).toMatchObject([
+      { kind: 'extension', field: 'extension', value: '900' }
+    ]);
+    expect(deposit).toHaveBeenCalledWith(
+      pipeline,
+      call,
+      { userId: anna },
+      'target'
+    );
+
+    const ended = makeCall();
+    await enterTarget(
+      pipeline,
+      ended,
+      { kind: 'external', number: '+43{{callerName}}x' },
+      null
+    );
+    expect(ended.status).toBe('missed');
+    const [invalid] = traced(ended, 'templateInvalid');
+    expect(invalid).toMatchObject({ kind: 'external', field: 'external' });
+    expect(traced(ended, 'fallback')).toEqual([]);
+  });
+
+  it('reads the call in a template condition: one decision serving several DIDs', async () => {
+    const anna = await mailboxUser();
+    const decisionId = await seedDecision(db, {
+      cases: [
+        {
+          when: [
+            { type: 'template', template: '{{slice did -4}}', equals: '0100' }
+          ],
+          targetId: await seedForwardTarget(db, { mailboxUserId: anna })
+        }
+      ],
+      defaultTargetId: await seedForwardTarget(db, {})
+    });
+    const call = makeCall();
+
+    await enterTarget(pipeline, call, { kind: 'decision', decisionId }, null);
+
+    expect(traced(call, 'decision')).toMatchObject([{ decisionCase: 0 }]);
+    expect(deposit).toHaveBeenCalledWith(
+      pipeline,
+      call,
+      { userId: anna },
+      'target'
+    );
+  });
+
   it('traces the default when no case matches', async () => {
     const decisionId = await seedDecision(db, {
       cases: [

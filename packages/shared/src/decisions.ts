@@ -16,6 +16,7 @@ export const DECISION_CONDITION_TYPES = [
   'caller',
   'callerUser',
   'presence',
+  'template',
   'any',
   'all',
   'not'
@@ -45,12 +46,14 @@ export type DecisionCondition =
   | { type: 'caller'; number: string | null; isPrefix: boolean }
   | { type: 'callerUser'; userId: string | null }
   | { type: 'presence'; userId: string; status: DecisionStatus[] }
+  /** True when `template` renders to exactly `equals` (§9.4 "Templates"). */
+  | { type: 'template'; template: string; equals: string }
   | { type: 'any' | 'all'; conditions: DecisionCondition[] }
   | { type: 'not'; condition: DecisionCondition };
 
 /** One condition's result and the input it read, an operator's with its children's (§10.3
  * "Decisions", the dry run): the time or date of a time condition, the caller of a caller
- * condition, the status of a presence condition. */
+ * condition, the status of a presence condition, what a template condition rendered to. */
 export type ConditionResult = {
   type: DecisionConditionType;
   matched: boolean;
@@ -149,6 +152,7 @@ const callerValue = z.object({
   isPrefix: z.boolean()
 });
 const statusValue = z.object({ status: z.array(z.enum(DECISION_STATUSES)) });
+const templateValue = z.object({ template: z.string(), equals: z.string() });
 
 /** A leaf's `value_json`, decoded with `schema`. */
 function decodeValue<T>(row: DecisionConditionRow, schema: z.ZodType<T>): T {
@@ -183,6 +187,15 @@ export function conditionColumns(
         }),
         userId: null
       };
+    case 'template':
+      return {
+        type,
+        valueJson: JSON.stringify({
+          template: condition.template,
+          equals: condition.equals
+        }),
+        userId: null
+      };
     case 'callerUser':
       return { type, valueJson: null, userId: condition.userId };
     case 'presence':
@@ -208,6 +221,8 @@ function conditionFromRow(
       return { type: 'dates', ...decodeValue(row, rangesValue) };
     case 'caller':
       return { type: 'caller', ...decodeValue(row, callerValue) };
+    case 'template':
+      return { type: 'template', ...decodeValue(row, templateValue) };
     case 'callerUser':
       return { type: 'callerUser', userId: row.userId };
     case 'presence':

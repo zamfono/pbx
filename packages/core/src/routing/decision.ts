@@ -8,32 +8,37 @@ import {
   ANONYMOUS,
   conditionsByCase,
   dateInRange,
+  renderTemplate,
   type ConditionResult,
   type DecisionCondition,
   type DecisionStatus
 } from '@zamfono/shared';
 
 import type { Snapshot } from '../internal/snapshot.js';
+import { renderTarget, type Rendered } from './renderTarget.js';
 import { isOpen } from './schedule.js';
-import {
-  findForwardTarget,
-  ownDidTarget,
-  type ForwardTarget
-} from './targets.js';
+import { findForwardTarget, type ForwardTarget } from './targets.js';
 
-/** A target that is no decision: what resolution ends at. */
-export type ResolvedTarget = Exclude<ForwardTarget, { kind: 'decision' }>;
+/** A target that is no decision and no `extension`, its templates rendered: what resolution ends
+ * at. */
+export type ResolvedTarget = Exclude<
+  ForwardTarget,
+  { kind: 'decision' | 'extension' }
+>;
 
 /**
  * What a decision's conditions read: the time of the evaluation in the tenant's zone, the party
  * on the caller channel, one of the tenant's users or else a number (`ANONYMOUS` for a withheld
- * one), and a user's effective status (`away`, `closed`, else the presence core publishes).
+ * one), a user's effective status (`away`, `closed`, else the presence core publishes), and the
+ * values the call's templates render with (§9.4 "Templates"), which a target's templated fields
+ * read too; without them every placeholder renders empty.
  */
 export type DecisionInputs = {
   now: string;
   timezone: string;
   caller: { userId: string | null; number: string };
   statusOf: (userId: string) => DecisionStatus;
+  values?: Readonly<Record<string, unknown>>;
 };
 
 /** The tenant-local date (`YYYY-MM-DD`), ISO weekday and time (`HH:MM`) of `now`. */
@@ -127,6 +132,11 @@ export function evaluateCondition(
         value: status
       };
     }
+    case 'template': {
+      const value =
+        renderTemplate(condition.template, inputs.values ?? {}, 'plain') ?? '';
+      return { type, matched: value === condition.equals, value };
+    }
     case 'not': {
       const inner = evaluateCondition(condition.condition, inputs);
       return { type, matched: !inner.matched, conditions: [inner] };
@@ -194,16 +204,33 @@ export function evaluateDecision(
 }
 
 /** A target resolved through its decisions: the target the call goes to and the announcements of
- * the decisions it passed and its own, in order (§10.1 step 7); or the decision met again. */
+ * the decisions it passed and its own, in order (§10.1 step 7); the decision met again; or the
+ * target whose template rendered `value`, which is no value of its `field` (§10.1 step 7
+ * "Templates"). */
 export type Resolution =
   | { kind: 'resolved'; target: ResolvedTarget; announcements: string[] }
-  | { kind: 'loop'; decisionId: string };
+  | { kind: 'loop'; decisionId: string }
+  | { kind: 'invalid'; target: ForwardTarget; field: string; value: string };
+
+/** The resolution of `target`, whose template rendered what `rendered` holds. */
+function invalid(
+  target: ForwardTarget,
+  rendered: Extract<Rendered, { ok: false }>
+): Resolution {
+  return {
+    kind: 'invalid',
+    target,
+    field: rendered.field,
+    value: rendered.value
+  };
+}
 
 /**
  * Resolves `target` through the decisions it leads to (§10.1 step 7 "Decisions"): each is
- * evaluated, `onEvaluate` told, and its chosen target taken as if the rule had named it. `seen`
- * holds the decisions evaluated since the last clearing event (§10.1 "Loops"); one met again is a
- * loop. Each decision is added to it.
+ * evaluated, `onEvaluate` told, and its chosen target taken as if the rule had named it; an
+ * `extension` target is followed to the target its extension leads to, and the target it ends at
+ * has its templates rendered. `seen` holds the decisions evaluated since the last clearing event
+ * (§10.1 "Loops"); one met again is a loop. Each decision is added to it.
  */
 export function resolveDecisions(
   snapshot: Snapshot,
@@ -214,55 +241,38 @@ export function resolveDecisions(
 ): Resolution {
   const announcements: string[] = [];
   let current = target;
-  while (current.kind === 'decision') {
-    if (seen.has(current.decisionId)) {
-      return { kind: 'loop', decisionId: current.decisionId };
-    }
-    seen.add(current.decisionId);
+  // An extension leads to a user, a ring group, a menu or a decision, never to another
+  // extension, so the decisions' loop set bounds this loop too.
+  while (current.kind === 'decision' || current.kind === 'extension') {
     if (current.announcementAudioId !== undefined) {
       announcements.push(current.announcementAudioId);
     }
-    const evaluation = evaluateDecision(snapshot, current.decisionId, inputs);
-    onEvaluate(evaluation);
-    current = evaluation.target;
+    if (current.kind === 'extension') {
+      const rendered = renderTarget(snapshot, current, inputs.values ?? {});
+      if (!rendered.ok) {
+        return invalid(current, rendered);
+      }
+      current = rendered.target;
+    } else {
+      if (seen.has(current.decisionId)) {
+        return { kind: 'loop', decisionId: current.decisionId };
+      }
+      seen.add(current.decisionId);
+      const evaluation = evaluateDecision(snapshot, current.decisionId, inputs);
+      onEvaluate(evaluation);
+      current = evaluation.target;
+    }
   }
   if (current.announcementAudioId !== undefined) {
     announcements.push(current.announcementAudioId);
   }
-  return { kind: 'resolved', target: current, announcements };
-}
-
-/**
- * The pure resolver of the contexts that only resolve and never play (§10.1 step 7 "Decisions": a
- * ring-group member's followed forward, `*5`, a consultation, an added party): `target` through
- * its decisions and the tenant's own DIDs it names, each DID one hop on the `hops` already taken,
- * as `enterOwnDid` counts them, a hop clearing the decisions met before it. `null` for a chain
- * that meets a decision again or passes the hop limit; such a member is not rung, such a party
- * refused.
- */
-export function resolvePure(
-  snapshot: Snapshot,
-  target: ForwardTarget,
-  hops: number,
-  inputs: DecisionInputs
-): { target: ResolvedTarget; hops: number } | null {
-  const seen = new Set<string>();
-  let current = target;
-  let taken = hops;
-  for (;;) {
-    const resolution = resolveDecisions(snapshot, current, inputs, seen);
-    if (resolution.kind === 'loop') {
-      return null;
-    }
-    const next = ownDidTarget(snapshot, resolution.target);
-    if (next === null) {
-      return { target: resolution.target, hops: taken };
-    }
-    taken += 1;
-    if (taken > snapshot.settings.maxForwardHops) {
-      return null;
-    }
-    seen.clear();
-    current = next;
+  const rendered = renderTarget(snapshot, current, inputs.values ?? {});
+  if (!rendered.ok) {
+    return invalid(current, rendered);
   }
+  return {
+    kind: 'resolved',
+    target: rendered.target as ResolvedTarget,
+    announcements
+  };
 }

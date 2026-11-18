@@ -9,20 +9,22 @@ import {
   isE164,
   MAX_CONDITION_DEPTH,
   newId,
+  templateProblem,
   type Db,
   type DecisionCondition
 } from '@zamfono/shared';
 
 import { intervalSchema, validateIntervals } from '../hours/_shared.js';
 import { liveRow } from '../rows.js';
+import { assertTemplateNames } from '../templateNames.js';
 import { OpError } from '../types.js';
 
 const userIdField = z.string().describe('A live user (users.list).');
 
 /**
  * One condition of a case (§10.1 step 7 "Decisions"), discriminated on `type`; an operator nests
- * further conditions. Every condition is instant and reads only the time, the caller and the
- * users it names.
+ * further conditions. Every condition is instant and reads only the time, the caller, the users
+ * it names and the call's template values.
  */
 export const conditionSchema: z.ZodType<DecisionCondition> = z
   .discriminatedUnion('type', [
@@ -106,6 +108,32 @@ export const conditionSchema: z.ZodType<DecisionCondition> = z
         )
     }),
     z.strictObject({
+      type: z
+        .literal('template')
+        .describe(
+          'Matches when `template` renders to exactly `equals` for the call.'
+        ),
+      template: z
+        .string()
+        .superRefine((value, ctx) => {
+          const problem = templateProblem(value);
+          if (problem !== null) {
+            ctx.addIssue({
+              code: 'custom',
+              message: `template has ${problem}`
+            });
+          }
+        })
+        .describe(
+          "A template of the call's values, such as {{slice did -2}} or {{length (digits callerNumber)}} (see zamfono.help templates)."
+        ),
+      equals: z
+        .string()
+        .describe(
+          'The text the template must render to, compared exactly and case-sensitively; several values through `any`.'
+        )
+    }),
+    z.strictObject({
       type: z.literal('any').describe('Matches when one of `conditions` does.'),
       get conditions(): z.ZodArray<z.ZodType<DecisionCondition>> {
         return z.array(conditionSchema).min(1);
@@ -143,8 +171,17 @@ function namedUsers(conditions: DecisionCondition[]): string[] {
   ]);
 }
 
-/** Throws 422 for operators nested deeper than `MAX_CONDITION_DEPTH`, or a schedule's invalid
- * interval, and 404 for a user that is not live. */
+/** The templates `conditions` hold, at any depth. */
+function namedTemplates(conditions: DecisionCondition[]): string[] {
+  return conditions.flatMap(condition => [
+    ...(condition.type === 'template' ? [condition.template] : []),
+    ...namedTemplates(childConditions(condition))
+  ]);
+}
+
+/** Throws 422 for operators nested deeper than `MAX_CONDITION_DEPTH`, a schedule's invalid
+ * interval or a template reading a name that is no value of a call, and 404 for a user that is
+ * not live. */
 export async function assertConditionsValid(
   db: Db,
   whens: DecisionCondition[][]
@@ -166,6 +203,7 @@ export async function assertConditionsValid(
   for (const when of whens) {
     check(when, 1);
   }
+  await assertTemplateNames(db, whens.flatMap(namedTemplates));
   const userIds = [...new Set(whens.flatMap(namedUsers))];
   for (const userId of userIds) {
     // eslint-disable-next-line no-await-in-loop -- the first unknown user is the one refused

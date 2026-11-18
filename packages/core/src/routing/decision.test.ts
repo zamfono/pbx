@@ -14,13 +14,18 @@ import {
 } from '@zamfono/shared/testDb.js';
 
 import { ConfigCache, type Snapshot } from '../internal/snapshot.js';
-import { seedDecision, seedForwardTarget } from '../testing/seedRows.js';
+import {
+  seedDecision,
+  seedExtension,
+  seedForwardTarget
+} from '../testing/seedRows.js';
 import {
   evaluateCondition,
   resolveDecisions,
-  resolvePure,
   type DecisionInputs
 } from './decision.js';
+import { resolvePure } from './resolvePure.js';
+import type { ForwardTarget } from './targets.js';
 
 // Wednesday 18 November 2026, 18:05 in Vienna (CET, UTC+1).
 const WEDNESDAY_EVENING = '2026-11-18T17:05:00Z';
@@ -52,6 +57,28 @@ describe('decision conditions (§10.1 step 7 "Decisions")', () => {
     expect(
       evaluateCondition({ type: 'schedule', intervals: [open] }, inputs())
     ).toMatchObject({ value: { weekday: 3, time: '18:05' } });
+  });
+
+  it('template: matches when the template renders exactly the text, case-sensitively', () => {
+    const values = { did: '+4312345617', crm: { tier: 'VIP' } };
+    const at = (template: string, equals: string) =>
+      matches({ type: 'template', template, equals }, { values });
+    expect(at('{{slice did -2}}', '17')).toBe(true);
+    expect(at('{{slice did -2}}', '18')).toBe(false);
+    expect(at('{{crm.tier}}', 'VIP')).toBe(true);
+    expect(at('{{crm.tier}}', 'vip')).toBe(false);
+    // A missing value renders empty, which only an empty text equals.
+    expect(at('{{crm.missing.path}}', '')).toBe(true);
+    expect(
+      evaluateCondition(
+        { type: 'template', template: '{{length (digits did)}}', equals: '4' },
+        inputs({ values })
+      )
+    ).toEqual({ type: 'template', matched: false, value: '10' });
+    // Without values, as in a context that has none, every placeholder is empty.
+    expect(matches({ type: 'template', template: '{{did}}', equals: '' })).toBe(
+      true
+    );
   });
 
   it('dates: one-off and yearly ranges, both ends inclusive, wrapping the year end', () => {
@@ -216,6 +243,86 @@ describe('resolving through decisions', () => {
       new Set()
     );
     expect(fromAbroad).toMatchObject({ target: { kind: 'hangup' } });
+  });
+
+  it('renders the templates of the target it ends at, and follows an extension target (§10.1 step 7 "Templates")', async () => {
+    const userId = await seedUser(db);
+    await seedExtension(db, '17', { userId });
+    const menuId = 'm1';
+    const values = { did: '+4312345617', callerNumber: '+43 660 1' };
+    await load();
+    const resolve = (target: ForwardTarget) =>
+      resolveDecisions(snapshot, target, inputs({ values }), new Set());
+
+    expect(
+      resolve({ kind: 'external', number: '+43199{{slice did -2}}' })
+    ).toMatchObject({
+      kind: 'resolved',
+      target: { kind: 'external', number: '+4319917' }
+    });
+    expect(
+      resolve({
+        kind: 'sip',
+        trunkId: 't1',
+        user: 'q-{{callerNumber}}',
+        headers: []
+      })
+    ).toMatchObject({ target: { kind: 'sip', user: 'q-+43%20660%201' } });
+    expect(
+      resolve({
+        kind: 'webSocket',
+        protocol: 'twilio',
+        url: 'wss://bot.example/s?c={{callerNumber}}',
+        sampleRate: 8000
+      })
+    ).toMatchObject({
+      target: { url: 'wss://bot.example/s?c=%2B43%20660%201' }
+    });
+    expect(
+      resolve({
+        kind: 'extension',
+        extension: '{{slice did -2}}',
+        announcementAudioId: 'a1'
+      })
+    ).toEqual({
+      kind: 'resolved',
+      target: { kind: 'user', userId },
+      announcements: ['a1']
+    });
+
+    // What a template renders is checked: no number, an extension nobody owns.
+    const fallback: ForwardTarget = { kind: 'menu', menuId };
+    const noNumber: ForwardTarget = {
+      kind: 'external',
+      number: '{{callerName}}',
+      fallback
+    };
+    expect(resolve(noNumber)).toEqual({
+      kind: 'invalid',
+      target: noNumber,
+      field: 'external',
+      value: ''
+    });
+    const noOwner: ForwardTarget = {
+      kind: 'extension',
+      extension: '{{slice did -3}}',
+      fallback
+    };
+    expect(resolve(noOwner)).toEqual({
+      kind: 'invalid',
+      target: noOwner,
+      field: 'extension',
+      value: '617'
+    });
+    expect(resolvePure(snapshot, noOwner, 0, inputs({ values }))).toBeNull();
+    expect(
+      resolvePure(
+        snapshot,
+        { kind: 'extension', extension: '{{slice did -2}}' },
+        0,
+        inputs({ values })
+      )
+    ).toEqual({ target: { kind: 'user', userId }, hops: 0 });
   });
 
   it("plays the decision's own announcement, then the chosen target's, through nested decisions", async () => {

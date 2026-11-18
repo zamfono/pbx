@@ -12,6 +12,7 @@ import { webSocketSampleRate, type TargetSpec } from './forwardTargetSchema.js';
 import type { LiveTable } from './liveHolder.js';
 import { liveRow } from './rows.js';
 import { warnForSipHeaders } from './sipHeaders.js';
+import { assertTemplateNames, targetTemplates } from './templateNames.js';
 import { type Context } from './types.js';
 
 /** The one column `spec`'s kind sets on its `forward_targets` row, `sip`'s and `webSocket`'s column
@@ -62,6 +63,9 @@ function forwardTargetColumns(
   if (spec.kind === 'decision') {
     return { decisionId: spec.decisionId };
   }
+  if (spec.kind === 'extension') {
+    return { extension: spec.extension };
+  }
   return {};
 }
 
@@ -81,6 +85,7 @@ type ForwardTargetColumns = {
   announcementAudioId: string | null;
   menuId: string | null;
   decisionId: string | null;
+  extension: string | null;
   ringTimeoutS: number | null;
   recordCalls: number;
 };
@@ -94,7 +99,7 @@ function storedSampleRate(rate: number | null): WebSocketSampleRate {
 }
 
 /** The inverse of `forwardTargetColumns`: the wire target a `forward_targets` row represents,
- * `hangup` for none of the nine targets set (§11.2), `fallback` still `null` (`rowToTarget`). */
+ * `hangup` for none of the ten targets set (§11.2), `fallback` still `null` (`rowToTarget`). */
 function baseTarget(row: ForwardTargetColumns): TargetSpec {
   if (row.userId !== null) {
     return { kind: 'user', userId: row.userId };
@@ -150,6 +155,9 @@ function baseTarget(row: ForwardTargetColumns): TargetSpec {
   if (row.decisionId !== null) {
     return { kind: 'decision', decisionId: row.decisionId };
   }
+  if (row.extension !== null) {
+    return { kind: 'extension', extension: row.extension, fallback: null };
+  }
   return { kind: 'hangup' };
 }
 
@@ -163,11 +171,7 @@ export async function rowToTarget(
     ...baseTarget(row),
     announcementAudioId: row.announcementAudioId
   };
-  if (
-    target.kind !== 'external' &&
-    target.kind !== 'sip' &&
-    target.kind !== 'webSocket'
-  ) {
+  if (!('fallback' in target)) {
     return target;
   }
   const fallback = await db
@@ -245,6 +249,7 @@ export async function insertForwardTarget(
 ): Promise<string> {
   const { db } = ctx;
   await assertTargetAvailable(db, spec);
+  await assertTemplateNames(db, targetTemplates(spec));
   if (spec.kind === 'sip') {
     await warnForSipHeaders(ctx, spec.trunkId, spec.headers);
   }
@@ -267,6 +272,7 @@ export async function insertForwardTarget(
       announcementAudioId: spec.announcementAudioId ?? null,
       menuId: null,
       decisionId: null,
+      extension: null,
       fallbackOfId,
       ...forwardTargetColumns(spec)
     })

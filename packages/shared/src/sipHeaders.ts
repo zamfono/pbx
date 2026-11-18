@@ -1,9 +1,11 @@
 /**
  * A `sip` forward target's custom headers (§9.4 "Header templates", §10.3 "Forward targets"): the
- * placeholders a value may name, each with the most bytes it renders to, and the one reading of a
- * value's `{{placeholder}}` syntax. `api` validates a target's headers with them on write and
- * `core` renders them at the originate, so the two cannot disagree on what a value means.
+ * call's placeholders, which every template of a call may name (§9.4 "Templates"), each with the
+ * most bytes it renders to in a SIP header, and the headers' validation and rendering. `api`
+ * validates a target's headers on write and `core` renders them at the originate, with the one
+ * renderer (`templates.ts`), so the two cannot disagree on what a value means.
  */
+import { renderTemplate, templateParts, templateProblem } from './templates.js';
 
 /** Each placeholder and the most UTF-8 bytes its value renders to; `core` cuts a longer one. */
 export const SIP_HEADER_PLACEHOLDERS = {
@@ -24,6 +26,14 @@ export const SIP_HEADER_PLACEHOLDERS = {
 
 export type SipHeaderPlaceholder = keyof typeof SIP_HEADER_PLACEHOLDERS;
 
+/** Every placeholder's value for one call, as its templates read them (§9.4 "Templates"). */
+export type CallValues = Record<SipHeaderPlaceholder, string>;
+
+/** Whether `name` is one of the call's placeholders. */
+export function isCallPlaceholder(name: string): name is SipHeaderPlaceholder {
+  return Object.hasOwn(SIP_HEADER_PLACEHOLDERS, name);
+}
+
 /** A header as a target stores it: a name and a value template. */
 export type SipHeaderTemplate = { name: string; value: string };
 
@@ -43,17 +53,8 @@ export const DEFAULT_SIP_HEADERS: readonly SipHeaderTemplate[] = [
   { name: 'X-Zamfono-Did', value: '{{did}}' }
 ];
 
-/** One piece of a parsed value: literal text, or a placeholder substituted at the originate. */
-export type SipHeaderPart =
-  { text: string } | { placeholder: SipHeaderPlaceholder };
-
-export type ParsedSipHeaderValue =
-  { ok: true; parts: SipHeaderPart[] } | { ok: false; reason: string };
-
-/** A `{{name}}`, spaces allowed inside the braces as the mail templates allow them. */
-const PLACEHOLDER = /^\{\{\s*(?<name>[A-Za-z][A-Za-z0-9]*)\s*\}\}/u;
-const OPEN = '{{';
 const CONTROL = /\p{Cc}/u;
+const EVERY_CONTROL = /\p{Cc}/gu;
 const utf8 = new TextEncoder();
 
 /** `text`'s length in bytes of UTF-8, the unit every size here is in. */
@@ -61,55 +62,54 @@ export function utf8Bytes(text: string): number {
   return utf8.encode(text).length;
 }
 
-function isPlaceholder(name: string): name is SipHeaderPlaceholder {
-  return Object.hasOwn(SIP_HEADER_PLACEHOLDERS, name);
+/** `text` cut to at most `maxBytes` bytes of UTF-8, never inside a character. */
+export function cutUtf8(text: string, maxBytes: number): string {
+  let bytes = 0;
+  let end = 0;
+  for (const char of text) {
+    const size = utf8Bytes(char);
+    if (bytes + size > maxBytes) {
+      break;
+    }
+    bytes += size;
+    end += char.length;
+  }
+  return text.slice(0, end);
 }
 
 /**
- * Reads `value` into literal text and placeholders: every `{{` opens a `{{name}}` of the table, and
- * there are no blocks, helpers or escapes (§9.4 "Header templates"). Refuses a control character,
- * which could end the header, a `{{` that opens nothing, and a name the table does not have.
+ * Why `value` is no header value, as a write refuses it, else `null` (§9.4 "Header templates"): a
+ * control character, which could end the header, or what makes it no template (`templateProblem`),
+ * a name `isName` does not take among them (left out, any name).
  */
-export function parseSipHeaderValue(value: string): ParsedSipHeaderValue {
-  if (CONTROL.test(value)) {
-    return { ok: false, reason: 'a control character' };
-  }
-  const parts: SipHeaderPart[] = [];
-  let rest = value;
-  while (rest !== '') {
-    const open = rest.indexOf(OPEN);
-    if (open === -1) {
-      parts.push({ text: rest });
-      break;
-    }
-    if (open > 0) {
-      parts.push({ text: rest.slice(0, open) });
-    }
-    const match = PLACEHOLDER.exec(rest.slice(open));
-    const name = match?.groups?.name;
-    if (match === null || name === undefined) {
-      return { ok: false, reason: `a '{{' that opens no {{placeholder}}` };
-    }
-    if (!isPlaceholder(name)) {
-      return { ok: false, reason: `the unknown placeholder '${name}'` };
-    }
-    parts.push({ placeholder: name });
-    rest = rest.slice(open + match[0].length);
-  }
-  return { ok: true, parts };
+export function lineTemplateProblem(
+  value: string,
+  isName?: (name: string) => boolean
+): string | null {
+  return CONTROL.test(value)
+    ? 'a control character'
+    : templateProblem(value, isName);
 }
 
-/** The most bytes `parts` render to: the literal text's UTF-8 bytes and each placeholder's
- * maximum, capped at `SIP_HEADER_VALUE_MAX_BYTES`. */
-export function maxRenderedBytes(parts: SipHeaderPart[]): number {
-  const total = parts.reduce(
-    (sum, part) =>
+/** The most bytes `value` renders to in a SIP header: its literal text's UTF-8 bytes, each plain
+ * `{{placeholder}}`'s maximum and, for any other mustache, the value's own cap, capped at
+ * `SIP_HEADER_VALUE_MAX_BYTES`. A value that is no template counts its literal length. */
+export function maxRenderedBytes(value: string): number {
+  const parts = templateParts(value);
+  if (parts === null) {
+    return utf8Bytes(value);
+  }
+  const total = parts.reduce((sum, part) => {
+    if ('text' in part) {
+      return sum + utf8Bytes(part.text);
+    }
+    return (
       sum +
-      ('text' in part
-        ? utf8Bytes(part.text)
-        : SIP_HEADER_PLACEHOLDERS[part.placeholder]),
-    0
-  );
+      ('name' in part && isCallPlaceholder(part.name)
+        ? SIP_HEADER_PLACEHOLDERS[part.name]
+        : SIP_HEADER_VALUE_MAX_BYTES)
+    );
+  }, 0);
   return Math.min(total, SIP_HEADER_VALUE_MAX_BYTES);
 }
 
@@ -117,13 +117,54 @@ export function maxRenderedBytes(parts: SipHeaderPart[]): number {
 const SEPARATOR_BYTES = 2;
 
 /** How many bytes `headers` may take (§10.3 "Forward targets"): per header its name, 2 for `: `
- * and its value's `maxRenderedBytes`. A value that does not parse counts its literal length. */
+ * and its value's `maxRenderedBytes`. */
 export function sipHeadersSize(headers: readonly SipHeaderTemplate[]): number {
-  return headers.reduce((sum, header) => {
-    const parsed = parseSipHeaderValue(header.value);
-    const value = parsed.ok
-      ? maxRenderedBytes(parsed.parts)
-      : utf8Bytes(header.value);
-    return sum + header.name.length + SEPARATOR_BYTES + value;
-  }, 0);
+  return headers.reduce(
+    (sum, header) =>
+      sum +
+      header.name.length +
+      SEPARATOR_BYTES +
+      maxRenderedBytes(header.value),
+    0
+  );
+}
+
+/** A header as its leg sends it. */
+export type SipHeader = { name: string; value: string };
+
+/**
+ * `templates` rendered for one leg (§9.4 "Header templates"): each placeholder's value without
+ * its control characters and cut to its maximum, each mustache's output without control
+ * characters, the whole trimmed and cut to 256 bytes; a header whose value renders empty, such as
+ * `{{callerNumber}}` for a withheld caller, is left out, and so is one whose value `api` would not
+ * have taken. `variables` are the call's other values, an HTTP request's answers by its name.
+ */
+export function renderSipHeaders(
+  templates: readonly SipHeaderTemplate[],
+  values: CallValues,
+  variables: Readonly<Record<string, unknown>> = {}
+): SipHeader[] {
+  const cut = Object.fromEntries(
+    Object.entries(SIP_HEADER_PLACEHOLDERS).map(([name, max]) => [
+      name,
+      cutUtf8(
+        values[name as SipHeaderPlaceholder].replaceAll(EVERY_CONTROL, ''),
+        max
+      )
+    ])
+  );
+  const headers: SipHeader[] = [];
+  for (const template of templates) {
+    const rendered = CONTROL.test(template.value)
+      ? null
+      : renderTemplate(template.value, { ...variables, ...cut }, 'line');
+    const value = cutUtf8(
+      (rendered ?? '').trim(),
+      SIP_HEADER_VALUE_MAX_BYTES
+    ).trimEnd();
+    if (value !== '') {
+      headers.push({ name: template.name, value });
+    }
+  }
+  return headers;
 }
