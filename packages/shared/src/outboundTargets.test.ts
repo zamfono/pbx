@@ -7,9 +7,14 @@ import {
   isForbiddenAddress,
   isForbiddenAddressError,
   isForbiddenLiteral,
+  isPrivateAddress,
+  literalRefusal,
   ownSubnets,
+  PLAINTEXT_LITERAL_REASON,
+  PLAINTEXT_PUBLIC_CODE,
   resolveTarget,
   targetLookup,
+  urlLiteralProblem,
   type TargetPolicy
 } from './outboundTargets.js';
 
@@ -216,4 +221,83 @@ describe('resolveTarget (§6.5: before a backup tool is spawned)', () => {
       });
     }
   );
+});
+
+describe('plaintext schemes (§3.1 "Outbound targets")', () => {
+  it('knows the private networks, which alone a plaintext scheme connects to', () => {
+    for (const address of [
+      '10.1.2.3',
+      '172.16.0.1',
+      '192.168.1.20',
+      '100.64.0.9',
+      'fd00::1',
+      '::ffff:10.1.2.3'
+    ]) {
+      expect(isPrivateAddress(address), address).toBe(true);
+    }
+    for (const address of ['203.0.113.7', '172.32.0.1', '2001:db8::1']) {
+      expect(isPrivateAddress(address), address).toBe(false);
+    }
+  });
+
+  it('fails a plaintext lookup of a name with any public address, against the answer it connects to', async () => {
+    const lookupPlain = (host: string) =>
+      new Promise<NodeJS.ErrnoException | null>(resolve => {
+        targetLookup(PRIVATE_ALLOWED, true)(host, {}, error => {
+          resolve(error);
+        });
+      });
+    expect(await lookupPlain('lan.test')).toBeNull();
+    for (const host of ['public.test', 'v6.test']) {
+      // eslint-disable-next-line no-await-in-loop -- one lookup after the other
+      const error = await lookupPlain(host);
+      expect(error?.code, host).toBe(PLAINTEXT_PUBLIC_CODE);
+      expect(error?.message).toBe('plain HTTP to a public address');
+      expect(isForbiddenAddressError(error)).toBe(true);
+    }
+    // A refused address stays refused as such, and TLS is unchanged.
+    expect((await lookupPlain('stack.test'))?.code).toBe(
+      FORBIDDEN_ADDRESS_CODE
+    );
+    expect((await lookupOf(PRIVATE_ALLOWED, 'public.test')).error).toBeNull();
+  });
+
+  it('refuses a plaintext URL with a public address literal before it connects', () => {
+    const refusal = (url: string) =>
+      (
+        literalRefusal(new URL(url), PRIVATE_ALLOWED) as {
+          code?: string;
+        } | null
+      )?.code;
+    expect(refusal('http://203.0.113.7/hook')).toBe(PLAINTEXT_PUBLIC_CODE);
+    expect(refusal('ws://[2001:db8::1]/bot')).toBe(PLAINTEXT_PUBLIC_CODE);
+    expect(refusal('http://127.0.0.1/hook')).toBe(FORBIDDEN_ADDRESS_CODE);
+    for (const url of [
+      'http://192.168.1.20/hook',
+      'ws://100.64.0.9/bot',
+      'https://203.0.113.7/hook',
+      'wss://203.0.113.7/bot',
+      'http://receiver.example/hook'
+    ]) {
+      expect(refusal(url), url).toBeUndefined();
+    }
+  });
+
+  it('names on write what no connection could reach', () => {
+    expect(urlLiteralProblem('http://203.0.113.7/hook')).toBe(
+      PLAINTEXT_LITERAL_REASON
+    );
+    expect(urlLiteralProblem('ws://[2001:db8::1]/bot')).toBe(
+      PLAINTEXT_LITERAL_REASON
+    );
+    expect(urlLiteralProblem('http://127.0.0.1/hook')).toMatch(/loopback/u);
+    for (const url of [
+      'http://10.0.0.5/hook',
+      'https://203.0.113.7/hook',
+      'http://receiver.example/hook',
+      'wss://bot.example/media'
+    ]) {
+      expect(urlLiteralProblem(url), url).toBeNull();
+    }
+  });
 });

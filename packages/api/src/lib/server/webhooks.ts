@@ -4,25 +4,23 @@
  * survives an `api` restart and resumes with its attempt count and backoff. A delivery's end moves
  * its hook's health and logs what changed (`webhookHealth.ts`).
  */
-import { createHmac } from 'node:crypto';
-import { request as httpRequest } from 'node:http';
-import { request as httpsRequest } from 'node:https';
 import { setTimeout as sleep } from 'node:timers/promises';
 
 import {
-  forbiddenAddressError,
-  HTTP_OK,
-  isForbiddenLiteral,
+  isSuccess,
   newId,
   nowIso,
   publicEnvelope,
-  targetLookup,
+  sendHttpRequest,
   type Db,
   type Envelope,
+  type HttpAnswer,
+  type HttpSend,
   type TargetPolicy
 } from '@zamfono/shared';
 
 import { attempt } from './errors.js';
+import { readHeaders } from './ops/httpHeaders.js';
 import { decrypt, type Keyring } from './secretbox.js';
 import {
   errorReason,
@@ -34,9 +32,6 @@ import { backoffMs, DELIVERY_ATTEMPTS, matchesFilter } from './webhookRules.js';
 
 // §10.6: a 5 s timeout per request.
 const REQUEST_TIMEOUT_MS = 5000;
-// A 2xx is a delivery; a 3xx is not, since no redirect is followed.
-const HTTP_MULTIPLE_CHOICES = 300;
-const SIGNATURE_HEADER = 'X-Zamfono-Signature';
 
 /** A `webhook_deliveries` row: one event's body on its way to one hook. */
 type DeliveryRow = {
@@ -53,22 +48,14 @@ type DeliveryRow = {
  */
 type AttemptOutcome = { failure: string | null; retryable: boolean };
 
-/** One POST of `body` with `headers` to `url`: the receiver's HTTP status, or a rejection when
- *  it never answered. */
-export type WebhookPost = (
-  url: string,
-  body: string,
-  headers: Record<string, string>
-) => Promise<number>;
-
 export type WebhookDispatcherDeps = {
   db: Db;
   kr: Keyring;
   /** The addresses a hook may be delivered to (§3.1 "Outbound targets"), from
    *  `ALLOW_PRIVATE_TARGETS`; `null` delivers to any, for a test's receiver on loopback. */
   targetPolicy: TargetPolicy | null;
-  /** Overridable in tests; by default `postTo(targetPolicy)`. */
-  post?: WebhookPost;
+  /** Overridable in tests; by default the one request sender, `sendHttpRequest`. */
+  send?: (send: HttpSend) => Promise<HttpAnswer>;
   delay?: (ms: number) => Promise<void>;
   now?: () => string;
 };
@@ -76,43 +63,11 @@ export type WebhookDispatcherDeps = {
 type ResolvedDeps = {
   db: Db;
   kr: Keyring;
-  post: WebhookPost;
+  targetPolicy: TargetPolicy | null;
+  send: (send: HttpSend) => Promise<HttpAnswer>;
   delay: (ms: number) => Promise<void>;
   now: () => string;
 };
-
-/**
- * POSTs over `node:http(s)` rather than `fetch`, whose socket takes no `lookup`: the host's
- * addresses are checked against `policy` as the socket connects (`targetLookup`), an address
- * literal before, and a refused one fails with `forbiddenAddressError`. A redirect is not
- * followed, so it cannot lead where the check did not look: its 3xx is the answer.
- */
-export function postTo(policy: TargetPolicy | null): WebhookPost {
-  return (url, body, headers) =>
-    new Promise((resolve, reject) => {
-      const target = new URL(url);
-      if (policy !== null && isForbiddenLiteral(target.hostname, policy)) {
-        reject(forbiddenAddressError());
-        return;
-      }
-      const send = target.protocol === 'https:' ? httpsRequest : httpRequest;
-      send(
-        target,
-        {
-          method: 'POST',
-          headers,
-          signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-          ...(policy === null ? {} : { lookup: targetLookup(policy) })
-        },
-        response => {
-          response.resume();
-          resolve(response.statusCode ?? 0);
-        }
-      )
-        .on('error', reject)
-        .end(body);
-    });
-}
 
 /**
  * Delivers events to the `webhooks` table's active, matching hooks: HMAC-SHA256 of the JSON
@@ -126,7 +81,8 @@ export class WebhookDispatcher {
     this.deps = {
       db: deps.db,
       kr: deps.kr,
-      post: deps.post ?? postTo(deps.targetPolicy),
+      targetPolicy: deps.targetPolicy,
+      send: deps.send ?? sendHttpRequest,
       delay: deps.delay ?? (ms => sleep(ms)),
       now: deps.now ?? nowIso
     };
@@ -224,7 +180,8 @@ export class WebhookDispatcher {
   }
 
   /**
-   * One POST of `row`'s body, signed with its hook's current secret, or `null` when the delivery
+   * One POST of `row`'s body, signed with its hook's current secret and carrying its custom
+   * headers, or `null` when the delivery
    * is gone or its hook deleted or switched off, which ends it with no status. A secret that cannot be decrypted
    * (§5.4: a key replaced without its previous generation, a database restored under another
    * `.env`) fails the delivery for good: no later attempt could read it either.
@@ -233,7 +190,12 @@ export class WebhookDispatcher {
     const hook = await this.deps.db
       .selectFrom('webhookDeliveries')
       .innerJoin('webhooks', 'webhooks.id', 'webhookDeliveries.webhookId')
-      .select(['webhooks.url', 'webhooks.secretEnc'])
+      .select([
+        'webhooks.url',
+        'webhooks.secretEnc',
+        'webhooks.headersJson',
+        'webhooks.secretHeadersEnc'
+      ])
       .where('webhookDeliveries.id', '=', row.id)
       .where('webhooks.active', '=', 1)
       .where('webhooks.deletedAt', 'is', null)
@@ -245,35 +207,38 @@ export class WebhookDispatcher {
         .execute();
       return null;
     }
-    const secret = attempt(() =>
-      decrypt(this.deps.kr, 'webhooks.secretEnc', hook.secretEnc).toString(
-        'utf8'
-      )
-    );
-    if (secret === undefined) {
+    // The secret and the secret headers alike: neither can be read under another key.
+    const credentials = attempt(() => ({
+      secret: decrypt(
+        this.deps.kr,
+        'webhooks.secretEnc',
+        hook.secretEnc
+      ).toString('utf8'),
+      headers: readHeaders(this.deps.kr, 'webhooks.secretHeadersEnc', hook)
+    }));
+    if (credentials === undefined) {
       return { failure: SECRET_UNREADABLE, retryable: false };
     }
-    const signature = createHmac('sha256', secret)
-      .update(row.bodyJson)
-      .digest('hex');
-    const failure = await this.post(hook.url, row.bodyJson, signature);
+    const failure = await this.post({
+      method: 'POST',
+      url: hook.url,
+      headers: Object.fromEntries(
+        credentials.headers.map(header => [header.name, header.value])
+      ),
+      body: row.bodyJson,
+      contentType: 'application/json',
+      secret: credentials.secret,
+      timeoutMs: REQUEST_TIMEOUT_MS,
+      policy: this.deps.targetPolicy
+    });
     return { failure, retryable: true };
   }
 
-  /** POSTs `body`: `null` once the receiver answered 2xx, else why not (`webhookHealth.ts`). */
-  private async post(
-    url: string,
-    body: string,
-    signature: string
-  ): Promise<string | null> {
+  /** Sends `send`: `null` once the receiver answered 2xx, else why not (`webhookHealth.ts`). */
+  private async post(send: HttpSend): Promise<string | null> {
     try {
-      const status = await this.deps.post(url, body, {
-        'Content-Type': 'application/json',
-        [SIGNATURE_HEADER]: signature
-      });
-      return status >= HTTP_OK && status < HTTP_MULTIPLE_CHOICES
-        ? null
-        : httpReason(status);
+      const { status } = await this.deps.send(send);
+      return isSuccess(status) ? null : httpReason(status);
     } catch (error) {
       return errorReason(error);
     }

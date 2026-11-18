@@ -36,3 +36,5 @@ export * from './credentials.js';
 export * from './mediaStorage.js';
 export * from './bearer.js';
 export * from './outboundTargets.js';
+export * from './httpSend.js';
+export * from './httpHeaders.js';

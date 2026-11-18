@@ -6,11 +6,13 @@ import { newId } from '@zamfono/shared';
 import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
 
 import { recordChange } from '../audit.js';
+import { recordHeaderChange, storeHeaders } from '../httpHeaders.js';
 import { defineOperation } from '../types.js';
 import {
   eventTypesField,
   httpUrlSchema,
   toWire,
+  webhookHeadersField,
   webhookSecretSchema,
   webhookWire,
   type WebhookWire
@@ -20,7 +22,8 @@ const inputSchema = z
   .object({
     url: httpUrlSchema,
     secret: webhookSecretSchema,
-    eventTypes: eventTypesField
+    eventTypes: eventTypesField,
+    headers: webhookHeadersField
   })
   .strict();
 
@@ -39,10 +42,12 @@ export const create = defineOperation({
   run: async (ctx, input) => {
     const id = newId();
     const eventTypes = input.eventTypes ?? null;
-    const secretEnc = encrypt(
-      keyringFromEnv(env),
-      'webhooks.secretEnc',
-      input.secret
+    const kr = keyringFromEnv(env);
+    const secretEnc = encrypt(kr, 'webhooks.secretEnc', input.secret);
+    const headers = storeHeaders(
+      kr,
+      'webhooks.secretHeadersEnc',
+      input.headers ?? []
     );
     await ctx.db
       .insertInto('webhooks')
@@ -52,6 +57,7 @@ export const create = defineOperation({
         eventTypesJson: eventTypes === null ? null : JSON.stringify(eventTypes),
         active: 0,
         secretEnc,
+        ...headers,
         lastStatus: null,
         lastDeliveryAt: null,
         createdAt: ctx.now
@@ -59,6 +65,7 @@ export const create = defineOperation({
       .execute();
     recordChange(ctx, { field: 'url', from: null, to: input.url });
     recordChange(ctx, { field: 'secret', from: null, to: input.secret });
+    recordHeaderChange(ctx, '[]', headers.headersJson);
     const row = await ctx.db
       .selectFrom('webhooks')
       .selectAll()

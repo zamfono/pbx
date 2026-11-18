@@ -1,7 +1,12 @@
+import * as privateEnv from '$app/env/private';
 import { describe, expect, it } from 'vitest';
 
+import type { Db } from '@zamfono/shared';
+
+import { keyringFromEnv } from '#lib/server/secretbox.js';
 import { asRun, makeTestDb } from '#testing/testDb.js';
 
+import { readHeaders } from '../httpHeaders.js';
 import { runOperation } from '../runner.js';
 import type { WebhookWire } from './_shared.js';
 
@@ -219,6 +224,25 @@ describe('webhooks', () => {
     ).rejects.toMatchObject({ status: 422 });
   });
 
+  // Plain HTTP reaches only a private address: a public literal is refused at once (§3.1).
+  it.each(['http://203.0.113.7/hook', 'http://[2001:db8::1]/hook'])(
+    'refuses %s, plain HTTP to a public address',
+    async url => {
+      const db = await makeTestDb();
+      await expect(
+        runOperation(db, 'webhooks.create', { url, secret: 's' }, asRun())
+      ).rejects.toMatchObject({ status: 422 });
+      await expect(
+        runOperation(
+          db,
+          'webhooks.create',
+          { url: url.replace('http:', 'https:'), secret: 's' },
+          asRun()
+        )
+      ).resolves.toBeDefined();
+    }
+  );
+
   it.each(['http://192.168.1.20/hook', 'http://core:3000/x'])(
     'takes %s, a private address or a name, which the delivery checks',
     async url => {
@@ -228,4 +252,110 @@ describe('webhooks', () => {
       ).resolves.toBeDefined();
     }
   );
+});
+
+describe('webhook headers (§10.6 "Request headers")', () => {
+  const create = (db: Db, headers: unknown) =>
+    runOperation(
+      db,
+      'webhooks.create',
+      { url: 'https://example.invalid/hook', secret: 'sh-secret', headers },
+      asRun()
+    ) as Promise<WebhookWire>;
+
+  it('stores them, a secret one encrypted and read back as secretSet, and keeps its value when a write leaves it out', async () => {
+    const db = await makeTestDb();
+    const created = await create(db, [
+      { name: 'X-Tenant', value: 'acme' },
+      { name: 'Authorization', value: 'Bearer tok-123', secret: true }
+    ]);
+    expect(created.headers).toEqual([
+      { name: 'X-Tenant', value: 'acme', secret: false },
+      { name: 'Authorization', secret: true, secretSet: true }
+    ]);
+    const row = await db
+      .selectFrom('webhooks')
+      .select(['headersJson', 'secretHeadersEnc'])
+      .where('id', '=', created.id)
+      .executeTakeFirstOrThrow();
+    expect(row.headersJson).not.toContain('tok-123');
+    expect(row.secretHeadersEnc?.toString('utf8')).not.toContain('tok-123');
+
+    // What a read returned goes back as it is: the secret stays, the rest is replaced.
+    const updated = (await runOperation(
+      db,
+      'webhooks.update',
+      {
+        id: created.id,
+        headers: [
+          { name: 'authorization', secret: true, secretSet: true },
+          { name: 'X-Env', value: 'prod' }
+        ]
+      },
+      asRun()
+    )) as WebhookWire;
+    expect(updated.headers).toEqual([
+      { name: 'authorization', secret: true, secretSet: true },
+      { name: 'X-Env', value: 'prod', secret: false }
+    ]);
+    expect(
+      readHeaders(
+        keyringFromEnv(privateEnv),
+        'webhooks.secretHeadersEnc',
+        await db
+          .selectFrom('webhooks')
+          .select(['headersJson', 'secretHeadersEnc'])
+          .where('id', '=', created.id)
+          .executeTakeFirstOrThrow()
+      )
+    ).toEqual([
+      { name: 'authorization', value: 'Bearer tok-123' },
+      { name: 'X-Env', value: 'prod' }
+    ]);
+    // Left out, the headers stay; an empty list removes them.
+    const untouched = (await runOperation(
+      db,
+      'webhooks.update',
+      { id: created.id, active: true },
+      asRun()
+    )) as WebhookWire;
+    expect(untouched.headers).toHaveLength(2);
+  });
+
+  it.each([
+    [[{ name: 'Host', value: 'x' }], 'a header the request sets itself'],
+    [[{ name: 'content-type', value: 'x' }], 'reserved without case'],
+    [[{ name: 'X-Zamfono-Signature', value: 'x' }], 'the signature'],
+    [[{ name: 'X Bad', value: 'x' }], 'no field name'],
+    [[{ name: `X-${'a'.repeat(63)}`, value: 'x' }], 'a name over 64'],
+    [
+      [
+        { name: 'X-A', value: '1' },
+        { name: 'x-a', value: '2' }
+      ],
+      'a name given twice'
+    ],
+    [[{ name: 'X-A', value: 'a\r\nb' }], 'a control character'],
+    [[{ name: 'X-A', value: '{{callerNumber}}' }], 'a placeholder'],
+    [[{ name: 'X-A' }], 'no value on a header that is no secret'],
+    [[{ name: 'X-A', secret: true }], 'no stored value to keep'],
+    [[{ name: 'X-A', value: 'x'.repeat(8192) }], 'more than 8 KiB']
+  ] as [unknown, string][])('refuses %j: %s', async headers => {
+    const db = await makeTestDb();
+    await expect(create(db, headers)).rejects.toMatchObject({ status: 422 });
+  });
+
+  it('takes a bearer token longer than a SIP header value may be', async () => {
+    const db = await makeTestDb();
+    const created = await create(db, [
+      {
+        name: 'Authorization',
+        value: `Bearer ${'j'.repeat(4000)}`,
+        secret: true
+      }
+    ]);
+    expect(created.headers).toEqual([
+      { name: 'Authorization', secret: true, secretSet: true }
+    ]);
+  });
 });

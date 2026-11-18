@@ -26,7 +26,7 @@ const ENC_COLUMNS: readonly {
   },
   { table: 'totpCredentials', columns: ['secretEnc'] },
   { table: 'trunks', columns: ['passwordEnc'] },
-  { table: 'webhooks', columns: ['secretEnc'] }
+  { table: 'webhooks', columns: ['secretEnc', 'secretHeadersEnc'] }
 ];
 
 /** One stored blob and the row and column it lives in. */

@@ -8,6 +8,7 @@ import { migratedTestDb } from '@zamfono/shared/testDb.js';
 
 import { testKeyring } from '#testing/fixtures.js';
 
+import { storeHeaders } from './ops/httpHeaders.js';
 import { encrypt, type Keyring } from './secretbox.js';
 import { WebhookDispatcher } from './webhooks.js';
 
@@ -179,6 +180,65 @@ describe('WebhookDispatcher', () => {
       .digest('hex');
     expect(request.headers['x-zamfono-signature']).toBe(expectedSignature);
     expect(JSON.parse(request.body)).toEqual(ev);
+  });
+
+  it("carries the hook's custom headers beside the signature, a secret one decrypted (§10.6)", async () => {
+    const db = await migratedTestDb();
+    const kr = testKeyring();
+    await insertWebhook(db, kr, { url: stub.url, secret: 'top-secret' });
+    await db
+      .updateTable('webhooks')
+      .set(
+        storeHeaders(kr, 'webhooks.secretHeadersEnc', [
+          { name: 'X-Tenant', value: 'acme', secret: false },
+          { name: 'Authorization', value: 'Bearer tok-123', secret: true }
+        ])
+      )
+      .execute();
+    const dispatcher = new WebhookDispatcher({
+      db,
+      kr,
+      targetPolicy: null,
+      delay: noDelay
+    });
+
+    await dispatcher.enqueue(sampleEvent());
+
+    const [request] = stub.requests;
+    expect(request?.headers).toMatchObject({
+      'x-tenant': 'acme',
+      authorization: 'Bearer tok-123',
+      'content-type': 'application/json'
+    });
+    expect(request?.headers['x-zamfono-signature']).toBe(
+      createHmac('sha256', 'top-secret')
+        .update(request?.body ?? '')
+        .digest('hex')
+    );
+  });
+
+  it('fails a delivery over plain HTTP to a public address, for that reason (§3.1)', async () => {
+    const db = await migratedTestDb();
+    const kr = testKeyring();
+    await insertWebhook(db, kr, { url: 'http://203.0.113.7/hook' });
+    const dispatcher = new WebhookDispatcher({
+      db,
+      kr,
+      targetPolicy: { allowPrivate: true, ownSubnets: [] },
+      delay: noDelay
+    });
+
+    await dispatcher.enqueue(sampleEvent());
+
+    expect(
+      await db
+        .selectFrom('webhooks')
+        .select(['lastStatus', 'lastError'])
+        .executeTakeFirstOrThrow()
+    ).toEqual({
+      lastStatus: 'failing',
+      lastError: 'plain HTTP to a public address'
+    });
   });
 
   it('posts a call.state event in the §10.6 shape, without its internal participant list', async () => {

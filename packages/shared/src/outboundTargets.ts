@@ -32,6 +32,10 @@ const IPV6_BRACKETS = /^\[(?<address>.*)\]$/u;
 
 /** The `code` of the error a refused address fails a connection with. */
 export const FORBIDDEN_ADDRESS_CODE = 'ERR_FORBIDDEN_ADDRESS';
+/** The `code` of the error a plaintext connection to a public address fails with. */
+export const PLAINTEXT_PUBLIC_CODE = 'ERR_PLAINTEXT_PUBLIC_ADDRESS';
+/** Why such a connection fails, as a delivery's reason names it (§3.1 "Outbound targets"). */
+export const PLAINTEXT_PUBLIC_REASON = 'plain HTTP to a public address';
 
 /**
  * Whether private networks are allowed (`ALLOW_PRIVATE_TARGETS`), and the subnets of the stack's
@@ -61,6 +65,23 @@ let processSubnets: string[] | undefined;
 
 function familyOf(address: string): 'ipv4' | 'ipv6' {
   return isIPv6(address) ? 'ipv6' : 'ipv4';
+}
+
+const privateList = new BlockList();
+for (const range of PRIVATE) {
+  const [network = '', prefix] = range.split('/');
+  privateList.addSubnet(network, Number(prefix), familyOf(network));
+}
+
+/** Whether `address`, an IP address, is on a private network (§3.1 "Outbound targets"): the only
+ * addresses a plaintext scheme connects to. */
+export function isPrivateAddress(address: string): boolean {
+  return privateList.check(address, familyOf(address));
+}
+
+/** Whether a URL's `protocol` sends in the clear: `http:` or `ws:`. */
+export function isPlaintextScheme(protocol: string): boolean {
+  return protocol === 'http:' || protocol === 'ws:';
 }
 
 // One list per policy object, which its holder keeps for the process (a webhook dispatcher, the
@@ -94,10 +115,19 @@ export function forbiddenAddressError(): Error {
   });
 }
 
-/** Whether `error`, or the error it wraps, is a refused address's. */
+/** The error a plaintext connection to a public address fails with. */
+export function plaintextPublicError(): Error {
+  return Object.assign(new Error(PLAINTEXT_PUBLIC_REASON), {
+    code: PLAINTEXT_PUBLIC_CODE
+  });
+}
+
+/** Whether `error`, or the error it wraps, is that of an address a connection may not be made
+ * to: a refused one, or a public one over a plaintext scheme. */
 export function isForbiddenAddressError(error: unknown): boolean {
   for (let current = error; current instanceof Error; current = current.cause) {
-    if ((current as { code?: unknown }).code === FORBIDDEN_ADDRESS_CODE) {
+    const { code } = current as { code?: unknown };
+    if (code === FORBIDDEN_ADDRESS_CODE || code === PLAINTEXT_PUBLIC_CODE) {
       return true;
     }
   }
@@ -135,14 +165,66 @@ export function isAlwaysForbiddenLiteral(host: string): boolean {
 /** The reason a write refused for `isAlwaysForbiddenLiteral` names. */
 export const ALWAYS_FORBIDDEN_REASON =
   'a loopback, link-local or unspecified address is never connected to';
+/** The reason a write refused for a plaintext URL to a public address literal names. */
+export const PLAINTEXT_LITERAL_REASON =
+  'a plain http:// or ws:// URL reaches only a private address; use https:// or wss://';
+
+/** The bare IP literal `host` (an `URL.hostname`) is, else `null`. */
+function literalOf(host: string): string | null {
+  const bare = host.replace(IPV6_BRACKETS, '$<address>');
+  return isIP(bare) === 0 ? null : bare;
+}
+
+/**
+ * Why a write refuses `url` at once (422), else `null` (§3.1 "Outbound targets"): its host is an
+ * address literal no connection could reach, or it has a plaintext scheme and a public address
+ * literal. A name is checked as the connection resolves it.
+ */
+export function urlLiteralProblem(url: string): string | null {
+  const parsed = URL.parse(url);
+  if (parsed === null) {
+    return null;
+  }
+  if (isAlwaysForbiddenLiteral(parsed.hostname)) {
+    return ALWAYS_FORBIDDEN_REASON;
+  }
+  const literal = literalOf(parsed.hostname);
+  return literal !== null &&
+    isPlaintextScheme(parsed.protocol) &&
+    !isPrivateAddress(literal)
+    ? PLAINTEXT_LITERAL_REASON
+    : null;
+}
+
+/**
+ * The error a connection to `url` fails with before it is made, else `null`: its host is an
+ * address literal `policy` refuses, or a public one under a plaintext scheme. A connection to an
+ * IP literal resolves nothing, so `targetLookup` never sees it: this is its check for that case.
+ */
+export function literalRefusal(url: URL, policy: TargetPolicy): Error | null {
+  if (isForbiddenLiteral(url.hostname, policy)) {
+    return forbiddenAddressError();
+  }
+  const literal = literalOf(url.hostname);
+  return literal !== null &&
+    isPlaintextScheme(url.protocol) &&
+    !isPrivateAddress(literal)
+    ? plaintextPublicError()
+    : null;
+}
 
 /**
  * A socket `lookup` that resolves like the default one but fails, with a
  * `FORBIDDEN_ADDRESS_CODE` error, for a host with any address `policy` refuses. The check holds
  * for the very answer the socket connects to, so a name whose answer changes between a check and
- * the connection (DNS rebinding) cannot slip a refused one in.
+ * the connection (DNS rebinding) cannot slip a refused one in. For a `plaintext` connection
+ * (`http:`, `ws:`) every address must also be private, else it fails with a
+ * `PLAINTEXT_PUBLIC_CODE` error: nothing is sent in the clear over the public internet.
  */
-export function targetLookup(policy: TargetPolicy): LookupFunction {
+export function targetLookup(
+  policy: TargetPolicy,
+  plaintext = false
+): LookupFunction {
   return (hostname, options, callback) => {
     lookup(hostname, { ...options, all: true }, (error, addresses) => {
       if (error) {
@@ -158,6 +240,11 @@ export function targetLookup(policy: TargetPolicy): LookupFunction {
         )
       ) {
         callback(forbiddenAddressError(), []);
+      } else if (
+        plaintext &&
+        addresses.some(({ address }) => !isPrivateAddress(address))
+      ) {
+        callback(plaintextPublicError(), []);
       } else if (options.all === true) {
         callback(null, addresses);
       } else {
@@ -165,6 +252,12 @@ export function targetLookup(policy: TargetPolicy): LookupFunction {
       }
     });
   };
+}
+
+/** The `lookup` a connection to `url` resolves its host with: `targetLookup`, its plaintext rule
+ * on for `http:` and `ws:`. */
+export function urlLookup(url: URL, policy: TargetPolicy): LookupFunction {
+  return targetLookup(policy, isPlaintextScheme(url.protocol));
 }
 
 /**

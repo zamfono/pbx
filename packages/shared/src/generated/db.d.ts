@@ -635,6 +635,7 @@ export interface Webhooks {
   eventTypesJson: string | null;
   failedDeliveries: Generated<number>;
   failingSince: string | null;
+  headersJson: Generated<string>;
   id: string;
   lastDeliveryAt: string | null;
   lastError: string | null;
@@ -642,6 +643,7 @@ export interface Webhooks {
   lastLoggedAt: string | null;
   lastStatus: WebhookStatus | null;
   secretEnc: Buffer;
+  secretHeadersEnc: Buffer | null;
   url: string;
 }
 

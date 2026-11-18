@@ -347,6 +347,28 @@ describe('webSocket targets (§9.4 "WebSocket targets")', () => {
     expect(call.hops).toBe(1);
   });
 
+  it('refuses a ws:// bot on a public address as forbiddenAddress, wss:// to it being tried (§3.1)', async () => {
+    pipeline.deps.targetPolicy = { allowPrivate: true, ownSubnets: [] };
+    const anna = await seedUser(db, { mailboxEnabled: 0 });
+    const call = inboundCall();
+    await enterTarget(
+      pipeline,
+      call,
+      target({
+        url: 'ws://203.0.113.7/bot',
+        fallback: { kind: 'user', userId: anna }
+      }),
+      null
+    );
+    expect(traceEvents(call)).toContainEqual(
+      expect.objectContaining({
+        event: 'fallback',
+        from: 'webSocket',
+        cause: 'forbiddenAddress'
+      })
+    );
+  });
+
   // §3.1 "Outbound targets": loopback is never connected to, whether the URL names it or a name
   // resolves to it, and the call goes on as for a socket that does not open.
   it.each([

@@ -147,4 +147,4 @@
 | `webhooks.create` | `POST /api/v1/webhooks` | Adds a webhook, an endpoint every event (or the filtered types) is POSTed to; created inactive until switched on with webhooks.update | admin | no |
 | `webhooks.delete` | `DELETE /api/v1/webhooks/{id}` | Soft-deletes a webhook; its events are no longer delivered | admin | yes |
 | `webhooks.list` | `GET /api/v1/webhooks` | Lists the tenant's webhooks with their delivery status, ok or failing | admin | no |
-| `webhooks.update` | `PATCH /api/v1/webhooks/{id}` | Changes a webhook's URL, secret or event-type filter, or switches it on or off | admin | no |
+| `webhooks.update` | `PATCH /api/v1/webhooks/{id}` | Changes a webhook's URL, secret, headers or event-type filter, or switches it on or off | admin | no |

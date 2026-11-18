@@ -2,11 +2,13 @@ import type { Selectable } from 'kysely';
 import { z } from 'zod';
 
 import {
-  ALWAYS_FORBIDDEN_REASON,
   eventTypesColumn,
   eventTypesSchema,
-  isAlwaysForbiddenLiteral,
+  httpHeadersSchema,
+  httpHeaderWire,
+  urlLiteralProblem,
   WEBHOOK_STATUSES,
+  wireHeaders,
   type Db,
   type DB,
   type EventType
@@ -32,14 +34,28 @@ export const eventTypesField = eventTypesSchema
     'The event types to deliver, such as ["call.state", "voicemail.new"]; null delivers every event.'
   );
 
-/** A webhook's `url`: `http(s)` only, since it names an HTTP POST endpoint (§10.6), and never an
- *  address literal no delivery could reach (§3.1 "Outbound targets"). */
+/** A webhook's `url`: `http(s)` only, since it names an HTTP POST endpoint (§10.6), never an
+ *  address literal no delivery could reach, and plain `http://` to no public address literal
+ *  (§3.1 "Outbound targets"). */
 export const httpUrlSchema = z
   .url({ protocol: /^https?$/u })
-  .refine(url => !isAlwaysForbiddenLiteral(URL.parse(url)?.hostname ?? ''), {
-    message: ALWAYS_FORBIDDEN_REASON
+  .superRefine((url, ctx) => {
+    const problem = urlLiteralProblem(url);
+    if (problem !== null) {
+      ctx.addIssue({ code: 'custom', message: problem });
+    }
   })
-  .describe('The http(s) endpoint every event is POSTed to as JSON.');
+  .describe(
+    'The endpoint every event is POSTed to as JSON: https://, or http:// for a receiver on a private network.'
+  );
+
+/** A webhook's `headers`, the same field on create and update (§10.6 "Request headers"): literal
+ *  values, since an event belongs to no call whose placeholders they could name. */
+export const webhookHeadersField = httpHeadersSchema({ templates: false })
+  .optional()
+  .describe(
+    'Custom headers every delivery carries beside X-Zamfono-Signature, such as Authorization; replaced as a whole.'
+  );
 
 /** `event_types_json` as the wire shape: `null` unfiltered, else the types delivered. */
 export function decodeEventTypes(json: string | null): EventType[] | null {
@@ -55,6 +71,11 @@ export const webhookWire = z.object({
     .literal(true)
     .describe(
       "Always true: a hook's secret is required; the secret itself is write-only."
+    ),
+  headers: z
+    .array(httpHeaderWire)
+    .describe(
+      'The custom headers every delivery carries; a secret one without its value.'
     ),
   active: z.boolean(),
   lastStatus: z.enum(WEBHOOK_STATUSES).nullable(),
@@ -84,6 +105,7 @@ export function toWire(row: WebhookRow): WebhookWire {
     url: row.url,
     eventTypes: decodeEventTypes(row.eventTypesJson),
     secretSet: true,
+    headers: wireHeaders(row.headersJson),
     active: row.active === 1,
     lastStatus: row.lastStatus,
     lastDeliveryAt: row.lastDeliveryAt,

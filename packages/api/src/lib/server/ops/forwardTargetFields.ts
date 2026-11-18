@@ -1,11 +1,10 @@
 import { z } from 'zod';
 
 import {
-  ALWAYS_FORBIDDEN_REASON,
-  isAlwaysForbiddenLiteral,
   isTemplate,
   targetFieldProblem,
   templateSample,
+  urlLiteralProblem,
   WEB_SOCKET_URL_MAX_LENGTH
 } from '@zamfono/shared';
 
@@ -35,12 +34,15 @@ export function templatedField(
 }
 
 /** A URL a `webSocket` target may connect to (§9.4 "WebSocket targets"); `forward_targets`' CHECK
- * holds the same. An address literal no connection could reach is refused at once (§3.1
- * "Outbound targets"). */
+ * holds the same. An address literal no connection could reach, and a public one under plain
+ * `ws://`, is refused at once (§3.1 "Outbound targets"). */
 const literalWebSocketUrl = z
   .url({ protocol: /^wss?$/u, hostname: z.regexes.hostname })
-  .refine(url => !isAlwaysForbiddenLiteral(URL.parse(url)?.hostname ?? ''), {
-    message: ALWAYS_FORBIDDEN_REASON
+  .superRefine((url, ctx) => {
+    const problem = urlLiteralProblem(url);
+    if (problem !== null) {
+      ctx.addIssue({ code: 'custom', message: problem });
+    }
   });
 
 /** A `webSocket` target's `url`: a URL as above, or a template of one whose scheme, host and port
@@ -60,5 +62,5 @@ export const webSocketUrlSchema = z
     }
   })
   .describe(
-    "The bot's WebSocket URL, wss:// (or ws://), at most 2048 characters; a token the bot checks goes in its query string. Past the host it may be a template (see zamfono.help templates)."
+    "The bot's WebSocket URL, wss://, or ws:// for a bot on a private network, at most 2048 characters; a token the bot checks goes in its query string. Past the host it may be a template (see zamfono.help templates)."
   );

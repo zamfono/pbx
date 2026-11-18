@@ -6,6 +6,7 @@ import { HTTP_NOT_FOUND } from '@zamfono/shared';
 import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
 
 import { fromFlag, recordChange, recordFieldChanges } from '../audit.js';
+import { recordHeaderChange, storeHeaders } from '../httpHeaders.js';
 import { orBefore } from '../patch.js';
 import { defineOperation } from '../types.js';
 import {
@@ -14,6 +15,7 @@ import {
   httpUrlSchema,
   liveWebhook,
   toWire,
+  webhookHeadersField,
   webhookSecretSchema,
   webhookWire
 } from './_shared.js';
@@ -24,6 +26,7 @@ const inputSchema = z
     url: httpUrlSchema.optional(),
     secret: webhookSecretSchema.optional(),
     eventTypes: eventTypesField,
+    headers: webhookHeadersField,
     active: z
       .boolean()
       .optional()
@@ -48,13 +51,13 @@ function nextEventTypesJson(
 }
 
 /**
- * `PATCH /webhooks/{id}` (§10.6): URL, secret, event-type filter and the `active` switch. A hook
+ * `PATCH /webhooks/{id}` (§10.6): URL, secret, headers, event-type filter and the `active` switch. A hook
  * switched off drops its pending deliveries, which switching it on again does not bring back.
  */
 export const update = defineOperation({
   name: 'webhooks.update',
   description:
-    "Changes a webhook's URL, secret or event-type filter, or switches it on or off",
+    "Changes a webhook's URL, secret, headers or event-type filter, or switches it on or off",
   input: inputSchema,
   output: webhookWire,
   problems: [HTTP_NOT_FOUND],
@@ -68,10 +71,18 @@ export const update = defineOperation({
       before.eventTypesJson,
       input.eventTypes
     );
+    const kr = keyringFromEnv(env);
     const secretEnc =
       input.secret === undefined
         ? before.secretEnc
-        : encrypt(keyringFromEnv(env), 'webhooks.secretEnc', input.secret);
+        : encrypt(kr, 'webhooks.secretEnc', input.secret);
+    const headers =
+      input.headers === undefined
+        ? null
+        : storeHeaders(kr, 'webhooks.secretHeadersEnc', input.headers, before);
+    if (headers !== null) {
+      recordHeaderChange(ctx, before.headersJson, headers.headersJson);
+    }
     const columns = { url, active: active ? 1 : 0, eventTypesJson };
     recordFieldChanges(ctx, before, columns, {
       active: { decode: fromFlag },
@@ -82,7 +93,7 @@ export const update = defineOperation({
     }
     await ctx.db
       .updateTable('webhooks')
-      .set({ ...columns, secretEnc })
+      .set({ ...columns, secretEnc, ...(headers ?? {}) })
       .where('id', '=', input.id)
       .execute();
     if (!active) {
