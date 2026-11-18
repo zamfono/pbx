@@ -274,3 +274,34 @@ for call in json.load(sys.stdin)["items"]:
     break
 ' "$1" "${2:-}" "${3:-}") && [ -n "$id" ]
 }
+
+# Where the request scenarios' receiver is reached: the port compose.test.yaml publishes on the
+# `outside` network's gateway, a private host address, so plain HTTP reaches it (§3.1 "Outbound
+# targets") while neither `api` nor `core` connects to the stack's own `internal` network.
+HTTP_RECEIVER=http://10.213.48.1:8766
+
+# Starts the HTTP receiver (`_http-receiver.cjs`) in the `voice-bot` container, with nothing kept
+# from an earlier scenario.
+start_http_receiver() {
+  dc exec -T voice-bot rm -rf /tmp/http-receiver
+  dc exec -T -d voice-bot sh -c \
+    'NODE_PATH=/app/node_modules node /scenarios/_http-receiver.cjs > /tmp/http-receiver.log 2>&1'
+  poll 30 1 dc exec -T voice-bot test -e /tmp/http-receiver/listening \
+    || { echo "the HTTP receiver never listened" >&2; return 1; }
+}
+
+# Stops the HTTP receiver and removes what it kept.
+stop_http_receiver() {
+  dc exec -T voice-bot sh -c \
+    'kill "$(cat /tmp/http-receiver.pid)"; rm -rf /tmp/http-receiver /tmp/http-receiver.log /tmp/http-receiver.pid'
+}
+
+# The requests the HTTP receiver got so far, one JSON line each; empty while it got none.
+http_received() {
+  dc exec -T voice-bot sh -c 'cat /tmp/http-receiver/requests.jsonl 2>/dev/null || true'
+}
+
+# Whether the HTTP receiver has noted a request yet, left in `received`.
+http_request_noted() {
+  received=$(http_received) && [ -n "$received" ]
+}

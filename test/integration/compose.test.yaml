@@ -180,6 +180,8 @@ services:
       - internal
     ports:
       - '10.213.48.1:8765:8765'
+      # The HTTP receiver of the request scenarios (_http-receiver.cjs), reached the same way.
+      - '10.213.48.1:8766:8766'
     volumes:
       - ${SCENARIOS_DIR:?set by run.sh}:/scenarios:ro
     entrypoint: ['sleep', 'infinity']
