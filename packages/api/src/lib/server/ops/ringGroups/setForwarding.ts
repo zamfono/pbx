@@ -7,8 +7,8 @@ import {
 import { recordChange } from '../audit.js';
 import {
   deleteForwardTargets,
-  insertForwardTarget
-} from '../forwardTargetSpec.js';
+  writeForwardTarget
+} from '../forwardTargetWrite.js';
 import { propagate } from '../propagate.js';
 import { defineOperation, OpError } from '../types.js';
 import {
@@ -38,7 +38,7 @@ export const setRingGroupForwarding = defineOperation({
       }
       seenConditions.add(rule.condition);
     }
-    // Read before the delete below, since `forwardTargets` rows are gone once it runs.
+    // Read before the writes below, which change a kept condition's row in place (§11.2).
     const existing = await storedRingGroupForwardRules(ctx.db, input.id);
     await ctx.db
       .deleteFrom('ringGroupForwardRules')
@@ -46,7 +46,9 @@ export const setRingGroupForwarding = defineOperation({
       .execute();
     await deleteForwardTargets(
       ctx.db,
-      existing.map(rule => rule.targetId)
+      existing
+        .filter(rule => !seenConditions.has(rule.condition))
+        .map(rule => rule.targetId)
     );
     const rows: {
       groupId: string;
@@ -55,7 +57,12 @@ export const setRingGroupForwarding = defineOperation({
     }[] = [];
     for (const rule of input.rules) {
       // eslint-disable-next-line no-await-in-loop -- in input order, so the first invalid target is the one refused and warnings follow the input
-      const targetId = await insertForwardTarget(ctx, rule.target);
+      const targetId = await writeForwardTarget(
+        ctx,
+        rule.target,
+        existing.find(each => each.condition === rule.condition)?.targetId ??
+          null
+      );
       rows.push({ groupId: input.id, condition: rule.condition, targetId });
     }
     if (rows.length > 0) {

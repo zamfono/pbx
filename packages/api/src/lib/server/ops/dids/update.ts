@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { HTTP_NOT_FOUND } from '@zamfono/shared';
 
 import { recordChange, recordFieldChanges } from '../audit.js';
-import { createTarget } from '../forwardTargets.js';
+import { writeTarget } from '../forwardTargets.js';
 import { targetSpecSchema } from '../forwardTargetSchema.js';
 import { resolveTarget } from '../forwardTargetSpec.js';
 import { orBefore } from '../patch.js';
@@ -42,13 +42,12 @@ export const update = defineOperation({
     const did = await liveRow(ctx.db, 'dids', input.id, 'dids: DID not found');
     const before = await resolveTarget(ctx.db, did.targetId);
     const label = orBefore(input.label, did.label);
-    const targetId =
-      input.target === undefined
-        ? did.targetId
-        : await createTarget(ctx, input.target);
+    if (input.target !== undefined) {
+      await writeTarget(ctx, input.target, did.targetId);
+    }
     await ctx.db
       .updateTable('dids')
-      .set({ label, targetId })
+      .set({ label })
       .where('id', '=', input.id)
       .execute();
     recordFieldChanges(ctx, did, { label });

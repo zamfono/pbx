@@ -6,11 +6,11 @@ import {
 
 import { recordChange } from '../audit.js';
 import {
-  createTarget,
-  deleteTargetIfOrphan,
   readableTarget,
-  resolveOwnTarget
+  resolveOwnTarget,
+  writeTarget
 } from '../forwardTargets.js';
+import { deleteForwardTargets } from '../forwardTargetWrite.js';
 import { ownUserId } from '../gates.js';
 import { propagate } from '../propagate.js';
 import { defineOperation, OpError } from '../types.js';
@@ -20,9 +20,10 @@ import { liveUser } from './_shared.js';
 /**
  * `PUT /users/{id}/forwarding` (§10.3, §11.2): replaces a user's forwarding rules as a whole,
  * self-service on a `user` actor's own id (§10.3 "Users"). An admin target is refused for a `user`
- * through `createTarget`; the marker a `user` reads for one keeps the target its condition holds,
- * on its own row (`resolveOwnTarget`); a rule the input leaves out is removed like any other
- * (§10.3 "Forward targets").
+ * through `writeTarget`; the marker a `user` reads for one keeps the target its condition holds
+ * as it is (`resolveOwnTarget`); any other target is written into the row its condition holds
+ * already (§11.2), and a rule the input leaves out is removed with its row (§10.3 "Forward
+ * targets").
  */
 export const setForwarding = defineOperation({
   name: 'users.setForwarding',
@@ -46,25 +47,25 @@ export const setForwarding = defineOperation({
       }
       seenConditions.add(rule.condition);
     }
-    // Resolved before the delete below, since `forward_targets` rows are gone once it runs.
+    // Resolved before the writes below, which change a kept condition's row in place.
     const existing = await storedForwardRules(ctx.db, input.id);
-    const next = input.rules.map(rule => ({
-      condition: rule.condition,
-      ...resolveOwnTarget(
-        ctx,
-        rule.target,
-        existing.find(each => each.condition === rule.condition)
-      )
-    }));
-    const keptIds = new Set(next.map(rule => rule.targetId));
+    const next = input.rules.map(rule => {
+      const held = existing.find(each => each.condition === rule.condition);
+      return {
+        condition: rule.condition,
+        heldId: held?.targetId ?? null,
+        ...resolveOwnTarget(ctx, rule.target, held)
+      };
+    });
     await ctx.db
       .deleteFrom('userForwardRules')
       .where('userId', '=', input.id)
       .execute();
-    await Promise.all(
+    await deleteForwardTargets(
+      ctx.db,
       existing
-        .filter(rule => !keptIds.has(rule.targetId))
-        .map(rule => deleteTargetIfOrphan(ctx, rule.targetId))
+        .filter(rule => !seenConditions.has(rule.condition))
+        .map(rule => rule.targetId)
     );
     const rows: {
       userId: string;
@@ -75,7 +76,7 @@ export const setForwarding = defineOperation({
       const targetId =
         rule.targetId ??
         // eslint-disable-next-line no-await-in-loop -- in input order, so the first invalid target is the one refused and warnings follow the input
-        (await createTarget(ctx, rule.target));
+        (await writeTarget(ctx, rule.target, rule.heldId));
       rows.push({ userId: input.id, condition: rule.condition, targetId });
     }
     if (rows.length > 0) {

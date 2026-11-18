@@ -4,13 +4,12 @@ import {
   isTemplate
 } from '@zamfono/shared';
 
-import { findForwardTargetOwners } from './forwardTargetOwners.js';
 import type {
   ManagedTarget,
   OwnTarget,
   TargetSpec
 } from './forwardTargetSchema.js';
-import { insertForwardTarget } from './forwardTargetSpec.js';
+import { writeForwardTarget } from './forwardTargetWrite.js';
 import { OpError, type Context } from './types.js';
 
 /**
@@ -39,7 +38,7 @@ export function targetChain(target: TargetSpec): TargetSpec[] {
   return fallback === null ? [target] : [target, ...targetChain(fallback)];
 }
 
-/** Why a `user` may not set the admin target `target` (`createTarget`, `resolveOwnTarget`). */
+/** Why a `user` may not set the admin target `target` (`writeTarget`, `resolveOwnTarget`). */
 function adminTargetRefusal(target: TargetSpec): string {
   if (target.kind === 'sip') {
     return 'a sip target is set by an admin';
@@ -89,7 +88,8 @@ export type HeldTarget = { targetId: string; target: TargetSpec };
  * and is refused with 422 elsewhere; matched by place alone, so a marker moved to another
  * condition keeps nothing. A `user`'s full admin target where one is held is refused with 422
  * naming the marker to send back; any other target comes back with a `null` row, for the caller
- * to write through `createTarget`, which refuses a `user` an admin target with 403.
+ * to write through `writeTarget`, into the row `held` has where there is one, which refuses a
+ * `user` an admin target with 403.
  */
 export function resolveOwnTarget(
   ctx: Context,
@@ -117,33 +117,20 @@ export function resolveOwnTarget(
 }
 
 /**
- * Inserts a `forward_targets` row for `input`, owned by the caller's rule, and returns its id;
- * 403s for an admin target (`isAdminTarget`), anywhere in its fallback chain, from a `user`
- * (§10.3 "Forward targets"), which every operation a `user` may call writes its targets through,
- * and 404s when `input` points at a row that is not live (§5.9).
+ * Writes `input` as a `forward_targets` row owned by the caller's rule and returns its id:
+ * `existingId`, the row the rule holds already, is updated in place, and without one a row is
+ * inserted (`writeForwardTarget`). 403s for an admin target (`isAdminTarget`), anywhere in its
+ * fallback chain, from a `user` (§10.3 "Forward targets"), which every operation a `user` may
+ * call writes its targets through, and 404s when `input` points at a row that is not live (§5.9).
  */
-export async function createTarget(
+export async function writeTarget(
   ctx: Context,
-  input: TargetSpec
+  input: TargetSpec,
+  existingId: string | null
 ): Promise<string> {
   const admin = targetChain(input).find(isAdminTarget);
   if (ctx.actor.role === 'user' && admin !== undefined) {
     throw new OpError(HTTP_FORBIDDEN, adminTargetRefusal(admin));
   }
-  return insertForwardTarget(ctx, input);
-}
-
-/**
- * Deletes a `forward_targets` row once no owner column references it any more (§5.9, §11.2): the
- * caller deletes its own owning row first, so this only ever finds a reference genuinely left by
- * another entity.
- */
-export async function deleteTargetIfOrphan(
-  ctx: Context,
-  id: string
-): Promise<void> {
-  const owners = await findForwardTargetOwners(ctx.db, [id]);
-  if (owners.length === 0) {
-    await ctx.db.deleteFrom('forwardTargets').where('id', '=', id).execute();
-  }
+  return writeForwardTarget(ctx, input, existingId);
 }

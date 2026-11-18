@@ -2,9 +2,10 @@ import { HTTP_UNPROCESSABLE_CONTENT, isE164 } from '@zamfono/shared';
 
 import { assertAudioOfKind } from '../audio/_shared.js';
 import { recordChange } from '../audit.js';
-import { createTarget } from '../forwardTargets.js';
+import { writeTarget } from '../forwardTargets.js';
 import { type TargetSpec } from '../forwardTargetSchema.js';
 import { resolveOptionalTarget } from '../forwardTargetSpec.js';
+import { deleteForwardTargets } from '../forwardTargetWrite.js';
 import { OpError, type Context } from '../types.js';
 import type { SettingsColumns, SettingsRow } from './_shared.js';
 
@@ -69,7 +70,8 @@ export async function applyHoldMohAudioId(
   columns.holdMohAudioId = input.holdMohAudioId;
 }
 
-/** Creates a new forward-target row for `fallbackTarget` when given (§11.3, like `dids.update`). */
+/** Writes `fallbackTarget` when given, into the forward-target row the settings hold or a new
+ * one where they hold none; `null` clears the column and deletes the row (§11.2, §11.3). */
 export async function applyFallbackTarget(
   ctx: Context,
   before: SettingsRow,
@@ -79,14 +81,29 @@ export async function applyFallbackTarget(
   if (input.fallbackTarget === undefined) {
     return;
   }
-  const targetId = input.fallbackTarget
-    ? await createTarget(ctx, input.fallbackTarget)
-    : null;
-  // The wire target, not the row id: undo replays `from` through `settings.update` (§5.8).
+  // The wire target, not the row id: undo replays `from` through `settings.update` (§5.8). Read
+  // before the write, which changes the row in place.
   recordChange(ctx, {
     field: 'fallbackTarget',
     from: await resolveOptionalTarget(ctx.db, before.fallbackTargetId),
     to: input.fallbackTarget
   });
-  columns.fallbackTargetId = targetId;
+  if (input.fallbackTarget !== null) {
+    columns.fallbackTargetId = await writeTarget(
+      ctx,
+      input.fallbackTarget,
+      before.fallbackTargetId
+    );
+    return;
+  }
+  columns.fallbackTargetId = null;
+  if (before.fallbackTargetId !== null) {
+    // The column lets go of the row before it is deleted (`ON DELETE RESTRICT`).
+    await ctx.db
+      .updateTable('settings')
+      .set({ fallbackTargetId: null })
+      .where('id', '=', 1)
+      .execute();
+    await deleteForwardTargets(ctx.db, [before.fallbackTargetId]);
+  }
 }

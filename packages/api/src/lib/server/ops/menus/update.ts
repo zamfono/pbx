@@ -8,11 +8,8 @@ import {
   recordFieldChanges,
   type WireColumns
 } from '../audit.js';
-import {
-  deleteForwardTargets,
-  insertForwardTarget,
-  resolveTarget
-} from '../forwardTargetSpec.js';
+import { resolveTarget } from '../forwardTargetSpec.js';
+import { writeForwardTarget } from '../forwardTargetWrite.js';
 import { changeOwnedExtension, ownedExtension } from '../ownedExtension.js';
 import { propagate } from '../propagate.js';
 import { pushRoster } from '../roster.js';
@@ -55,22 +52,17 @@ const WIRE_COLUMNS: WireColumns<MenuRow> = {
   allowExtensionDialing: { decode: Boolean }
 };
 
-/**
- * Inserts the menu's new fallback target when `fallbackTarget` is given, returning its id. The
- * old target row is deleted by the caller only after `menus.fallback_target_id` points at the
- * new one, since `forward_targets` rows are `ON DELETE RESTRICT` (§11.2) and the old row is
- * still referenced until that update runs.
- */
-async function resolvedFallbackTargetId(
+/** Writes `fallbackTarget`, when given, into the menu's own fallback target row (§11.2). */
+async function writeFallbackTarget(
   ctx: Context,
   before: MenuRow,
   fallbackTarget: z.infer<typeof updateMenuInput>['fallbackTarget']
-): Promise<string> {
+): Promise<void> {
   if (!fallbackTarget) {
-    return before.fallbackTargetId;
+    return;
   }
   const previous = await resolveTarget(ctx.db, before.fallbackTargetId);
-  const newTargetId = await insertForwardTarget(ctx, fallbackTarget);
+  await writeForwardTarget(ctx, fallbackTarget, before.fallbackTargetId);
   // The diff names this operation's own input field and carries the wire target, so `audit.undo`
   // replays it straight back through `menus.update` (§5.8).
   recordChange(ctx, {
@@ -78,7 +70,6 @@ async function resolvedFallbackTargetId(
     from: previous,
     to: fallbackTarget
   });
-  return newTargetId;
 }
 
 export const updateMenu = defineOperation({
@@ -99,19 +90,12 @@ export const updateMenu = defineOperation({
     }
     const after = resolvedFields(before, input);
     recordFieldChanges(ctx, before, after, WIRE_COLUMNS);
-    const fallbackTargetId = await resolvedFallbackTargetId(
-      ctx,
-      before,
-      input.fallbackTarget
-    );
+    await writeFallbackTarget(ctx, before, input.fallbackTarget);
     await ctx.db
       .updateTable('menus')
-      .set({ ...after, fallbackTargetId })
+      .set(after)
       .where('id', '=', input.id)
       .execute();
-    if (input.fallbackTarget) {
-      await deleteForwardTargets(ctx.db, [before.fallbackTargetId]);
-    }
     const extensionChanged = await changeOwnedExtension(
       ctx,
       { menuId: input.id },

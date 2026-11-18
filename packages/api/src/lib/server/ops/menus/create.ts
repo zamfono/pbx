@@ -4,7 +4,7 @@ import { HTTP_CONFLICT, HTTP_NOT_FOUND, newId } from '@zamfono/shared';
 
 import { assertAudioOfKind } from '../audio/_shared.js';
 import { recordChange } from '../audit.js';
-import { insertForwardTarget } from '../forwardTargetSpec.js';
+import { writeForwardTarget } from '../forwardTargetWrite.js';
 import { insertOwnedExtension } from '../ownedExtension.js';
 import { propagate } from '../propagate.js';
 import { defineOperation } from '../types.js';
@@ -36,9 +36,10 @@ export const createMenu = defineOperation({
     await assertNameAvailable(ctx.db, input.name);
     await assertAudioOfKind(ctx.db, input.audioId, 'announcement');
     const id = newId();
-    const fallbackTargetId = await insertForwardTarget(
+    const fallbackTargetId = await writeForwardTarget(
       ctx,
-      input.fallbackTarget
+      input.fallbackTarget,
+      null
     );
     await ctx.db
       .insertInto('menus')

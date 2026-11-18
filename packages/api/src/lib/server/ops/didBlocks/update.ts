@@ -3,9 +3,10 @@ import { z } from 'zod';
 import { HTTP_NOT_FOUND } from '@zamfono/shared';
 
 import { recordChange, recordFieldChanges } from '../audit.js';
-import { createTarget } from '../forwardTargets.js';
+import { writeTarget } from '../forwardTargets.js';
 import { type TargetSpec } from '../forwardTargetSchema.js';
 import { resolveOptionalTarget } from '../forwardTargetSpec.js';
+import { deleteForwardTargets } from '../forwardTargetWrite.js';
 import { orBefore } from '../patch.js';
 import { propagate } from '../propagate.js';
 import { defineOperation, type Context } from '../types.js';
@@ -27,7 +28,8 @@ const inputSchema = z
 
 /**
  * The block's next `fallback_target_id`: unchanged while `fallbackTarget` is absent, cleared on
- * `null`, else a freshly created forward-target row (§11.3, like `dids.update`).
+ * `null`, the caller deleting the row once the block no longer names it, else the block's own
+ * forward-target row written in place, or a new one where it has none (§11.2, §11.3).
  */
 async function resolveFallbackTargetId(
   ctx: Context,
@@ -40,7 +42,7 @@ async function resolveFallbackTargetId(
   if (fallbackTarget === null) {
     return null;
   }
-  return createTarget(ctx, fallbackTarget);
+  return writeTarget(ctx, fallbackTarget, before);
 }
 
 /**
@@ -60,6 +62,11 @@ export const update = defineOperation({
     const before = await liveDidBlock(ctx.db, input.id);
     const label = orBefore(input.label, before.label);
     const digits = orBefore(input.digits, before.digits);
+    // Read before the write, which changes the row in place.
+    const previous = await resolveOptionalTarget(
+      ctx.db,
+      before.fallbackTargetId
+    );
     const fallbackTargetId = await resolveFallbackTargetId(
       ctx,
       before.fallbackTargetId,
@@ -71,7 +78,7 @@ export const update = defineOperation({
       // `audit.undo` replays it straight back through `didBlocks.update` (§5.8).
       recordChange(ctx, {
         field: 'fallbackTarget',
-        from: await resolveOptionalTarget(ctx.db, before.fallbackTargetId),
+        from: previous,
         to: input.fallbackTarget
       });
     }
@@ -80,6 +87,9 @@ export const update = defineOperation({
       .set({ label, digits, fallbackTargetId })
       .where('id', '=', input.id)
       .execute();
+    if (fallbackTargetId === null && before.fallbackTargetId !== null) {
+      await deleteForwardTargets(ctx.db, [before.fallbackTargetId]);
+    }
     const fallbackTarget =
       input.fallbackTarget === undefined
         ? await resolveOptionalTarget(ctx.db, fallbackTargetId)

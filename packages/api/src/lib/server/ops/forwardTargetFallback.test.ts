@@ -1,12 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { nowIso, type Db } from '@zamfono/shared';
+import type { Db } from '@zamfono/shared';
 import { seedSettings } from '@zamfono/shared/testDb.js';
 
 import { createTrunk, createUser } from '#testing/fixtures.js';
 import { asRun, makeTestDb } from '#testing/testDb.js';
 
-import { runPurge } from '../jobs/purge.js';
 import { runOperation } from './runner.js';
 import type { Actor } from './types.js';
 
@@ -143,7 +142,7 @@ describe('forward-target fallbacks', () => {
     ).rejects.toMatchObject({ status: 422 });
   });
 
-  it('deletes the whole chain with the rule that owns it, and the purge sweeps an orphaned one', async () => {
+  it('deletes the chain a write no longer names, in a forwarding rule and in a DID', async () => {
     const db = await makeTestDb();
     await seedSettings(db);
     const seeded = await targetRows(db);
@@ -173,7 +172,6 @@ describe('forward-target fallbacks', () => {
       { id: did.id, target: { kind: 'user', userId: 'owner' } },
       asRun()
     );
-    await runPurge(db, nowIso());
     expect(await targetRows(db)).toBe(seeded + 2);
   });
 

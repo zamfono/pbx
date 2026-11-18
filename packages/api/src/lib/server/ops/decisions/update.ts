@@ -3,11 +3,8 @@ import { z } from 'zod';
 import { HTTP_CONFLICT, HTTP_NOT_FOUND } from '@zamfono/shared';
 
 import { recordChange } from '../audit.js';
-import {
-  deleteForwardTargets,
-  insertForwardTarget,
-  resolveTarget
-} from '../forwardTargetSpec.js';
+import { resolveTarget } from '../forwardTargetSpec.js';
+import { writeForwardTarget } from '../forwardTargetWrite.js';
 import { changeOwnedExtension, ownedExtension } from '../ownedExtension.js';
 import { propagate } from '../propagate.js';
 import { pushRoster } from '../roster.js';
@@ -17,10 +14,9 @@ import {
   decisionCases,
   decisionFields,
   decisionOut,
-  deleteCases,
-  insertCases,
   liveDecision,
-  toDecisionOut
+  toDecisionOut,
+  writeCases
 } from './_shared.js';
 
 export const updateDecisionInput = z
@@ -46,27 +42,22 @@ export const updateDecision = defineOperation({
       await assertNameAvailable(ctx.db, name, input.id);
       recordChange(ctx, { field: 'name', from: before.name, to: name });
     }
-    let { defaultTargetId } = before;
     if (input.default !== undefined) {
       recordChange(ctx, {
         field: 'default',
         from: await resolveTarget(ctx.db, before.defaultTargetId),
         to: input.default
       });
-      defaultTargetId = await insertForwardTarget(ctx, input.default);
+      await writeForwardTarget(ctx, input.default, before.defaultTargetId);
     }
     await ctx.db
       .updateTable('decisions')
-      .set({ name, defaultTargetId })
+      .set({ name })
       .where('id', '=', input.id)
       .execute();
-    if (defaultTargetId !== before.defaultTargetId) {
-      await deleteForwardTargets(ctx.db, [before.defaultTargetId]);
-    }
     if (input.cases !== undefined) {
       const previous = await decisionCases(ctx.db, input.id);
-      await deleteCases(ctx.db, input.id);
-      await insertCases(ctx, input.id, input.cases);
+      await writeCases(ctx, input.id, input.cases);
       recordChange(ctx, { field: 'cases', from: previous, to: input.cases });
     }
     const extensionChanged = await changeOwnedExtension(

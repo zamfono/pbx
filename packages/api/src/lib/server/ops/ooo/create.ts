@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { HTTP_NOT_FOUND, newId } from '@zamfono/shared';
 
 import { recordChange } from '../audit.js';
-import { createTarget, resolveOwnTarget } from '../forwardTargets.js';
+import { resolveOwnTarget, writeTarget } from '../forwardTargets.js';
 import { propagate } from '../propagate.js';
 import {
   assertScopeExists,
@@ -50,7 +50,7 @@ export const create = defineOperation({
     }
     // A new rule holds nothing a marker could keep.
     const { target } = resolveOwnTarget(ctx, input.target, undefined);
-    const targetId = await createTarget(ctx, target);
+    const targetId = await writeTarget(ctx, target, null);
     const id = newId();
     await ctx.db
       .insertInto('oooRules')

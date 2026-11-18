@@ -102,8 +102,8 @@ describe('users.setForwarding, an admin-set sip rule', () => {
     ]);
     const idsAfter = await storedTargetIds(db, anna.id);
     expect(idsAfter.noAnswer).toBe(idsBefore.noAnswer);
-    expect(idsAfter.busy).not.toBe(idsBefore.busy);
-    // One row replaced (busy), none added for the kept sip target.
+    expect(idsAfter.busy).toBe(idsBefore.busy);
+    // The busy rule's row is written in place, and none is added for the kept sip target.
     const targetsAfter = await db
       .selectFrom('forwardTargets')
       .select('id')

@@ -1,6 +1,5 @@
 import {
   isWebSocketSampleRate,
-  newId,
   sipHeadersColumn,
   type Db,
   type WebSocketProtocol,
@@ -8,66 +7,9 @@ import {
 } from '@zamfono/shared';
 
 import { assertAudioOfKind } from './audio/_shared.js';
-import { webSocketSampleRate, type TargetSpec } from './forwardTargetSchema.js';
+import type { TargetSpec } from './forwardTargetSchema.js';
 import type { LiveTable } from './liveHolder.js';
 import { liveRow } from './rows.js';
-import { warnForSipHeaders } from './sipHeaders.js';
-import { assertTemplateNames, targetTemplates } from './templateNames.js';
-import { type Context } from './types.js';
-
-/** The one column `spec`'s kind sets on its `forward_targets` row, `sip`'s and `webSocket`'s column
- * sets among them and `hangup` none, with a target's `record_calls` and `ring_timeout_s`; every
- * other column stays `null`, but for the announcement any kind may have (`insertForwardTarget`). */
-function forwardTargetColumns(
-  spec: TargetSpec
-): Record<string, string | number | null> {
-  if (spec.kind === 'user') {
-    return { userId: spec.userId };
-  }
-  if (spec.kind === 'ringGroup') {
-    return { ringGroupId: spec.ringGroupId };
-  }
-  if (spec.kind === 'external') {
-    return {
-      external: spec.external,
-      recordCalls: spec.record ? 1 : 0,
-      ringTimeoutS: spec.ringTimeoutS ?? null
-    };
-  }
-  if (spec.kind === 'sip') {
-    return {
-      sipTrunkId: spec.trunkId,
-      sipUser: spec.user,
-      sipHeadersJson: JSON.stringify(spec.headers),
-      recordCalls: spec.record ? 1 : 0,
-      ringTimeoutS: spec.ringTimeoutS ?? null
-    };
-  }
-  if (spec.kind === 'webSocket') {
-    return {
-      webSocketProtocol: spec.protocol,
-      webSocketUrl: spec.url,
-      webSocketSampleRate: webSocketSampleRate(spec),
-      recordCalls: spec.record ? 1 : 0
-    };
-  }
-  if (spec.kind === 'mailboxUser') {
-    return { mailboxUserId: spec.userId };
-  }
-  if (spec.kind === 'mailboxRingGroup') {
-    return { mailboxRingGroupId: spec.ringGroupId };
-  }
-  if (spec.kind === 'menu') {
-    return { menuId: spec.menuId };
-  }
-  if (spec.kind === 'decision') {
-    return { decisionId: spec.decisionId };
-  }
-  if (spec.kind === 'extension') {
-    return { extension: spec.extension };
-  }
-  return {};
-}
 
 type ForwardTargetColumns = {
   id: string;
@@ -210,7 +152,10 @@ export async function resolveOptionalTarget(
  * soft-deleted row, so a rule can only ever target one), its announcement's included, which is
  * of that kind (422); `external` names no row and needs none.
  */
-async function assertTargetAvailable(db: Db, spec: TargetSpec): Promise<void> {
+export async function assertTargetAvailable(
+  db: Db,
+  spec: TargetSpec
+): Promise<void> {
   // A `forward_targets` column's `RESTRICT` FK names a live row of `table`.
   const assertLiveRow = (table: LiveTable, id: string, label: string) =>
     liveRow(db, table, id, `${label} '${id}' not found`);
@@ -236,60 +181,5 @@ async function assertTargetAvailable(db: Db, spec: TargetSpec): Promise<void> {
   }
   if (spec.kind === 'sip') {
     await assertLiveRow('trunks', spec.trunkId, 'trunk');
-  }
-}
-
-/** Inserts one owned `forward_targets` row for `spec`, returning its id (§11.2), and one more for
- * each fallback down its chain, each naming the one before as `fallback_of_id`; a `sip` target's
- * headers too large for its UDP trunk are a warning of the operation's result (§10.3). */
-export async function insertForwardTarget(
-  ctx: Context,
-  spec: TargetSpec,
-  fallbackOfId: string | null = null
-): Promise<string> {
-  const { db } = ctx;
-  await assertTargetAvailable(db, spec);
-  await assertTemplateNames(db, targetTemplates(spec));
-  if (spec.kind === 'sip') {
-    await warnForSipHeaders(ctx, spec.trunkId, spec.headers);
-  }
-  const id = newId();
-  await db
-    .insertInto('forwardTargets')
-    .values({
-      id,
-      userId: null,
-      ringGroupId: null,
-      external: null,
-      sipTrunkId: null,
-      sipUser: null,
-      sipHeadersJson: null,
-      webSocketProtocol: null,
-      webSocketUrl: null,
-      webSocketSampleRate: null,
-      mailboxUserId: null,
-      mailboxRingGroupId: null,
-      announcementAudioId: spec.announcementAudioId ?? null,
-      menuId: null,
-      decisionId: null,
-      extension: null,
-      fallbackOfId,
-      ...forwardTargetColumns(spec)
-    })
-    .execute();
-  const fallback = ('fallback' in spec ? spec.fallback : null) ?? null;
-  if (fallback !== null) {
-    await insertForwardTarget(ctx, fallback, id);
-  }
-  return id;
-}
-
-/** Deletes the `forward_targets` rows an operation no longer owns, e.g. ones it is about to replace. */
-export async function deleteForwardTargets(
-  db: Db,
-  ids: string[]
-): Promise<void> {
-  if (ids.length > 0) {
-    await db.deleteFrom('forwardTargets').where('id', 'in', ids).execute();
   }
 }

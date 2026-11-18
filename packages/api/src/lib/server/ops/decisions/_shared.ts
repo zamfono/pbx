@@ -4,11 +4,11 @@ import { z } from 'zod';
 import { conditionsByCase, newId, type DB, type Db } from '@zamfono/shared';
 
 import { targetSpecSchema } from '../forwardTargetSchema.js';
+import { resolveTarget } from '../forwardTargetSpec.js';
 import {
   deleteForwardTargets,
-  insertForwardTarget,
-  resolveTarget
-} from '../forwardTargetSpec.js';
+  writeForwardTarget
+} from '../forwardTargetWrite.js';
 import { assertNoLiveHolder } from '../liveHolder.js';
 import { ownedExtension } from '../ownedExtension.js';
 import { liveRow } from '../rows.js';
@@ -91,10 +91,13 @@ export const decisionOut = z.object({
 export type DecisionOut = z.infer<typeof decisionOut>;
 
 /**
- * Writes `cases` as `decisionId`'s cases, its conditions validated first (422, a user not live
- * 404); each case's target is a row of its own, owned by `decision_cases.target_id` (§11.2).
+ * Writes `cases` as `decisionId`'s cases in place of the ones it has, its conditions validated
+ * first (422, a user not live 404). Each case's target is a row of its own, owned by
+ * `decision_cases.target_id` (§11.2): the case at a position keeps the row the case there had,
+ * written in place, and the rows of positions `cases` no longer has are deleted. The case rows
+ * and their conditions (by the FK cascade) are written anew.
  */
-export async function insertCases(
+export async function writeCases(
   ctx: Context,
   decisionId: string,
   cases: DecisionCase[]
@@ -103,9 +106,27 @@ export async function insertCases(
     ctx.db,
     cases.map(decisionCase => decisionCase.when)
   );
+  const held = await ctx.db
+    .selectFrom('decisionCases')
+    .select('targetId')
+    .where('decisionId', '=', decisionId)
+    .orderBy('position')
+    .execute();
+  await ctx.db
+    .deleteFrom('decisionCases')
+    .where('decisionId', '=', decisionId)
+    .execute();
+  await deleteForwardTargets(
+    ctx.db,
+    held.slice(cases.length).map(row => row.targetId)
+  );
   for (const [position, decisionCase] of cases.entries()) {
     // eslint-disable-next-line no-await-in-loop -- in input order, so the first invalid target is the one refused
-    const targetId = await insertForwardTarget(ctx, decisionCase.target);
+    const targetId = await writeForwardTarget(
+      ctx,
+      decisionCase.target,
+      held[position]?.targetId ?? null
+    );
     const caseId = newId();
     // eslint-disable-next-line no-await-in-loop -- as above
     await ctx.db
@@ -120,23 +141,6 @@ export async function insertCases(
       null
     );
   }
-}
-
-/** Deletes `decisionId`'s cases, their conditions (by the FK cascade) and their targets. */
-export async function deleteCases(db: Db, decisionId: string): Promise<void> {
-  const rows = await db
-    .selectFrom('decisionCases')
-    .select('targetId')
-    .where('decisionId', '=', decisionId)
-    .execute();
-  await db
-    .deleteFrom('decisionCases')
-    .where('decisionId', '=', decisionId)
-    .execute();
-  await deleteForwardTargets(
-    db,
-    rows.map(row => row.targetId)
-  );
 }
 
 /** `decisionId`'s cases in order, in `decisions.update`'s own input shape (§10.3). */

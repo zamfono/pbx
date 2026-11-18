@@ -1,16 +1,17 @@
 import { HTTP_NOT_FOUND, HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
 
 import { recordChange } from '../audit.js';
+import { resolveTarget } from '../forwardTargetSpec.js';
 import {
   deleteForwardTargets,
-  insertForwardTarget,
-  resolveTarget
-} from '../forwardTargetSpec.js';
+  writeForwardTarget
+} from '../forwardTargetWrite.js';
 import { propagate } from '../propagate.js';
 import { defineOperation, OpError } from '../types.js';
 import { liveMenu, menuTargetsSchema } from './_shared.js';
 
-/** `PUT /menus/{id}/targets` (§10.3): replaces a menu's DTMF map as a whole. */
+/** `PUT /menus/{id}/targets` (§10.3): replaces a menu's DTMF map as a whole. A key the menu
+ * keeps keeps its forward target row, written in place (§11.2); a key it loses loses its row. */
 export const setMenuTargets = defineOperation({
   name: 'menus.setTargets',
   description: "Replaces a menu's DTMF-to-target map as a whole.",
@@ -36,7 +37,7 @@ export const setMenuTargets = defineOperation({
       .select(['digits', 'targetId'])
       .where('menuId', '=', input.id)
       .execute();
-    // Resolved before the delete below, since `forwardTargets` rows are gone once it runs.
+    // Resolved before the writes below, which change the kept keys' rows in place.
     const existingTargets = await Promise.all(
       existing.map(async row => ({
         digits: row.digits,
@@ -49,12 +50,18 @@ export const setMenuTargets = defineOperation({
       .execute();
     await deleteForwardTargets(
       ctx.db,
-      existing.map(row => row.targetId)
+      existing
+        .filter(row => !seenDigits.has(row.digits))
+        .map(row => row.targetId)
     );
     const rows: { menuId: string; digits: string; targetId: string }[] = [];
     for (const option of input.targets) {
       // eslint-disable-next-line no-await-in-loop -- in input order, so the first invalid target is the one refused and warnings follow the input
-      const targetId = await insertForwardTarget(ctx, option.target);
+      const targetId = await writeForwardTarget(
+        ctx,
+        option.target,
+        existing.find(row => row.digits === option.digits)?.targetId ?? null
+      );
       rows.push({ menuId: input.id, digits: option.digits, targetId });
     }
     if (rows.length > 0) {

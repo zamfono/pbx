@@ -8,7 +8,7 @@ import {
 } from '@zamfono/shared';
 
 import { recordChange } from '../audit.js';
-import { createTarget } from '../forwardTargets.js';
+import { writeTarget } from '../forwardTargets.js';
 import { assertNoLiveHolder } from '../liveHolder.js';
 import { propagate } from '../propagate.js';
 import { defineOperation } from '../types.js';
@@ -74,7 +74,7 @@ export const create = defineOperation({
       values: { base }
     });
     const fallbackTargetId = input.fallbackTarget
-      ? await createTarget(ctx, input.fallbackTarget)
+      ? await writeTarget(ctx, input.fallbackTarget, null)
       : null;
     const id = newId();
     const label = input.label ?? null;

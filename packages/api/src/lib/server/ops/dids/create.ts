@@ -7,7 +7,7 @@ import {
   normalizeInbound
 } from '@zamfono/shared';
 
-import { createTarget } from '../forwardTargets.js';
+import { writeTarget } from '../forwardTargets.js';
 import { targetSpecSchema } from '../forwardTargetSchema.js';
 import { assertNoLiveHolder } from '../liveHolder.js';
 import { propagate } from '../propagate.js';
@@ -53,7 +53,7 @@ export const create = defineOperation({
       label: 'number',
       values: { number }
     });
-    const targetId = await createTarget(ctx, input.target);
+    const targetId = await writeTarget(ctx, input.target, null);
     const id = newId();
     const label = input.label ?? null;
     await ctx.db

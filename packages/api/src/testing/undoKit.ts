@@ -67,8 +67,8 @@ export async function ringotelDevice(db: Db, userId: string): Promise<string> {
   return created.device.id;
 }
 
-// A column naming a `forward_targets` row: compared by what the target forwards to, since a
-// replace writes a fresh row and the purge sweeps the one it left (§5.9).
+// A column naming a `forward_targets` row: compared by what the target forwards to, since an
+// owner deleted and restored may come back with a row of another id (§5.9).
 const TARGET_COLUMN = /^(?:.+T|t)argetId$/u;
 
 /**

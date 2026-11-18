@@ -4,9 +4,9 @@ import { HTTP_NOT_FOUND } from '@zamfono/shared';
 
 import { fromFlag, recordChange, recordFieldChanges } from '../audit.js';
 import {
-  createTarget,
   readableTarget,
-  resolveOwnTarget
+  resolveOwnTarget,
+  writeTarget
 } from '../forwardTargets.js';
 import { resolveTarget } from '../forwardTargetSpec.js';
 import { orBefore } from '../patch.js';
@@ -79,7 +79,9 @@ export const update = defineOperation({
       input.target === undefined
         ? held
         : resolveOwnTarget(ctx, input.target, held);
-    const targetId = next.targetId ?? (await createTarget(ctx, next.target));
+    if (next.targetId === null) {
+      await writeTarget(ctx, next.target, before.targetId);
+    }
     const columns = { active: active ? 1 : 0, startsAt, expiresAt };
     recordFieldChanges(ctx, before, columns, { active: { decode: fromFlag } });
     if (next.targetId === null) {
@@ -93,7 +95,7 @@ export const update = defineOperation({
     }
     await ctx.db
       .updateTable('oooRules')
-      .set({ ...columns, targetId })
+      .set(columns)
       .where('id', '=', input.id)
       .execute();
     // Read by the routing pipeline (§3.1), and nothing in it reaches Asterisk's own

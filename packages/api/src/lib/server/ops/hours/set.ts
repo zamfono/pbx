@@ -4,9 +4,9 @@ import { HTTP_NOT_FOUND, newId } from '@zamfono/shared';
 
 import { recordChange } from '../audit.js';
 import {
-  createTarget,
   readableTarget,
-  resolveOwnTarget
+  resolveOwnTarget,
+  writeTarget
 } from '../forwardTargets.js';
 import { ownTargetSchema } from '../forwardTargetSchema.js';
 import { resolveTarget } from '../forwardTargetSpec.js';
@@ -115,7 +115,8 @@ export const set = defineOperation({
     };
     const closed = resolveOwnTarget(ctx, input.closedTarget, held);
     const closedTargetId =
-      closed.targetId ?? (await createTarget(ctx, closed.target));
+      closed.targetId ??
+      (await writeTarget(ctx, closed.target, before?.closedTargetId ?? null));
     const beforeIntervals = before
       ? await loadIntervals(ctx.db, before.id)
       : [];

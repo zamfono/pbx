@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { HTTP_CONFLICT, HTTP_NOT_FOUND, newId } from '@zamfono/shared';
 
 import { recordChange } from '../audit.js';
-import { insertForwardTarget } from '../forwardTargetSpec.js';
+import { writeForwardTarget } from '../forwardTargetWrite.js';
 import { insertOwnedExtension } from '../ownedExtension.js';
 import { propagate } from '../propagate.js';
 import { defineOperation } from '../types.js';
@@ -11,9 +11,9 @@ import {
   assertNameAvailable,
   decisionFields,
   decisionOut,
-  insertCases,
   liveDecision,
   toDecisionOut,
+  writeCases,
   type DecisionOut
 } from './_shared.js';
 
@@ -40,12 +40,12 @@ export const createDecision = defineOperation({
   run: async (ctx, input) => {
     await assertNameAvailable(ctx.db, input.name);
     const id = newId();
-    const defaultTargetId = await insertForwardTarget(ctx, input.default);
+    const defaultTargetId = await writeForwardTarget(ctx, input.default, null);
     await ctx.db
       .insertInto('decisions')
       .values({ id, name: input.name, defaultTargetId, createdAt: ctx.now })
       .execute();
-    await insertCases(ctx, id, input.cases);
+    await writeCases(ctx, id, input.cases);
     recordChange(ctx, { field: 'name', from: null, to: input.name });
     await insertOwnedExtension(
       ctx,
