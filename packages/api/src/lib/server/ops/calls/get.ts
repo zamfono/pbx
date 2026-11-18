@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { HTTP_NOT_FOUND, QOS_ROLES } from '@zamfono/shared';
+import { HTTP_NOT_FOUND, QOS_ROLES, type Db } from '@zamfono/shared';
 
 import { defineOperation, OpError, type Context } from '../types.js';
 import {
@@ -51,16 +51,14 @@ async function endedCall(ctx: Context, id: string): Promise<CallRow> {
   return row;
 }
 
-/**
- * The §7 diagnostics of call `row`, the `calls.log` JSON lines written at call end and the
- * `call_qos` rows of its legs, and its ended direct children, for a `user` only their own and
- * the log's SIP secrets redacted (`redactLog`).
- */
-async function callDetail(
-  ctx: Context,
-  row: CallRow
-): Promise<z.infer<typeof callDetailOut>> {
-  const qos = await ctx.db
+/** The `call_qos` rows of call `id` and its ended direct children, of which a `user` sees only
+ * their own. */
+async function qosAndChildren(
+  db: Db,
+  id: string,
+  ownOf: string | null
+): Promise<Pick<z.infer<typeof callDetailOut>, 'qos' | 'childCallIds'>> {
+  const qos = await db
     .selectFrom('callQos')
     .select([
       'channelId',
@@ -71,28 +69,54 @@ async function callDetail(
       'rxPackets',
       'txPackets'
     ])
-    .where('callId', '=', row.id)
+    .where('callId', '=', id)
     .orderBy('channelId')
     .execute();
-  let children = ctx.db
+  let children = db
     .selectFrom('calls')
     .select('id')
-    .where('parentCallId', '=', row.id)
+    .where('parentCallId', '=', id)
     .where('endedAt', 'is not', null);
-  if (ctx.actor.role === 'user') {
-    const userId = ctx.actor.id;
-    children = children.where(eb => ownCallWhere(eb, userId));
+  if (ownOf !== null) {
+    children = children.where(eb => ownCallWhere(eb, ownOf));
   }
   const childRows = await children.orderBy('startedAt').orderBy('id').execute();
+  return { qos, childCallIds: childRows.map(child => child.id) };
+}
+
+/**
+ * The §7 diagnostics of call `row`, the `calls.log` JSON lines written at call end and the
+ * `call_qos` rows of its legs, and its ended direct children, for a `user` only their own and
+ * the log's SIP secrets redacted (`redactLog`).
+ */
+async function callDetail(
+  ctx: Context,
+  row: CallRow
+): Promise<z.infer<typeof callDetailOut>> {
+  const isUser = ctx.actor.role === 'user';
   return {
     ...toCallOut(row),
-    log:
-      ctx.actor.role === 'user' && row.log !== null
-        ? redactLog(row.log)
-        : row.log,
-    qos,
-    childCallIds: childRows.map(child => child.id)
+    log: isUser && row.log !== null ? redactLog(row.log) : row.log,
+    ...(await qosAndChildren(ctx.db, row.id, isUser ? ctx.actor.id : null))
   };
+}
+
+/** The ended call `id` as `GET /calls/{id}` returns it to an admin, without its `log`, which is
+ * no contract and can hold SIP header values: the call's part of the record an after-call
+ * request sends (§10.6 "After-call requests"). `null` for a call that is not in the history. */
+export async function callRecord(
+  db: Db,
+  id: string
+): Promise<Omit<z.infer<typeof callDetailOut>, 'log'> | null> {
+  const row = await db
+    .selectFrom('calls')
+    .selectAll()
+    .where('id', '=', id)
+    .where('endedAt', 'is not', null)
+    .executeTakeFirst();
+  return row === undefined
+    ? null
+    : { ...toCallOut(row), ...(await qosAndChildren(db, id, null)) };
 }
 
 /**

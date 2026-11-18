@@ -64,6 +64,7 @@ async function arrange(): Promise<Fixture> {
     url: BOT_URL,
     sampleRate: 8000,
     record: false,
+    afterCall: null,
     fallback: {
       kind: 'mailboxUser',
       userId: anna.id,
@@ -78,6 +79,7 @@ async function arrange(): Promise<Fixture> {
     headers: [{ name: 'X-Auth', value: HEADER_VALUE }],
     ringTimeoutS: 20,
     record: false,
+    afterCall: null,
     fallback: null,
     announcementAudioId: null
   };
@@ -86,6 +88,7 @@ async function arrange(): Promise<Fixture> {
     external: '+4319999',
     ringTimeoutS: null,
     record: true,
+    afterCall: null,
     fallback: null,
     announcementAudioId: null
   };

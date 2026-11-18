@@ -5,7 +5,30 @@
 import { isTemplate, renderTargetField } from '@zamfono/shared';
 
 import type { Snapshot } from '../internal/snapshot.js';
-import { extensionTarget, type ForwardTarget } from './targets.js';
+import type { ForwardTarget } from './targets.js';
+
+/** The target the live extension `ext` leads to, as a dialled extension does (§10.1 "Outbound"
+ * step 3): its user, ring group, decision or menu; `null` for an extension nobody owns and for a
+ * parking slot. */
+function extensionTarget(
+  snapshot: Snapshot,
+  ext: string
+): ForwardTarget | null {
+  const row = snapshot.extensions.find(candidate => candidate.ext === ext);
+  if (row === undefined) {
+    return null;
+  }
+  if (row.userId !== null) {
+    return { kind: 'user', userId: row.userId };
+  }
+  if (row.ringGroupId !== null) {
+    return { kind: 'ringGroup', ringGroupId: row.ringGroupId };
+  }
+  if (row.decisionId !== null) {
+    return { kind: 'decision', decisionId: row.decisionId };
+  }
+  return row.menuId === null ? null : { kind: 'menu', menuId: row.menuId };
+}
 
 export type Rendered =
   | { ok: true; target: ForwardTarget }

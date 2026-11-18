@@ -76,7 +76,8 @@ export const noopRecorder: ParticipationRecorder = {
   onTransfereeUp: () => Promise.resolve(),
   onCallerEnded: () => Promise.resolve(),
   onLegEnded: () => Promise.resolve(),
-  onLegMoved: () => undefined
+  onLegMoved: () => undefined,
+  settled: () => Promise.resolve()
 };
 
 /** A `TrunkState` over an AMI client that never connects. */
@@ -130,6 +131,7 @@ export function testPipelineDeps(
     mediaFull: () => Promise.resolve(false),
     db,
     apiClient: { mail: () => Promise.resolve() },
+    reports: { afterCall: () => Promise.resolve() },
     logger: noopLogger,
     trunkChannels: overrides.trunkChannels ?? new TrunkChannels({ ari, state }),
     bots: overrides.bots ?? new BotSessions(ari, '127.0.0.1'),

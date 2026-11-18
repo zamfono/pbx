@@ -65,6 +65,7 @@ describe('users.getForwarding', () => {
       user,
       headers: sipHeaders,
       record: false,
+      afterCall: null,
       ringTimeoutS: null,
       fallback: null,
       announcementAudioId: null
@@ -91,6 +92,7 @@ describe('users.getForwarding', () => {
             kind: 'external',
             external: '+4915112345678',
             record: false,
+            afterCall: null,
             ringTimeoutS: null,
             fallback: null,
             announcementAudioId: null

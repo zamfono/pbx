@@ -37,6 +37,8 @@ export type ParsedForwardTarget = Omit<
   'sipHeadersJson'
 > & {
   sipHeaders: SipHeaderTemplate[] | null;
+  /** Whether the target has an after-call request (§10.6), whose row `api` alone reads. */
+  afterCall: boolean;
 };
 export type ParsedSettings = Omit<
   Selectable<DB['settings']>,
@@ -66,12 +68,14 @@ export function parseTrunk(row: ConfigRow<'trunks'>): ParsedTrunk {
 }
 
 export function parseForwardTarget(
-  row: ConfigRow<'forwardTargets'>
+  row: ConfigRow<'forwardTargets'>,
+  afterCall: boolean
 ): ParsedForwardTarget {
   const { sipHeadersJson, ...rest } = row;
   return {
     ...rest,
-    sipHeaders: sipHeadersColumn.nullable().decode(sipHeadersJson)
+    sipHeaders: sipHeadersColumn.nullable().decode(sipHeadersJson),
+    afterCall
   };
 }
 

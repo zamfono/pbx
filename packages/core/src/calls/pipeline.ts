@@ -2,6 +2,8 @@
 // the Call aggregate's ring/leg/bridge lifecycle (`legs.ts`), `inbound.ts`'s target resolution,
 // `outbound.ts`'s dial resolution and the transfers Asterisk executes (`referTransfers.ts`).
 import { isEvent, type AriEvent, type AriEventOf } from '../ari/events.js';
+import { logFailure } from '../ari/failures.js';
+import { reportAttempts } from './attempts.js';
 import type { Call } from './call.js';
 import { noteHangupRequest } from './callEnd.js';
 import type { ActiveBatch } from './groupPickup.js';
@@ -252,5 +254,9 @@ export class Pipeline {
   async finishCall(call: Call): Promise<void> {
     this.channelless.delete(call.id);
     await this.deps.cdr.finish(call);
+    // Not waited for: the recordings may take a while to mix, and the call is over.
+    reportAttempts(this, call).catch(
+      logFailure(this.deps.logger, 'after-call report', { callId: call.id })
+    );
   }
 }

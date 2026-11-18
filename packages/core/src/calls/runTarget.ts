@@ -3,6 +3,7 @@
 import type { Resolution } from '../routing/decision.js';
 import { nextHop, type ForwardTarget } from '../routing/targets.js';
 import { SIP_TEMPORARILY_UNAVAILABLE } from '../sipCodes.js';
+import { noteAttempt } from './attempts.js';
 import { type Call } from './call.js';
 import { resolveOnCall } from './callDecisions.js';
 import { noteDiversion, type Diversion } from './forwardContext.js';
@@ -61,6 +62,10 @@ export async function endUnresolved(
   }
   const { target, field, value } = resolution;
   call.log.event({ event: 'templateInvalid', kind: target.kind, field, value });
+  await noteAttempt(pipeline, call, target, pipeline.deps.now(), {
+    outcome: 'failed',
+    cause: 'templateInvalid'
+  });
   // eslint-disable-next-line no-use-before-define -- falling back applies a target again
   if (!(await failOver(pipeline, call, target, forwarder, 'templateInvalid'))) {
     await release(pipeline, call, SIP_TEMPORARILY_UNAVAILABLE, 'missed');

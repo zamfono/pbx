@@ -4,10 +4,12 @@ import type {
   WebSocketSampleRate
 } from '@zamfono/shared';
 
+import type { AfterCallSpec } from './afterCall.js';
+
 type Announcement = { announcementAudioId?: string | null };
 
 /** What `forwardTargetSchema.ts`'s `targetSpecSchema` parses to, written out since its fallback
- * nests it. `announcementAudioId`, `ringTimeoutS` and `fallback` are always set on a parsed or
+ * nests it. `announcementAudioId`, `ringTimeoutS`, `afterCall` and `fallback` are always set on a parsed or
  * read target; a target built in code may leave them out for `null`. */
 export type TargetSpec = Announcement &
   (
@@ -18,6 +20,7 @@ export type TargetSpec = Announcement &
         external: string;
         ringTimeoutS?: number | null;
         record: boolean;
+        afterCall?: AfterCallSpec | null;
         fallback?: TargetSpec | null;
       }
     | {
@@ -27,6 +30,7 @@ export type TargetSpec = Announcement &
         headers: SipHeaderTemplate[];
         ringTimeoutS?: number | null;
         record: boolean;
+        afterCall?: AfterCallSpec | null;
         fallback?: TargetSpec | null;
       }
     | {
@@ -35,6 +39,7 @@ export type TargetSpec = Announcement &
         url: string;
         sampleRate?: WebSocketSampleRate;
         record: boolean;
+        afterCall?: AfterCallSpec | null;
         fallback?: TargetSpec | null;
       }
     | { kind: 'mailboxUser'; userId: string }

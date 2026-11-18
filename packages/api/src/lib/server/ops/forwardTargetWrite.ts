@@ -1,7 +1,8 @@
 import { newId, type Db } from '@zamfono/shared';
 
+import { writeAfterCall } from './afterCall.js';
+import { assertTargetAvailable } from './forwardTargetAvailable.js';
 import { webSocketSampleRate, type TargetSpec } from './forwardTargetSchema.js';
-import { assertTargetAvailable } from './forwardTargetSpec.js';
 import { warnForSipHeaders } from './sipHeaders.js';
 import { assertTemplateNames, targetTemplates } from './templateNames.js';
 import { type Context } from './types.js';
@@ -77,8 +78,9 @@ export async function deleteForwardTargets(
  * reference it by its id; without one a row is inserted. Its fallback chain is written the same
  * way, each fallback naming the one before as `fallback_of_id`: the fallback the row has is
  * updated in place, a new one inserted, and one `spec` no longer has deleted, the rest of its
- * chain going with it. A `sip` target's headers too large for its UDP trunk are a warning of the
- * operation's result (§10.3).
+ * chain going with it. The row's after-call request is written with it (`writeAfterCall`). A
+ * `sip` target's headers too large for its UDP trunk are a warning of the operation's result
+ * (§10.3).
  */
 export async function writeForwardTarget(
   ctx: Context,
@@ -132,6 +134,11 @@ export async function writeForwardTarget(
       .set(columns)
       .where('id', '=', id)
       .execute();
+  }
+  const afterCall = ('afterCall' in spec ? spec.afterCall : null) ?? null;
+  // A row just inserted has no request to delete.
+  if (afterCall !== null || existingId !== null) {
+    await writeAfterCall(ctx, id, afterCall);
   }
   const fallback = ('fallback' in spec ? spec.fallback : null) ?? null;
   if (fallback !== null) {

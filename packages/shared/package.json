@@ -34,6 +34,8 @@
       "DiversionPolicy": "../columnValues.js",
       "ForwardedCallerId": "../columnValues.js",
       "HostDirection": "../columnValues.js",
+      "HttpContentType": "../httpRequestBlock.js",
+      "HttpMethod": "../httpSend.js",
       "Language": "../columnValues.js",
       "LogLevelOverride": "../columnValues.js",
       "MailKind": "../columnValues.js",
@@ -60,6 +62,9 @@
     "outFile": "./src/generated/db.d.ts",
     "overrides": {
       "columns": {
+        "after_call_requests.content_type": "HttpContentType | null",
+        "after_call_requests.last_status": "WebhookStatus | null",
+        "after_call_requests.method": "HttpMethod",
         "audio_assets.kind": "AudioKind",
         "audit_log.channel": "AuditChannel",
         "backup_runs.status": "BackupRunStatus",

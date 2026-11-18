@@ -139,8 +139,12 @@ export function settleHealth(
   return { update, log };
 }
 
-/** The `type` of the event `bodyJson` carries, for the log. */
-function eventTypeOf(bodyJson: string): string {
+/** What `bodyJson` delivers, for the log: the `type` of the event it carries, or an after-call
+ * request's call record. */
+function eventTypeOf(bodyJson: string, isAfterCall: boolean): string {
+  if (isAfterCall) {
+    return 'afterCall';
+  }
   const body = tryParseJson(bodyJson);
   return isRecord(body) && typeof body.type === 'string'
     ? body.type
@@ -148,24 +152,36 @@ function eventTypeOf(bodyJson: string): string {
 }
 
 /**
- * Removes a delivery from the outbox and records its end on its hook, `last_status` and the
- * failure columns, logging what changed once the write committed. `failure` is `null` for a
- * delivery that was delivered, else why its last attempt failed.
+ * Removes a delivery from the outbox and records its end on its owner, a webhook or an
+ * after-call request, whose health columns are the same: `last_status` and the failure columns,
+ * logging what changed once the write committed. `failure` is `null` for a delivery that was
+ * delivered, else why its last attempt failed.
  */
 export async function settleDelivery(
   db: Db,
-  delivery: { id: string; webhookId: string; bodyJson: string },
+  delivery: {
+    id: string;
+    webhookId: string | null;
+    afterCallRequestId: string | null;
+    bodyJson: string;
+  },
   failure: string | null,
   at: string
 ): Promise<void> {
-  const settled = { failure, eventType: eventTypeOf(delivery.bodyJson), at };
+  const table = delivery.webhookId === null ? 'afterCallRequests' : 'webhooks';
+  const ownerId = delivery.webhookId ?? delivery.afterCallRequestId ?? '';
+  const settled = {
+    failure,
+    eventType: eventTypeOf(delivery.bodyJson, table === 'afterCallRequests'),
+    at
+  };
   const log = await db.transaction().execute(async trx => {
     await trx
       .deleteFrom('webhookDeliveries')
       .where('id', '=', delivery.id)
       .execute();
     const hook = await trx
-      .selectFrom('webhooks')
+      .selectFrom(table)
       .select([
         'id',
         'url',
@@ -175,16 +191,16 @@ export async function settleDelivery(
         'failedDeliveries',
         'lastLoggedAt'
       ])
-      .where('id', '=', delivery.webhookId)
+      .where('id', '=', ownerId)
       .executeTakeFirst();
     if (hook === undefined) {
       return null;
     }
     const next = settleHealth(hook, settled);
     await trx
-      .updateTable('webhooks')
+      .updateTable(table)
       .set(next.update)
-      .where('id', '=', delivery.webhookId)
+      .where('id', '=', ownerId)
       .execute();
     return next.log;
   });

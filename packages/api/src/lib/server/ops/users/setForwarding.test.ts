@@ -40,6 +40,7 @@ describe('users.setForwarding, self-service', () => {
           kind: 'external',
           external: '+4915112345678',
           record: false,
+          afterCall: null,
           ringTimeoutS: null,
           fallback: null,
           announcementAudioId: null

@@ -85,6 +85,7 @@ function forwardedTarget(
       forward: {
         diversions: [],
         headers: [],
+        target,
         ...recordingOf(target),
         ...ringTimeoutOf(target)
       }

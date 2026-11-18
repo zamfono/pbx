@@ -2,7 +2,13 @@
  * routing cursor; SQLite holds durable outcomes alone, via the CDR writer. */
 import type { Selectable } from 'kysely';
 
-import { newId, type CallLogLevel, type DB, type Scope } from '@zamfono/shared';
+import {
+  newId,
+  type CallLogLevel,
+  type DB,
+  type Scope,
+  type TargetAttempt
+} from '@zamfono/shared';
 
 import { CallLog } from '../callLog.js';
 import type { Diversion } from './forwardContext.js';
@@ -87,6 +93,9 @@ export type Call = {
   /** The call's own template values beside the placeholders (§9.4 "Templates"): each HTTP
    * request's answer under the request's name, in memory only. */
   variables: Record<string, unknown>;
+  /** The attempts of forward targets with an after-call request made for this call so far, each
+   * reported to `api` once the call's history row and recordings are written (`attempts.ts`). */
+  attempts: TargetAttempt[];
   /** The caller's name as `{{callerName}}` renders it, once looked up (`forwardValues.ts`). */
   callerName?: Promise<string>;
   menuAttempts: number;
@@ -180,6 +189,7 @@ export function newCall(params: NewCallParams): Call {
     evaluated: new Set(),
     decisionsSeen: new Set(),
     variables: {},
+    attempts: [],
     menuAttempts: 0
   };
 }

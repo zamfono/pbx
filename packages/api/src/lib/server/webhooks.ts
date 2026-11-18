@@ -1,6 +1,7 @@
 /**
- * Signed webhook delivery (§10.6): every active hook matching an event's type gets an
- * at-least-once HTTP POST from the `webhook_deliveries` outbox, so a queued or retrying delivery
+ * Signed webhook delivery (§10.6): every active hook matching an event's type, and every
+ * after-call request of an attempted forward target, gets an at-least-once HTTP request from the
+ * `webhook_deliveries` outbox, so a queued or retrying delivery
  * survives an `api` restart and resumes with its attempt count and backoff. A delivery's end moves
  * its hook's health and logs what changed (`webhookHealth.ts`).
  */
@@ -12,6 +13,7 @@ import {
   nowIso,
   publicEnvelope,
   sendHttpRequest,
+  type AfterCallReport,
   type Db,
   type Envelope,
   type HttpAnswer,
@@ -19,16 +21,12 @@ import {
   type TargetPolicy
 } from '@zamfono/shared';
 
-import { attempt } from './errors.js';
-import { readHeaders } from './ops/httpHeaders.js';
-import { decrypt, type Keyring } from './secretbox.js';
-import {
-  errorReason,
-  httpReason,
-  SECRET_UNREADABLE
-} from './webhookFailure.js';
+import { afterCallDeliveries, afterCallSend } from './afterCallDelivery.js';
+import type { Keyring } from './secretbox.js';
+import { errorReason, httpReason } from './webhookFailure.js';
 import { settleDelivery } from './webhookHealth.js';
 import { backoffMs, DELIVERY_ATTEMPTS, matchesFilter } from './webhookRules.js';
+import { webhookSend } from './webhookSend.js';
 
 // §10.6: a 5 s timeout per request.
 const REQUEST_TIMEOUT_MS = 5000;
@@ -36,7 +34,8 @@ const REQUEST_TIMEOUT_MS = 5000;
 /** A `webhook_deliveries` row: one event's body on its way to one hook. */
 type DeliveryRow = {
   id: string;
-  webhookId: string;
+  webhookId: string | null;
+  afterCallRequestId: string | null;
   bodyJson: string;
   attempts: number;
   nextAttemptAt: string;
@@ -58,6 +57,9 @@ export type WebhookDispatcherDeps = {
   send?: (send: HttpSend) => Promise<HttpAnswer>;
   delay?: (ms: number) => Promise<void>;
   now?: () => string;
+  /** What an after-call request's recording links are signed with and open under (§10.6), read
+   *  as one is built; left out by a dispatcher that delivers events alone. */
+  links?: () => { jwtSecret: string; origin: string };
 };
 
 type ResolvedDeps = {
@@ -67,6 +69,7 @@ type ResolvedDeps = {
   send: (send: HttpSend) => Promise<HttpAnswer>;
   delay: (ms: number) => Promise<void>;
   now: () => string;
+  links: (() => { jwtSecret: string; origin: string }) | null;
 };
 
 /**
@@ -84,7 +87,8 @@ export class WebhookDispatcher {
       targetPolicy: deps.targetPolicy,
       send: deps.send ?? sendHttpRequest,
       delay: deps.delay ?? (ms => sleep(ms)),
-      now: deps.now ?? nowIso
+      now: deps.now ?? nowIso,
+      links: deps.links ?? null
     };
   }
 
@@ -115,10 +119,36 @@ export class WebhookDispatcher {
     const rows: DeliveryRow[] = matching.map(hook => ({
       id: newId(),
       webhookId: hook.id,
+      afterCallRequestId: null,
       bodyJson,
       attempts: 0,
       nextAttemptAt: now
     }));
+    await this.deps.db
+      .insertInto('webhookDeliveries')
+      .values(rows.map(row => ({ ...row, createdAt: now })))
+      .execute();
+    await Promise.all(rows.map(row => this.deliver(row)));
+  }
+
+  /**
+   * Queues the after-call request of each attempt of `report`'s call whose forward target has
+   * one (§10.6 "After-call requests") and delivers it. Resolves once every one has settled.
+   */
+  async enqueueAfterCall(report: AfterCallReport): Promise<void> {
+    const now = this.deps.now();
+    const rows: DeliveryRow[] = (
+      await afterCallDeliveries(this.deps.db, report)
+    ).map(delivery => ({
+      id: newId(),
+      webhookId: null,
+      ...delivery,
+      attempts: 0,
+      nextAttemptAt: now
+    }));
+    if (rows.length === 0) {
+      return;
+    }
     await this.deps.db
       .insertInto('webhookDeliveries')
       .values(rows.map(row => ({ ...row, createdAt: now })))
@@ -133,7 +163,14 @@ export class WebhookDispatcher {
   async resume(): Promise<void> {
     const rows = await this.deps.db
       .selectFrom('webhookDeliveries')
-      .select(['id', 'webhookId', 'bodyJson', 'attempts', 'nextAttemptAt'])
+      .select([
+        'id',
+        'webhookId',
+        'afterCallRequestId',
+        'bodyJson',
+        'attempts',
+        'nextAttemptAt'
+      ])
       .orderBy('id')
       .execute();
     await Promise.all(rows.map(row => this.deliver(row)));
@@ -180,54 +217,34 @@ export class WebhookDispatcher {
   }
 
   /**
-   * One POST of `row`'s body, signed with its hook's current secret and carrying its custom
-   * headers, or `null` when the delivery
-   * is gone or its hook deleted or switched off, which ends it with no status. A secret that cannot be decrypted
-   * (§5.4: a key replaced without its previous generation, a database restored under another
-   * `.env`) fails the delivery for good: no later attempt could read it either.
+   * One send of `row`: an event to its hook, or an after-call request built anew
+   * (`webhookSend.ts`, `afterCallDelivery.ts`). `null` when the delivery's owner is gone or
+   * switched off, which ends it with no status; a failure no later attempt could mend, a secret
+   * that cannot be decrypted (§5.4) among them, fails the delivery for good.
    */
   private async attempt(row: DeliveryRow): Promise<AttemptOutcome | null> {
-    const hook = await this.deps.db
-      .selectFrom('webhookDeliveries')
-      .innerJoin('webhooks', 'webhooks.id', 'webhookDeliveries.webhookId')
-      .select([
-        'webhooks.url',
-        'webhooks.secretEnc',
-        'webhooks.headersJson',
-        'webhooks.secretHeadersEnc'
-      ])
-      .where('webhookDeliveries.id', '=', row.id)
-      .where('webhooks.active', '=', 1)
-      .where('webhooks.deletedAt', 'is', null)
-      .executeTakeFirst();
-    if (hook === undefined) {
-      await this.deps.db
+    const { db, kr, now, links } = this.deps;
+    let built: Awaited<ReturnType<typeof webhookSend>> = null;
+    if (row.afterCallRequestId === null) {
+      built = await webhookSend({ db, kr }, row);
+    } else if (links !== null) {
+      built = await afterCallSend(
+        { db, kr, now, ...links() },
+        { afterCallRequestId: row.afterCallRequestId, bodyJson: row.bodyJson }
+      );
+    }
+    if (built === null) {
+      await db
         .deleteFrom('webhookDeliveries')
         .where('id', '=', row.id)
         .execute();
       return null;
     }
-    // The secret and the secret headers alike: neither can be read under another key.
-    const credentials = attempt(() => ({
-      secret: decrypt(
-        this.deps.kr,
-        'webhooks.secretEnc',
-        hook.secretEnc
-      ).toString('utf8'),
-      headers: readHeaders(this.deps.kr, 'webhooks.secretHeadersEnc', hook)
-    }));
-    if (credentials === undefined) {
-      return { failure: SECRET_UNREADABLE, retryable: false };
+    if ('failure' in built) {
+      return { failure: built.failure, retryable: false };
     }
     const failure = await this.post({
-      method: 'POST',
-      url: hook.url,
-      headers: Object.fromEntries(
-        credentials.headers.map(header => [header.name, header.value])
-      ),
-      body: row.bodyJson,
-      contentType: 'application/json',
-      secret: credentials.secret,
+      ...built.send,
       timeoutMs: REQUEST_TIMEOUT_MS,
       policy: this.deps.targetPolicy
     });

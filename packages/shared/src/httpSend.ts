@@ -112,11 +112,12 @@ export function sendHttpRequest(send: HttpSend): Promise<HttpAnswer> {
         response.on('data', (chunk: Buffer) => {
           size += chunk.length;
           if (size > limit) {
-            request.destroy(
+            reject(
               Object.assign(new Error('response too large'), {
                 code: RESPONSE_TOO_LARGE_CODE
               })
             );
+            request.destroy();
             return;
           }
           chunks.push(chunk);

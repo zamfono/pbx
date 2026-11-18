@@ -5,6 +5,7 @@
  * leg that presents the original caller (`forwardedCaller.ts`), and a `sip` target's headers,
  * rendered by `forwardHeaders.ts`.
  */
+import type { ForwardTarget } from '../routing/targets.js';
 import type { Diversion } from './forwardContext.js';
 import { diversionHeader, type DiversionTrunk } from './forwardDiversion.js';
 import { headerVariables, type SipHeader } from './forwardHeaders.js';
@@ -59,6 +60,9 @@ export type ForwardLeg = {
   /** Seconds the target may ring, across every route and host it is tried on, before it counts
    * as not working (§10.1 step 7). */
   ringTimeoutS?: number;
+  /** The forward target the leg dials, where its attempt is reported for the target's
+   * after-call request (§10.6 "After-call requests"). */
+  target?: ForwardTarget;
 };
 
 /** The user whose own rule forwards a call (§10.1 step 7), whose call an external or SIP target is

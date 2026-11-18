@@ -18,6 +18,9 @@ export type Actor = {
   name: string;
   role: UserRole;
   callSession?: { callId: string };
+  /** Set on the actor of a recording link (§10.6 "After-call requests"): the link is its
+   * holder's decision made already, so what it does asks no confirmation. */
+  recordingLink?: true;
   personalAccessTokenId?: string;
 };
 

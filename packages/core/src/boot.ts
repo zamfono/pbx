@@ -63,6 +63,7 @@ export function buildPipeline(deps: {
     log,
     now: nowIso
   });
+  const apiClient = new ApiClient(env.apiInternalUrl, env.internalToken);
   const pipeline = new Pipeline({
     ari,
     ami,
@@ -80,7 +81,8 @@ export function buildPipeline(deps: {
     mediaDir: env.mediaDir,
     mediaFull: media.full,
     db,
-    apiClient: new ApiClient(env.apiInternalUrl, env.internalToken),
+    apiClient,
+    reports: apiClient,
     logger: log,
     trunkChannels: new TrunkChannels({ ari, state }),
     presence: deps.presence,

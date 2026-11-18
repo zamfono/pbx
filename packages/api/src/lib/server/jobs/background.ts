@@ -35,6 +35,7 @@ import { propagateAtBoot } from '../propagation.js';
 import type { Keyring } from '../secretbox.js';
 import { seedIfEmpty } from '../seed.js';
 import { renderSipBanList } from '../sipBanList.js';
+import { originFromEnv } from '../stackAddress.js';
 import { WebhookDispatcher } from '../webhooks.js';
 import { scheduleAutoUpdate, type AutoUpdateScheduler } from './autoUpdate.js';
 import type { BackupJobDeps, Bus } from './backup.js';
@@ -220,7 +221,8 @@ export async function startBackgroundJobs(
   const dispatcher = new WebhookDispatcher({
     db,
     kr,
-    targetPolicy: { allowPrivate: env.ALLOW_PRIVATE_TARGETS }
+    targetPolicy: { allowPrivate: env.ALLOW_PRIVATE_TARGETS },
+    links: () => ({ jwtSecret: env.JWT_SECRET, origin: originFromEnv() })
   });
   // The deliveries the previous process left pending (§10.6), alongside the new ones.
   dispatcher.resume().catch((error: unknown) => {

@@ -34,6 +34,7 @@ function external(number: string): {
   kind: 'external';
   external: string;
   record: boolean;
+  afterCall: null;
   ringTimeoutS: null;
   fallback: null;
   announcementAudioId: null;
@@ -42,6 +43,7 @@ function external(number: string): {
     kind: 'external',
     external: number,
     record: false,
+    afterCall: null,
     ringTimeoutS: null,
     fallback: null,
     announcementAudioId: null

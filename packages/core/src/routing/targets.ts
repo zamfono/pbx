@@ -19,6 +19,11 @@ type Fallback = { fallback?: ForwardTarget };
 /** An `external` or `sip` target's ring timeout in seconds (§10.1 step 7); set only when it has one. */
 type RingTimeout = { ringTimeoutS?: number };
 
+/** The forward target row whose after-call request an attempt of the target is reported for
+ * (§10.6 "After-call requests"); set only on an `external`, `sip` or `webSocket` target that
+ * has one. */
+type AfterCall = { afterCallOf?: string };
+
 /** The announcement a target of any kind plays to the caller before the call goes where it sends
  * it (§10.1 step 7); set only when it has one. */
 type Announcement = { announcementAudioId?: string };
@@ -28,6 +33,7 @@ export type ForwardTarget = Announcement &
     | { kind: 'user'; userId: string }
     | { kind: 'ringGroup'; ringGroupId: string }
     | ({ kind: 'external'; number: string; record?: true } & RingTimeout &
+        AfterCall &
         Fallback)
     | ({
         kind: 'sip';
@@ -36,6 +42,7 @@ export type ForwardTarget = Announcement &
         headers: SipHeaderTemplate[];
         record?: true;
       } & RingTimeout &
+        AfterCall &
         Fallback)
     | ({
         kind: 'webSocket';
@@ -43,7 +50,8 @@ export type ForwardTarget = Announcement &
         url: string;
         sampleRate: WebSocketSampleRate;
         record?: true;
-      } & Fallback)
+      } & AfterCall &
+        Fallback)
     | { kind: 'mailboxUser'; userId: string }
     | { kind: 'mailboxRingGroup'; ringGroupId: string }
     | { kind: 'menu'; menuId: string }
@@ -82,12 +90,19 @@ type ForwardTargetsRow = {
   /** The target this row is the fallback of (§10.1 step 7), `null` for a chain's first row. */
   fallbackOfId: string | null;
   recordCalls: number;
+  /** Whether an `after_call_requests` row names this one, as the config snapshot marks it. */
+  afterCall?: boolean;
 };
 
 /** An `external`, `sip` or `webSocket` target's `record` (§10.2 "Recording semantics"): set only
  * when it records. */
 function recordOf(row: ForwardTargetsRow): { record?: true } {
   return row.recordCalls === 1 ? { record: true } : {};
+}
+
+/** An `external`, `sip` or `webSocket` target's `afterCallOf`: set only when it has a request. */
+function afterCallOf(row: ForwardTargetsRow): AfterCall {
+  return row.afterCall === true ? { afterCallOf: row.id } : {};
 }
 
 /** An `external` or `sip` target's `ringTimeoutS`: set only when it has one. */
@@ -124,6 +139,7 @@ function kindFromRow(
       number: row.external,
       ...recordOf(row),
       ...ringTimeoutOf(row),
+      ...afterCallOf(row),
       ...fallback
     };
   }
@@ -140,6 +156,7 @@ function kindFromRow(
       headers: row.sipHeaders,
       ...recordOf(row),
       ...ringTimeoutOf(row),
+      ...afterCallOf(row),
       ...fallback
     };
   }
@@ -151,6 +168,7 @@ function kindFromRow(
       url: row.webSocketUrl,
       sampleRate: sampleRateOf(row),
       ...recordOf(row),
+      ...afterCallOf(row),
       ...fallback
     };
   }
@@ -264,27 +282,4 @@ export function nextHop(
     return { ok: false };
   }
   return { ok: true, hops: next };
-}
-
-/** The target the live extension `ext` leads to, as a dialled extension does (§10.1 "Outbound"
- * step 3): its user, ring group, decision or menu; `null` for an extension nobody owns and for a
- * parking slot. */
-export function extensionTarget(
-  snapshot: Snapshot,
-  ext: string
-): ForwardTarget | null {
-  const row = snapshot.extensions.find(candidate => candidate.ext === ext);
-  if (row === undefined) {
-    return null;
-  }
-  if (row.userId !== null) {
-    return { kind: 'user', userId: row.userId };
-  }
-  if (row.ringGroupId !== null) {
-    return { kind: 'ringGroup', ringGroupId: row.ringGroupId };
-  }
-  if (row.decisionId !== null) {
-    return { kind: 'decision', decisionId: row.decisionId };
-  }
-  return row.menuId === null ? null : { kind: 'menu', menuId: row.menuId };
 }

@@ -5,12 +5,35 @@
 
 import type { AudioKind, AuditChannel, BackupRunStatus, BackupTargetKind, CallDirection, CallerIdHeader, CallLogLevel, CallStatus, DeviceKind, DeviceTransport, DiversionPolicy, ForwardedCallerId, HostDirection, Language, LogLevelOverride, MailKind, MaintenanceWork, NumberFormat, OAuthClientKind, PresenceStatus, PromptVoice, QosRole, RingGroupForwardCondition, RingStrategy, SipBanProtocol, SmtpSecurity, SsoProvider, TokenKind, TrunkAuthMode, TrunkTransport, UserForwardCondition, UserRole, WebhookStatus, WebSocketProtocol } from "../columnValues.js";
 import type { DecisionConditionType } from "../decisions.js";
+import type { HttpContentType } from "../httpRequestBlock.js";
+import type { HttpMethod } from "../httpSend.js";
 import type { ColumnType } from "kysely";
 import type { CountryCode } from "libphonenumber-js";
 
 export type Generated<T> = T extends ColumnType<infer S, infer I, infer U>
   ? ColumnType<S, I | undefined, U>
   : ColumnType<T, T | undefined, T>;
+
+export interface AfterCallRequests {
+  body: string | null;
+  contentType: HttpContentType | null;
+  failedDeliveries: Generated<number>;
+  failingSince: string | null;
+  forwardTargetId: string;
+  headersJson: Generated<string>;
+  id: string;
+  lastDeliveryAt: string | null;
+  lastError: string | null;
+  lastErrorAt: string | null;
+  lastLoggedAt: string | null;
+  lastStatus: WebhookStatus | null;
+  method: HttpMethod;
+  recordingDelete: Generated<number>;
+  recordingDownload: Generated<number>;
+  secretEnc: Buffer;
+  secretHeadersEnc: Buffer | null;
+  url: string;
+}
 
 export interface AudioAssets {
   createdAt: string;
@@ -620,12 +643,13 @@ export interface WebauthnCredentials {
 }
 
 export interface WebhookDeliveries {
+  afterCallRequestId: string | null;
   attempts: Generated<number>;
   bodyJson: string;
   createdAt: string;
   id: string;
   nextAttemptAt: string;
-  webhookId: string;
+  webhookId: string | null;
 }
 
 export interface Webhooks {
@@ -648,6 +672,7 @@ export interface Webhooks {
 }
 
 export interface DB {
+  afterCallRequests: AfterCallRequests;
   audioAssets: AudioAssets;
   auditLog: AuditLog;
   backupRuns: BackupRuns;

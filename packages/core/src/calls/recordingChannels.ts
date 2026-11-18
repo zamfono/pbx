@@ -6,10 +6,11 @@
  */
 import { rm } from 'node:fs/promises';
 
-import { newId } from '@zamfono/shared';
+import { newId, RECORDINGS_SUBDIR } from '@zamfono/shared';
 
 import type { AriClient } from '../ari/client.js';
 import { logFailure, logUnlessGone } from '../ari/failures.js';
+import type { Logger } from '../ari/types.js';
 import { waitForRecording, waitForStasisEntry } from './ariWaits.js';
 import type { RecordFormat } from './recordingRate.js';
 
@@ -125,4 +126,25 @@ export async function startSnoopPair(
       .catch(logFailure(ari.log, 'snoop file removal'));
     throw error;
   }
+}
+
+/** Stops a participation's snoop pair and waits until both raw recordings are finished. */
+export async function stopSnoopPair(
+  ari: AriClient,
+  log: Logger,
+  pair: { id: string; leftChannelId: string; rightChannelId: string }
+): Promise<void> {
+  // Registered before the hangup that stops the recordings, so neither `RecordingFinished`
+  // event can fire (and be missed) before this module is listening for it.
+  const finished = ['l', 'r'].map(side =>
+    waitForRecordingFinished(ari, `${RECORDINGS_SUBDIR}/${pair.id}-${side}`)
+  );
+  await Promise.all(
+    [pair.leftChannelId, pair.rightChannelId].map(snoop =>
+      ari.channels
+        .hangup(snoop)
+        .catch(logUnlessGone(log, 'snoop hangup', { participationId: pair.id }))
+    )
+  );
+  await Promise.all(finished);
 }

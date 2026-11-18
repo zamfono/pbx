@@ -123,7 +123,8 @@ describe('winding calls down as core stops', () => {
       onTransfereeUp: vi.fn(),
       onCallerEnded: vi.fn(() => Promise.resolve()),
       onLegEnded: vi.fn(() => Promise.resolve()),
-      onLegMoved: vi.fn()
+      onLegMoved: vi.fn(),
+      settled: vi.fn(() => Promise.resolve())
     };
     rig = await startRig({ recorder });
     const userId = await seedUser(rig.db, { ext: '101' });

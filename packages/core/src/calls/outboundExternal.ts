@@ -7,6 +7,7 @@
  */
 import { userById } from '../internal/snapshot.js';
 import { settleAnswered } from './answer.js';
+import { dialEnd, noteAttempt } from './attempts.js';
 import type { Call } from './call.js';
 import { concludeExhausted, concludeFinal } from './conclude.js';
 import { dialRoutes, type DialResult } from './dialAttempt.js';
@@ -43,7 +44,8 @@ export async function originateExternalLeg(
 ): Promise<DialResult> {
   const { pipeline, trunkChannels } = ctx;
   const snapshot = await pipeline.deps.cache.get();
-  return dialRoutes(
+  const startedAt = pipeline.deps.now();
+  const result = await dialRoutes(
     openCursor(
       {
         pipeline,
@@ -58,6 +60,15 @@ export async function originateExternalLeg(
       routeWays(snapshot, number, asUser)
     )
   );
+  // A forward target's attempt, for its after-call request (§10.6).
+  await noteAttempt(
+    pipeline,
+    call,
+    ctx.forward?.target,
+    startedAt,
+    dialEnd(result)
+  );
+  return result;
 }
 
 /** Settles `call` on a waiting dial's `result`: bridged with the answered leg, or concluded on its

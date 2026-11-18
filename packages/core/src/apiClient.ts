@@ -7,6 +7,7 @@
  */
 import {
   internalAuthorization,
+  type AfterCallReport,
   type MailRequest,
   type SipBanReport
 } from '@zamfono/shared';
@@ -24,6 +25,11 @@ export class ApiClient {
 
   mail(req: MailRequest): Promise<void> {
     return this.post('/internal/mail', req);
+  }
+
+  /** `/internal/afterCall` (§10.6 "After-call requests"): the attempts of one ended call. */
+  afterCall(report: AfterCallReport): Promise<void> {
+    return this.post('/internal/afterCall', report);
   }
 
   sipBan(report: SipBanReport): Promise<void> {

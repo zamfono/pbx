@@ -69,6 +69,7 @@ describe('sip forward targets', () => {
       ...sipTarget(trunkId),
       headers: DEFAULT_SIP_HEADERS,
       record: false,
+      afterCall: null,
       ringTimeoutS: null,
       fallback: null,
       announcementAudioId: null

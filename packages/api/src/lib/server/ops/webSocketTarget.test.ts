@@ -59,6 +59,7 @@ describe('webSocket forward targets', () => {
       url: BOT_URL,
       sampleRate: 8000,
       record: false,
+      afterCall: null,
       fallback: null,
       announcementAudioId: null
     });
@@ -72,6 +73,7 @@ describe('webSocket forward targets', () => {
           protocol: 'vonage',
           url: 'ws://10.0.0.5:8080/bot',
           record: true,
+          afterCall: null,
           fallback: null,
           announcementAudioId: null
         }
@@ -84,6 +86,7 @@ describe('webSocket forward targets', () => {
       url: 'ws://10.0.0.5:8080/bot',
       sampleRate: 16000,
       record: true,
+      afterCall: null,
       fallback: null,
       announcementAudioId: null
     });

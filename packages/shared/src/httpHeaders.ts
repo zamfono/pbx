@@ -33,8 +33,14 @@ export const RESERVED_HTTP_HEADERS: readonly string[] = [
  * 8k header buffers). */
 export const HTTP_HEADERS_MAX_BYTES = 8192;
 
-/** A header as a write gives it: a `secret` one may leave its value out to keep the stored one. */
-export type HttpHeaderInput = { name: string; value?: string; secret: boolean };
+/** A header as a write gives it: a `secret` one may leave its value out to keep the stored
+ * one, and may carry the `secretSet` a read returned it with, which a write ignores. */
+export type HttpHeaderInput = {
+  name: string;
+  value?: string | undefined;
+  secret: boolean;
+  secretSet?: true | undefined;
+};
 
 /** A header as a row's `headers_json` holds it: a secret one without its value, which the row's
  * `secret_headers_enc` keeps by the header's lower-case name. */
@@ -102,38 +108,31 @@ export function httpHeadersSchema(options: {
     secretSet: z
       .literal(true)
       .optional()
-      .describe('As a read returns a secret header; ignored on a write.')
+      .describe(
+        'Set on a secret header as a read returns it; ignored on a write.'
+      )
   });
-  return z
-    .array(header)
-    .superRefine((headers, ctx) => {
-      const seen = new Set<string>();
-      for (const [index, { name, value, secret }] of headers.entries()) {
-        const key = name.toLowerCase();
-        if (seen.has(key)) {
-          ctx.addIssue({
-            code: 'custom',
-            path: [index, 'name'],
-            message: `header ${name} is given twice`
-          });
-        }
-        seen.add(key);
-        if (value === undefined && !secret) {
-          ctx.addIssue({
-            code: 'custom',
-            path: [index, 'value'],
-            message: 'a header that is no secret needs its value'
-          });
-        }
+  return z.array(header).superRefine((headers, ctx) => {
+    const seen = new Set<string>();
+    for (const [index, { name, value, secret }] of headers.entries()) {
+      const key = name.toLowerCase();
+      if (seen.has(key)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: [index, 'name'],
+          message: `header ${name} is given twice`
+        });
       }
-    })
-    .transform(headers =>
-      headers.map(({ name, value, secret }) => ({
-        name,
-        secret,
-        ...(value === undefined ? {} : { value })
-      }))
-    );
+      seen.add(key);
+      if (value === undefined && !secret) {
+        ctx.addIssue({
+          code: 'custom',
+          path: [index, 'value'],
+          message: 'a header that is no secret needs its value'
+        });
+      }
+    }
+  });
 }
 
 /** A header as a read returns it: a secret one as `secretSet`, without its value. */

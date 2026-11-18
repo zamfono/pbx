@@ -33,6 +33,7 @@ async function withAdminSipRule(): Promise<Fixture> {
       user: 'proj_abc123',
       headers: [{ name: 'X-Ext', value: '{{calledExtension}}' }],
       record: false,
+      afterCall: null,
       ringTimeoutS: null,
       fallback: null,
       announcementAudioId: null
@@ -82,6 +83,7 @@ describe('users.setForwarding, an admin-set sip rule', () => {
         kind: 'external',
         external: '+4915112345678',
         record: false,
+        afterCall: null,
         ringTimeoutS: null,
         fallback: null,
         announcementAudioId: null

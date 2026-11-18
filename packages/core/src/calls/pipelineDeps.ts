@@ -3,6 +3,7 @@
 import type { Db, TargetPolicy } from '@zamfono/shared';
 
 import type { AmiClient } from '../ami/client.js';
+import type { ApiClient } from '../apiClient.js';
 import type { AriClient } from '../ari/client.js';
 import type { Channel, Logger } from '../ari/types.js';
 import type { EventBus } from '../internal/eventBus.js';
@@ -65,6 +66,8 @@ export type PipelineDeps = {
   // Voicemail deposit's own collaborators (§3.1).
   db: Db;
   apiClient: MailSender;
+  /** Where a call's attempts are reported once it is over (§10.6 "After-call requests"). */
+  reports: Pick<ApiClient, 'afterCall'>;
   // Process-level logging (§10.1 "Emergency calls": an ERROR line while no live emergency trunk
   // exists).
   logger: Logger;

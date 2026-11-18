@@ -24,6 +24,7 @@ import {
   crossSiteFormRejection,
   INTERNAL_PREFIX
 } from '#lib/server/auth/crossSiteForms.js';
+import { authenticateRecordingLink } from '#lib/server/auth/recordingLinks.js';
 import {
   authenticateSessionToken,
   sessionTokenOf
@@ -249,9 +250,14 @@ const handleRequest: Handle = async ({ event, resolve }) => {
     sessionToken === null
       ? await authenticateRequest(deps, event.request)
       : await authenticateSessionToken(sessionToken);
+  // A download link's token (§10.5), else a recording link's (§10.6 "After-call requests").
   const link = bearer
     ? null
-    : await authenticateLink(deps, 'download', event.url);
+    : ((await authenticateLink(deps, 'download', event.url)) ??
+      (await authenticateRecordingLink(env.JWT_SECRET, {
+        method: event.request.method,
+        url: event.url
+      })));
   const auth = bearer ?? link;
   if (!auth) {
     return problem(HTTP_UNAUTHORIZED, 'unauthorized');

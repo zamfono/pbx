@@ -126,12 +126,23 @@ async function loadSnapshot(trx: Transaction<DB>): Promise<Snapshot> {
     .selectFrom('settings')
     .selectAll()
     .executeTakeFirstOrThrow();
+  // Which targets have an after-call request (§10.6); the request itself is `api`'s to read.
+  const afterCall = new Set(
+    (
+      await trx
+        .selectFrom('afterCallRequests')
+        .select('forwardTargetId')
+        .execute()
+    ).map(row => row.forwardTargetId)
+  );
   return {
     ...tables,
     users: tables.users.map(parseUser),
     devices: tables.devices.map(parseDevice),
     trunks: tables.trunks.map(parseTrunk),
-    forwardTargets: tables.forwardTargets.map(parseForwardTarget),
+    forwardTargets: tables.forwardTargets.map(row =>
+      parseForwardTarget(row, afterCall.has(row.id))
+    ),
     settings: parseSettings(settingsRow)
   };
 }

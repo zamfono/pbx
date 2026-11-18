@@ -83,6 +83,7 @@ describe('forward-target fallbacks', () => {
       external: '+4366412345',
       ringTimeoutS: 15,
       record: false,
+      afterCall: null,
       announcementAudioId: null,
       fallback: {
         kind: 'sip',
@@ -91,6 +92,7 @@ describe('forward-target fallbacks', () => {
         headers: expect.any(Array) as unknown,
         ringTimeoutS: null,
         record: false,
+        afterCall: null,
         announcementAudioId: null,
         fallback: {
           kind: 'webSocket',
@@ -98,6 +100,7 @@ describe('forward-target fallbacks', () => {
           url: BOT_URL,
           sampleRate: 16000,
           record: false,
+          afterCall: null,
           announcementAudioId: null,
           fallback: {
             kind: 'mailboxUser',
@@ -253,7 +256,12 @@ describe('fallbacks a user sets on their own forwarding', () => {
       withFallback({ kind: 'webSocket', protocol: 'twilio', url: BOT_URL })
     ).rejects.toMatchObject({ status: 403 });
     await expect(
-      withFallback({ kind: 'external', external: '+4311111', record: true })
+      withFallback({
+        kind: 'external',
+        external: '+4311111',
+        record: true,
+        afterCall: null
+      })
     ).rejects.toMatchObject({
       status: 403,
       title: 'a recording target is set by an admin'

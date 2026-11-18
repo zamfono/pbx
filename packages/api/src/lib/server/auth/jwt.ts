@@ -184,3 +184,52 @@ export async function verifyLinkToken(
   });
   return payload && { sub: payload.sub, cid: payload.cid, ep: payload.ep };
 }
+
+/**
+ * A recording link's token (§10.6 "After-call requests"): `ft` the forward target whose
+ * after-call request carried it, `scope` what it may do with the one recording whose REST path
+ * is its `aud`. Its `typ`, `recording+jwt`, sets it apart from every other token.
+ */
+export type RecordingLinkPayload = {
+  ft: string;
+  scope: ('download' | 'delete')[];
+  aud: string;
+  iat: number;
+  exp: number;
+};
+
+const RECORDING_TYP = 'recording+jwt';
+
+const RecordingLinkPayloadSchema = z.object({
+  ft: z.string(),
+  scope: z.array(z.enum(['download', 'delete'])),
+  aud: z.string(),
+  iat: z.number(),
+  exp: z.number()
+});
+
+/** Encodes `payload` as an HS256 recording link token signed with `secret`. */
+export function encodeRecordingToken(
+  secret: string,
+  payload: RecordingLinkPayload
+): Promise<string> {
+  return new SignJWT(payload)
+    .setProtectedHeader({ alg: JWT_ALG, typ: RECORDING_TYP })
+    .sign(keyFor(secret));
+}
+
+/** The forward target and scope of recording link token `token`, verified like an access token
+ *  and issued for `path` alone; `null` for any token that fails. */
+export async function verifyRecordingToken(
+  secret: string,
+  token: string,
+  nowS: number,
+  path: string
+): Promise<Pick<RecordingLinkPayload, 'ft' | 'scope'> | null> {
+  const payload = await verifiedPayload(secret, token, nowS, {
+    typ: RECORDING_TYP,
+    audience: path,
+    schema: RecordingLinkPayloadSchema
+  });
+  return payload && { ft: payload.ft, scope: payload.scope };
+}

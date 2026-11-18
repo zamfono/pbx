@@ -29,6 +29,7 @@ describe('ringGroups.getForwarding', () => {
           kind: 'external',
           external: '+491111111',
           record: false,
+          afterCall: null,
           ringTimeoutS: null,
           fallback: null,
           announcementAudioId: null

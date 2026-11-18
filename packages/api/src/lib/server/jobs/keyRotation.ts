@@ -5,6 +5,7 @@ import type { DB, Db } from '@zamfono/shared';
 import { decrypt, encrypt, type Keyring } from '../secretbox.js';
 
 type EncTable =
+  | 'afterCallRequests'
   | 'backupTargets'
   | 'devices'
   | 'settings'
@@ -18,6 +19,10 @@ type AnyEncColumn = { [T in EncTable]: EncColumn<T> }[EncTable];
 const ENC_COLUMNS: readonly {
   [T in EncTable]: { table: T; columns: readonly EncColumn<T>[] };
 }[EncTable][] = [
+  {
+    table: 'afterCallRequests',
+    columns: ['secretEnc', 'secretHeadersEnc']
+  },
   { table: 'backupTargets', columns: ['secretEnc'] },
   { table: 'devices', columns: ['sipPasswordEnc', 'adminPasswordEnc'] },
   {

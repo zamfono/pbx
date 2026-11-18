@@ -112,7 +112,7 @@ export async function handleRest(
       clientName: deps.clientName,
       requestId: deps.requestId,
       credentialEpoch: deps.credentialEpoch,
-      confirm: confirm === true
+      confirm: confirm === true || actor.recordingLink === true
     });
     return await outputResponse(output);
   } catch (error) {

@@ -7,6 +7,7 @@
 import { userById, type Snapshot } from '../internal/snapshot.js';
 import { ownDid, type ForwardTarget } from '../routing/targets.js';
 import { SIP_SERVICE_UNAVAILABLE } from '../sipCodes.js';
+import { dialEnd, noteAttempt } from './attempts.js';
 import { type Call } from './call.js';
 import type { TrunkRow } from './callerIdentity.js';
 import { dialCause, dialRoutes, type DialResult } from './dialAttempt.js';
@@ -92,6 +93,10 @@ export async function dialSipTarget(
       trunkId: target.trunkId,
       cause: unusable
     });
+    await noteAttempt(pipeline, call, target, pipeline.deps.now(), {
+      outcome: 'failed',
+      cause: unusable ?? 'trunkMissing'
+    });
     if (
       !(await failOver(
         pipeline,
@@ -130,12 +135,10 @@ export async function dialSipTarget(
     },
     [trunkWay(snapshot, trunk.id)]
   );
-  await settleForward(
-    pipeline,
-    call,
-    { target, forwarder },
-    await dialRoutes(cursor)
-  );
+  const startedAt = pipeline.deps.now();
+  const result = await dialRoutes(cursor);
+  await noteAttempt(pipeline, call, target, startedAt, dialEnd(result));
+  await settleForward(pipeline, call, { target, forwarder }, result);
 }
 
 /**
@@ -166,6 +169,7 @@ export async function dialForwardTarget(
   const forward: ForwardLeg = {
     diversions: [...call.diversions],
     headers: [],
+    target,
     ...standInOf(forwarder),
     ...recordingOf(target),
     ...ringTimeoutOf(target)

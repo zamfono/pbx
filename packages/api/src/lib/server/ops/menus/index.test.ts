@@ -43,6 +43,7 @@ describe('menus', () => {
       kind: 'external',
       external: '+490000000',
       record: false,
+      afterCall: null,
       ringTimeoutS: null,
       fallback: null,
       announcementAudioId: null
@@ -249,6 +250,7 @@ describe('menus', () => {
       kind: 'external',
       external: '+491111111',
       record: false,
+      afterCall: null,
       ringTimeoutS: null,
       fallback: null,
       announcementAudioId: null

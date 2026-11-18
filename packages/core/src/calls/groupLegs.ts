@@ -24,6 +24,8 @@ export type GroupLeg = {
   standsInFor?: string;
   /** As a `Leg`'s: the forward target an external member leg dials records its calls. */
   targetRecords?: true;
+  /** Told when the leg wins the batch: an external member leg's attempt answered (§10.6). */
+  answered?: () => void;
 };
 
 /** Ends every one of `memberKey`'s still-ringing legs (§10.1 step 5: `allow_reject` stops ringing all of a declining member's devices). */

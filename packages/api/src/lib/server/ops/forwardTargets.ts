@@ -19,7 +19,8 @@ import { OpError, type Context } from './types.js';
  * `decision`, whose cases may hold either (§10.1 step 7 "Decisions"), an `external` one that
  * records (§10.2 "Recording semantics"), and a template, an `extension` target or an `external`
  * number built from the call (§9.4 "Templates"), since a number built from caller data is a way
- * to place calls at the tenant's cost.
+ * to place calls at the tenant's cost, and a target with an after-call request, which sends the
+ * call's record to whatever URL it names (§10.6 "After-call requests").
  */
 export function isAdminTarget(target: TargetSpec): boolean {
   return (
@@ -27,6 +28,7 @@ export function isAdminTarget(target: TargetSpec): boolean {
     target.kind === 'webSocket' ||
     target.kind === 'decision' ||
     target.kind === 'extension' ||
+    ('afterCall' in target && (target.afterCall ?? null) !== null) ||
     (target.kind === 'external' &&
       (target.record || isTemplate(target.external)))
   );
@@ -52,9 +54,12 @@ function adminTargetRefusal(target: TargetSpec): string {
   if (target.kind === 'extension') {
     return 'an extension target is set by an admin';
   }
-  return target.kind === 'external' && isTemplate(target.external)
-    ? 'a templated target is set by an admin'
-    : 'a recording target is set by an admin';
+  if (target.kind === 'external' && isTemplate(target.external)) {
+    return 'a templated target is set by an admin';
+  }
+  return target.kind === 'external' && target.record
+    ? 'a recording target is set by an admin'
+    : 'an after-call request is set by an admin';
 }
 
 /** Whether `target` holds an admin target (`isAdminTarget`) anywhere in its fallback chain, so

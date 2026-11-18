@@ -7,7 +7,6 @@ import path from 'node:path';
 import { newId, RECORDINGS_SUBDIR, type Db } from '@zamfono/shared';
 
 import type { AriClient } from '../ari/client.js';
-import { logUnlessGone } from '../ari/failures.js';
 import type { Logger } from '../ari/types.js';
 import type { ConfigCache } from '../internal/snapshot.js';
 import type { MediaLimit } from '../mediaLimit.js';
@@ -17,13 +16,11 @@ import {
   type Leg,
   type Transferee
 } from './call.js';
-import {
-  startSnoopPair,
-  waitForRecordingFinished
-} from './recordingChannels.js';
+import { startSnoopPair, stopSnoopPair } from './recordingChannels.js';
 import { legRecords, userRecords } from './recordingFlags.js';
 import { ffmpegMix, type Mixer } from './recordingMix.js';
 import { recordFormatFor } from './recordingRate.js';
+import { CallsRecording } from './recordingSettle.js';
 import { storeParticipation } from './recordingStore.js';
 
 type RecorderDeps = {
@@ -72,6 +69,7 @@ export class Recorder {
   // files are still being finished or mixed: a recording in progress all the same, until its row
   // is stored.
   private finishing = 0;
+  private readonly calls = new CallsRecording();
 
   constructor(deps: RecorderDeps) {
     this.deps = deps;
@@ -155,6 +153,7 @@ export class Recorder {
     );
     const entry: Entry = { key, callId, snoops: snoops.catch(() => null) };
     this.participations.set(key, entry);
+    this.calls.begin(callId);
     try {
       await snoops;
     } finally {
@@ -164,6 +163,7 @@ export class Recorder {
         this.participations.get(entry.key) === entry
       ) {
         this.participations.delete(entry.key);
+        this.calls.done(entry.callId);
       }
     }
   }
@@ -235,6 +235,13 @@ export class Recorder {
     entry.key = participationKey(to.id, leg.channelId);
     entry.callId = to.id;
     this.participations.set(entry.key, entry);
+    this.calls.begin(to.id);
+    this.calls.done(from.id);
+  }
+
+  /** Resolves once every recording of call `callId` is stored, or failed to be. */
+  settled(callId: string): Promise<void> {
+    return this.calls.settled(callId);
   }
 
   /** The caller-side counterpart of `onLegEnded`, for a participation started by `onCallerUp`. */
@@ -260,30 +267,12 @@ export class Recorder {
       }
     } finally {
       this.finishing -= 1;
+      this.calls.done(entry.callId);
     }
   }
 
   private async finish(participation: Participation): Promise<void> {
-    // Registered before the hangup that stops the recordings, so neither `RecordingFinished`
-    // event can fire (and be missed) before this module is listening for it.
-    const leftFinished = waitForRecordingFinished(
-      this.deps.ari,
-      `${RECORDINGS_SUBDIR}/${participation.id}-l`
-    );
-    const rightFinished = waitForRecordingFinished(
-      this.deps.ari,
-      `${RECORDINGS_SUBDIR}/${participation.id}-r`
-    );
-    await Promise.all(
-      [participation.leftChannelId, participation.rightChannelId].map(snoop =>
-        this.deps.ari.channels.hangup(snoop).catch(
-          logUnlessGone(this.deps.log, 'snoop hangup', {
-            participationId: participation.id
-          })
-        )
-      )
-    );
-    await Promise.all([leftFinished, rightFinished]);
+    await stopSnoopPair(this.deps.ari, this.deps.log, participation);
     const stored = await storeParticipation(
       {
         db: this.deps.db,

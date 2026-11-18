@@ -13,6 +13,9 @@ export type ParticipationRecorder = {
   onLegEnded(call: Call, leg: Leg): Promise<void>;
   /** `leg`'s channel goes on in `to` (a parking ring-back's answer, §10.2 "Call parking"). */
   onLegMoved(from: Call, to: Call, leg: Leg): void;
+  /** Resolves once no participation of call `callId` is being recorded, finished or mixed any
+   * more: every recording of the call that will exist does (§10.6 "After-call requests"). */
+  settled(callId: string): Promise<void>;
 };
 
 /**

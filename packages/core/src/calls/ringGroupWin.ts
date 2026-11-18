@@ -27,6 +27,7 @@ export async function winBatch(
     // Ended either way: a second `Up` for a member already ended (the batch's winner, or a
     // hung-up sibling) must not be re-hung-up as still ringing once `hangupAllRinging` runs.
     winner.state = 'ended';
+    winner.answered?.();
   }
   const winningLeg: Leg | null =
     winner === undefined

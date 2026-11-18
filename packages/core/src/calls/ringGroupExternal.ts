@@ -6,6 +6,7 @@ import { newId } from '@zamfono/shared';
 
 import type { Snapshot } from '../internal/snapshot.js';
 import type { ForwardTarget } from '../routing/targets.js';
+import { noteAttempt, type AttemptEnd } from './attempts.js';
 import type { Call } from './call.js';
 import { ringExternalLeg } from './externalLeg.js';
 import { CONDITION_REASONS, diversionFor } from './forwardContext.js';
@@ -13,6 +14,30 @@ import { recordingOf, ringTimeoutOf, type ForwardLeg } from './forwardLeg.js';
 import { sipForwardLeg } from './forwardValues.js';
 import type { Pipeline } from './pipeline.js';
 import type { BatchLegs } from './ringGroupOriginate.js';
+
+/** Notes the member's leg as an attempt of `target` (§10.6 "After-call requests"), given up
+ * unless it fails first or is the one that answers: what to call with how it ended. */
+async function memberAttempt(
+  pipeline: Pipeline,
+  call: Call,
+  target: ForwardTarget
+): Promise<(end: AttemptEnd) => void> {
+  const attempt = await noteAttempt(
+    pipeline,
+    call,
+    target,
+    pipeline.deps.now(),
+    {
+      outcome: 'cancelled',
+      cause: null
+    }
+  );
+  return end => {
+    if (attempt !== null) {
+      Object.assign(attempt, end, { endedAt: pipeline.deps.now() });
+    }
+  };
+}
 
 /** Rings a member's unconditional forward to an external number or a SIP target as the member's
  * leg (§10.1 step 5), dialled as the member's own call (§9.4 "Outbound routing", §10.1 step 7) by
@@ -45,6 +70,7 @@ export async function originateExternalLeg(
   // §10.1 step 5: the member's leg rings for the target's own ring timeout at most, and a failure
   // drops it from the group, the target's fallback not followed.
   const timed: ForwardLeg = { ...forward, ...ringTimeoutOf(target) };
+  const ended = await memberAttempt(pipeline, call, target);
   await ringExternalLeg(
     pipeline,
     call,
@@ -65,6 +91,9 @@ export async function originateExternalLeg(
           memberKey,
           state: 'placing',
           external: true,
+          answered: () => {
+            ended({ outcome: 'answered', cause: null });
+          },
           standsInFor: memberKey,
           ...recordingOf(target)
         });
@@ -85,6 +114,7 @@ export async function originateExternalLeg(
       end: (channelId, cause) => {
         const leg = tracked.get(channelId);
         if (leg?.state === 'ringing') {
+          ended({ outcome: 'failed', cause });
           batch.end(leg, cause);
         }
       }

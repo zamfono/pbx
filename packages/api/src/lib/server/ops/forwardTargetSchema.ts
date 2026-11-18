@@ -12,6 +12,7 @@ import {
   type WebSocketSampleRate
 } from '@zamfono/shared';
 
+import { afterCallSchema } from './afterCall.js';
 import { templatedField, webSocketUrlSchema } from './forwardTargetFields.js';
 import type { TargetSpec } from './forwardTargetType.js';
 import { sipHeadersSchema } from './sipHeaders.js';
@@ -80,6 +81,7 @@ const webSocketTargetSchema = z.strictObject({
       'The PCM sample rate in Hz: 8000, 16000 or 24000 for vonage, left out 16000; always 8000 for twilio.'
     ),
   record: recordSchema,
+  afterCall: afterCallSchema,
   announcementAudioId: announcementSchema,
   get fallback(): FallbackSchema {
     // eslint-disable-next-line no-use-before-define -- a fallback nests the union this kind is in
@@ -145,6 +147,7 @@ export const targetSpecSchema: z.ZodType<TargetSpec> = z
         ),
         ringTimeoutS: ringTimeoutSchema,
         record: recordSchema,
+        afterCall: afterCallSchema,
         announcementAudioId: announcementSchema,
         get fallback(): FallbackSchema {
           return fallbackSchema();
@@ -176,6 +179,7 @@ export const targetSpecSchema: z.ZodType<TargetSpec> = z
         ),
       ringTimeoutS: ringTimeoutSchema,
       record: recordSchema,
+      afterCall: afterCallSchema,
       announcementAudioId: announcementSchema,
       get fallback(): FallbackSchema {
         return fallbackSchema();

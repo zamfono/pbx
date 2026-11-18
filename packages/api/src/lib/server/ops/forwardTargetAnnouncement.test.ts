@@ -60,6 +60,7 @@ describe("a forward target's announcement and the hangup kind", () => {
       external: '+4366412345',
       ringTimeoutS: null,
       record: false,
+      afterCall: null,
       announcementAudioId: audioId,
       fallback: {
         kind: 'mailboxUser',
