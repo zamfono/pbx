@@ -19,6 +19,14 @@ why the specified behaviour changed; the commit history, how.
   writes `{ "kind": "announcement", "audioId": … }` is refused with 422 until it sends
   `{ "kind": "hangup", "announcementAudioId": … }`, and one that reads targets finds
   `announcementAudioId` on every kind.
+- Plain `http://` webhooks and `ws://` voice-bot targets now reach only a receiver on a private
+  network (`10.x`, `172.16–31.x`, `192.168.x`, `100.64–127.x`, `fc00::/7`). One whose host is on
+  the public internet stops working with this release: a webhook's deliveries fail with
+  `plain HTTP to a public address` and the hook turns `failing`, and a `ws://` target counts as
+  not reachable, its fallback taking the call where it has one. Before upgrading, list them with
+  `webhooks.list` and by reading your `webSocket` targets, and switch each public receiver to
+  `https://` or `wss://` (`webhooks.update`, or the rule that holds the target). Receivers on the
+  LAN or a VPN need nothing.
 
 ### Added
 
@@ -44,6 +52,29 @@ why the specified behaviour changed; the commit history, how.
 - Decisions and menus can have an extension of their own (`extension`, none unless given), so
   they can be dialled, transferred to, put on a BLF key or in the Ringotel app's colleague list,
   and found in search.
+- Templates: a forward target can be built from the call. An `external` target's number, a `sip`
+  target's `user` and a `webSocket` target's URL take `{{placeholders}}` such as `{{did}}` and
+  `{{callerNumber}}`, with the helpers `slice`, `length`, `replace`, `stripPrefix` and `digits`:
+  `"+431234567{{slice did -2}}"`. The new target kind `extension` sends a call to the extension
+  its template renders, so one rule forwards a block of numbers to the extensions in their last
+  digits. A decision takes the condition `template`, true when a template renders exactly the
+  text given, which lets one decision serve several numbers. A value that renders nothing usable
+  makes the target count as not working: the call takes its fallback, else ends unanswered, and
+  the call trace says what was rendered. Admins only. See the guide's `templates` topic.
+- HTTP requests in a call flow: the new target kind `httpRequest` asks an outside system while
+  the caller hears ringing, a CRM or an availability service, and the call goes on by the answer.
+  The JSON it answers is read in templates under the request's name (`{{crm.data.tier}}`), in a
+  decision's `template` condition or in a target; a request that fails, times out or answers
+  something else sends the call to its error target. `/api/v1/httpRequests` and the MCP tools
+  `httpRequests.*` manage them, admins only. See the guide's `http-requests` topic.
+- After-call requests: an `external`, `sip` or `webSocket` target can send an HTTP request after
+  each of its attempts, once the call is over and its recordings are written (`afterCall`): the
+  call's record as JSON, or a body of your own, signed like a webhook and delivered with the same
+  retries and failure status. On request each recording comes with a link to download it and one
+  to delete it, valid for an hour. A target read and written back keeps its request, with its
+  secret and delivery status. See the guide's `after-call-request` topic.
+- Webhooks take custom `headers`, such as `Authorization: Bearer …`, sent with every delivery
+  beside the signature. A header marked `secret` is stored encrypted and never read back.
 
 ### Changed
 
@@ -56,6 +87,15 @@ why the specified behaviour changed; the commit history, how.
 - A user whose own forwarding, out-of-office rule or opening hours an admin pointed at a decision
   reads it as `{ "managed": true, "kind": "decision" }` and keeps it by sending that back, as for
   the other admin-only targets.
+- **Breaking:** plain `http://` and `ws://` connect only to private networks (upgrade notes). A
+  write of such a URL with a public address is refused with 422; `https://` and `wss://` are
+  unchanged.
+- A `sip` target's header values are templates like every other: they may use the helpers and an
+  HTTP request's answer. Existing headers render as before.
+- Every read of an `external`, `sip` or `webSocket` target returns `afterCall`, `null` without
+  one, and every read of a webhook returns `headers`.
+- `decisions.dryRun` takes `values` for what templates read and answers `invalid` for a target
+  whose template renders nothing usable.
 
 ## [0.10.2] - 2026-11-16
 
