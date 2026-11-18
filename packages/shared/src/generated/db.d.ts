@@ -236,6 +236,7 @@ export interface ForwardTargets {
   extension: string | null;
   external: string | null;
   fallbackOfId: string | null;
+  httpRequestId: string | null;
   id: string;
   mailboxRingGroupId: string | null;
   mailboxUserId: string | null;
@@ -250,6 +251,23 @@ export interface ForwardTargets {
   webSocketProtocol: WebSocketProtocol | null;
   webSocketSampleRate: number | null;
   webSocketUrl: string | null;
+}
+
+export interface HttpRequests {
+  body: string | null;
+  contentType: HttpContentType | null;
+  createdAt: string;
+  deletedAt: string | null;
+  errorTargetId: string;
+  headersJson: Generated<string>;
+  id: string;
+  method: HttpMethod;
+  name: string;
+  secretEnc: Buffer | null;
+  secretHeadersEnc: Buffer | null;
+  targetId: string;
+  timeoutS: Generated<number>;
+  url: string;
 }
 
 export interface MailTemplates {
@@ -692,6 +710,7 @@ export interface DB {
   dids: Dids;
   extensions: Extensions;
   forwardTargets: ForwardTargets;
+  httpRequests: HttpRequests;
   mailTemplates: MailTemplates;
   maintenanceGate: MaintenanceGate;
   menus: Menus;

@@ -2,6 +2,7 @@ import { sql } from 'kysely';
 
 import type { Db } from '@zamfono/shared';
 
+import { httpRequestOwners } from './forwardTargetHttpOwners.js';
 import {
   loadScheduleSources,
   type ScheduleSources
@@ -12,13 +13,14 @@ export type Reference = { kind: string; id: string; label: string };
 
 /**
  * The entity whose own rules travel with it rather than blocking its own delete (§5.9): a ring
- * group's, a menu's or a decision's own scope is excluded from the owners `findForwardTargetOwners`
+ * group's, a menu's, a decision's or an HTTP request's own scope is excluded from the owners `findForwardTargetOwners`
  * reports.
  */
 export type OwnScope = {
   ringGroupId?: string;
   menuId?: string;
   decisionId?: string;
+  httpRequestId?: string;
 };
 
 type UnscopedSources = {
@@ -254,10 +256,11 @@ async function chainHeads(db: Db, ftIds: string[]): Promise<string[]> {
 }
 
 /**
- * Every row across all eleven `forward_targets` owner columns of §11.2 that still points at one of
+ * Every row across all thirteen `forward_targets` owner columns of §11.2 that still points at one of
  * `ftIds`, outside `exclude`'s own scope: `dids.target_id`, `did_blocks.fallback_target_id`,
  * `menus.fallback_target_id`, `menu_targets.target_id`, `decisions.default_target_id`,
- * `decision_cases.target_id`, `user_forward_rules.target_id`,
+ * `decision_cases.target_id`, `http_requests.target_id` and `error_target_id`,
+ * `user_forward_rules.target_id`,
  * `ring_group_forward_rules.target_id`, `settings.fallback_target_id`, `ooo_rules.target_id` and
  * `opening_hours.closed_target_id` (§5.9: a soft delete is refused while any of these exist); a
  * fallback is referenced by the owner of its chain's first row (`chainHeads`).
@@ -279,11 +282,8 @@ export async function findForwardTargetOwners(
       loadRingGroupOwnedSources(db, ftIds, exclude.ringGroupId),
       loadScheduleSources(db, ftIds, exclude)
     ]);
-  return toReferences(
-    unscoped,
-    menuOwned,
-    decisionOwned,
-    groupRules,
-    schedules
-  );
+  return [
+    ...toReferences(unscoped, menuOwned, decisionOwned, groupRules, schedules),
+    ...(await httpRequestOwners(db, ftIds, exclude.httpRequestId))
+  ];
 }

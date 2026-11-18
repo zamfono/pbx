@@ -61,6 +61,9 @@ export type ForwardTarget = Announcement &
     /** Sends the call to the first of the decision's cases whose conditions match, else its
      * default (§10.1 step 7 "Decisions"), resolved before the call goes anywhere. */
     | { kind: 'decision'; decisionId: string }
+    /** Sends an HTTP request while the call waits, then sends the call to the request's target,
+     * or to its error target when it failed (§10.1 step 7 "HTTP requests"). */
+    | { kind: 'httpRequest'; httpRequestId: string }
     /** Ends the call, the row naming none of the nine targets (§11.2). */
     | { kind: 'hangup' }
   );
@@ -86,6 +89,7 @@ type ForwardTargetsRow = {
   menuId: string | null;
   decisionId: string | null;
   extension: string | null;
+  httpRequestId: string | null;
   ringTimeoutS: number | null;
   /** The target this row is the fallback of (§10.1 step 7), `null` for a chain's first row. */
   fallbackOfId: string | null;
@@ -189,6 +193,9 @@ function kindFromRow(
   }
   if (row.extension !== null) {
     return { kind: 'extension', extension: row.extension, ...fallback };
+  }
+  if (row.httpRequestId !== null) {
+    return { kind: 'httpRequest', httpRequestId: row.httpRequestId };
   }
   return { kind: 'hangup' };
 }

@@ -23,6 +23,7 @@ import { raiseLogLevel } from './callLogLevel.js';
 import { noteNumberForward, type TenantNumber } from './forwardContext.js';
 import { dialForwardTarget } from './forwardDial.js';
 import type { Forwarder } from './forwardLeg.js';
+import { runHttpRequest } from './httpRequestNode.js';
 import { applyOooAndHours, targetIdentity } from './inboundSchedule.js';
 import { inboundBoundary } from './inboundTrunk.js';
 import { playMenu } from './menu.js';
@@ -54,8 +55,10 @@ async function enterKind(
     await dialForwardTarget(pipeline, call, target, forwarder);
     return;
   }
-  if (target.kind === 'webSocket') {
-    await dialWebSocketTarget(pipeline, call, target, forwarder);
+  if (target.kind === 'webSocket' || target.kind === 'httpRequest') {
+    await (target.kind === 'webSocket'
+      ? dialWebSocketTarget(pipeline, call, target, forwarder)
+      : runHttpRequest(pipeline, call, target, forwarder));
     return;
   }
 
@@ -104,8 +107,7 @@ async function enterKind(
     await playMenu(pipeline, call, target.menuId);
     return;
   }
-  // The last of `ForwardTarget`'s kinds: `hangup`, the two mailboxes, the outward targets, the user
-  // and the menu each returned above.
+  // The last of `ForwardTarget`'s kinds: every other one returned above.
   await ringGroup(pipeline, call, target.ringGroupId);
 }
 

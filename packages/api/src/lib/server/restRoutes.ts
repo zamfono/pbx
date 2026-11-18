@@ -202,6 +202,7 @@ const STATIC_ROUTES: RouteTuple[] = [
   ['PUT', '/menus/{id}/targets', 'menus.setTargets'],
   ...crud('decisions', '/decisions', ALL_CRUD),
   ['POST', '/decisions/{id}/dryRun', 'decisions.dryRun'],
+  ...crud('httpRequests', '/httpRequests', ALL_CRUD),
   ...scopeRoutes('ooo', [
     ['GET', 'ooo.list'],
     ['POST', 'ooo.create']

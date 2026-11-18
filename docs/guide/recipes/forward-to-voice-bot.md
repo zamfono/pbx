@@ -41,8 +41,13 @@ OpenAI's Realtime API, is `forward-to-ai-agent` instead.
    }
    ```
 
-   `url` is `wss://` (or `ws://` on a network you trust), at most 2048 characters; the stack sends
-   no headers of its own on the handshake, so a token the bot checks goes in the query string.
+   `url` is `wss://`, at most 2048 characters; the stack sends no headers of its own on the
+   handshake, so a token the bot checks goes in the query string. Plain `ws://` is taken only for
+   a bot on a private network (`10.x`, `172.16–31.x`, `192.168.x`, `100.64–127.x`, `fc00::/7`): a
+   call's audio never crosses the public internet unencrypted, so a `ws://` URL with a public
+   address is refused with 422, and one whose name resolves to a public address fails as
+   `forbiddenAddress`. Past the host the URL may be a template, such as
+   `wss://bot.example/media?caller={{callerNumber}}` (`templates`).
    The bot must be on an address the stack may connect to: never loopback, link-local or the
    stack's own internal network, and a private network only while the stack's `.env` allows it
    (`ALLOW_PRIVATE_TARGETS`, as on premises; a provider's shared host may set it to `false`). A

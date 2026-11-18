@@ -2,7 +2,8 @@ import { newId, type Db } from '@zamfono/shared';
 
 import { writeAfterCall } from './afterCall.js';
 import { assertTargetAvailable } from './forwardTargetAvailable.js';
-import { webSocketSampleRate, type TargetSpec } from './forwardTargetSchema.js';
+import { webSocketSampleRate } from './forwardTargetFields.js';
+import type { TargetSpec } from './forwardTargetType.js';
 import { warnForSipHeaders } from './sipHeaders.js';
 import { assertTemplateNames, targetTemplates } from './templateNames.js';
 import { type Context } from './types.js';
@@ -58,6 +59,9 @@ function forwardTargetColumns(
   if (spec.kind === 'extension') {
     return { extension: spec.extension };
   }
+  if (spec.kind === 'httpRequest') {
+    return { httpRequestId: spec.httpRequestId };
+  }
   return {};
 }
 
@@ -111,6 +115,7 @@ export async function writeForwardTarget(
     menuId: null,
     decisionId: null,
     extension: null,
+    httpRequestId: null,
     ringTimeoutS: null,
     recordCalls: 0,
     ...forwardTargetColumns(spec)

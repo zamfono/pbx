@@ -7,7 +7,7 @@ import {
 } from '@zamfono/shared';
 
 import { readAfterCall } from './afterCall.js';
-import type { TargetSpec } from './forwardTargetSchema.js';
+import type { TargetSpec } from './forwardTargetType.js';
 
 type ForwardTargetColumns = {
   id: string;
@@ -26,6 +26,7 @@ type ForwardTargetColumns = {
   menuId: string | null;
   decisionId: string | null;
   extension: string | null;
+  httpRequestId: string | null;
   ringTimeoutS: number | null;
   recordCalls: number;
 };
@@ -39,7 +40,7 @@ function storedSampleRate(rate: number | null): WebSocketSampleRate {
 }
 
 /** The inverse of `forwardTargetColumns`: the wire target a `forward_targets` row represents,
- * `hangup` for none of the ten targets set (§11.2), `fallback` still `null` (`rowToTarget`). */
+ * `hangup` for none of the eleven targets set (§11.2), `fallback` still `null` (`rowToTarget`). */
 function baseTarget(row: ForwardTargetColumns): TargetSpec {
   if (row.userId !== null) {
     return { kind: 'user', userId: row.userId };
@@ -97,6 +98,9 @@ function baseTarget(row: ForwardTargetColumns): TargetSpec {
   }
   if (row.extension !== null) {
     return { kind: 'extension', extension: row.extension, fallback: null };
+  }
+  if (row.httpRequestId !== null) {
+    return { kind: 'httpRequest', httpRequestId: row.httpRequestId };
   }
   return { kind: 'hangup' };
 }

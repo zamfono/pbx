@@ -24,6 +24,7 @@ const DELETE_PROPAGATE_KINDS: Partial<Record<string, ReloadKind[]>> = {
   userGroup: ['pjsip'],
   menu: [],
   decision: [],
+  httpRequest: [],
   did: [],
   didBlock: [],
   oooRule: [],

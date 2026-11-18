@@ -44,6 +44,16 @@ export async function endAtDecisionLoop(
   await endAtHopLimit(pipeline, call, { event: 'decisionLoop', decisionId });
 }
 
+/** An HTTP request met again since the last clearing event ends the call as a decision met again
+ * does (§10.1 step 7 "Loops"), with a trace line naming it. */
+export async function endAtRequestLoop(
+  pipeline: Pipeline,
+  call: Call,
+  httpRequestId: string
+): Promise<void> {
+  await endAtHopLimit(pipeline, call, { event: 'decisionLoop', httpRequestId });
+}
+
 /**
  * A resolution that is no target to apply ends here (§10.1 step 7): a decision met again ends the
  * call as at the hop limit, and a target whose template rendered no value of its field counts as

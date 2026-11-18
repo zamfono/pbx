@@ -26,15 +26,28 @@ the outbound route nor the caller sets one. See `numbers`.
 block's `fallbackTarget`, else the tenant-wide `settings.fallbackTarget`, else a 404 release. See
 `numbers`.
 
-**Forward target** — the ten-kind vocabulary (`user`, `ringGroup`, `external`, `sip`,
-`webSocket`, `mailboxUser`, `mailboxRingGroup`, `menu`, `decision`, `hangup`) every routing rule
-points at, each with an optional announcement that plays first. See `mental-model`.
+**Forward target** — the twelve-kind vocabulary (`user`, `ringGroup`, `external`, `sip`,
+`webSocket`, `mailboxUser`, `mailboxRingGroup`, `menu`, `decision`, `httpRequest`, `extension`,
+`hangup`) every routing rule points at, each with an optional announcement that plays first. See
+`mental-model`.
 
 **Hop** — one re-entry of the routing pipeline through a `user` or `ringGroup` forward target. A
 call is released to a mailbox after the third hop.
 
 **Decision** — ordered cases of conditions (time, dates, caller, a user's status) and targets,
 with a default target: a call goes where the first matching case says. See `decisions`.
+
+**HTTP request** — a request sent to an outside system while a call waits; its JSON answer is
+read in templates under the request's name, and the call goes on to the request's target, or to
+its error target when it failed. See `http-requests`.
+
+**Template** — text with `{{placeholders}}` and helpers such as `{{slice did -2}}`, filled in for
+each call, in a target's number, extension, user part or URL, a header, a decision's condition or
+an HTTP request. See `templates`.
+
+**After-call request** — an HTTP request an `external`, `sip` or `webSocket` target sends after
+each of its attempts, with the call's record and links to its recordings. See
+`after-call-request`.
 
 **OOO rule** — an out-of-office rule for a scope (user, ring group, menu or tenant), with an
 optional start and expiry and a forward target, evaluated ahead of opening hours.

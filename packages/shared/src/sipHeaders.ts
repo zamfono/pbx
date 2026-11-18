@@ -29,6 +29,9 @@ export type SipHeaderPlaceholder = keyof typeof SIP_HEADER_PLACEHOLDERS;
 /** Every placeholder's value for one call, as its templates read them (§9.4 "Templates"). */
 export type CallValues = Record<SipHeaderPlaceholder, string>;
 
+/** The call's placeholders' names. */
+export const CALL_PLACEHOLDER_NAMES = Object.keys(SIP_HEADER_PLACEHOLDERS);
+
 /** Whether `name` is one of the call's placeholders. */
 export function isCallPlaceholder(name: string): name is SipHeaderPlaceholder {
   return Object.hasOwn(SIP_HEADER_PLACEHOLDERS, name);

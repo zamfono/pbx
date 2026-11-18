@@ -28,6 +28,7 @@ export function isAdminTarget(target: TargetSpec): boolean {
     target.kind === 'webSocket' ||
     target.kind === 'decision' ||
     target.kind === 'extension' ||
+    target.kind === 'httpRequest' ||
     ('afterCall' in target && (target.afterCall ?? null) !== null) ||
     (target.kind === 'external' &&
       (target.record || isTemplate(target.external)))
@@ -53,6 +54,9 @@ function adminTargetRefusal(target: TargetSpec): string {
   }
   if (target.kind === 'extension') {
     return 'an extension target is set by an admin';
+  }
+  if (target.kind === 'httpRequest') {
+    return 'an httpRequest target is set by an admin';
   }
   if (target.kind === 'external' && isTemplate(target.external)) {
     return 'a templated target is set by an admin';

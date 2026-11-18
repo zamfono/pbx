@@ -37,6 +37,10 @@ export async function assertTargetAvailable(
     await assertLiveRow('decisions', spec.decisionId, 'decision');
     return;
   }
+  if (spec.kind === 'httpRequest') {
+    await assertLiveRow('httpRequests', spec.httpRequestId, 'HTTP request');
+    return;
+  }
   if (spec.kind === 'sip') {
     await assertLiveRow('trunks', spec.trunkId, 'trunk');
   }

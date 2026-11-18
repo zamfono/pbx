@@ -7,7 +7,7 @@ import { SIP_HEADER_PLACEHOLDERS } from '@zamfono/shared';
 import { PLACEHOLDERS } from '../mail/index.js';
 
 /**
- * The admin guide lists the placeholders of the mail templates and of the SIP header templates by
+ * The admin guide lists the placeholders of the mail templates and of a call's templates by
  * hand, each with its meaning; this holds both lists to the tables the code validates with, so a
  * placeholder added, renamed or dropped in one fails here until the guide says the same.
  */
@@ -66,11 +66,9 @@ describe('the guide’s placeholder lists', () => {
     }
   });
 
-  it('lists every SIP header placeholder, and only those', () => {
+  it("lists every placeholder of a call's templates, and only those", () => {
     const listed = [
-      ...guide('recipes/forward-to-ai-agent.md').matchAll(
-        /^ *\| `\{\{(?<name>\w+)\}\}` /gmu
-      )
+      ...guide('templates.md').matchAll(/^ *\| `\{\{(?<name>\w+)\}\}` /gmu)
     ].map(match => match.groups?.name ?? '');
     expect(listed.sort()).toEqual(Object.keys(SIP_HEADER_PLACEHOLDERS).sort());
   });

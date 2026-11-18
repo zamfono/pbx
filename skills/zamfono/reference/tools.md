@@ -59,6 +59,11 @@
 | `hours.delete` | `DELETE /api/v1/users/{id}/hours`, `DELETE /api/v1/ringGroups/{id}/hours`, `DELETE /api/v1/menus/{id}/hours`, `DELETE /api/v1/tenant/hours` | Removes a scope's opening-hours schedule | user | yes |
 | `hours.get` | `GET /api/v1/users/{id}/hours`, `GET /api/v1/ringGroups/{id}/hours`, `GET /api/v1/menus/{id}/hours`, `GET /api/v1/tenant/hours` | Reads a scope's opening-hours schedule | user | no |
 | `hours.set` | `PUT /api/v1/users/{id}/hours`, `PUT /api/v1/ringGroups/{id}/hours`, `PUT /api/v1/menus/{id}/hours`, `PUT /api/v1/tenant/hours` | Replaces a scope's weekly opening-hours schedule and the target its calls go to while closed | user | no |
+| `httpRequests.create` | `POST /api/v1/httpRequests` | Creates an HTTP request for call flows: sent while a call waits, its JSON answer readable in templates under its name, with a target for the call after it and one for a failed request. | admin | no |
+| `httpRequests.delete` | `DELETE /api/v1/httpRequests/{id}` | Soft-deletes an HTTP request of call flows. | admin | yes |
+| `httpRequests.get` | `GET /api/v1/httpRequests/{id}` | Reads one live HTTP request of call flows by id. | admin | no |
+| `httpRequests.list` | `GET /api/v1/httpRequests` | Lists the tenant's live HTTP requests of call flows. | admin | no |
+| `httpRequests.update` | `PATCH /api/v1/httpRequests/{id}` | Updates an HTTP request's name, request, timeout, target or error target, the request replaced as a whole. | admin | no |
 | `mailTemplates.delete` | `DELETE /api/v1/mailTemplates/{kind}/{language}` | Removes a tenant's mail template override, so the shipped template applies again | admin | yes |
 | `mailTemplates.get` | `GET /api/v1/mailTemplates/{kind}/{language}` | Reads the effective mail template of a kind and language: the tenant override, else the shipped one | admin | no |
 | `mailTemplates.list` | `GET /api/v1/mailTemplates` | Lists the effective mail templates in the tenant language | admin | no |

@@ -11,19 +11,31 @@ import { OpError } from './types.js';
 
 /**
  * Throws 422 for a template among `templates` that reads a top-level name which is no value of a
- * call (§9.4 "Templates"): one of the call's placeholders or one of `more`. The syntax and the
- * helpers are the field's own schema's to check; this is the part that needs the database.
+ * call (§9.4 "Templates"): one of the call's placeholders, the name of a live HTTP request, whose
+ * answer it reads, or one of `more`. The syntax and the helpers are the field's own schema's to
+ * check; this is the part that needs the database.
  */
-// eslint-disable-next-line @typescript-eslint/require-await -- reads the database once a name can be a row's
 export async function assertTemplateNames(
-  _db: Db,
+  db: Db,
   templates: readonly string[],
   more: readonly string[] = []
 ): Promise<void> {
-  const unknown = templates
+  const names = templates
     .filter(isTemplate)
     .flatMap(templateNames)
-    .find(name => !isCallPlaceholder(name) && !more.includes(name));
+    .filter(name => !isCallPlaceholder(name) && !more.includes(name));
+  if (names.length === 0) {
+    return;
+  }
+  const requests = await db
+    .selectFrom('httpRequests')
+    .select('name')
+    .where('name', 'in', names)
+    .where('deletedAt', 'is', null)
+    .execute();
+  const unknown = names.find(
+    name => !requests.some(request => request.name === name)
+  );
   if (unknown !== undefined) {
     throw new OpError(
       HTTP_UNPROCESSABLE_CONTENT,

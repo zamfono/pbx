@@ -1,11 +1,15 @@
 import { z } from 'zod';
 
 import {
+  DEFAULT_VONAGE_SAMPLE_RATE,
   isTemplate,
   targetFieldProblem,
   templateSample,
+  TWILIO_SAMPLE_RATE,
   urlLiteralProblem,
-  WEB_SOCKET_URL_MAX_LENGTH
+  WEB_SOCKET_URL_MAX_LENGTH,
+  type WebSocketProtocol,
+  type WebSocketSampleRate
 } from '@zamfono/shared';
 
 /**
@@ -64,3 +68,17 @@ export const webSocketUrlSchema = z
   .describe(
     "The bot's WebSocket URL, wss://, or ws:// for a bot on a private network, at most 2048 characters; a token the bot checks goes in its query string. Past the host it may be a template (see zamfono.help templates)."
   );
+
+/** The sample rate a `webSocket` target speaks at (§9.4 "WebSocket targets"): `twilio` always 8000,
+ * `vonage` the one given, 16000 unless given. */
+export function webSocketSampleRate(target: {
+  protocol: WebSocketProtocol;
+  sampleRate?: WebSocketSampleRate | undefined;
+}): WebSocketSampleRate {
+  return (
+    target.sampleRate ??
+    (target.protocol === 'twilio'
+      ? TWILIO_SAMPLE_RATE
+      : DEFAULT_VONAGE_SAMPLE_RATE)
+  );
+}

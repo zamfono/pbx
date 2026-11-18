@@ -55,7 +55,8 @@ placed, while their own phone is in it, or are connected in (`call-control`), as
 (`calls.park`); every user sees the parked calls (`parking.list`), which only an admin ends.
 Recordings are `admin`/`owner` only, including of a user's own calls.
 
-A `sip` or `webSocket` target, and an `external` one with `"record": true`, is admin-only
+A `sip`, `webSocket`, `decision`, `httpRequest` or `extension` target, and an `external` one
+with `"record": true`, a template in its number or an `afterCall` request, is admin-only
 everywhere, as a fallback too: a user's own forwarding, OOO rule or hours that names a new one
 anywhere in its fallback chain is refused with 403. A user may give their own forward to an
 external number a `ringTimeoutS` and a `fallback` of any other kind.

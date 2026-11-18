@@ -6,7 +6,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, expect } from 'vitest';
 
-import { nowIso, type Db, type MailRequest } from '@zamfono/shared';
+import {
+  nowIso,
+  sendHttpRequest,
+  type Db,
+  type MailRequest
+} from '@zamfono/shared';
 
 import { AmiClient } from '../ami/client.js';
 import type { AriClient } from '../ari/client.js';
@@ -132,6 +137,10 @@ export function testPipelineDeps(
     db,
     apiClient: { mail: () => Promise.resolve() },
     reports: { afterCall: () => Promise.resolve() },
+    httpRequests: {
+      secrets: () => Promise.resolve({ secret: null, headers: [] }),
+      send: sendHttpRequest
+    },
     logger: noopLogger,
     trunkChannels: overrides.trunkChannels ?? new TrunkChannels({ ari, state }),
     bots: overrides.bots ?? new BotSessions(ari, '127.0.0.1'),

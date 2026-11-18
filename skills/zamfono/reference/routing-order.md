@@ -35,13 +35,17 @@ target is first replaced by the target its conditions pick (`decisions`).
 7. **Forward targets.** A `user` or `ringGroup` target re-enters at **Entry** with the hop counter
    increased; a `menu` target re-enters without counting a hop. Past the hop limit,
    `settings.maxForwardHops` (3 unless set), the call goes to the last target's mailbox, or is
-   released if it has none. An `external`, `sip` or `webSocket` target that does not work — busy,
-   refused, no route or trunk, a bot that cannot be reached, or its `ringTimeoutS` run out — hands
-   the call to its `fallback`, as if the rule had named that target instead; a ring-group member's
+   released if it has none. An `external`, `sip`, `webSocket` or `extension` target that does not
+   work — busy, refused, no route or trunk, a bot that cannot be reached, its `ringTimeoutS` run
+   out, or a template that renders nothing usable (`templates`) — hands the call to its
+   `fallback`, as if the rule had named that target instead; a ring-group member's
    forward and a `*5` party never fall back (see `mental-model`). A `decision` target is resolved
    first, and the target it picks is applied as if the rule had named it: the hop limit, its
    announcement and its hop as for that kind. A call meeting the same decision twice with nothing
-   in between — no hop, no forward rule, no menu key — ends as at the hop limit (`decisions`).
+   in between — no hop, no forward rule, no menu key — ends as at the hop limit (`decisions`). An
+   `httpRequest` target sends its request while the caller hears ringing, then applies its
+   target, or its error target when the request failed, counting no hop itself and bounded like a
+   decision (`http-requests`).
 
 ## Outbound resolution
 

@@ -2,7 +2,7 @@
  * The long-lived parts `main()` builds and starts once ARI and AMI are up: the call pipeline with
  * the collaborators it owns, the timers no call drives, and the HEP collector (§3.1, §7).
  */
-import { nowIso, type Db } from '@zamfono/shared';
+import { nowIso, sendHttpRequest, type Db } from '@zamfono/shared';
 
 import type { AmiClient } from './ami/client.js';
 import { ApiClient } from './apiClient.js';
@@ -83,6 +83,10 @@ export function buildPipeline(deps: {
     db,
     apiClient,
     reports: apiClient,
+    httpRequests: {
+      secrets: id => apiClient.httpRequestSecrets(id),
+      send: sendHttpRequest
+    },
     logger: log,
     trunkChannels: new TrunkChannels({ ari, state }),
     presence: deps.presence,

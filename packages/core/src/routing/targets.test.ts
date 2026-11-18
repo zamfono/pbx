@@ -50,6 +50,7 @@ describe('targetFromRow', () => {
     menuId: null,
     decisionId: null,
     extension: null,
+    httpRequestId: null,
     ringTimeoutS: null,
     fallbackOfId: null,
     recordCalls: 0

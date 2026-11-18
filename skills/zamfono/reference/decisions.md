@@ -47,8 +47,8 @@ Then point a number at it: `dids.update` (`PATCH /api/v1/dids/{id}`) with
 
 ## Conditions
 
-All conditions of a case must match. Each is instant and reads only the time, the caller and the
-status of the users it names.
+All conditions of a case must match. Each is instant and reads only the time, the caller, the
+status of the users it names and the call's own values.
 
 | `type`       | Fields               | Matches                                                                                                |
 | ------------ | -------------------- | ------------------------------------------------------------------------------------------------------ |
@@ -57,6 +57,7 @@ status of the users it names.
 | `caller`     | `number`, `isPrefix` | an outside caller with that number, or one starting with it; `number: null` a withheld one             |
 | `callerUser` | `userId`             | a colleague's phone placed the call, that colleague alone with `userId`                                |
 | `presence`   | `userId`, `status`   | while the user's status is one of `status`                                                             |
+| `template`   | `template`, `equals` | when the template renders exactly `equals` for the call (`templates`)                                  |
 | `any`, `all` | `conditions`         | one of them, or all of them                                                                            |
 | `not`        | `condition`          | when it does not                                                                                       |
 
@@ -68,6 +69,26 @@ effect, `closed` outside the user's own opening hours, else the presence colleag
 (in a call or ringing), `dnd`, `offline` (no phone registered) or `available`. The tenant's own
 OOO and hours do not count. Note that `offline` ignores find-me numbers: a decision "Anna offline
 → colleague" sends a call away that Anna's mobile would have taken.
+
+A `template` condition compares text, exactly and case-sensitively, and has no other operator: a
+prefix, a suffix, a length or a part comes from the template's helpers, and several values from
+`any`. It is how one decision serves several numbers, and how a call is routed on what an outside
+system answered (`http-requests`):
+
+```json
+[
+  { "type": "template", "template": "{{slice did -2}}", "equals": "17" },
+  {
+    "type": "template",
+    "template": "{{length (digits callerNumber)}}",
+    "equals": "4"
+  },
+  { "type": "template", "template": "{{crm.data.tier}}", "equals": "vip" }
+]
+```
+
+A value that is missing renders empty, so a condition on an answer that never came matches only
+`"equals": ""`.
 
 ## Who the caller is
 
@@ -111,7 +132,12 @@ without placing one:
 It answers every decision evaluated, each condition's result with the input it read (the time, the
 caller, the status), the target the call goes to, and the out-of-office rule or opening hours that
 would then override it. `caller` takes `{ "userId": "…" }` for a colleague; `direction` `internal`
-skips opening hours, as an internal call does.
+skips opening hours, as an internal call does. `values` stands in for what templates read, by
+placeholder or HTTP request name, such as `{ "did": "+4315550117", "crm": { "data": { "tier":
+"vip" } } }`; without it only the caller's number, the direction, the language and the time are
+known. A `template` condition's result shows what it rendered, and `invalid` names the field and
+value of a target whose template renders nothing usable for these values. The dry run sends no
+HTTP request: a decision that leads to one ends there.
 
 ## Loops
 
@@ -131,6 +157,6 @@ ends in a menu, a mailbox or a voice bot is refused there, as those are no party
 
 ## Deleting
 
-`decisions.delete` (`DELETE /api/v1/decisions/{id}`) is refused while a number, rule, menu or
-another decision points at it, and frees its extension. A user named in a live decision's
+`decisions.delete` (`DELETE /api/v1/decisions/{id}`) is refused while a number, rule, menu, HTTP
+request or another decision points at it, and frees its extension. A user named in a live decision's
 `presence` or `callerUser` condition cannot be deleted until the decision no longer names them.

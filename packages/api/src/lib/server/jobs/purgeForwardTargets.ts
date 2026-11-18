@@ -79,7 +79,7 @@ export async function purgeOwnRuleRows(
 }
 
 /**
- * Every `forward_targets` id still named by one of §11.2's eleven owner columns, regardless of the
+ * Every `forward_targets` id still named by one of §11.2's thirteen owner columns, regardless of the
  * owning row's own `deleted_at`: unlike `findForwardTargetOwners` (a live-delete refusal, which
  * counts only live owners), the physical FK a purge must respect blocks on any owning row that
  * still exists, deleted or not.
@@ -98,7 +98,8 @@ async function referencedForwardTargetIds(
     oooRules,
     openingHours,
     decisions,
-    decisionCases
+    decisionCases,
+    httpRequests
   ] = await Promise.all([
     trx.selectFrom('dids').select('targetId').execute(),
     trx
@@ -118,7 +119,11 @@ async function referencedForwardTargetIds(
     trx.selectFrom('oooRules').select('targetId').execute(),
     trx.selectFrom('openingHours').select('closedTargetId').execute(),
     trx.selectFrom('decisions').select('defaultTargetId').execute(),
-    trx.selectFrom('decisionCases').select('targetId').execute()
+    trx.selectFrom('decisionCases').select('targetId').execute(),
+    trx
+      .selectFrom('httpRequests')
+      .select(['targetId', 'errorTargetId'])
+      .execute()
   ]);
   return new Set(
     [
@@ -132,7 +137,8 @@ async function referencedForwardTargetIds(
       ...oooRules.map(row => row.targetId),
       ...openingHours.map(row => row.closedTargetId),
       ...decisions.map(row => row.defaultTargetId),
-      ...decisionCases.map(row => row.targetId)
+      ...decisionCases.map(row => row.targetId),
+      ...httpRequests.flatMap(row => [row.targetId, row.errorTargetId])
     ].filter(id => id !== null)
   );
 }

@@ -2,18 +2,19 @@ import { z } from 'zod';
 
 import {
   DEFAULT_SIP_HEADERS,
-  DEFAULT_VONAGE_SAMPLE_RATE,
   isE164,
   SIP_USER_PATTERN,
   TWILIO_SAMPLE_RATE,
   WEB_SOCKET_PROTOCOLS,
-  WEB_SOCKET_SAMPLE_RATES,
-  type WebSocketProtocol,
-  type WebSocketSampleRate
+  WEB_SOCKET_SAMPLE_RATES
 } from '@zamfono/shared';
 
 import { afterCallSchema } from './afterCall.js';
-import { templatedField, webSocketUrlSchema } from './forwardTargetFields.js';
+import {
+  templatedField,
+  webSocketSampleRate,
+  webSocketUrlSchema
+} from './forwardTargetFields.js';
 import type { TargetSpec } from './forwardTargetType.js';
 import { sipHeadersSchema } from './sipHeaders.js';
 import { timeoutSeconds } from './timeoutInput.js';
@@ -45,20 +46,6 @@ const ringTimeoutSchema = timeoutSeconds
   .describe(
     'Seconds the target may ring, across every route and host it is tried on, before the call goes to its fallback, else ends unanswered (480); null rings until the far end decides.'
   );
-
-/** The sample rate a `webSocket` target speaks at (§9.4 "WebSocket targets"): `twilio` always 8000,
- * `vonage` the one given, 16000 unless given. */
-export function webSocketSampleRate(target: {
-  protocol: WebSocketProtocol;
-  sampleRate?: WebSocketSampleRate | undefined;
-}): WebSocketSampleRate {
-  return (
-    target.sampleRate ??
-    (target.protocol === 'twilio'
-      ? TWILIO_SAMPLE_RATE
-      : DEFAULT_VONAGE_SAMPLE_RATE)
-  );
-}
 
 /** A `webSocket` target (§9.4 "WebSocket targets"); its sample rate is checked and filled in on
  * the union (`targetSpecSchema`), whose own type its fallback nests. */
@@ -112,7 +99,7 @@ function fallbackSchema(): FallbackSchema {
 /**
  * The shared target vocabulary a ring group's forwarding rule or a menu's fallback/DTMF option
  * points at (§11.2 `forward_targets`). One of the union's kinds maps to exactly one of the
- * table's ten exclusive targets, `sip`'s and `webSocket`'s being their column sets, and `hangup`
+ * table's eleven exclusive targets, `sip`'s and `webSocket`'s being their column sets, and `hangup`
  * to none of them; each takes the announcement that plays before it (§10.1 step 7). Each is
  * strict, so a field of another kind, such as `record` on a `user` target, is refused rather
  * than dropped.
@@ -220,6 +207,15 @@ export const targetSpecSchema: z.ZodType<TargetSpec> = z
     }),
     z.strictObject({
       kind: z
+        .literal('httpRequest')
+        .describe(
+          'Sends an HTTP request while the call waits, then sends the call on by its answer; admin-only.'
+        ),
+      httpRequestId: z.string(),
+      announcementAudioId: announcementSchema
+    }),
+    z.strictObject({
+      kind: z
         .literal('extension')
         .describe(
           'Sends the call to the extension a template renders for it, as if that extension had been dialled; admin-only.'
@@ -263,7 +259,7 @@ export const targetSpecSchema: z.ZodType<TargetSpec> = z
   // which the OpenAPI document lifts into its components (`openapi.ts`).
   .meta({ id: 'ForwardTarget' })
   .describe(
-    'Where the call goes: one of eleven kinds, chosen by `kind` (see zamfono.help mental-model).'
+    'Where the call goes: one of twelve kinds, chosen by `kind` (see zamfono.help mental-model).'
   );
 /**
  * What a `user` reads in place of a target an admin set on their own forwarding rule, OOO rule or
@@ -275,7 +271,14 @@ export const targetSpecSchema: z.ZodType<TargetSpec> = z
 export const managedTargetSchema = z
   .strictObject({
     managed: z.literal(true),
-    kind: z.enum(['external', 'sip', 'webSocket', 'decision', 'extension'])
+    kind: z.enum([
+      'external',
+      'sip',
+      'webSocket',
+      'decision',
+      'extension',
+      'httpRequest'
+    ])
   })
   .meta({ id: 'ManagedForwardTarget' })
   .describe(

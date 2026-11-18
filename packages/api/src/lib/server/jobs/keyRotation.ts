@@ -8,6 +8,7 @@ type EncTable =
   | 'afterCallRequests'
   | 'backupTargets'
   | 'devices'
+  | 'httpRequests'
   | 'settings'
   | 'totpCredentials'
   | 'trunks'
@@ -25,6 +26,7 @@ const ENC_COLUMNS: readonly {
   },
   { table: 'backupTargets', columns: ['secretEnc'] },
   { table: 'devices', columns: ['sipPasswordEnc', 'adminPasswordEnc'] },
+  { table: 'httpRequests', columns: ['secretEnc', 'secretHeadersEnc'] },
   {
     table: 'settings',
     columns: ['ringotelApiTokenEnc', 'smtpPasswordEnc', 'ssoClientSecretEnc']

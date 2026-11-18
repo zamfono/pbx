@@ -40,6 +40,9 @@ that single tenant; there is no cross-tenant sharing.
 - **Decision** — ordered cases, each a set of conditions (time, dates, caller, a colleague's
   status) and a target, and a default target: the first matching case wins. Usable anywhere a
   target is, and, with an extension of its own, dialled like a menu. See `decisions`.
+- **HTTP request** — a request to an outside system sent while a call waits, whose JSON answer
+  the call is then routed on, with a target for the call after it and one for a failed request.
+  Usable anywhere a target is. See `http-requests`.
 - **User group** — a named, nestable set of users, used as ring-group membership and as an
   outbound-route caller list. See `user-groups`.
 - **Contact** — a phone-book entry with one or more numbers, shared tenant-wide, that names
@@ -48,6 +51,8 @@ that single tenant; there is no cross-tenant sharing.
   it. See `parking`.
 - **Webhook** — an HTTP endpoint the stack POSTs its realtime events to, signed with a per-hook
   secret. See `webhooks`.
+- **Template** — text with `{{placeholders}}` filled in for each call: a target's number or
+  address, a header, a condition, an HTTP request. See `templates`.
 - **Settings** — the one tenant-wide row: time zone, language, feature codes, emergency numbers,
   the mail relay, and every other tenant default.
 
@@ -55,7 +60,7 @@ that single tenant; there is no cross-tenant sharing.
 
 Every place that routes a call somewhere else — a DID, a menu option, a forward rule, an
 out-of-office rule, a group fallback, an opening-hours closed target — points at one of the same
-ten target kinds:
+twelve target kinds:
 
 | Kind               | Meaning                                                            |
 | ------------------ | ------------------------------------------------------------------ |
@@ -68,6 +73,8 @@ ten target kinds:
 | `mailboxRingGroup` | deposits the caller directly in a ring group's mailbox, no ringing |
 | `menu`             | plays a menu's greeting and collects DTMF                          |
 | `decision`         | goes where the decision's first matching case says (admin-only)    |
+| `httpRequest`      | asks an outside system, then goes on by its answer (admin-only)    |
+| `extension`        | goes to the extension a template renders for the call (admin-only) |
 | `hangup`           | ends the call                                                      |
 
 A `user` or `ringGroup` target re-enters the routing pipeline and counts a hop toward the
@@ -81,7 +88,15 @@ headers; either leg tells it who forwarded only as far as the trunk's `diversion
 a voice bot that takes calls over a WebSocket, in the Twilio Media Streams or the Vonage protocol
 (`forward-to-voice-bot`); like `external` and `sip` it neither counts a hop nor re-enters.
 `decision`, `{ "kind": "decision", "decisionId": "…" }`, is replaced by the target its conditions
-pick, which then counts or not as it would on its own (`decisions`).
+pick, which then counts or not as it would on its own (`decisions`). `httpRequest`,
+`{ "kind": "httpRequest", "httpRequestId": "…" }`, sends its request while the caller hears
+ringing and then goes to the request's target, or to its error target (`http-requests`); it
+counts no hop either. `extension`, `{ "kind": "extension", "extension": "{{slice did -2}}" }`,
+goes where that extension leads, as if it had been dialled (`templates`).
+
+An `external` target's number, a `sip` target's `user` and headers and a `webSocket` target's
+`url` may be templates as well, built from the call: `"external": "+431234567{{slice did -2}}"`
+(`templates`).
 
 A target of any kind may carry an `announcementAudioId`, an audio asset of kind `announcement`
 that plays to the caller before the call goes on to the target:
@@ -92,9 +107,9 @@ that turns out busy or unreachable afterwards can no longer refuse the call as s
 without an announcement releases the call unanswered with 480. A ring-group member's own forward
 that the group follows plays nothing.
 
-An `external`, `sip` or `webSocket` target may carry a `fallback`, any target, which may carry a
-fallback of its own: where the call goes when the target does not work, for any reason but the
-caller hanging up. An `external` or `sip` one may also carry `ringTimeoutS`, how many seconds it
+An `external`, `sip`, `webSocket` or `extension` target may carry a `fallback`, any target, which
+may carry a fallback of its own: where the call goes when the target does not work, for any
+reason but the caller hanging up, a template that renders nothing usable among them. An `external` or `sip` one may also carry `ringTimeoutS`, how many seconds it
 rings before it counts as not working; set it below the carrier's own no-answer time to reach the
 fallback before a mobile's voicemail answers. The fallback applies as if the rule had named it: a
 `user` or `ringGroup` fallback counts a hop, so a loop such as "user → bot → back to the same user"
@@ -112,15 +127,22 @@ fallback; a party added with `*5` doesn't either.
 }
 ```
 
+An `external`, `sip` or `webSocket` target may also carry `afterCall`, an HTTP request sent after
+each of its attempts with the call's record, once the call is over (`after-call-request`).
+
 A `user` reading their own forwarding, out-of-office rules or opening hours sees a target an admin
-set there that is admin-only (`sip`, `webSocket`, `decision`, or `external` with `"record": true`), anywhere
-in its fallback chain, as a marker such as `{ "managed": true, "kind": "sip" }` (`guardrails`).
+set there that is admin-only (`sip`, `webSocket`, `decision`, `httpRequest`, `extension`, or
+`external` with `"record": true`, a template or an after-call request), anywhere in its fallback
+chain, as a marker such as `{ "managed": true, "kind": "sip" }` (`guardrails`).
 
 ## Where to look next
 
 - `routing-order` — the order every call is decided in, inbound and outbound.
 - `numbers` — DIDs, number blocks, the main number and the fallbacks, with a worked example.
 - `decisions` — conditional forwarding by time, dates, caller or presence, and its dry run.
+- `templates` — targets, headers and conditions built from the call's own values.
+- `http-requests` — asking an outside system during a call and routing on its answer.
+- `after-call-request` — the call's record sent to your system after a forwarded call.
 - `glossary` — short definitions of the terms used across the guide and the REST/MCP surface.
 - `guardrails` — what the API refuses, confirms or lets you undo.
 - `user-groups` — nestable sets of users for ring groups and outbound routes.

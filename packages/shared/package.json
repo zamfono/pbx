@@ -76,6 +76,8 @@
         "devices.kind": "DeviceKind",
         "devices.transport": "Generated<DeviceTransport>",
         "forward_targets.web_socket_protocol": "WebSocketProtocol | null",
+        "http_requests.content_type": "HttpContentType | null",
+        "http_requests.method": "HttpMethod",
         "mail_templates.kind": "MailKind",
         "mail_templates.language": "Language",
         "maintenance_gate.work": "MaintenanceWork",

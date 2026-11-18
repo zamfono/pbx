@@ -86,34 +86,19 @@ outside the stack; this recipe gets the call to OpenAI. OpenAI's guide:
    ```
 
    A name starts with `X-` and has up to 64 letters, digits and dashes after it, each name once. A
-   value is text with placeholders in double braces, filled in for each call:
-
-   | Placeholder                | Filled with                                                                             |
-   | -------------------------- | --------------------------------------------------------------------------------------- |
-   | `{{callerNumber}}`         | the caller's number (`+43…`), or a colleague's extension; empty when withheld           |
-   | `{{callerName}}`           | the caller's name from the phone book, else a colleague's own name, else empty          |
-   | `{{did}}`                  | the company number an outside caller dialled; empty for an internal call                |
-   | `{{calledExtension}}`      | the extension of the user or ring group the call was for, empty when it has none        |
-   | `{{calledName}}`           | that user's or ring group's name                                                        |
-   | `{{forwardedByExtension}}` | the extension of the user or ring group that forwarded the call last, empty without one |
-   | `{{forwardedByName}}`      | their name, or the label of the DID or number block whose target the agent is           |
-   | `{{forwardReason}}`        | why: `outOfOffice`, `closed`, `unconditional`, `busy`, `noAnswer`, `unavailable`, `dnd` |
-   | `{{hopCount}}`             | how many times the call was forwarded                                                   |
-   | `{{callId}}`               | the call's id, as `calls.get` (`GET /api/v1/calls/{id}`) knows it                       |
-   | `{{direction}}`            | `inbound` or `internal`                                                                 |
-   | `{{language}}`             | the company's language, such as `de`                                                    |
-   | `{{startedAt}}`            | when the call started, such as `2026-09-30T12:00:00.000Z`                               |
+   value is a template: text with placeholders in double braces, filled in for each call, such as
+   `{{callerNumber}}`, `{{did}}`, `{{calledName}}` or `{{forwardReason}}` (`templates` lists them
+   and the helpers a value may use).
 
    A header whose value comes out empty is left out: a caller who withheld their number sends no
    `X-Zamfono-Caller`. Each value is at most 256 bytes, and the headers together at most 2048 by
-   their longest possible values; anything else in braces, or a header named twice, is refused
-   with 422. Left out, `headers` is the first two above; `[]` sends none. On a trunk whose
-   `transport` is `udp` a write whose headers could make the INVITE too large for one UDP packet
-   is accepted with a warning; OpenAI's trunk is TLS and has no such limit.
+   their longest possible values; a value that is no template, or a header named twice, is refused
+   with 422. Left out, `headers` is `X-Zamfono-Caller: {{callerNumber}}` and
+   `X-Zamfono-Did: {{did}}`; `[]` sends none. On a trunk whose `transport` is `udp` a write whose
+   headers could make the INVITE too large for one UDP packet is accepted with a warning; OpenAI's
+   trunk is TLS and has no such limit.
 
-   A call that user A's out-of-office rule sent to user B, whose rule sent it on to the agent,
-   has A as `{{calledName}}`, B as `{{forwardedByName}}` and `unconditional` as
-   `{{forwardReason}}`.
+   The `user` part may be a template too, such as `proj_{{calledExtension}}`.
 
 4. Let the media through. OpenAI sends and receives its SRTP audio from 13.79.45.80/28,
    23.98.140.64/28, 40.67.149.176/28 and 40.83.204.240/28; a firewall in front of the stack must

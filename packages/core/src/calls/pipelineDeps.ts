@@ -1,6 +1,6 @@
 // What a `Pipeline` is built from: the collaborators and settings the call modules reach through
 // `pipeline.deps`.
-import type { Db, TargetPolicy } from '@zamfono/shared';
+import type { Db, HttpAnswer, HttpSend, TargetPolicy } from '@zamfono/shared';
 
 import type { AmiClient } from '../ami/client.js';
 import type { ApiClient } from '../apiClient.js';
@@ -68,6 +68,12 @@ export type PipelineDeps = {
   apiClient: MailSender;
   /** Where a call's attempts are reported once it is over (§10.6 "After-call requests"). */
   reports: Pick<ApiClient, 'afterCall'>;
+  /** What a call flow's HTTP request is sent with (§10.1 step 7 "HTTP requests"): its secrets,
+   * which `api` holds, and the one request sender. */
+  httpRequests: {
+    secrets: ApiClient['httpRequestSecrets'];
+    send: (send: HttpSend) => Promise<HttpAnswer>;
+  };
   // Process-level logging (§10.1 "Emergency calls": an ERROR line while no live emergency trunk
   // exists).
   logger: Logger;

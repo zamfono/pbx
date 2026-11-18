@@ -1,6 +1,7 @@
 /**
- * A call's forward-target attempts between `core` and `api` (§10.6 "After-call requests"): the
- * internal API's request body.
+ * What `core` and `api` exchange for the HTTP requests of a call (§10.6): a call's
+ * forward-target attempts, for its after-call requests, and the secrets of a call flow's HTTP
+ * request, which `core` sends itself.
  */
 import { z } from 'zod';
 
@@ -33,3 +34,13 @@ export const afterCallReportSchema = z.object({
   attempts: z.array(targetAttemptSchema).min(1)
 });
 export type AfterCallReport = z.infer<typeof afterCallReportSchema>;
+
+/** `POST /internal/httpRequestSecrets` → 200 `HttpRequestSecrets` | 404 (§5.4): what `core`,
+ * which holds no key, needs of a call flow's HTTP request to send it: its signing secret and
+ * its headers with their values, the secret ones decrypted. */
+export const httpRequestSecretsRequestSchema = z.object({ id: z.string() });
+export const httpRequestSecretsSchema = z.object({
+  secret: z.string().nullable(),
+  headers: z.array(z.object({ name: z.string(), value: z.string() }))
+});
+export type HttpRequestSecrets = z.infer<typeof httpRequestSecretsSchema>;

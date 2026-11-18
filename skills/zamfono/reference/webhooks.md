@@ -10,15 +10,16 @@ that keeps a connection open.
 
 All webhook operations are `admin`.
 
-- `webhooks.create` (`POST /api/v1/webhooks`) takes `url` (`http` or `https`), `secret` (any
-  non-empty string, write-only) and an optional `eventTypes` filter. A new hook is always created
-  **inactive**, so nothing is POSTed to a receiver that is not deployed yet.
-- `webhooks.update` (`PATCH /api/v1/webhooks/{id}`) changes `url`, `secret` or `eventTypes`, and
-  switches delivery on and off with `active`. `{ "active": true }` once the receiver verifies
+- `webhooks.create` (`POST /api/v1/webhooks`) takes `url` (`https`, or `http` for a receiver on a
+  private network), `secret` (any non-empty string, write-only), optional `headers` and an
+  optional `eventTypes` filter. A new hook is always created **inactive**, so nothing is POSTed
+  to a receiver that is not deployed yet.
+- `webhooks.update` (`PATCH /api/v1/webhooks/{id}`) changes `url`, `secret`, `headers` or
+  `eventTypes`, and switches delivery on and off with `active`. `{ "active": true }` once the receiver verifies
   signatures; switching a hook off drops the deliveries still pending for it (Delivery).
-- `webhooks.list` (`GET /api/v1/webhooks`) lists the hooks with `eventTypes`, `active`,
-  `lastStatus`, `lastDeliveryAt` and the failure fields below; the secret never appears in a read,
-  only `secretSet`.
+- `webhooks.list` (`GET /api/v1/webhooks`) lists the hooks with `eventTypes`, `headers`,
+  `active`, `lastStatus`, `lastDeliveryAt` and the failure fields below; the secret never appears
+  in a read, only `secretSet`.
 - `webhooks.delete` (`DELETE /api/v1/webhooks/{id}`) soft-deletes a hook (`guardrails`); nothing
   more is delivered to it.
 
@@ -29,6 +30,35 @@ per-role visibility of `/events` does not apply. There a `user` receives a call'
 events while it is theirs to see (`guardrails`), and `ended` once it stops being theirs while it
 goes on for others, as when their phone stops ringing; a hook never receives that `ended`, and
 receives `call.legs` instead, which a `user` never does.
+
+## Request headers
+
+`headers` are sent with every delivery, beside `X-Zamfono-Signature`, for a receiver that wants a
+token rather than a signature, such as an automation service or a CRM's API:
+
+```json
+{
+  "headers": [
+    { "name": "Authorization", "value": "Bearer …", "secret": true },
+    { "name": "X-Tenant", "value": "acme" }
+  ]
+}
+```
+
+- A `name` is any HTTP header name of up to 64 characters, each once whatever its case. The
+  headers a request sets itself are refused: `Host`, `Content-Type`, `Content-Length`,
+  `Transfer-Encoding`, `Connection`, `Keep-Alive`, `TE`, `Trailer`, `Upgrade`, `Expect`, and
+  `X-Zamfono-Signature`.
+- A `value` is literal text, any length, the headers together at most 8 KiB. An event belongs to
+  no call, so a webhook's header takes no `{{placeholder}}`: a value with `{{` is refused with 422.
+- With `"secret": true` the value is stored encrypted and never read back: a read shows the
+  header as `{ "name": "Authorization", "secret": true, "secretSet": true }`. `headers` is
+  replaced as a whole on `webhooks.update`; a secret header sent back without a `value` keeps the
+  stored one, so a list that was read can be edited and written back. A change of headers with a
+  secret one among them cannot be undone (`guardrails`).
+
+A token in a header is better than one in the `url`'s query, which is stored and shown in the
+clear.
 
 ## Events and payloads
 
@@ -90,18 +120,24 @@ the body and an `X-Zamfono-Signature` header.
   by several customers; on premises they are allowed. A `url` with a loopback, link-local or
   unspecified address literal is refused with 422 when saved; a name that resolves to a refused
   address fails each delivery with `forbidden address`.
+- Plain `http://` reaches only a private network, where a receiver on the LAN or a VPN often has
+  no certificate: over the public internet an event's phone numbers and a header's token would
+  travel in the clear, whatever the signature proves. An `http://` `url` with a public address is
+  refused with 422 when saved, and one whose name resolves to a public address fails each
+  delivery with `plain HTTP to a public address`. Use `https://` for a receiver on the internet.
 - `lastStatus` in `webhooks.list` is `ok` after a delivery that succeeded and `failing` after one
   that gave up, with `lastDeliveryAt` its time; `null` before the first. A failing hook stays
   active and keeps receiving new events: it is never switched off automatically.
   - `lastError` is why the last delivery that gave up failed, with `lastErrorAt` its time: the
     status, such as `HTTP 404` or `HTTP 403`, or the kind of error, `timeout`, `DNS lookup failed`,
-    `forbidden address`, `TLS error <code>`, `connection refused`, `connection reset`. While the hook
+    `forbidden address`, `plain HTTP to a public address`, `TLS error <code>`, `connection refused`,
+    `connection reset`. While the hook
     is failing, `failingSince` is when it turned so and `failedDeliveries` how many deliveries gave up
     since; a delivery that succeeds sets them back to `null` and 0, and `lastError` stays as a record.
 - `api` logs a warning when a hook turns `failing`, again whenever the reason changes while it
   stays failing (a `404` fixed by a new `url` that now answers `403` for a wrong `secret`), and
   once a day while it keeps failing for the same reason; it logs when the hook delivers again.
-- A hook whose secret `api` cannot decrypt (the `SECRETBOX_KEY` was replaced without keeping the
+- A hook whose secret or secret header `api` cannot decrypt (the `SECRETBOX_KEY` was replaced without keeping the
   previous key, or the database was restored under another `.env`) fails each delivery at once,
   without a retry: `lastError` reads `secret unreadable — set a new secret`. Set one with
   `webhooks.update` `{ "secret": "…" }`, and the receiver's check with it.
@@ -144,3 +180,11 @@ Reject a request that fails the check. The signature covers the body only and ca
 timestamp, so a replayed request verifies again; the `id` deduplication above is what turns it
 away. To rotate the secret, `webhooks.update` with a new `secret`: the next delivery is signed
 with it, and the change is audited with the value masked and cannot be undone (`guardrails`).
+
+## Other HTTP requests the stack sends
+
+Two more requests are configured where they belong and delivered or sent by the same rules for
+the receiver's address, the timeout and the signature: an **after-call request** on a forward
+target, which sends a call's record once the call is over (`after-call-request`), and an **HTTP
+request** in a call flow, whose answer routes the call (`http-requests`). Both take the headers
+above, with `{{placeholders}}` of the call in their values (`templates`).

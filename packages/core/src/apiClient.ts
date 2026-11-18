@@ -6,8 +6,10 @@
  * client makes one request and does not retry.
  */
 import {
+  httpRequestSecretsSchema,
   internalAuthorization,
   type AfterCallReport,
+  type HttpRequestSecrets,
   type MailRequest,
   type SipBanReport
 } from '@zamfono/shared';
@@ -36,7 +38,17 @@ export class ApiClient {
     return this.post('/internal/sipBan', report);
   }
 
+  /** `/internal/httpRequestSecrets` (§5.4): the secret and headers of HTTP request `id`. */
+  async httpRequestSecrets(id: string): Promise<HttpRequestSecrets> {
+    const response = await this.send('/internal/httpRequestSecrets', { id });
+    return httpRequestSecretsSchema.parse(await response.json());
+  }
+
   private async post(path: string, body: unknown): Promise<void> {
+    await this.send(path, body);
+  }
+
+  private async send(path: string, body: unknown): Promise<Response> {
     const response = await fetch(`${this.baseUrl}${path}`, {
       method: 'POST',
       headers: {
@@ -48,5 +60,6 @@ export class ApiClient {
     if (!response.ok) {
       throw new Error(`apiClient: POST ${path} responded ${response.status}`);
     }
+    return response;
   }
 }
