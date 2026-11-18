@@ -13,7 +13,9 @@ import {
   insertForwardTarget,
   resolveTarget
 } from '../forwardTargetSpec.js';
+import { changeOwnedExtension, ownedExtension } from '../ownedExtension.js';
 import { propagate } from '../propagate.js';
+import { pushRoster } from '../roster.js';
 import { defineOperation, type Context } from '../types.js';
 import {
   assertNameAvailable,
@@ -109,6 +111,19 @@ export const updateMenu = defineOperation({
       .execute();
     if (input.fallbackTarget) {
       await deleteForwardTargets(ctx.db, [before.fallbackTargetId]);
+    }
+    const extensionChanged = await changeOwnedExtension(
+      ctx,
+      { menuId: input.id },
+      input.extension
+    );
+    // The roster lists the extension, titled by the menu's name (§10.4 "Colleague presence").
+    if (
+      extensionChanged ||
+      (after.name !== before.name &&
+        (await ownedExtension(ctx.db, { menuId: input.id })) !== null)
+    ) {
+      await pushRoster(ctx);
     }
     const row = await ctx.db
       .selectFrom('menus')

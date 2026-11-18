@@ -15,6 +15,8 @@ import {
   type AttendedTransferRequest,
   type ConsultRequest,
   type CoreVersionResponse,
+  type DecisionDryRunRequest,
+  type DecisionDryRunResponse,
   type DeclineRequest,
   type HangupRequest,
   type HealthDocument,
@@ -60,6 +62,11 @@ export type CoreClient = {
   decline(callId: string, req: DeclineRequest): Promise<void>;
   /** Has Asterisk register the `registration` trunk afresh (§9.4 "Provisioning and status"). */
   reregisterTrunk(trunkId: string): Promise<void>;
+  /** A decision's dry run (§10.3 "Decisions"), evaluated where presence and hours live. */
+  decisionDryRun(
+    decisionId: string,
+    req: DecisionDryRunRequest
+  ): Promise<DecisionDryRunResponse>;
   /** The call and bot leg the session token hashed to `hash` acts for (§5.2 "Session tokens"),
    * `null` once its stream has ended or for no such token. */
   callSession(hash: string): Promise<{ callId: string; legId: string } | null>;
@@ -82,6 +89,17 @@ async function fetchCallSession(
     throw new Error(`core call session lookup failed: ${response.status}`);
   }
   return (await response.json()) as { callId: string; legId: string };
+}
+
+/** `POST /internal/decisions/{id}/dryRun` (§10.3 "Decisions"). */
+async function postDryRun(
+  fetchFn: typeof fetch,
+  baseUrl: string,
+  decisionId: string,
+  req: DecisionDryRunRequest
+): Promise<DecisionDryRunResponse> {
+  const url = `${baseUrl}/internal/decisions/${encodeURIComponent(decisionId)}/dryRun`;
+  return (await postJsonForBody(fetchFn, url, req)) as DecisionDryRunResponse;
 }
 
 /** `send` with `token` as every request's bearer token (§3.1 "Internal trust"). */
@@ -168,6 +186,8 @@ export function createCoreClient(
         `${baseUrl}/internal/trunks/${encodeURIComponent(trunkId)}/reregister`,
         undefined
       ),
+    decisionDryRun: async (decisionId, req) =>
+      postDryRun(fetchFn, baseUrl, decisionId, req),
     callSession: async hash => fetchCallSession(fetchFn, baseUrl, hash)
   };
 }

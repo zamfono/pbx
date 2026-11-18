@@ -7,11 +7,11 @@ import {
   type WebSocketSampleRate
 } from '@zamfono/shared';
 
-import { noteWarning } from './afterCommit.js';
 import { assertAudioOfKind } from './audio/_shared.js';
 import { webSocketSampleRate, type TargetSpec } from './forwardTargetSchema.js';
+import type { LiveTable } from './liveHolder.js';
 import { liveRow } from './rows.js';
-import { udpHeadersWarning } from './sipHeaders.js';
+import { warnForSipHeaders } from './sipHeaders.js';
 import { type Context } from './types.js';
 
 /** The one column `spec`'s kind sets on its `forward_targets` row, `sip`'s and `webSocket`'s column
@@ -59,6 +59,9 @@ function forwardTargetColumns(
   if (spec.kind === 'menu') {
     return { menuId: spec.menuId };
   }
+  if (spec.kind === 'decision') {
+    return { decisionId: spec.decisionId };
+  }
   return {};
 }
 
@@ -77,6 +80,7 @@ type ForwardTargetColumns = {
   mailboxRingGroupId: string | null;
   announcementAudioId: string | null;
   menuId: string | null;
+  decisionId: string | null;
   ringTimeoutS: number | null;
   recordCalls: number;
 };
@@ -90,7 +94,7 @@ function storedSampleRate(rate: number | null): WebSocketSampleRate {
 }
 
 /** The inverse of `forwardTargetColumns`: the wire target a `forward_targets` row represents,
- * `hangup` for none of the eight targets set (§11.2), `fallback` still `null` (`rowToTarget`). */
+ * `hangup` for none of the nine targets set (§11.2), `fallback` still `null` (`rowToTarget`). */
 function baseTarget(row: ForwardTargetColumns): TargetSpec {
   if (row.userId !== null) {
     return { kind: 'user', userId: row.userId };
@@ -143,6 +147,9 @@ function baseTarget(row: ForwardTargetColumns): TargetSpec {
   if (row.menuId !== null) {
     return { kind: 'menu', menuId: row.menuId };
   }
+  if (row.decisionId !== null) {
+    return { kind: 'decision', decisionId: row.decisionId };
+  }
   return { kind: 'hangup' };
 }
 
@@ -194,56 +201,37 @@ export async function resolveOptionalTarget(
   return targetId === null ? null : resolveTarget(db, targetId);
 }
 
-/** Throws 404 when `id` names no live row of `table` (a `forward_targets` column's `RESTRICT` FK). */
-async function assertLiveRow(
-  db: Db,
-  table: 'users' | 'ringGroups' | 'menus' | 'audioAssets' | 'trunks',
-  id: string,
-  label: string
-): Promise<void> {
-  await liveRow(db, table, id, `${label} '${id}' not found`);
-}
-
 /**
  * Throws 404 when an id `spec` references names no live row (§5.9: routing never depends on a
  * soft-deleted row, so a rule can only ever target one), its announcement's included, which is
  * of that kind (422); `external` names no row and needs none.
  */
 async function assertTargetAvailable(db: Db, spec: TargetSpec): Promise<void> {
+  // A `forward_targets` column's `RESTRICT` FK names a live row of `table`.
+  const assertLiveRow = (table: LiveTable, id: string, label: string) =>
+    liveRow(db, table, id, `${label} '${id}' not found`);
   const audioId = spec.announcementAudioId ?? null;
   if (audioId !== null) {
     await assertAudioOfKind(db, audioId, 'announcement');
   }
   if (spec.kind === 'user' || spec.kind === 'mailboxUser') {
-    await assertLiveRow(db, 'users', spec.userId, 'user');
+    await assertLiveRow('users', spec.userId, 'user');
     return;
   }
   if (spec.kind === 'ringGroup' || spec.kind === 'mailboxRingGroup') {
-    await assertLiveRow(db, 'ringGroups', spec.ringGroupId, 'ring group');
+    await assertLiveRow('ringGroups', spec.ringGroupId, 'ring group');
     return;
   }
   if (spec.kind === 'menu') {
-    await assertLiveRow(db, 'menus', spec.menuId, 'menu');
+    await assertLiveRow('menus', spec.menuId, 'menu');
+    return;
+  }
+  if (spec.kind === 'decision') {
+    await assertLiveRow('decisions', spec.decisionId, 'decision');
     return;
   }
   if (spec.kind === 'sip') {
-    await assertLiveRow(db, 'trunks', spec.trunkId, 'trunk');
-  }
-}
-
-/** Notes the warning a `sip` target's headers get over its trunk on `ctx`'s result (§10.3). */
-async function warnForSipHeaders(
-  ctx: Context,
-  spec: Extract<TargetSpec, { kind: 'sip' }>
-): Promise<void> {
-  const trunk = await ctx.db
-    .selectFrom('trunks')
-    .select(['name', 'transport'])
-    .where('id', '=', spec.trunkId)
-    .executeTakeFirstOrThrow();
-  const warning = udpHeadersWarning(spec.headers, trunk);
-  if (warning !== null) {
-    noteWarning(ctx, warning);
+    await assertLiveRow('trunks', spec.trunkId, 'trunk');
   }
 }
 
@@ -258,7 +246,7 @@ export async function insertForwardTarget(
   const { db } = ctx;
   await assertTargetAvailable(db, spec);
   if (spec.kind === 'sip') {
-    await warnForSipHeaders(ctx, spec);
+    await warnForSipHeaders(ctx, spec.trunkId, spec.headers);
   }
   const id = newId();
   await db
@@ -278,6 +266,7 @@ export async function insertForwardTarget(
       mailboxRingGroupId: null,
       announcementAudioId: spec.announcementAudioId ?? null,
       menuId: null,
+      decisionId: null,
       fallbackOfId,
       ...forwardTargetColumns(spec)
     })

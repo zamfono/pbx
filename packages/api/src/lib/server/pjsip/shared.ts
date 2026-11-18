@@ -45,6 +45,8 @@ export type RenderInput = {
     mwiRingGroupIds: string[] | null;
   }[];
   ringGroups: { id: string; ext: string }[];
+  // The extensions of decisions and menus (§9.3): a presence hint each, nothing rings there.
+  passThrough: { type: 'decision' | 'menu'; id: string; ext: string }[];
   parkingSlots: string[];
   trunks: {
     id: string;

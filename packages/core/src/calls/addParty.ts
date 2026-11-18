@@ -4,6 +4,7 @@ import type { Snapshot } from '../internal/snapshot.js';
 import { SIP_FORBIDDEN, SIP_TEMPORARILY_UNAVAILABLE } from '../sipCodes.js';
 import { resolveAddedTarget, type AddedTarget } from './addPartyTarget.js';
 import { linkParent, type Call } from './call.js';
+import { callDecisionInputs } from './callDecisions.js';
 import { activeCallOf, channelOf } from './callLookup.js';
 import { dialEmergency } from './emergency.js';
 import { dialSipTarget } from './forwardDial.js';
@@ -117,7 +118,11 @@ export async function dialAddPartyTarget(
   activeBridgeId: string,
   rest: string
 ): Promise<boolean> {
-  const target = resolveAddedTarget(snapshot, rest);
+  const target = resolveAddedTarget(
+    snapshot,
+    rest,
+    callDecisionInputs(snapshot, pipeline.deps, call)
+  );
   call.log.event({ event: 'addPartyTarget', target: target.kind });
   if (target.kind === 'refuse') {
     await release(pipeline, call, target.code, 'failed');

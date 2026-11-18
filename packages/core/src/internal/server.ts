@@ -41,6 +41,7 @@ import {
   type PresenceRefresh,
   type TrunkMonitoringRefresh
 } from './configChanged.js';
+import { handleDecisionRoute } from './decisionRoute.js';
 import { EventBus } from './eventBus.js';
 import { attachEventStream } from './eventStream.js';
 import { respondJson, respondProblem } from './http.js';
@@ -77,6 +78,9 @@ type InternalDeps = {
   version: ZamfonoVersion;
   /** The voice bots' session tokens (§5.2 "Session tokens"). */
   sessions: Pick<BotSessions, 'resolve'>;
+  /** The stack's `TZ` (`CoreEnv.tz`), the tenant clock while `settings.timezone` is NULL; a
+   * decision's dry run reads it. */
+  stackTz: string;
 };
 
 /** `core:database` and `core:ari`, each `fail` while down (§6.3 "Health"). */
@@ -203,6 +207,7 @@ const ROUTES: Partial<Record<string, Route[]>> = {
     at('/internal/configChanged', handleConfigChanged),
     handleMwiRoute,
     handleTrunkRoute,
+    handleDecisionRoute,
     handleActionRoute
   ]
 };

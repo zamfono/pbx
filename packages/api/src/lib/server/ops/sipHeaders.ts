@@ -15,6 +15,9 @@ import {
   type SipHeaderTemplate
 } from '@zamfono/shared';
 
+import { noteWarning } from './afterCommit.js';
+import type { Context } from './types.js';
+
 /**
  * The room custom headers have in an INVITE over UDP (§10.3 "Forward targets"): an INVITE past
  * about 1300 bytes risks IP fragmentation, and the rest of a forwarded INVITE takes about 1150,
@@ -87,4 +90,21 @@ export function udpHeadersWarning(
     return null;
   }
   return `sip target headers may push an INVITE over UDP trunk '${trunk.name}' past ${UDP_INVITE_SAFE_BYTES} bytes`;
+}
+
+/** Notes the warning a `sip` target's headers get over its trunk on `ctx`'s result (§10.3). */
+export async function warnForSipHeaders(
+  ctx: Context,
+  trunkId: string,
+  headers: SipHeaderTemplate[]
+): Promise<void> {
+  const trunk = await ctx.db
+    .selectFrom('trunks')
+    .select(['name', 'transport'])
+    .where('id', '=', trunkId)
+    .executeTakeFirstOrThrow();
+  const warning = udpHeadersWarning(headers, trunk);
+  if (warning !== null) {
+    noteWarning(ctx, warning);
+  }
 }

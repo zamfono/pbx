@@ -79,7 +79,7 @@ export async function purgeOwnRuleRows(
 }
 
 /**
- * Every `forward_targets` id still named by one of §11.2's nine owner columns, regardless of the
+ * Every `forward_targets` id still named by one of §11.2's eleven owner columns, regardless of the
  * owning row's own `deleted_at`: unlike `findForwardTargetOwners` (a live-delete refusal, which
  * counts only live owners), the physical FK a purge must respect blocks on any owning row that
  * still exists, deleted or not.
@@ -96,7 +96,9 @@ async function referencedForwardTargetIds(
     groupRules,
     settingsRows,
     oooRules,
-    openingHours
+    openingHours,
+    decisions,
+    decisionCases
   ] = await Promise.all([
     trx.selectFrom('dids').select('targetId').execute(),
     trx
@@ -114,41 +116,25 @@ async function referencedForwardTargetIds(
       .where('fallbackTargetId', 'is not', null)
       .execute(),
     trx.selectFrom('oooRules').select('targetId').execute(),
-    trx.selectFrom('openingHours').select('closedTargetId').execute()
+    trx.selectFrom('openingHours').select('closedTargetId').execute(),
+    trx.selectFrom('decisions').select('defaultTargetId').execute(),
+    trx.selectFrom('decisionCases').select('targetId').execute()
   ]);
-  const ids = new Set<string>();
-  for (const row of dids) {
-    ids.add(row.targetId);
-  }
-  for (const row of didBlocks) {
-    if (row.fallbackTargetId !== null) {
-      ids.add(row.fallbackTargetId);
-    }
-  }
-  for (const row of menus) {
-    ids.add(row.fallbackTargetId);
-  }
-  for (const row of menuTargets) {
-    ids.add(row.targetId);
-  }
-  for (const row of userRules) {
-    ids.add(row.targetId);
-  }
-  for (const row of groupRules) {
-    ids.add(row.targetId);
-  }
-  for (const row of settingsRows) {
-    if (row.fallbackTargetId !== null) {
-      ids.add(row.fallbackTargetId);
-    }
-  }
-  for (const row of oooRules) {
-    ids.add(row.targetId);
-  }
-  for (const row of openingHours) {
-    ids.add(row.closedTargetId);
-  }
-  return ids;
+  return new Set(
+    [
+      ...dids.map(row => row.targetId),
+      ...didBlocks.map(row => row.fallbackTargetId),
+      ...menus.map(row => row.fallbackTargetId),
+      ...menuTargets.map(row => row.targetId),
+      ...userRules.map(row => row.targetId),
+      ...groupRules.map(row => row.targetId),
+      ...settingsRows.map(row => row.fallbackTargetId),
+      ...oooRules.map(row => row.targetId),
+      ...openingHours.map(row => row.closedTargetId),
+      ...decisions.map(row => row.defaultTargetId),
+      ...decisionCases.map(row => row.targetId)
+    ].filter(id => id !== null)
+  );
 }
 
 /** Hard-deletes every `forward_targets` row no owner column references any more (§5.9), with

@@ -53,6 +53,7 @@ function renderTrunk(trunk: Trunk): string {
     users: [],
     devices: [],
     ringGroups: [],
+    passThrough: [],
     parkingSlots: [],
     trunks: [trunk],
     moh: []
@@ -153,6 +154,7 @@ describe('renderTrunksConf username', () => {
         users: [],
         devices: [],
         ringGroups: [],
+        passThrough: [],
         parkingSlots: [],
         trunks: [
           { ...registrationTrunk, username },
@@ -193,6 +195,7 @@ describe('renderTrunksConf registration retries', () => {
       users: [],
       devices: [],
       ringGroups: [],
+      passThrough: [],
       parkingSlots: [],
       trunks: [
         {
@@ -292,6 +295,7 @@ describe('renderTrunksConf inbound_auth source restriction', () => {
       users: [],
       devices: [],
       ringGroups: [],
+      passThrough: [],
       parkingSlots: [],
       trunks: [
         { ...authTrunk, ...registrarOnly, username: 'a'.repeat(80) },

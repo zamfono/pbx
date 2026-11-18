@@ -8,7 +8,7 @@ import { phoneDigits, tenantCountry } from '../contacts/_shared.js';
 import { defineOperation } from '../types.js';
 
 const hit = z.object({
-  kind: z.enum(['user', 'ringGroup', 'contact']),
+  kind: z.enum(['user', 'ringGroup', 'decision', 'menu', 'contact']),
   id: z.string(),
   label: z.string(),
   matched: z.string().describe('The field the text matched in.')
@@ -32,34 +32,18 @@ function firstMatch(
   return null;
 }
 
-/** `ext` per `user_id`, for every extension a live user owns (§11.2). */
-async function extensionsByUser(db: Db): Promise<Map<string, string>> {
+/** `ext` per owner id, for every extension `column`'s owners hold (§11.2): live by construction,
+ * since a soft delete deletes the owner's extension. */
+async function extensionsBy(
+  db: Db,
+  column: 'userId' | 'ringGroupId' | 'decisionId' | 'menuId'
+): Promise<Map<string, string>> {
   const rows = await db
     .selectFrom('extensions')
-    .select(['ext', 'userId'])
+    .select(['ext', column])
+    .where(column, 'is not', null)
     .execute();
-  const byUser = new Map<string, string>();
-  for (const row of rows) {
-    if (row.userId !== null) {
-      byUser.set(row.userId, row.ext);
-    }
-  }
-  return byUser;
-}
-
-/** `ext` per `ring_group_id`, for every extension a live ring group owns (§11.2). */
-async function extensionsByRingGroup(db: Db): Promise<Map<string, string>> {
-  const rows = await db
-    .selectFrom('extensions')
-    .select(['ext', 'ringGroupId'])
-    .execute();
-  const byRingGroup = new Map<string, string>();
-  for (const row of rows) {
-    if (row.ringGroupId !== null) {
-      byRingGroup.set(row.ringGroupId, row.ext);
-    }
-  }
-  return byRingGroup;
+  return new Map(rows.map(row => [String(row[column]), row.ext]));
 }
 
 // ponytail: matches over every live row in JS rather than a SQL LIKE, since a pasted number
@@ -76,7 +60,7 @@ async function searchUsers(
       .select(['id', 'name', 'email'])
       .where('deletedAt', 'is', null)
       .execute(),
-    extensionsByUser(db)
+    extensionsBy(db, 'userId')
   ]);
   const hits: Hit[] = [];
   for (const user of users) {
@@ -101,30 +85,42 @@ async function searchUsers(
   return hits;
 }
 
-async function searchRingGroups(db: Db, needle: string): Promise<Hit[]> {
-  const [groups, exts] = await Promise.all([
+/** The named entities whose name or extension matches `needle`: ring groups, and decisions and
+ * menus, which a `user` finds only with an extension, nothing else of them being theirs to use
+ * (§10.2 "Search"). */
+async function searchNamed(
+  db: Db,
+  needle: string,
+  source: {
+    kind: 'ringGroup' | 'decision' | 'menu';
+    table: 'ringGroups' | 'decisions' | 'menus';
+    column: 'ringGroupId' | 'decisionId' | 'menuId';
+    withoutExtension: boolean;
+  }
+): Promise<Hit[]> {
+  const [rows, exts] = await Promise.all([
     db
-      .selectFrom('ringGroups')
+      .selectFrom(source.table)
       .select(['id', 'name'])
       .where('deletedAt', 'is', null)
       .execute(),
-    extensionsByRingGroup(db)
+    extensionsBy(db, source.column)
   ]);
   const hits: Hit[] = [];
-  for (const group of groups) {
-    const ext = exts.get(group.id) ?? null;
+  for (const row of rows) {
+    const ext = exts.get(row.id) ?? null;
     const matched = firstMatch(
       [
-        { field: 'name', value: group.name, search: true },
+        { field: 'name', value: row.name, search: true },
         { field: 'ext', value: ext, search: true }
       ],
       needle
     );
-    if (matched) {
+    if (matched && (ext !== null || source.withoutExtension)) {
       hits.push({
-        kind: 'ringGroup',
-        id: group.id,
-        label: ext ? `${group.name} · ${ext}` : group.name,
+        kind: source.kind,
+        id: row.id,
+        label: ext ? `${row.name} · ${ext}` : row.name,
         matched
       });
     }
@@ -232,7 +228,7 @@ const ADMIN_ROLES = new Set(['owner', 'admin']);
 export const searchQuery = defineOperation({
   name: 'search.query',
   description:
-    'The type-ahead behind the search bar: users, ring groups and contacts.',
+    'The type-ahead behind the search bar: users, ring groups, decisions, menus and contacts.',
   input: z
     .object({
       // eslint-disable-next-line id-length -- 'q' is the wire query-parameter name fixed by §10.3's `GET /search?q=`
@@ -240,7 +236,7 @@ export const searchQuery = defineOperation({
         .string()
         .min(1)
         .describe(
-          "Text matched case-insensitively against users' names, extensions and (for admins) e-mails, ring groups' names and extensions, and contacts' names, companies and numbers."
+          "Text matched case-insensitively against users' names, extensions and (for admins) e-mails, the names and extensions of ring groups, decisions and menus (for users only those with an extension), and contacts' names, companies and numbers."
         ),
       ...pageInput.shape
     })
@@ -251,13 +247,30 @@ export const searchQuery = defineOperation({
   readOnly: true,
   run: async (ctx, input) => {
     const needle = input.q.toLowerCase();
-    const includeEmail = ADMIN_ROLES.has(ctx.actor.role);
-    const [users, ringGroups, contacts] = await Promise.all([
-      searchUsers(ctx.db, needle, includeEmail),
-      searchRingGroups(ctx.db, needle),
+    const isAdmin = ADMIN_ROLES.has(ctx.actor.role);
+    const [users, ringGroups, decisions, menus, contacts] = await Promise.all([
+      searchUsers(ctx.db, needle, isAdmin),
+      searchNamed(ctx.db, needle, {
+        kind: 'ringGroup',
+        table: 'ringGroups',
+        column: 'ringGroupId',
+        withoutExtension: true
+      }),
+      searchNamed(ctx.db, needle, {
+        kind: 'decision',
+        table: 'decisions',
+        column: 'decisionId',
+        withoutExtension: isAdmin
+      }),
+      searchNamed(ctx.db, needle, {
+        kind: 'menu',
+        table: 'menus',
+        column: 'menuId',
+        withoutExtension: isAdmin
+      }),
       searchContacts(ctx.db, needle)
     ]);
-    const hits = [...users, ...ringGroups, ...contacts];
+    const hits = [...users, ...ringGroups, ...decisions, ...menus, ...contacts];
     const { page, nextPageToken, totalSize } = arrayPage(
       ctx.operation,
       input,

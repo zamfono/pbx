@@ -17,7 +17,7 @@ import { SIP_NOT_FOUND } from '../sipCodes.js';
 import { callerChannel, type Call } from './call.js';
 import { dialEmergency, emergencyLogLevel } from './emergency.js';
 import { handleFeature } from './features.js';
-import { noteBlindTransfer, noteNumberForward } from './forwardContext.js';
+import { noteBlindTransfer } from './forwardContext.js';
 import { enterTarget } from './inbound.js';
 import { dialExternal } from './outboundExternal.js';
 import { resolveDialedContext, toFor } from './outboundLookup.js';
@@ -147,6 +147,25 @@ async function dispatchExtension(
     );
     return;
   }
+  // §10.1 step 7: a dialled decision or menu forwards without a caller, as a menu option does.
+  if (action.owner.kind === 'decision') {
+    await enterTarget(
+      pipeline,
+      call,
+      { kind: 'decision', decisionId: action.owner.decisionId },
+      null
+    );
+    return;
+  }
+  if (action.owner.kind === 'menu') {
+    await enterTarget(
+      pipeline,
+      call,
+      { kind: 'menu', menuId: action.owner.menuId },
+      null
+    );
+    return;
+  }
   // §10.2 "Call parking": a blind transfer to a slot parks the transferee there.
   if (dial.blindTransfer === true && dial.asUser !== null) {
     await parkTransferee(pipeline, call, dial.asUser, action.owner.ext);
@@ -199,9 +218,13 @@ export async function dispatchAction(
   if (action.kind === 'ownDid') {
     // §10.1 step 7: a DID's own target is the call's first hop too, so it adds no hop either, and
     // an external one is dialled without a caller, since the DID forwards, not the dialling user.
-    const target = findForwardTarget(snapshot, action.targetId);
-    noteNumberForward(snapshot, call, { didId: action.didId }, target);
-    await enterTarget(pipeline, call, target, null);
+    await enterTarget(
+      pipeline,
+      call,
+      findForwardTarget(snapshot, action.targetId),
+      null,
+      { didId: action.didId }
+    );
     return;
   }
   if (action.kind === 'extension') {

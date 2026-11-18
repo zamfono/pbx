@@ -3,17 +3,12 @@ import { z } from 'zod';
 import { HTTP_CONFLICT, HTTP_NOT_FOUND } from '@zamfono/shared';
 
 import { recordChange, recordFieldChanges } from '../audit.js';
-import { loadDroppedBlfKeys } from '../devices/_shared.js';
 import type { MemberSpec } from '../members.js';
+import { changeOwnedExtension } from '../ownedExtension.js';
 import { propagate } from '../propagate.js';
 import { pushRoster } from '../roster.js';
 import { logLevelInputFields, resolveLogLevel } from '../settings/logLevel.js';
-import { defineOperation, type Context } from '../types.js';
-import { moveExtension } from '../users/_extensionChange.js';
-import {
-  assertExtensionAvailable,
-  assertValidExtension
-} from '../users/_extensions.js';
+import { defineOperation } from '../types.js';
 import { ringGroupFields } from './_input.js';
 import { replaceMembers, ringGroupMembers } from './_members.js';
 import {
@@ -21,7 +16,6 @@ import {
   assertNameAvailable,
   liveRingGroup,
   optionalFlag,
-  ringGroupExtension,
   ringGroupOut,
   toRingGroupOut,
   type RingGroupRow
@@ -70,54 +64,6 @@ function resolvedFields(
   };
 }
 
-/**
- * Gives group `id` the extension `next`, moves it, or removes it (`null`), with the BLF and mailbox
- * keys watching it: a move takes them along, a removal drops them by the FK cascade, as a delete
- * does (§11.2). Recorded under `extension`, this operation's own field, so audit.undo replays it,
- * then re-inserts the dropped keys (§5.8). `true` when the extension changed.
- */
-async function changeExtension(
-  ctx: Context,
-  id: string,
-  next: string | null | undefined
-): Promise<boolean> {
-  const current = await ringGroupExtension(ctx.db, id);
-  if (next === undefined || next === current) {
-    return false;
-  }
-  if (next !== null) {
-    await assertValidExtension(ctx.db, next);
-    await assertExtensionAvailable(ctx.db, next);
-  }
-  const droppedBlfKeys =
-    next === null && current !== null
-      ? await loadDroppedBlfKeys(ctx, current)
-      : [];
-  if (next === null) {
-    await ctx.db
-      .deleteFrom('extensions')
-      .where('ringGroupId', '=', id)
-      .execute();
-  } else if (current === null) {
-    await ctx.db
-      .insertInto('extensions')
-      .values({ ext: next, ringGroupId: id })
-      .execute();
-  } else {
-    await moveExtension(ctx, current, next);
-  }
-  recordChange(ctx, { field: 'extension', from: current, to: next });
-  if (droppedBlfKeys.length > 0) {
-    recordChange(ctx, {
-      field: 'droppedBlfKeys',
-      from: droppedBlfKeys,
-      to: []
-    });
-  }
-  propagate(ctx, ['pjsip', 'dialplan']);
-  return true;
-}
-
 export const updateRingGroup = defineOperation({
   name: 'ringGroups.update',
   description: "Updates a ring group's configuration.",
@@ -140,9 +86,9 @@ export const updateRingGroup = defineOperation({
       .set({ ...after, ...logLevel })
       .where('id', '=', input.id)
       .execute();
-    const extensionChanged = await changeExtension(
+    const extensionChanged = await changeOwnedExtension(
       ctx,
-      input.id,
+      { ringGroupId: input.id },
       input.extension
     );
     if (input.members) {

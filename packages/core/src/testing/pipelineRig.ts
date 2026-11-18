@@ -112,6 +112,7 @@ export async function startRig(
       const started = await startInternalServer(
         {
           token: TEST_INTERNAL_TOKEN,
+          stackTz: 'UTC',
           db,
           ari,
           log: noopLogger,

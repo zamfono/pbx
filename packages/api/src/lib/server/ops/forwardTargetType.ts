@@ -40,5 +40,6 @@ export type TargetSpec = Announcement &
     | { kind: 'mailboxUser'; userId: string }
     | { kind: 'mailboxRingGroup'; ringGroupId: string }
     | { kind: 'menu'; menuId: string }
+    | { kind: 'decision'; decisionId: string }
     | { kind: 'hangup' }
   );

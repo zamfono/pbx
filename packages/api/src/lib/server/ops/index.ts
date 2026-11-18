@@ -7,6 +7,7 @@ import './backups/index.js';
 import './blockedNumbers/index.js';
 import './calls/index.js';
 import './contacts/index.js';
+import './decisions/index.js';
 import './devices/index.js';
 import './didBlocks/index.js';
 import './dids/index.js';

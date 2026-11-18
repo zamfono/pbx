@@ -67,9 +67,15 @@ async function rowsWhere(
   return rows;
 }
 
+// The owned rows whose own references count (§5.8): a decision's conditions name users. Every
+// other owned row only routes through its forward targets; a ring group's members never block
+// (§5.9).
+const CHECKED_OWNED = new Set(['decision_conditions']);
+
 /**
  * The revived row and the forward targets it routes to (§11.2): its own, and those of the live
- * rows it owns, which go with it on delete (its rules, menu options, OOO rules and schedules).
+ * rows it owns, which go with it on delete (its rules, menu options, decision cases, OOO rules
+ * and schedules), and the owned rows of `CHECKED_OWNED`.
  */
 async function holders(
   db: Db,
@@ -104,6 +110,7 @@ async function holders(
   );
   return [
     revived,
+    ...owned.flat().filter(holder => CHECKED_OWNED.has(holder.table)),
     ...targets.flat().map(row => ({ table: FORWARD_TARGETS, row }))
   ];
 }

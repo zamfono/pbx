@@ -23,6 +23,7 @@ const DELETE_PROPAGATE_KINDS: Partial<Record<string, ReloadKind[]>> = {
   trunk: ['pjsip'],
   userGroup: ['pjsip'],
   menu: [],
+  decision: [],
   did: [],
   didBlock: [],
   oooRule: [],
@@ -44,19 +45,17 @@ async function audioReloadKinds(
   return asset.kind === 'moh' ? ['moh'] : undefined;
 }
 
-/** `extensions.userId`/`ringGroupId` for the entity kind an `ext` change belongs to (§11.2). */
-function extensionOwner(
-  entityKind: string,
-  entityId: string
-): { userId: string | null; ringGroupId: string | null } {
-  return {
-    userId: entityKind === 'user' ? entityId : null,
-    ringGroupId: entityKind === 'ringGroup' ? entityId : null
-  };
-}
+/** The `extensions` owner column for the entity kind an `ext` change belongs to (§11.2). */
+const EXTENSION_OWNERS = {
+  user: 'userId',
+  ringGroup: 'ringGroupId',
+  decision: 'decisionId',
+  menu: 'menuId'
+} as const;
 
 /**
- * Re-inserts the `extensions` row a user's or ring group's own delete cascade dropped (§5.9),
+ * Re-inserts the `extensions` row a user's, ring group's, decision's or menu's own delete dropped
+ * (§5.9),
  * refused with the row naming it if the extension has been taken since (§5.8).
  */
 export async function revertExtension(
@@ -75,16 +74,13 @@ export async function revertExtension(
       { kind: 'extension', id: ext, label: ext }
     ]);
   }
-  const owner = extensionOwner(entityKind, entityId);
+  const column = EXTENSION_OWNERS[entityKind as keyof typeof EXTENSION_OWNERS];
   await ctx.db
     .insertInto('extensions')
-    .values({
-      ext,
-      userId: owner.userId,
-      ringGroupId: owner.ringGroupId,
-      isParkingSlot: 0
-    })
+    .values({ ext, [column]: entityId, isParkingSlot: 0 })
     .execute();
+  // Its hint comes back with it (§9.3), as the delete took it away.
+  propagate(ctx, ['dialplan']);
 }
 
 /**

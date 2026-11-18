@@ -33,6 +33,12 @@
 | `contacts.get` | `GET /api/v1/contacts/{id}` | Reads one live contact by id. | user | no |
 | `contacts.list` | `GET /api/v1/contacts` | Lists the tenant's live phone-book contacts. | user | no |
 | `contacts.update` | `PATCH /api/v1/contacts/{id}` | Updates a contact's details; `phones` replaces the number set as a whole. | admin | no |
+| `decisions.create` | `POST /api/v1/decisions` | Creates a decision: ordered cases, each a set of conditions and a target, and a default target for a call no case matches. | admin | no |
+| `decisions.delete` | `DELETE /api/v1/decisions/{id}` | Soft-deletes a decision. | admin | yes |
+| `decisions.dryRun` | `POST /api/v1/decisions/{id}/dryRun` | Shows which case a decision takes for a given time, caller and presence, each condition's result and the input it read, and the OOO rule or opening hours that apply downstream; changes nothing. | admin | no |
+| `decisions.get` | `GET /api/v1/decisions/{id}` | Reads one live decision by id. | admin | no |
+| `decisions.list` | `GET /api/v1/decisions` | Lists the tenant's live decisions. | admin | no |
+| `decisions.update` | `PATCH /api/v1/decisions/{id}` | Updates a decision's name, extension, default target or cases, the cases replaced as a whole. | admin | no |
 | `devices.create` | `POST /api/v1/users/{id}/devices` | Creates a SIP device for a user; a manual or yealink device's connection settings, and a yealink device's provisioning link, are returned once. | user | no |
 | `devices.delete` | `DELETE /api/v1/devices/{id}` | Soft-deletes a device. | user | yes |
 | `devices.getBlf` | `GET /api/v1/devices/{id}/blf` | Reads a device's key list: a ringotel device's BLF panel, or a manual device's line keys. | user | no |
@@ -73,7 +79,7 @@
 | `outboundRoutes.replace` | `PUT /api/v1/outboundRoutes` | Replaces the outbound route list as a whole, in evaluation order: a call takes the first route whose callers and numbers both match, falling through to the next when its trunk fails. | admin | no |
 | `parking.get` | `GET /api/v1/parking/slots` | Reads the set of parking-slot extensions | admin | no |
 | `parking.list` | `GET /api/v1/parking/calls` | Lists the calls parked right now: slot, call, caller (null when withheld), parked since and by whom. | user | no |
-| `parking.set` | `PUT /api/v1/parking/slots` | Replaces the set of parking-slot extensions as a whole; an extension a user or ring group owns, or an emergency number, is refused | admin | no |
+| `parking.set` | `PUT /api/v1/parking/slots` | Replaces the set of parking-slot extensions as a whole; an extension a user, ring group, decision or menu owns, or an emergency number, is refused | admin | no |
 | `personalAccessTokens.create` | `POST /api/v1/users/{id}/personalAccessTokens` | Creates a personal access token, acting as the user, for a server application; its value is returned once. | user | no |
 | `personalAccessTokens.current` | `GET /api/v1/personalAccessTokens/current` | Reads the personal access token the caller authenticated with, e.g. to see when it expires; 404 for a caller without one. | user | no |
 | `personalAccessTokens.list` | `GET /api/v1/users/{id}/personalAccessTokens` | Lists a user's personal access tokens, revoked and expired ones until the daily purge, paginated. | user | no |
@@ -93,7 +99,7 @@
 | `ringGroups.list` | `GET /api/v1/ringGroups` | Lists the tenant's live ring groups. | admin | no |
 | `ringGroups.setForwarding` | `PUT /api/v1/ringGroups/{id}/forwarding` | Replaces a ring group's 'unanswered' and 'unavailable' forwarding rules as a whole. | admin | no |
 | `ringGroups.update` | `PATCH /api/v1/ringGroups/{id}` | Updates a ring group's configuration. | admin | no |
-| `search.query` | `GET /api/v1/search` | The type-ahead behind the search bar: users, ring groups and contacts. | user | no |
+| `search.query` | `GET /api/v1/search` | The type-ahead behind the search bar: users, ring groups, decisions, menus and contacts. | user | no |
 | `settings.get` | `GET /api/v1/settings` | Reads the tenant settings row, each secret only as whether it is set | admin | no |
 | `settings.update` | `PATCH /api/v1/settings` | Updates tenant-wide settings: main number, fallback, country, language, mail relay, feature codes, retention, SSO and more; owner-only fields say so | admin | no |
 | `sipAllowlist.create` | `POST /api/v1/sipAllowlist` | Exempts a source address or range from SIP bans, ending every active ban it covers | admin | no |

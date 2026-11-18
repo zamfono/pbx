@@ -132,6 +132,7 @@ const REUSE_CONFLICT_CHECKS: Partial<Record<string, ReuseCheck>> = {
   ringGroup: uniqueAmongLive('ringGroups', 'ringGroup', 'name', ['name']),
   userGroup: uniqueAmongLive('userGroups', 'userGroup', 'name', ['name']),
   menu: uniqueAmongLive('menus', 'menu', 'name', ['name']),
+  decision: uniqueAmongLive('decisions', 'decision', 'name', ['name']),
   trunk: uniqueAmongLive('trunks', 'trunk', 'name', ['name'], ['priority']),
   did: uniqueAmongLive('dids', 'did', 'number', ['number']),
   didBlock: uniqueAmongLive('didBlocks', 'didBlock', 'base', ['base']),

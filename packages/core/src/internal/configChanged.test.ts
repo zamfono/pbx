@@ -96,6 +96,7 @@ describe('POST /internal/configChanged and presence (§3.1, §10.2)', () => {
     const started = await startInternalServer(
       {
         token: TEST_INTERNAL_TOKEN,
+        stackTz: 'UTC',
         db,
         ari,
         log: noopLogger,
@@ -167,6 +168,7 @@ describe('POST /internal/configChanged and presence (§3.1, §10.2)', () => {
     const started = await startInternalServer(
       {
         token: TEST_INTERNAL_TOKEN,
+        stackTz: 'UTC',
         db,
         ari,
         log: noopLogger,

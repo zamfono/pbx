@@ -207,6 +207,8 @@ async function purgeSoftDeletedRows(
 
   await purgeOrphanForwardTargets(trx);
 
+  // Before the users their conditions name (§5.9); their cases and conditions go with them.
+  await purgeSoftDeleted(trx, 'decisions', softDeleteCutoff);
   await purgeSoftDeleted(trx, 'menus', softDeleteCutoff);
   await purgeSoftDeleted(trx, 'ringGroups', softDeleteCutoff);
   await purgeSoftDeleted(trx, 'users', softDeleteCutoff);

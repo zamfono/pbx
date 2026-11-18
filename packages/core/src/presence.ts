@@ -101,7 +101,8 @@ export class Presence {
 
   /** Seeds registration state from `endpoints.list()` and writes every live user's initial hint.
    * Every ring-group and parking-slot lamp starts `NOT_INUSE` (§9.3): no call of this process
-   * rings a group or waits in a slot yet, while Asterisk keeps the state a crash left behind. */
+   * rings a group or waits in a slot yet, while Asterisk keeps the state a crash left behind.
+   * Decision and menu lamps are `refreshAll`'s. */
   async resyncOnBoot(): Promise<void> {
     const endpoints = await this.deps.ari.endpoints.list();
     for (const endpoint of endpoints) {
@@ -119,11 +120,16 @@ export class Presence {
   /** Recomputes every live user's hint and status, and every mailbox's lamp, from a fresh
    * snapshot: at boot, and after each `/internal/configChanged` (§3.1), since `api`'s writes (DND
    * through `PUT /users/{id}/presence`, a deleted device, a renumbered extension) change what they
-   * fold from (§9.3, §10.2). Only a real transition reaches `presence_log` and `/events`. */
+   * fold from (§9.3, §10.2). Only a real transition reaches `presence_log` and `/events`. A
+   * decision's or menu's lamp is always `NOT_INUSE`, a call passing through at once, so one added
+   * or renumbered gets it here. */
   async refreshAll(): Promise<void> {
     const snapshot = await this.deps.cache.get();
     await Promise.all([
       ...snapshot.users.map(user => this.refreshUser(user.id, snapshot)),
+      ...snapshot.extensions
+        .filter(row => row.decisionId !== null || row.menuId !== null)
+        .map(row => this.hints.push(row.ext, 'NOT_INUSE')),
       resyncMwiLamps({ ari: this.deps.ari, db: this.deps.db })
     ]);
   }

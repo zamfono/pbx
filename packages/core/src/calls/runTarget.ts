@@ -3,20 +3,21 @@
 import { nextHop, type ForwardTarget } from '../routing/targets.js';
 import { SIP_TEMPORARILY_UNAVAILABLE } from '../sipCodes.js';
 import { type Call } from './call.js';
-import {
-  noteDiversion,
-  noteNumberForward,
-  type Diversion
-} from './forwardContext.js';
+import { resolveOnCall } from './callDecisions.js';
+import { noteDiversion, type Diversion } from './forwardContext.js';
 import type { Forwarder } from './forwardLeg.js';
-import { enterTarget } from './inbound.js';
+import { enterResolved, enterTarget } from './inbound.js';
 import type { Pipeline } from './pipeline.js';
 import { endTargetOwner, type Owner } from './release.js';
 
 /** Past the hop limit (`settings.max_forward_hops`): the last target's mailbox, else 480 (§10.1
- * step 7). */
-async function endAtHopLimit(pipeline: Pipeline, call: Call): Promise<void> {
-  call.log.event({ event: 'hopLimit', hops: call.hops });
+ * step 7), `trace` saying why. */
+async function endAtHopLimit(
+  pipeline: Pipeline,
+  call: Call,
+  trace: Record<string, unknown> = { event: 'hopLimit', hops: call.hops }
+): Promise<void> {
+  call.log.event(trace);
   const snapshot = await pipeline.deps.cache.get();
   let owner: Owner | null = null;
   if (call.calleeUserId !== null) {
@@ -31,26 +32,59 @@ async function endAtHopLimit(pipeline: Pipeline, call: Call): Promise<void> {
   });
 }
 
-/** Step 7 "Forward targets": hop counting, then dispatch, or the hop-limit mailbox fallback.
- * `forwarder` is `enterTarget`'s: the forwarding user, `null` for a forward nobody's own rule made.
- * `diversion` is the forward hop this is, `null` for a forward that diverts nobody (a menu's
- * fallback, a parked call's), recorded once the hop limit let it through. */
+/** A decision met again since the last clearing event ends the call as at the hop limit (§10.1
+ * step 7 "Loops"), with a trace line naming it. */
+export async function endAtDecisionLoop(
+  pipeline: Pipeline,
+  call: Call,
+  decisionId: string
+): Promise<void> {
+  await endAtHopLimit(pipeline, call, { event: 'decisionLoop', decisionId });
+}
+
+/** What a target is applied for: the forward hop it is, `null` for a forward that diverts nobody
+ * (a menu's fallback, a parked call's, a fallback), recorded once the hop limit let it through;
+ * and whether an OOO rule, a closed schedule, a user's or a group's rule forwards, which clears
+ * the decisions met so far (§10.1 step 7 "Loops"). */
+export type Forward = { diversion: Diversion | null; rule: boolean };
+
+/** A forward that is no rule's and diverts nobody. */
+export const PLAIN_FORWARD: Forward = { diversion: null, rule: false };
+
+/** Step 7 "Forward targets": the target's decisions resolved (`resolveOnCall`), hop counting on the
+ * target they resolve to, then dispatch, or the hop-limit mailbox fallback. `forwarder` is
+ * `enterTarget`'s: the forwarding user, `null` for a forward nobody's own rule made. */
 export async function runTarget(
   pipeline: Pipeline,
   call: Call,
   target: ForwardTarget,
   forwarder: Forwarder | null,
-  diversion: Diversion | null
+  forward: Forward
 ): Promise<void> {
+  if (forward.rule) {
+    call.decisionsSeen.clear();
+  }
+  const resolution = await resolveOnCall(pipeline, call, target);
+  if (resolution.kind === 'loop') {
+    await endAtDecisionLoop(pipeline, call, resolution.decisionId);
+    return;
+  }
   const snapshot = await pipeline.deps.cache.get();
-  const hop = nextHop(call.hops, target, snapshot.settings.maxForwardHops);
+  const hop = nextHop(
+    call.hops,
+    resolution.target,
+    snapshot.settings.maxForwardHops
+  );
   if (!hop.ok) {
     await endAtHopLimit(pipeline, call);
     return;
   }
+  if (hop.hops > call.hops) {
+    call.decisionsSeen.clear();
+  }
   call.hops = hop.hops;
-  noteDiversion(call, diversion);
-  await enterTarget(pipeline, call, target, forwarder);
+  noteDiversion(call, forward.diversion);
+  await enterResolved(pipeline, call, resolution, forwarder);
 }
 
 /**
@@ -83,7 +117,7 @@ export async function failOver(
     cause,
     to: fallback.kind
   });
-  await runTarget(pipeline, call, fallback, forwarder, null);
+  await runTarget(pipeline, call, fallback, forwarder, PLAIN_FORWARD);
   return true;
 }
 
@@ -102,6 +136,6 @@ export async function enterOwnDid(
     return;
   }
   call.hops += 1;
-  noteNumberForward(snapshot, call, { didId: did.id }, did.target);
-  await enterTarget(pipeline, call, did.target, null);
+  call.decisionsSeen.clear();
+  await enterTarget(pipeline, call, did.target, null, { didId: did.id });
 }

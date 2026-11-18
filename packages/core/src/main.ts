@@ -209,7 +209,8 @@ export async function main(): Promise<{ close: () => Promise<void> }> {
         media,
         trunks: trunkState,
         version: env.version,
-        sessions: pipeline.deps.bots
+        sessions: pipeline.deps.bots,
+        stackTz: env.tz
       },
       CORE_INTERNAL_PORT
     );

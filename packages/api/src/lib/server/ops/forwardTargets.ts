@@ -12,13 +12,15 @@ import { OpError, type Context } from './types.js';
 /**
  * Whether only an `admin` or `owner` sets or keeps `target` (§10.3 "Forward targets"): a `sip`
  * target, which sends calls to whatever host its trunk names (§9.4 "SIP targets"), a `webSocket`
- * one, which sends a call's audio to whatever URL it names (§9.4 "WebSocket targets"), and an
- * `external` one that records (§10.2 "Recording semantics").
+ * one, which sends a call's audio to whatever URL it names (§9.4 "WebSocket targets"), a
+ * `decision`, whose cases may hold either (§10.1 step 7 "Decisions"), and an `external` one that
+ * records (§10.2 "Recording semantics").
  */
 export function isAdminTarget(target: TargetSpec): boolean {
   return (
     target.kind === 'sip' ||
     target.kind === 'webSocket' ||
+    target.kind === 'decision' ||
     (target.kind === 'external' && target.record)
   );
 }
@@ -36,6 +38,9 @@ function adminTargetRefusal(target: TargetSpec): string {
   }
   if (target.kind === 'webSocket') {
     return 'a webSocket target is set by an admin';
+  }
+  if (target.kind === 'decision') {
+    return 'a decision target is set by an admin';
   }
   return 'a recording target is set by an admin';
 }
@@ -56,7 +61,8 @@ export function readableTarget(ctx: Context, target: TargetSpec): OwnTarget {
   if (ctx.actor.role !== 'user' || !isManagedTarget(target)) {
     return target;
   }
-  // Only these kinds carry a fallback, so only they head a chain holding an admin target.
+  // Only these kinds carry a fallback or are admin targets themselves, so only they head a chain
+  // holding an admin target.
   return { managed: true, kind: target.kind as ManagedTarget['kind'] };
 }
 

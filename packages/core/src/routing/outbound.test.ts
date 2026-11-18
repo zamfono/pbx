@@ -32,7 +32,16 @@ describe('resolveDialed', () => {
   it('resolves an emergency number even when an extension of the same digits exists', () => {
     const ctx = baseCtx({
       extensions: new Map([
-        ['112', { userId: 'user-1', ringGroupId: null, isParkingSlot: false }]
+        [
+          '112',
+          {
+            userId: 'user-1',
+            ringGroupId: null,
+            decisionId: null,
+            menuId: null,
+            isParkingSlot: false
+          }
+        ]
       ])
     });
 
@@ -45,7 +54,16 @@ describe('resolveDialed', () => {
   it('resolves an owned extension', () => {
     const ctx = baseCtx({
       extensions: new Map([
-        ['101', { userId: 'user-1', ringGroupId: null, isParkingSlot: false }]
+        [
+          '101',
+          {
+            userId: 'user-1',
+            ringGroupId: null,
+            decisionId: null,
+            menuId: null,
+            isParkingSlot: false
+          }
+        ]
       ])
     });
 

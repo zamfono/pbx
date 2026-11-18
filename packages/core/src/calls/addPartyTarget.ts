@@ -6,12 +6,9 @@
  * result.
  */
 import type { Snapshot } from '../internal/snapshot.js';
+import { resolvePure, type DecisionInputs } from '../routing/decision.js';
 import { resolveDialed } from '../routing/outbound.js';
-import {
-  findForwardTarget,
-  ownDidTarget,
-  type ForwardTarget
-} from '../routing/targets.js';
+import { findForwardTarget, type ForwardTarget } from '../routing/targets.js';
 import { SIP_NOT_FOUND, SIP_TEMPORARILY_UNAVAILABLE } from '../sipCodes.js';
 import { extensionOf } from './extensionOwner.js';
 import { recordingOf, ringTimeoutOf, type ForwardLeg } from './forwardLeg.js';
@@ -47,54 +44,34 @@ function didNumber(snapshot: Snapshot, didId: string): string {
   return row.number;
 }
 
-/** `target` followed through every external target that is itself an own DID's number, one hop
- * each, as an ordinary dial of the DID follows it (§10.1 step 7), so it never leaves through a
- * trunk; `null` past the hop limit. */
-function followOwnDids(
+/**
+ * A forward target dialled as `*5`'s party, resolved without playing anything (§10.1 step 7
+ * "Decisions": the pure resolver), through its decisions and the own DIDs it names: an own DID or
+ * a decision extension (§10.1 Outbound steps 3 and 5). A user or ring-group outcome is rung like
+ * that extension, an external or SIP one dialled; a mailbox, a menu, a WebSocket target or
+ * `hangup` is no party that could join a conversation, so it is refused like an unowned number,
+ * and a chain past the hop limit or meeting a decision again with 480, as past the hop limit.
+ * `to` is the number or extension dialled.
+ */
+function forwardedTarget(
   snapshot: Snapshot,
-  target: ForwardTarget
-): { target: ForwardTarget; hops: number } | null {
-  let reached = target;
-  let hops = 0;
-  for (
-    let next = ownDidTarget(snapshot, reached);
-    next !== null;
-    next = ownDidTarget(snapshot, reached)
-  ) {
-    hops += 1;
-    if (hops > snapshot.settings.maxForwardHops) {
-      return null;
-    }
-    reached = next;
-  }
-  return { target: reached, hops };
-}
-
-/** An own DID dialled as `*5`'s target (§10.1 Outbound step 5): its user or ring-group target is
- * rung like that extension, an external or SIP one dialled; a mailbox, a menu or `hangup` is
- * no party that could join a conversation, so it is refused like an unowned number, and DIDs
- * forwarding to each other past the hop limit with 480, as their mailbox-less last target is. */
-function didTarget(
-  snapshot: Snapshot,
-  targetId: string,
-  number: string
+  forwarded: ForwardTarget,
+  to: string,
+  inputs: DecisionInputs
 ): AddedTarget {
-  const followed = followOwnDids(
-    snapshot,
-    findForwardTarget(snapshot, targetId)
-  );
+  const followed = resolvePure(snapshot, forwarded, 0, inputs);
   if (followed === null) {
     return { kind: 'refuse', code: SIP_TEMPORARILY_UNAVAILABLE };
   }
   const { target, hops } = followed;
   if (target.kind === 'user') {
-    return { kind: 'user', userId: target.userId, to: number, hops };
+    return { kind: 'user', userId: target.userId, to, hops };
   }
   if (target.kind === 'ringGroup') {
     return {
       kind: 'ringGroup',
       ringGroupId: target.ringGroupId,
-      to: number,
+      to,
       hops
     };
   }
@@ -113,15 +90,17 @@ function didTarget(
     };
   }
   if (target.kind === 'sip') {
-    return { kind: 'sip', target, to: number };
+    return { kind: 'sip', target, to };
   }
   return { kind: 'refuse', code: SIP_NOT_FOUND };
 }
 
-/** Resolves `*5`'s target string (everything after the feature code) against `snapshot`. */
+/** Resolves `*5`'s target string (everything after the feature code) against `snapshot`, a
+ * decision on the way read with `inputs`: the party who dials it as the caller. */
 export function resolveAddedTarget(
   snapshot: Snapshot,
-  dialed: string
+  dialed: string,
+  inputs: DecisionInputs
 ): AddedTarget {
   const action = resolveDialed(dialed, resolveDialedContext(snapshot));
   switch (action.kind) {
@@ -136,15 +115,28 @@ export function resolveAddedTarget(
         clir: action.clir
       };
     case 'ownDid':
-      return didTarget(
+      return forwardedTarget(
         snapshot,
-        action.targetId,
-        didNumber(snapshot, action.didId)
+        findForwardTarget(snapshot, action.targetId),
+        didNumber(snapshot, action.didId),
+        inputs
       );
     case 'extension': {
       const { owner } = action;
-      if (owner.kind === 'parking') {
-        // A parked call is retrieved by dialling its slot, not added to another conversation.
+      if (owner.kind === 'decision') {
+        const ext = snapshot.extensions.find(
+          row => row.decisionId === owner.decisionId
+        )?.ext;
+        return forwardedTarget(
+          snapshot,
+          { kind: 'decision', decisionId: owner.decisionId },
+          ext ?? dialed,
+          inputs
+        );
+      }
+      if (owner.kind === 'parking' || owner.kind === 'menu') {
+        // A parked call is retrieved by dialling its slot, not added to another conversation,
+        // and a menu answers nobody but plays to its caller.
         return { kind: 'refuse', code: SIP_NOT_FOUND };
       }
       const ownerRef =

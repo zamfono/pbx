@@ -12,6 +12,8 @@ export * from './trunks.js';
 export * from './cidr.js';
 export * from './addressKey.js';
 export * from './columnValues.js';
+export * from './decisions.js';
+export * from './decisionDryRun.js';
 export * from './sipHeaders.js';
 export * from './events.js';
 export * from './health.js';

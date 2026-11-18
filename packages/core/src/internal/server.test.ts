@@ -101,6 +101,7 @@ describe('startInternalServer', () => {
     const started = await startInternalServer(
       {
         token: TEST_INTERNAL_TOKEN,
+        stackTz: 'UTC',
         db,
         ari,
         log: serverLogger,
@@ -468,6 +469,7 @@ describe('startInternalServer', () => {
     const started = await startInternalServer(
       {
         token: TEST_INTERNAL_TOKEN,
+        stackTz: 'UTC',
         db,
         ari,
         log: noopLogger,
@@ -521,6 +523,7 @@ describe('startInternalServer', () => {
     const started = await startInternalServer(
       {
         token: TEST_INTERNAL_TOKEN,
+        stackTz: 'UTC',
         db,
         ari,
         log: noopLogger,
@@ -565,6 +568,7 @@ describe('startInternalServer', () => {
     const started = await startInternalServer(
       {
         token: TEST_INTERNAL_TOKEN,
+        stackTz: 'UTC',
         db,
         ari,
         log: noopLogger,
@@ -618,6 +622,7 @@ describe('startInternalServer', () => {
     const started = await startInternalServer(
       {
         token: TEST_INTERNAL_TOKEN,
+        stackTz: 'UTC',
         db,
         ari,
         log: noopLogger,

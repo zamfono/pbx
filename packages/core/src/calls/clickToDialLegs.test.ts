@@ -7,7 +7,11 @@ import { contactEndpoint } from '../testing/ami/contacts.js';
 import { defaultChannel } from '../testing/ari/fakeChannel.js';
 import { eventually } from '../testing/eventually.js';
 import { startRig, type Rig } from '../testing/pipelineRig.js';
-import { seedRegisteredDevice } from '../testing/seedRows.js';
+import {
+  seedDecision,
+  seedForwardTarget,
+  seedRegisteredDevice
+} from '../testing/seedRows.js';
 import { CallActions } from './actions.js';
 import type { Call } from './call.js';
 import { liveLegs } from './liveLegs.js';
@@ -95,6 +99,40 @@ describe('click-to-dial live legs', () => {
       ]);
     });
     expect(liveLegs(rig.state, call)[0]?.id).toBe(answering);
+    await actions.hangup(callId, { actorUserId: newId() });
+  });
+  it('dials a decision extension with the originating user as its caller (§10.1 step 7 "Decisions")', async () => {
+    rig = await startRig();
+    rig.fakeAri.answerAfterMs = 60_000;
+    const anna = await seedUser(rig.db, { ext: '101' });
+    await seedRegisteredDevice(rig, anna, 'e101-a');
+    const ben = await seedUser(rig.db, { ext: '102' });
+    await seedRegisteredDevice(rig, ben, 'e102-a');
+    await seedDecision(rig.db, {
+      cases: [
+        {
+          when: [{ type: 'callerUser', userId: anna }],
+          targetId: await seedForwardTarget(rig.db, { userId: ben })
+        }
+      ],
+      defaultTargetId: await seedForwardTarget(rig.db, {}),
+      ext: '650'
+    });
+    await rig.devicesUp();
+    const actions = new CallActions(rig.pipeline);
+
+    const result = await actions.originate({
+      userId: anna,
+      target: '650',
+      actorUserId: newId(),
+      requestId: 'req-1'
+    });
+    const callId = 'callId' in result ? result.callId : '';
+    answer(channelOf(contactEndpoint('e101-a')));
+
+    await eventually(() => {
+      expect(channelOf(contactEndpoint('e102-a'))).not.toBe('');
+    });
     await actions.hangup(callId, { actorUserId: newId() });
   });
 });

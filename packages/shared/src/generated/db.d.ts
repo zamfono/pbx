@@ -4,6 +4,7 @@
  */
 
 import type { AudioKind, AuditChannel, BackupRunStatus, BackupTargetKind, CallDirection, CallerIdHeader, CallLogLevel, CallStatus, DeviceKind, DeviceTransport, DiversionPolicy, ForwardedCallerId, HostDirection, Language, LogLevelOverride, MailKind, MaintenanceWork, NumberFormat, OAuthClientKind, PresenceStatus, PromptVoice, QosRole, RingGroupForwardCondition, RingStrategy, SipBanProtocol, SmtpSecurity, SsoProvider, TokenKind, TrunkAuthMode, TrunkTransport, UserForwardCondition, UserRole, WebhookStatus, WebSocketProtocol } from "../columnValues.js";
+import type { DecisionConditionType } from "../decisions.js";
 import type { ColumnType } from "kysely";
 import type { CountryCode } from "libphonenumber-js";
 
@@ -115,6 +116,32 @@ export interface Contacts {
   updatedAt: string;
 }
 
+export interface DecisionCases {
+  decisionId: string;
+  id: string;
+  position: number;
+  targetId: string;
+}
+
+export interface DecisionConditions {
+  caseId: string;
+  decisionId: string;
+  id: string;
+  parentId: string | null;
+  position: number;
+  type: DecisionConditionType;
+  userId: string | null;
+  valueJson: string | null;
+}
+
+export interface Decisions {
+  createdAt: string;
+  defaultTargetId: string;
+  deletedAt: string | null;
+  id: string;
+  name: string;
+}
+
 export interface DeviceBlfKeys {
   deviceId: string;
   ext: string | null;
@@ -172,14 +199,17 @@ export interface Dids {
 }
 
 export interface Extensions {
+  decisionId: string | null;
   ext: string;
   isParkingSlot: Generated<number>;
+  menuId: string | null;
   ringGroupId: string | null;
   userId: string | null;
 }
 
 export interface ForwardTargets {
   announcementAudioId: string | null;
+  decisionId: string | null;
   external: string | null;
   fallbackOfId: string | null;
   id: string;
@@ -624,6 +654,9 @@ export interface DB {
   calls: Calls;
   contactPhones: ContactPhones;
   contacts: Contacts;
+  decisionCases: DecisionCases;
+  decisionConditions: DecisionConditions;
+  decisions: Decisions;
   deviceBlfKeys: DeviceBlfKeys;
   deviceMwiRingGroups: DeviceMwiRingGroups;
   devices: Devices;

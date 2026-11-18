@@ -9,10 +9,19 @@ import {
 } from '@zamfono/shared/testDb.js';
 
 import { ConfigCache } from '../internal/snapshot.js';
+import type { DecisionInputs } from '../routing/decision.js';
 import { ringable } from '../routing/ringGroup.js';
-import { seedForwardTarget } from '../testing/seedRows.js';
+import { seedDecision, seedForwardTarget } from '../testing/seedRows.js';
 import type { Pipeline } from './pipeline.js';
 import { buildMemberStates } from './ringGroupState.js';
+
+/** No member forward here reaches a decision, so nothing reads these. */
+const NO_DECISIONS: DecisionInputs = {
+  now: '2026-01-01T00:00:00Z',
+  timezone: 'UTC',
+  caller: { userId: null, number: '+4930123456' },
+  statusOf: () => 'available'
+};
 
 /** `settings.max_forward_hops`' default. */
 const MAX_HOPS = 3;
@@ -85,7 +94,8 @@ describe('buildMemberStates', () => {
     const states = buildMemberStates(idlePipeline, snapshot, groupId, {
       now: nowIso(),
       busy: new Set(),
-      hops: 0
+      hops: 0,
+      inputs: NO_DECISIONS
     });
 
     expect(
@@ -136,7 +146,8 @@ describe('buildMemberStates', () => {
     const states = buildMemberStates(idlePipeline, snapshot, groupId, {
       now: nowIso(),
       busy: new Set(),
-      hops: 0
+      hops: 0,
+      inputs: NO_DECISIONS
     });
 
     expect(states.map(state => state.unconditional)).toStrictEqual([
@@ -194,7 +205,8 @@ describe('buildMemberStates', () => {
     const states = buildMemberStates(idlePipeline, snapshot, groupId, {
       now: nowIso(),
       busy: new Set(),
-      hops: 0
+      hops: 0,
+      inputs: NO_DECISIONS
     });
 
     expect(states.map(state => state.unconditional)).toStrictEqual([
@@ -209,17 +221,103 @@ describe('buildMemberStates', () => {
     const within = buildMemberStates(idlePipeline, snapshot, groupId, {
       now: nowIso(),
       busy: new Set(),
-      hops: 0
+      hops: 0,
+      inputs: NO_DECISIONS
     });
     const past = buildMemberStates(idlePipeline, snapshot, groupId, {
       now: nowIso(),
       busy: new Set(),
-      hops: 1
+      hops: 1,
+      inputs: NO_DECISIONS
     });
 
     expect(within.map(state => state.unconditional?.kind)).toStrictEqual([
       'user'
     ]);
     expect(ringable(past, true)).toStrictEqual([]);
+  });
+  it('resolves a member\'s forward to a decision on its own, ringing an outward outcome and skipping a mailbox or a loop (§10.1 step 7 "Decisions")', async () => {
+    const groupId = newId();
+    await db
+      .insertInto('ringGroups')
+      .values({
+        id: groupId,
+        name: 'Sales',
+        strategy: 'simultaneous',
+        createdAt: nowIso()
+      })
+      .execute();
+    const [outward, mailbox, looping] = await Promise.all([
+      seedUser(db),
+      seedUser(db),
+      seedUser(db)
+    ]);
+    const back = await seedForwardTarget(db, {});
+    const loop = await seedDecision(db, { cases: [], defaultTargetId: back });
+    await db
+      .updateTable('forwardTargets')
+      .set({ decisionId: loop })
+      .where('id', '=', back)
+      .execute();
+    const forwards: [string, string][] = [
+      [
+        outward,
+        await seedDecision(db, {
+          cases: [
+            {
+              when: [{ type: 'caller', number: '+4930', isPrefix: true }],
+              targetId: await seedForwardTarget(db, { external: '+4989555' })
+            }
+          ],
+          defaultTargetId: await seedForwardTarget(db, {})
+        })
+      ],
+      [
+        mailbox,
+        await seedDecision(db, {
+          cases: [],
+          defaultTargetId: await seedForwardTarget(db, {
+            mailboxUserId: mailbox
+          })
+        })
+      ],
+      [looping, loop]
+    ];
+    for (const [position, [userId, decisionId]] of forwards.entries()) {
+      // eslint-disable-next-line no-await-in-loop -- member order
+      await db
+        .insertInto('ringGroupMembers')
+        .values({ groupId, position, userId, userGroupId: null })
+        .execute();
+      // eslint-disable-next-line no-await-in-loop -- as above
+      const targetId = await seedForwardTarget(db, { decisionId });
+      // eslint-disable-next-line no-await-in-loop -- as above
+      await db
+        .insertInto('userForwardRules')
+        .values({ userId, condition: 'unconditional', targetId })
+        .execute();
+    }
+    const snapshot = await new ConfigCache(db).get();
+
+    const states = buildMemberStates(idlePipeline, snapshot, groupId, {
+      now: nowIso(),
+      busy: new Set(),
+      hops: 0,
+      inputs: { ...NO_DECISIONS, caller: { userId: null, number: '+4930123' } }
+    });
+
+    expect(states.map(state => state.unconditional?.kind)).toStrictEqual([
+      'external',
+      'mailboxUser',
+      'decision'
+    ]);
+    expect(states[2]?.forwardHopLimit).toBe(true);
+    // `ringable` follows the first forward, and skips the mailbox and the member whose chain met
+    // its decision again.
+    expect(states[0]?.unconditional).toStrictEqual({
+      kind: 'external',
+      number: '+4989555'
+    });
+    expect(states[0]?.forwardHopLimit).toBeUndefined();
   });
 });

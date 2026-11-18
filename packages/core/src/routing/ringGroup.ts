@@ -96,7 +96,8 @@ export type MemberState = {
   idleDevices: number;
   oooInEffect: boolean;
   unconditional: ForwardTarget | null;
-  /** `unconditional` runs through own DIDs forwarding on past the hop limit (§10.1 step 7). */
+  /** `unconditional` runs through own DIDs forwarding on past the hop limit, or meets a decision
+   * again, which ends like it (§10.1 step 7). */
   forwardHopLimit?: true;
   /** The registered devices of `unconditional`'s user, when it forwards to a user; 0 otherwise. */
   forwardRegisteredDevices: number;

@@ -6,6 +6,7 @@ import { type DB, type Db } from '@zamfono/shared';
 import { targetSpecSchema } from '../forwardTargetSchema.js';
 import { resolveTarget } from '../forwardTargetSpec.js';
 import { assertNoLiveHolder } from '../liveHolder.js';
+import { ownedExtension } from '../ownedExtension.js';
 import { liveRow } from '../rows.js';
 import { timeoutSeconds } from '../timeoutInput.js';
 
@@ -67,7 +68,13 @@ export const menuFields = {
     ),
   fallbackTarget: targetSpecSchema.describe(
     'Where the call goes after the last attempt.'
-  )
+  ),
+  extension: z
+    .string()
+    .nullable()
+    .describe(
+      'An extension of its own, so the menu can be dialled and transferred to; null for none.'
+    )
 };
 
 /** One entry of a menu's DTMF map: the keys and the forward target they route to. */
@@ -112,6 +119,10 @@ export async function menuTargetRows(
 export const menuOut = z.object({
   id: z.string(),
   name: z.string(),
+  ext: z
+    .string()
+    .nullable()
+    .describe('The extension, null for none (reached only through targets).'),
   audioId: z.string(),
   timeoutS: z.number(),
   maxAttempts: z.number(),
@@ -123,13 +134,15 @@ export type MenuOut = z.infer<typeof menuOut>;
 
 /** Assembles the wire shape of a menu from its row, fallback target and DTMF map (§10.3). */
 export async function toMenuOut(db: Db, row: MenuRow): Promise<MenuOut> {
-  const [fallback, targets] = await Promise.all([
+  const [ext, fallback, targets] = await Promise.all([
+    ownedExtension(db, { menuId: row.id }),
     resolveTarget(db, row.fallbackTargetId),
     menuTargetRows(db, row.id)
   ]);
   return {
     id: row.id,
     name: row.name,
+    ext,
     audioId: row.audioId,
     timeoutS: row.timeoutS,
     maxAttempts: row.maxAttempts,

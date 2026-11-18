@@ -14,6 +14,7 @@ import { isPlacement } from '../testing/ari/fakeDial.js';
 import { eventually } from '../testing/eventually.js';
 import { answeredCall, startRig, type Rig } from '../testing/pipelineRig.js';
 import {
+  seedDecision,
   seedExternalRoute,
   seedRegisteredDevice,
   seedSlot
@@ -378,5 +379,32 @@ describe('parking ring-back', () => {
 
     expect((await bridgedLeg(parked, onward)).userId).toBe(ben);
     expect(onward.diversions).toEqual([]);
+  });
+  it('sends the parked party through a tenant fallback decision as the outside caller it is', async () => {
+    await setUp();
+    const anna = await seedParker();
+    const ben = await seedBen();
+    const decisionId = await seedDecision(db, {
+      cases: [
+        {
+          when: [{ type: 'callerUser', userId: null }],
+          targetId: await seedTarget({})
+        },
+        {
+          when: [{ type: 'caller', number: '+15559999', isPrefix: false }],
+          targetId: await seedTarget({ userId: ben })
+        }
+      ],
+      defaultTargetId: await seedTarget({})
+    });
+    await seedFallback({ decisionId });
+    const parked = await parkFor(anna);
+
+    const { onward } = await answeredOnward(parked);
+
+    expect(onward.answeredByUserId).toBe(ben);
+    expect(onward.log.finish().log).toContain(
+      `"event":"decision","decisionId":"${decisionId}","decisionCase":1`
+    );
   });
 });

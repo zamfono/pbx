@@ -132,7 +132,7 @@ function fallbackSchema(): FallbackSchema {
 /**
  * The shared target vocabulary a ring group's forwarding rule or a menu's fallback/DTMF option
  * points at (§11.2 `forward_targets`). One of the union's kinds maps to exactly one of the
- * table's eight exclusive targets, `sip`'s and `webSocket`'s being their column sets, and `hangup`
+ * table's nine exclusive targets, `sip`'s and `webSocket`'s being their column sets, and `hangup`
  * to none of them; each takes the announcement that plays before it (§10.1 step 7). Each is
  * strict, so a field of another kind, such as `record` on a `user` target, is refused rather
  * than dropped.
@@ -223,6 +223,15 @@ export const targetSpecSchema: z.ZodType<TargetSpec> = z
     }),
     z.strictObject({
       kind: z
+        .literal('decision')
+        .describe(
+          "Sends the call to the first of a decision's cases whose conditions match, else its default; admin-only."
+        ),
+      decisionId: z.string(),
+      announcementAudioId: announcementSchema
+    }),
+    z.strictObject({
+      kind: z
         .literal('hangup')
         .describe(
           'Ends the call: once its announcement has played, or unanswered (480) without one.'
@@ -248,18 +257,19 @@ export const targetSpecSchema: z.ZodType<TargetSpec> = z
   // which the OpenAPI document lifts into its components (`openapi.ts`).
   .meta({ id: 'ForwardTarget' })
   .describe(
-    'Where the call goes: one of nine kinds, chosen by `kind` (see zamfono.help mental-model).'
+    'Where the call goes: one of ten kinds, chosen by `kind` (see zamfono.help mental-model).'
   );
 /**
  * What a `user` reads in place of a target an admin set on their own forwarding rule, OOO rule or
- * opening hours (§10.3 "Forward targets"), a chain holding a `sip` or `webSocket` target, or an
- * `external` one that records, anywhere in it: its kind alone, never its number, URL, token or
- * headers. Sent back unchanged in the same place, it keeps the admin's target as it is.
+ * opening hours (§10.3 "Forward targets"), a chain holding a `sip`, `webSocket` or `decision`
+ * target, or an `external` one that records, anywhere in it: its kind alone, never its number,
+ * URL, token, headers or cases. Sent back unchanged in the same place, it keeps the admin's target
+ * as it is.
  */
 export const managedTargetSchema = z
   .strictObject({
     managed: z.literal(true),
-    kind: z.enum(['external', 'sip', 'webSocket'])
+    kind: z.enum(['external', 'sip', 'webSocket', 'decision'])
   })
   .meta({ id: 'ManagedForwardTarget' })
   .describe(

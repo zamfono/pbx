@@ -2,7 +2,9 @@ import { z } from 'zod';
 
 import { HTTP_NOT_FOUND } from '@zamfono/shared';
 
+import { dropOwnedExtension } from '../ownedExtension.js';
 import { propagate } from '../propagate.js';
+import { pushRoster } from '../roster.js';
 import { idOutput, softDelete, softDeleteQuestion } from '../rows.js';
 import { Conflict, defineOperation } from '../types.js';
 import { findMenuReferences } from './_references.js';
@@ -28,9 +30,13 @@ export const deleteMenu = defineOperation({
       throw new Conflict('menu is still in use', references);
     }
     await softDelete(ctx, 'menus', input.id);
+    const ext = await dropOwnedExtension(ctx, { menuId: input.id });
     // Read by the routing pipeline (§3.1), and nothing in it reaches Asterisk's own
     // configuration, so this drops `core`'s config cache without a reload.
     propagate(ctx, []);
+    if (ext !== null) {
+      await pushRoster(ctx);
+    }
     return { id: input.id };
   }
 });

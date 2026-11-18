@@ -12,9 +12,14 @@ export type Reference = { kind: string; id: string; label: string };
 
 /**
  * The entity whose own rules travel with it rather than blocking its own delete (§5.9): a ring
- * group's or a menu's own scope is excluded from the owners `findForwardTargetOwners` reports.
+ * group's, a menu's or a decision's own scope is excluded from the owners `findForwardTargetOwners`
+ * reports.
  */
-export type OwnScope = { ringGroupId?: string; menuId?: string };
+export type OwnScope = {
+  ringGroupId?: string;
+  menuId?: string;
+  decisionId?: string;
+};
 
 type UnscopedSources = {
   dids: { id: string; label: string | null; number: string }[];
@@ -124,10 +129,51 @@ async function loadRingGroupOwnedSources(
     : query.where('ringGroupForwardRules.groupId', '!=', ringGroupId).execute();
 }
 
+type DecisionOwnedSources = {
+  decisions: { id: string; name: string }[];
+  cases: { decisionId: string; name: string; position: number }[];
+};
+
+/**
+ * `decisions.default_target_id` and `decision_cases.target_id`, outside `decisionId`'s own scope: a
+ * decision's own default and cases travel with it (§5.9) rather than blocking its own delete.
+ */
+async function loadDecisionOwnedSources(
+  db: Db,
+  ftIds: string[],
+  decisionId: string | undefined
+): Promise<DecisionOwnedSources> {
+  let decisions = db
+    .selectFrom('decisions')
+    .select(['id', 'name'])
+    .where('defaultTargetId', 'in', ftIds)
+    .where('deletedAt', 'is', null);
+  let cases = db
+    .selectFrom('decisionCases')
+    .innerJoin('decisions', 'decisions.id', 'decisionCases.decisionId')
+    .select([
+      'decisionCases.decisionId as decisionId',
+      'decisions.name as name',
+      'decisionCases.position as position'
+    ])
+    .where('decisionCases.targetId', 'in', ftIds)
+    .where('decisions.deletedAt', 'is', null);
+  if (decisionId !== undefined) {
+    decisions = decisions.where('id', '!=', decisionId);
+    cases = cases.where('decisionCases.decisionId', '!=', decisionId);
+  }
+  const [decisionRows, caseRows] = await Promise.all([
+    decisions.execute(),
+    cases.execute()
+  ]);
+  return { decisions: decisionRows, cases: caseRows };
+}
+
 /** Flattens every §5.9 reference source into the wire shape a delete refusal carries. */
 function toReferences(
   unscoped: UnscopedSources,
   menuOwned: MenuOwnedSources,
+  decisionOwned: DecisionOwnedSources,
   groupRules: { groupId: string; condition: string }[],
   schedules: ScheduleSources
 ): Reference[] {
@@ -161,6 +207,16 @@ function toReferences(
       kind: 'menu',
       id: row.menuId,
       label: `menu option (${row.digits})`
+    })),
+    ...decisionOwned.decisions.map(row => ({
+      kind: 'decision',
+      id: row.id,
+      label: `${row.name} (default)`
+    })),
+    ...decisionOwned.cases.map(row => ({
+      kind: 'decision',
+      id: row.decisionId,
+      label: `${row.name} (case ${row.position + 1})`
     })),
     ...groupRules.map(row => ({
       kind: 'ringGroup',
@@ -198,9 +254,10 @@ async function chainHeads(db: Db, ftIds: string[]): Promise<string[]> {
 }
 
 /**
- * Every row across all nine `forward_targets` owner columns of §11.2 that still points at one of
+ * Every row across all eleven `forward_targets` owner columns of §11.2 that still points at one of
  * `ftIds`, outside `exclude`'s own scope: `dids.target_id`, `did_blocks.fallback_target_id`,
- * `menus.fallback_target_id`, `menu_targets.target_id`, `user_forward_rules.target_id`,
+ * `menus.fallback_target_id`, `menu_targets.target_id`, `decisions.default_target_id`,
+ * `decision_cases.target_id`, `user_forward_rules.target_id`,
  * `ring_group_forward_rules.target_id`, `settings.fallback_target_id`, `ooo_rules.target_id` and
  * `opening_hours.closed_target_id` (§5.9: a soft delete is refused while any of these exist); a
  * fallback is referenced by the owner of its chain's first row (`chainHeads`).
@@ -214,11 +271,19 @@ export async function findForwardTargetOwners(
     return [];
   }
   const ftIds = await chainHeads(db, targetIds);
-  const [unscoped, menuOwned, groupRules, schedules] = await Promise.all([
-    loadUnscopedSources(db, ftIds),
-    loadMenuOwnedSources(db, ftIds, exclude.menuId),
-    loadRingGroupOwnedSources(db, ftIds, exclude.ringGroupId),
-    loadScheduleSources(db, ftIds, exclude)
-  ]);
-  return toReferences(unscoped, menuOwned, groupRules, schedules);
+  const [unscoped, menuOwned, decisionOwned, groupRules, schedules] =
+    await Promise.all([
+      loadUnscopedSources(db, ftIds),
+      loadMenuOwnedSources(db, ftIds, exclude.menuId),
+      loadDecisionOwnedSources(db, ftIds, exclude.decisionId),
+      loadRingGroupOwnedSources(db, ftIds, exclude.ringGroupId),
+      loadScheduleSources(db, ftIds, exclude)
+    ]);
+  return toReferences(
+    unscoped,
+    menuOwned,
+    decisionOwned,
+    groupRules,
+    schedules
+  );
 }

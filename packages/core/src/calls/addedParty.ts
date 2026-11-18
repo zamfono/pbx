@@ -18,6 +18,7 @@ import { ActionError, notBridged } from './actionError.js';
 import { dialAddPartyTarget } from './addParty.js';
 import { resolveAddedTarget } from './addPartyTarget.js';
 import { linkParent, newCall, type Call } from './call.js';
+import { effectiveStatus, tenantClock } from './callDecisions.js';
 import { ownBridge, transferrerChannel } from './callLookup.js';
 import { extensionOf } from './extensionOwner.js';
 import { settleStatus } from './missedCall.js';
@@ -40,7 +41,22 @@ export async function newAddedLeg(
   kind: AddedLegKind
 ): Promise<Call> {
   const snapshot = await pipeline.deps.cache.get();
-  if (resolveAddedTarget(snapshot, req.target).kind === 'refuse') {
+  const callerUserId = userOfChannel(running, byChannelId);
+  const from =
+    (callerUserId === null
+      ? null
+      : extensionOf(snapshot, { userId: callerUserId })) ?? running.from;
+  // A decision on the way reads the leg's caller, the user acting through `byChannelId`, else
+  // the running call's number (§10.1 step 7 "Decisions").
+  const inputs = {
+    ...tenantClock(snapshot, pipeline.deps),
+    caller: { userId: callerUserId, number: from }
+  };
+  const resolved = resolveAddedTarget(snapshot, req.target, {
+    ...inputs,
+    statusOf: effectiveStatus(snapshot, pipeline.deps.state.presence, inputs)
+  });
+  if (resolved.kind === 'refuse') {
     running.log.event({
       event: kind,
       actorUserId: req.actorUserId,
@@ -54,15 +70,11 @@ export async function newAddedLeg(
     );
   }
   const id = newId();
-  const callerUserId = userOfChannel(running, byChannelId);
   const leg = newCall({
     id,
     direction: 'internal',
     callerChannelId: null,
-    from:
-      (callerUserId === null
-        ? null
-        : extensionOf(snapshot, { userId: callerUserId })) ?? running.from,
+    from,
     to: req.target,
     startedAt: pipeline.deps.now(),
     logLevel: running.log.level,

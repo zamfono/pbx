@@ -2,7 +2,14 @@
 // and user seeders (`@zamfono/shared/testDb.js`): devices, extensions, ring groups, audio
 // assets, forward targets, trunks and outbound routes. Each takes the row's columns on top of its
 // defaults.
-import { newId, nowIso, type Db } from '@zamfono/shared';
+import {
+  childConditions,
+  conditionColumns,
+  newId,
+  nowIso,
+  type Db,
+  type DecisionCondition
+} from '@zamfono/shared';
 import { seedUser, type Row } from '@zamfono/shared/testDb.js';
 
 import { registerDevice } from './pipelineDeps.js';
@@ -123,6 +130,68 @@ export async function seedForwardTarget(
     .insertInto('forwardTargets')
     .values({ ...target, id })
     .execute();
+  return id;
+}
+
+/** `conditions`' rows under `parentId`, each operator's children under it. */
+async function seedConditions(
+  db: Db,
+  owner: { decisionId: string; caseId: string },
+  conditions: DecisionCondition[],
+  parentId: string | null
+): Promise<void> {
+  for (const [position, condition] of conditions.entries()) {
+    const id = newId();
+    // eslint-disable-next-line no-await-in-loop -- a child names its parent, inserted first
+    await db
+      .insertInto('decisionConditions')
+      .values({
+        id,
+        ...owner,
+        parentId,
+        position,
+        ...conditionColumns(condition)
+      })
+      .execute();
+    // eslint-disable-next-line no-await-in-loop -- as above
+    await seedConditions(db, owner, childConditions(condition), id);
+  }
+}
+
+/** A decision (§10.1 step 7 "Decisions") with `cases`, each its conditions and a target row's id,
+ * and the default target row `defaultTargetId`, optionally at extension `ext`. Returns its id. */
+export async function seedDecision(
+  db: Db,
+  decision: {
+    id?: string;
+    cases: { when: DecisionCondition[]; targetId: string }[];
+    defaultTargetId: string;
+    ext?: string;
+  }
+): Promise<string> {
+  const id = decision.id ?? newId();
+  await db
+    .insertInto('decisions')
+    .values({
+      id,
+      name: `Decision ${id}`,
+      defaultTargetId: decision.defaultTargetId,
+      createdAt: nowIso()
+    })
+    .execute();
+  for (const [position, { when, targetId }] of decision.cases.entries()) {
+    const caseId = newId();
+    // eslint-disable-next-line no-await-in-loop -- in case order
+    await db
+      .insertInto('decisionCases')
+      .values({ id: caseId, decisionId: id, position, targetId })
+      .execute();
+    // eslint-disable-next-line no-await-in-loop -- as above
+    await seedConditions(db, { decisionId: id, caseId }, when, null);
+  }
+  if (decision.ext !== undefined) {
+    await seedExtension(db, decision.ext, { decisionId: id });
+  }
   return id;
 }
 

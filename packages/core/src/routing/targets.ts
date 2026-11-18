@@ -47,7 +47,10 @@ export type ForwardTarget = Announcement &
     | { kind: 'mailboxUser'; userId: string }
     | { kind: 'mailboxRingGroup'; ringGroupId: string }
     | { kind: 'menu'; menuId: string }
-    /** Ends the call, the row naming none of the eight targets (§11.2). */
+    /** Sends the call to the first of the decision's cases whose conditions match, else its
+     * default (§10.1 step 7 "Decisions"), resolved before the call goes anywhere. */
+    | { kind: 'decision'; decisionId: string }
+    /** Ends the call, the row naming none of the nine targets (§11.2). */
     | { kind: 'hangup' }
   );
 
@@ -70,6 +73,7 @@ type ForwardTargetsRow = {
   mailboxRingGroupId: string | null;
   announcementAudioId: string | null;
   menuId: string | null;
+  decisionId: string | null;
   ringTimeoutS: number | null;
   /** The target this row is the fallback of (§10.1 step 7), `null` for a chain's first row. */
   fallbackOfId: string | null;
@@ -157,6 +161,9 @@ function kindFromRow(
   }
   if (row.menuId !== null) {
     return { kind: 'menu', menuId: row.menuId };
+  }
+  if (row.decisionId !== null) {
+    return { kind: 'decision', decisionId: row.decisionId };
   }
   return { kind: 'hangup' };
 }
@@ -250,30 +257,4 @@ export function nextHop(
     return { ok: false };
   }
   return { ok: true, hops: next };
-}
-
-/**
- * `target` followed through the tenant's own DIDs it names (`ownDidTarget`) to the target the
- * chain ends at, each DID one hop on the `hops` already taken, as `enterOwnDid` counts them
- * (§10.1 step 7); `null` for a chain that passes the hop limit.
- */
-export function throughOwnDids(
-  snapshot: Snapshot,
-  target: ForwardTarget,
-  hops: number
-): ForwardTarget | null {
-  let current = target;
-  let taken = hops;
-  for (
-    let next = ownDidTarget(snapshot, current);
-    next !== null;
-    next = ownDidTarget(snapshot, current)
-  ) {
-    taken += 1;
-    if (taken > snapshot.settings.maxForwardHops) {
-      return null;
-    }
-    current = next;
-  }
-  return current;
 }

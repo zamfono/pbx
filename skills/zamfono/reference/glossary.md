@@ -1,7 +1,7 @@
 # Glossary
 
 **Extension** — the short internal number dialled between colleagues. A parking slot is one; a
-user or a ring group owns at most one.
+user, a ring group, a decision or a menu owns at most one.
 
 **Parking slot** — an extension that holds a parked call (`*70`) until someone dials it; replaced
 as a set with `parking.set`. See `parking`.
@@ -26,12 +26,15 @@ the outbound route nor the caller sets one. See `numbers`.
 block's `fallbackTarget`, else the tenant-wide `settings.fallbackTarget`, else a 404 release. See
 `numbers`.
 
-**Forward target** — the nine-kind vocabulary (`user`, `ringGroup`, `external`, `sip`,
-`webSocket`, `mailboxUser`, `mailboxRingGroup`, `menu`, `hangup`) every routing rule points at,
-each with an optional announcement that plays first. See `mental-model`.
+**Forward target** — the ten-kind vocabulary (`user`, `ringGroup`, `external`, `sip`,
+`webSocket`, `mailboxUser`, `mailboxRingGroup`, `menu`, `decision`, `hangup`) every routing rule
+points at, each with an optional announcement that plays first. See `mental-model`.
 
 **Hop** — one re-entry of the routing pipeline through a `user` or `ringGroup` forward target. A
 call is released to a mailbox after the third hop.
+
+**Decision** — ordered cases of conditions (time, dates, caller, a user's status) and targets,
+with a default target: a call goes where the first matching case says. See `decisions`.
 
 **OOO rule** — an out-of-office rule for a scope (user, ring group, menu or tenant), with an
 optional start and expiry and a forward target, evaluated ahead of opening hours.

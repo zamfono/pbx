@@ -17,6 +17,8 @@ import { SIP_ADDRESS_INCOMPLETE, SIP_NOT_FOUND } from '../sipCodes.js';
 type ExtensionOwner =
   | { kind: 'user'; userId: string }
   | { kind: 'ringGroup'; ringGroupId: string }
+  | { kind: 'decision'; decisionId: string }
+  | { kind: 'menu'; menuId: string }
   | { kind: 'parking'; ext: string };
 
 export type DialAction =
@@ -39,6 +41,8 @@ export type DialAction =
 export type ExtensionRow = {
   userId: string | null;
   ringGroupId: string | null;
+  decisionId: string | null;
+  menuId: string | null;
   isParkingSlot: boolean;
 };
 
@@ -61,6 +65,12 @@ function ownerFromRow(ext: string, row: ExtensionRow): ExtensionOwner {
   }
   if (row.ringGroupId !== null) {
     return { kind: 'ringGroup', ringGroupId: row.ringGroupId };
+  }
+  if (row.decisionId !== null) {
+    return { kind: 'decision', decisionId: row.decisionId };
+  }
+  if (row.menuId !== null) {
+    return { kind: 'menu', menuId: row.menuId };
   }
   throw new Error(`resolveDialed: extension "${ext}" owns nothing`);
 }

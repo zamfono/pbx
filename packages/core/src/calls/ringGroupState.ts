@@ -4,13 +4,13 @@
  * an unconditional forward — and its `ring_group_forward_rules`, for `ringGroup.ts`.
  */
 import { userById, type Snapshot } from '../internal/snapshot.js';
+import { resolvePure, type DecisionInputs } from '../routing/decision.js';
 import type { MemberState } from '../routing/ringGroup.js';
 import { ownInEffectOoo } from '../routing/schedule.js';
 import { buildOooRules } from '../routing/scheduleRows.js';
 import {
   buildUserRules,
   findForwardTarget,
-  throughOwnDids,
   type ForwardTarget
 } from '../routing/targets.js';
 import { groupMemberUserIds } from './extensionOwner.js';
@@ -22,23 +22,29 @@ export type GroupRules = Partial<Record<GroupOutcome, ForwardTarget>>;
 
 /** `ring_group_members`, flattened through `groupMemberUserIds`, as the `MemberState[]` `ringable` (§10.1 step 5) expects;
  * `busy` holds the devices carrying a call (`busyDevices`), `hops` the forward hops the call has
- * taken (`Call.hops`). */
+ * taken (`Call.hops`), `inputs` what a decision a member's forward reaches reads. */
 export function buildMemberStates(
   pipeline: Pipeline,
   snapshot: Snapshot,
   groupId: string,
-  at: { now: string; busy: ReadonlySet<string>; hops: number }
+  at: {
+    now: string;
+    busy: ReadonlySet<string>;
+    hops: number;
+    inputs: DecisionInputs;
+  }
 ): MemberState[] {
   const { now, busy } = at;
   const userIds = groupMemberUserIds(snapshot, groupId);
   const oooRules = buildOooRules(snapshot.oooRules);
   return userIds.map(userId => {
     const rule = buildUserRules(snapshot, userId).unconditional ?? null;
-    // A forward to an own DID is followed to the DID's target (§10.1 Outbound step 5), through
-    // DIDs forwarding to each other up to the hop limit (step 7).
+    // A forward is resolved through its decisions and the own DIDs it names (§10.1 Outbound
+    // step 5) to the target the member's leg rings, each member's chain on its own, up to the hop
+    // limit or a decision met again (step 7).
     const followed =
-      rule === null ? null : throughOwnDids(snapshot, rule, at.hops);
-    const unconditional = followed ?? rule;
+      rule === null ? null : resolvePure(snapshot, rule, at.hops, at.inputs);
+    const unconditional = followed?.target ?? rule;
     const devices = registeredDevices(pipeline, snapshot, userId);
     return {
       userId,

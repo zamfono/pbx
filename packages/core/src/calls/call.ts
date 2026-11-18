@@ -81,6 +81,9 @@ export type Call = {
   status: CallsRow['status'] | null;
   parentCallId: string | null;
   evaluated: Set<Scope>;
+  /** The decisions evaluated since the last clearing event (§10.1 step 7 "Loops"): a hop, a rule
+   * forwarding, a menu key matching an option. One met again ends the call as at the hop limit. */
+  decisionsSeen: Set<string>;
   menuAttempts: number;
   /** The bridge this call's next answer joins in place of a bridge of its own: the parked
    * party's for the parking ring-back (§10.2 "Call parking"), the running call's for `*5`
@@ -170,6 +173,7 @@ export function newCall(params: NewCallParams): Call {
     status: null,
     parentCallId: null,
     evaluated: new Set(),
+    decisionsSeen: new Set(),
     menuAttempts: 0
   };
 }

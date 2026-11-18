@@ -67,18 +67,28 @@ export async function assertValidExtension(db: Db, ext: string): Promise<void> {
   }
 }
 
-/** The `{kind, id}` a live `extensions` row names as its owner (§11.2: user, ring group, or a parking slot). */
-function extensionReference(
-  ext: string,
-  row: { userId: string | null; ringGroupId: string | null }
-): { kind: string; id: string } {
+/** The `{kind, id}` a live `extensions` row names as its owner (§11.2: a user, ring group,
+ * decision or menu, or a parking slot). */
+export function extensionReference(row: {
+  ext: string;
+  userId: string | null;
+  ringGroupId: string | null;
+  decisionId: string | null;
+  menuId: string | null;
+}): { kind: string; id: string } {
   if (row.userId !== null) {
     return { kind: 'user', id: row.userId };
   }
   if (row.ringGroupId !== null) {
     return { kind: 'ringGroup', id: row.ringGroupId };
   }
-  return { kind: 'parkingSlot', id: ext };
+  if (row.decisionId !== null) {
+    return { kind: 'decision', id: row.decisionId };
+  }
+  if (row.menuId !== null) {
+    return { kind: 'menu', id: row.menuId };
+  }
+  return { kind: 'parkingSlot', id: row.ext };
 }
 
 /**
@@ -92,12 +102,12 @@ export async function assertExtensionAvailable(
 ): Promise<void> {
   const existing = await db
     .selectFrom('extensions')
-    .select(['ext', 'userId', 'ringGroupId'])
+    .select(['ext', 'userId', 'ringGroupId', 'decisionId', 'menuId'])
     .where('ext', '=', ext)
     .executeTakeFirst();
   if (existing) {
     throw new Conflict('extension already in use', [
-      { ...extensionReference(ext, existing), label: `extension ${ext}` }
+      { ...extensionReference(existing), label: `extension ${ext}` }
     ]);
   }
 }

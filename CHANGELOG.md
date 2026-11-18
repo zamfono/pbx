@@ -33,6 +33,17 @@ why the specified behaviour changed; the commit history, how.
   Podman boot unit where it installed one. It shows what its checks of DNS and ports warned about
   first and checks again on request; while the stack's name does not resolve to its address alone,
   Enter answers Later.
+- Decisions: a forward target of the new kind `decision` sends a call to the first of its cases
+  whose conditions all match, else to its default target, a switch for calls. Conditions read the
+  time (weekly intervals and date ranges, one-off or every year), the caller (a number or prefix,
+  a withheld number, any or one colleague) and a colleague's status (away, closed, busy, dnd,
+  offline, available), combined with `any`, `all` and `not`. `/api/v1/decisions` and the MCP
+  tools `decisions.*` manage them, admins only, with undo; `decisions.dryRun` shows which case a
+  call would take and what out-of-office or opening hours then make of it. The call trace names
+  each decision and the case it took. See the guide's `decisions` topic.
+- Decisions and menus can have an extension of their own (`extension`, none unless given), so
+  they can be dialled, transferred to, put on a BLF key or in the Ringotel app's colleague list,
+  and found in search.
 
 ### Changed
 
@@ -40,6 +51,11 @@ why the specified behaviour changed; the commit history, how.
   above: `{ "kind": "hangup", "announcementAudioId": … }` is what it was.
 - `api` and `core` take the current releases of their dependencies: @simplewebauthn/server
   14.1.0, jose 6.2.16, nodemailer 10.4.0 and ws 8.22.2.
+- Search (`GET /api/v1/search`) also finds decisions and menus, by name and extension; a user
+  finds only those with an extension.
+- A user whose own forwarding, out-of-office rule or opening hours an admin pointed at a decision
+  reads it as `{ "managed": true, "kind": "decision" }` and keeps it by sending that back, as for
+  the other admin-only targets.
 
 ## [0.10.2] - 2026-11-16
 

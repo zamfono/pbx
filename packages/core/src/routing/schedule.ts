@@ -74,7 +74,7 @@ export function inEffectOoo(
 /** Whether `schedule` is open at `nowIso`, evaluated in `timezone` (§10.2 "Opening hours"): closed
  * exactly when a closed period of `closedPeriods`, whose edges follow the DST rule, starts now. */
 export function isOpen(
-  schedule: Schedule,
+  schedule: { intervals: readonly OpeningInterval[] },
   nowIso: string,
   timezone: string
 ): boolean {

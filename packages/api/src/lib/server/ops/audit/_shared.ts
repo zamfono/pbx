@@ -21,6 +21,7 @@ export const ENTITY_TABLES: Partial<Record<string, keyof DB>> = {
   device: 'devices',
   ringGroup: 'ringGroups',
   menu: 'menus',
+  decision: 'decisions',
   did: 'dids',
   didBlock: 'didBlocks',
   trunk: 'trunks',

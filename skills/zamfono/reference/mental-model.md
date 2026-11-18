@@ -35,7 +35,11 @@ that single tenant; there is no cross-tenant sharing.
   mailbox is opened on the web or over the API. `ringGroups.update` adds, moves or removes it;
   removing it drops the BLF and mailbox keys watching it, and undo puts them back.
 - **Menu** — a greeting plus a map of DTMF digits to forward targets, usable anywhere a target is
-  usable, including as one option of another menu.
+  usable, including as one option of another menu. A menu may have an extension of its own,
+  given with `menus.create` or `menus.update`, so it can be dialled and transferred to.
+- **Decision** — ordered cases, each a set of conditions (time, dates, caller, a colleague's
+  status) and a target, and a default target: the first matching case wins. Usable anywhere a
+  target is, and, with an extension of its own, dialled like a menu. See `decisions`.
 - **User group** — a named, nestable set of users, used as ring-group membership and as an
   outbound-route caller list. See `user-groups`.
 - **Contact** — a phone-book entry with one or more numbers, shared tenant-wide, that names
@@ -51,7 +55,7 @@ that single tenant; there is no cross-tenant sharing.
 
 Every place that routes a call somewhere else — a DID, a menu option, a forward rule, an
 out-of-office rule, a group fallback, an opening-hours closed target — points at one of the same
-nine target kinds:
+ten target kinds:
 
 | Kind               | Meaning                                                            |
 | ------------------ | ------------------------------------------------------------------ |
@@ -63,6 +67,7 @@ nine target kinds:
 | `mailboxUser`      | deposits the caller directly in a user's mailbox, no ringing       |
 | `mailboxRingGroup` | deposits the caller directly in a ring group's mailbox, no ringing |
 | `menu`             | plays a menu's greeting and collects DTMF                          |
+| `decision`         | goes where the decision's first matching case says (admin-only)    |
 | `hangup`           | ends the call                                                      |
 
 A `user` or `ringGroup` target re-enters the routing pipeline and counts a hop toward the
@@ -75,6 +80,8 @@ headers; either leg tells it who forwarded only as far as the trunk's `diversion
 `webSocket`, `{ "kind": "webSocket", "protocol": "twilio", "url": "wss://…" }`, hands the call to
 a voice bot that takes calls over a WebSocket, in the Twilio Media Streams or the Vonage protocol
 (`forward-to-voice-bot`); like `external` and `sip` it neither counts a hop nor re-enters.
+`decision`, `{ "kind": "decision", "decisionId": "…" }`, is replaced by the target its conditions
+pick, which then counts or not as it would on its own (`decisions`).
 
 A target of any kind may carry an `announcementAudioId`, an audio asset of kind `announcement`
 that plays to the caller before the call goes on to the target:
@@ -106,13 +113,14 @@ fallback; a party added with `*5` doesn't either.
 ```
 
 A `user` reading their own forwarding, out-of-office rules or opening hours sees a target an admin
-set there that is admin-only (`sip`, `webSocket`, or `external` with `"record": true`), anywhere
+set there that is admin-only (`sip`, `webSocket`, `decision`, or `external` with `"record": true`), anywhere
 in its fallback chain, as a marker such as `{ "managed": true, "kind": "sip" }` (`guardrails`).
 
 ## Where to look next
 
 - `routing-order` — the order every call is decided in, inbound and outbound.
 - `numbers` — DIDs, number blocks, the main number and the fallbacks, with a worked example.
+- `decisions` — conditional forwarding by time, dates, caller or presence, and its dry run.
 - `glossary` — short definitions of the terms used across the guide and the REST/MCP surface.
 - `guardrails` — what the API refuses, confirms or lets you undo.
 - `user-groups` — nestable sets of users for ring groups and outbound routes.

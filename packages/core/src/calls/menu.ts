@@ -16,7 +16,7 @@ import { collectMenuInput } from './menuInput.js';
 import type { Pipeline } from './pipeline.js';
 import { playAndWait } from './playback.js';
 import { release } from './release.js';
-import { runTarget } from './runTarget.js';
+import { PLAIN_FORWARD, runTarget } from './runTarget.js';
 
 type MenuRow = Snapshot['menus'][number];
 
@@ -28,9 +28,10 @@ function collectionMap(menu: MenuRow, snapshot: Snapshot): MenuMap {
     .map(row => ({ digits: row.digits, targetId: row.targetId }));
 }
 
-/** The live user/ring-group extensions (parking slots excluded) `menu` may dial straight through
- * to, when it allows it — empty otherwise (§10.1 step 6). Shared between the collector's
- * still-a-prefix check and the exact match below, so both agree on the same candidate set. */
+/** The live user, ring-group, decision and menu extensions (parking slots excluded) `menu` may
+ * dial straight through to, when it allows it — empty otherwise (§10.1 step 6). Shared between the
+ * collector's still-a-prefix check and the exact match below, so both agree on the same
+ * candidate set. */
 function liveExtensions(
   menu: MenuRow,
   snapshot: Snapshot
@@ -38,11 +39,7 @@ function liveExtensions(
   if (menu.allowExtensionDialing !== 1) {
     return [];
   }
-  return snapshot.extensions.filter(
-    row =>
-      row.isParkingSlot !== 1 &&
-      (row.userId !== null || row.ringGroupId !== null)
-  );
+  return snapshot.extensions.filter(row => row.isParkingSlot !== 1);
 }
 
 /** An unmatched, non-waiting string that exactly names one of `extensions`. */
@@ -60,7 +57,10 @@ function matchLiveExtension(
   if (row.ringGroupId !== null) {
     return { kind: 'ringGroup', ringGroupId: row.ringGroupId };
   }
-  return null;
+  if (row.decisionId !== null) {
+    return { kind: 'decision', decisionId: row.decisionId };
+  }
+  return row.menuId === null ? null : { kind: 'menu', menuId: row.menuId };
 }
 
 /** Whether the call has already been concluded elsewhere, such as by the caller's own hangup
@@ -122,6 +122,9 @@ async function attemptMenuRound(
     // way — including one nested inside another (§10.2 "press 5 for technical assistance") —
     // gets its own full `max_attempts` rather than inheriting what this menu had already spent.
     call.menuAttempts = 0;
+    // A matched key clears the decisions met so far (§10.1 step 7 "Loops"), so key-press
+    // navigation through decisions stays unbounded.
+    call.decisionsSeen.clear();
     // §10.1 step 7: a menu forwards without a caller.
     await enterTarget(pipeline, call, target, null);
     return;
@@ -133,7 +136,7 @@ async function attemptMenuRound(
       call,
       findForwardTarget(snapshot, menu.fallbackTargetId),
       null,
-      null
+      PLAIN_FORWARD
     );
     return;
   }

@@ -7,7 +7,10 @@ import type { DroppedBlfKey } from '../devices/_shared.js';
 import { propagate } from '../propagate.js';
 import { pushRoster } from '../roster.js';
 import { Conflict, defineOperation, type Context } from '../types.js';
-import { assertValidExtension } from '../users/_extensions.js';
+import {
+  assertValidExtension,
+  extensionReference
+} from '../users/_extensions.js';
 import { loadParkingSlots, slotsOutput } from './_shared.js';
 
 /** An extension digit string, matching the `extensions.ext` CHECK (§11.2). */
@@ -27,7 +30,8 @@ const inputSchema = z
   .strict();
 
 /**
- * Refuses a new slot ext that already names a user's or ring group's extension (§10.3 "Parking"):
+ * Refuses a new slot ext that already names a user's, ring group's, decision's or menu's extension
+ * (§10.3 "Parking"):
  * the primary key on `extensions.ext` would collide on insert otherwise.
  */
 async function guardNoCollision(
@@ -39,17 +43,13 @@ async function guardNoCollision(
   }
   const owned = await ctx.db
     .selectFrom('extensions')
-    .select(['ext', 'userId', 'ringGroupId'])
+    .select(['ext', 'userId', 'ringGroupId', 'decisionId', 'menuId'])
     .where('ext', 'in', additions)
     .execute();
   if (owned.length > 0) {
     throw new Conflict(
       'parking: extension already assigned',
-      owned.map(row => ({
-        kind: row.userId === null ? 'ringGroup' : 'user',
-        id: row.userId ?? row.ringGroupId ?? row.ext,
-        label: row.ext
-      }))
+      owned.map(row => ({ ...extensionReference(row), label: row.ext }))
     );
   }
 }
@@ -76,7 +76,7 @@ async function loadDroppedBlfKeys(
 export const set = defineOperation({
   name: 'parking.set',
   description:
-    'Replaces the set of parking-slot extensions as a whole; an extension a user or ring group owns, or an emergency number, is refused',
+    'Replaces the set of parking-slot extensions as a whole; an extension a user, ring group, decision or menu owns, or an emergency number, is refused',
   input: inputSchema,
   output: slotsOutput,
   problems: [HTTP_CONFLICT],
@@ -103,8 +103,6 @@ export const set = defineOperation({
         .values(
           additions.map(ext => ({
             ext,
-            userId: null,
-            ringGroupId: null,
             isParkingSlot: 1
           }))
         )

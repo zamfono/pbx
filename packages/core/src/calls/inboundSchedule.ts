@@ -97,7 +97,10 @@ export async function applyOooAndHours(
       call,
       findForwardTarget(snapshot, ooo.targetId),
       scopeForwarder(ooo.scope),
-      scheduleDiversion(snapshot, call, scope, 'away')
+      {
+        diversion: scheduleDiversion(snapshot, call, scope, 'away'),
+        rule: true
+      }
     );
     return true;
   }
@@ -128,7 +131,10 @@ export async function applyOooAndHours(
     call,
     findForwardTarget(snapshot, schedule.closedTargetId),
     scopeForwarder(schedule.scope),
-    scheduleDiversion(snapshot, call, scope, 'time_of_day')
+    {
+      diversion: scheduleDiversion(snapshot, call, scope, 'time_of_day'),
+      rule: true
+    }
   );
   return true;
 }

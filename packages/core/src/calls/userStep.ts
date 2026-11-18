@@ -64,7 +64,7 @@ export async function applyUserDecision(
     call,
     decision.target,
     { userId, standsIn: decision.condition === 'unconditional' },
-    diversion
+    { diversion, rule: true }
   );
 }
 

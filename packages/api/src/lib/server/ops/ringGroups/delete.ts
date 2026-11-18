@@ -2,8 +2,7 @@ import { z } from 'zod';
 
 import { HTTP_NOT_FOUND } from '@zamfono/shared';
 
-import { recordChange } from '../audit.js';
-import { loadDroppedBlfKeys } from '../devices/_shared.js';
+import { dropOwnedExtension } from '../ownedExtension.js';
 import { propagate } from '../propagate.js';
 import { pushRoster } from '../roster.js';
 import { idOutput, softDelete, softDeleteQuestion } from '../rows.js';
@@ -35,24 +34,8 @@ export const deleteRingGroup = defineOperation({
     if (references.length > 0) {
       throw new Conflict('ring group is still in use', references);
     }
-    const ext = await ringGroupExtension(ctx.db, input.id);
-    const droppedBlfKeys =
-      ext === null ? [] : await loadDroppedBlfKeys(ctx, ext);
     await softDelete(ctx, 'ringGroups', input.id);
-    if (ext !== null) {
-      await ctx.db
-        .deleteFrom('extensions')
-        .where('ringGroupId', '=', input.id)
-        .execute();
-      recordChange(ctx, { field: 'ext', from: ext, to: null });
-    }
-    if (droppedBlfKeys.length > 0) {
-      recordChange(ctx, {
-        field: 'droppedBlfKeys',
-        from: droppedBlfKeys,
-        to: []
-      });
-    }
+    await dropOwnedExtension(ctx, { ringGroupId: input.id });
     propagate(ctx, ['pjsip', 'dialplan']);
     await pushRoster(ctx);
     return { id: input.id };

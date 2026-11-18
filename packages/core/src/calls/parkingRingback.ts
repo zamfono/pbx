@@ -18,7 +18,7 @@ import { settleStatus } from './missedCall.js';
 import { startOnwardCall, type OnwardEntry } from './onwardCall.js';
 import type { Pipeline } from './pipeline.js';
 import { release } from './release.js';
-import { runTarget } from './runTarget.js';
+import { PLAIN_FORWARD, runTarget } from './runTarget.js';
 import {
   applyUserDecision,
   runUserStep,
@@ -108,7 +108,7 @@ function onwardRoute(
     return null;
   }
   const target = findForwardTarget(snapshot, targetId);
-  return child => runTarget(pipeline, child, target, null, null);
+  return child => runTarget(pipeline, child, target, null, PLAIN_FORWARD);
 }
 
 /**

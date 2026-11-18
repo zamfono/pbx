@@ -197,7 +197,8 @@ const FEATURE_CODE_PATTERN = /^[*#0-9]+$/u;
 /**
  * Every extension's hint, by extension, a parking slot known by its extension alone; each user's
  * DND hint, `<dndToggle code><ext>`, and each user's and ring group's mailbox hint,
- * `<mailbox code><ext>`, which a desk phone's DND and mailbox keys watch and dial (§9.3).
+ * `<mailbox code><ext>`, which a desk phone's DND and mailbox keys watch and dial (§9.3); a
+ * decision or menu, which has no mailbox, its presence hint alone.
  */
 function renderHintsConf(input: RenderInput, skipped: SkippedRow[]): string {
   const { dndToggleCode: dndCode, mailboxCode } = input.settings;
@@ -209,6 +210,7 @@ function renderHintsConf(input: RenderInput, skipped: SkippedRow[]): string {
       type: 'ringGroup' as const,
       ...group
     })),
+    ...input.passThrough,
     ...input.parkingSlots.map(ext => ({
       type: 'parkingSlot' as const,
       id: ext,
@@ -224,7 +226,7 @@ function renderHintsConf(input: RenderInput, skipped: SkippedRow[]): string {
       if (type === 'user' && dndHints) {
         hints.push(`exten => ${dndCode}${ext},hint,${dndHintDevice(ext)}`);
       }
-      if (type !== 'parkingSlot' && mailboxHints) {
+      if ((type === 'user' || type === 'ringGroup') && mailboxHints) {
         hints.push(`exten => ${mailboxCode}${ext},hint,${mwiHintDevice(ext)}`);
       }
       return hints;

@@ -1,13 +1,14 @@
 /** Inbound call entry (§10.1 step 1; §9.2 `inbound,<exten>`) and pipeline steps 2-4, 6 and 7
  * (ring groups are `ringGroup.ts`'s): OOO, opening hours, the target-user and target-menu steps,
- * reject-anonymous, a target's announcement, and each target kind's dispatch; hop counting is
- * `runTarget.ts`'s. */
+ * reject-anonymous, a target's decisions and announcements, and each target kind's dispatch; hop
+ * counting is `runTarget.ts`'s. */
 import { newId } from '@zamfono/shared';
 
 import type { AriEventOf } from '../ari/events.js';
 import { ignoreGone } from '../ari/failures.js';
 import { userById, type Snapshot } from '../internal/snapshot.js';
 import { setChannelLanguage, soundLanguage } from '../prompts.js';
+import type { Resolution, ResolvedTarget } from '../routing/decision.js';
 import {
   isBlocked,
   rejectAnonymous,
@@ -17,8 +18,9 @@ import { targetFromRow, type ForwardTarget } from '../routing/targets.js';
 import { SIP_DECLINE, SIP_SERVER_ERROR } from '../sipCodes.js';
 import { announce, hangUp } from './announce.js';
 import { newCall, type Call } from './call.js';
+import { resolveOnCall } from './callDecisions.js';
 import { raiseLogLevel } from './callLogLevel.js';
-import { noteNumberForward } from './forwardContext.js';
+import { noteNumberForward, type TenantNumber } from './forwardContext.js';
 import { dialForwardTarget } from './forwardDial.js';
 import type { Forwarder } from './forwardLeg.js';
 import { applyOooAndHours, targetIdentity } from './inboundSchedule.js';
@@ -28,28 +30,24 @@ import { isLocalDiallingHalf } from './pendingTransfer.js';
 import type { Pipeline } from './pipeline.js';
 import { endTargetOwner, release } from './release.js';
 import { ringGroup } from './ringGroup.js';
+import { endAtDecisionLoop } from './runTarget.js';
 import { runUserStep } from './userStep.js';
 import { deposit } from './voicemail.js';
 import { dialWebSocketTarget } from './webSocketTarget.js';
 
-/** `enterTarget` once the target's announcement has played: what its kind does. */
+/** `enterTarget` once the target's announcements have played: what its kind does. */
 async function enterKind(
   pipeline: Pipeline,
   call: Call,
-  target: Exclude<ForwardTarget, { kind: 'hangup' }>,
+  target: Exclude<ResolvedTarget, { kind: 'hangup' }>,
   forwarder: Forwarder | null
 ): Promise<void> {
-  if (target.kind === 'mailboxUser') {
-    await deposit(pipeline, call, { userId: target.userId }, 'target');
-    return;
-  }
-  if (target.kind === 'mailboxRingGroup') {
-    await deposit(
-      pipeline,
-      call,
-      { ringGroupId: target.ringGroupId },
-      'target'
-    );
+  if (target.kind === 'mailboxUser' || target.kind === 'mailboxRingGroup') {
+    const owner =
+      target.kind === 'mailboxUser'
+        ? { userId: target.userId }
+        : { ringGroupId: target.ringGroupId };
+    await deposit(pipeline, call, owner, 'target');
     return;
   }
   if (target.kind === 'external' || target.kind === 'sip') {
@@ -111,28 +109,55 @@ async function enterKind(
   await ringGroup(pipeline, call, target.ringGroupId);
 }
 
-/** Step 1 "Entry" for an already-resolved target (§10.1): reject-anonymous, OOO/hours, then the
- * target's own step. Exported for outbound dialling of an internal extension or own DID, which
- * enters here directly, without `runTarget`'s hop counting (§10.1 Outbound steps 3 and 5).
- * `forwarder` is the user whose own rule forwarded here, whose call an external target is dialled
- * as (§10.1 step 7), or `null` when a DID, menu, ring group or tenant rule forwards; no other
- * target kind reads it. */
+/** A resolved target applied (§10.1 step 7): the announcements of the decisions it passed and its
+ * own play first, in order, then what its kind does. */
+export async function enterResolved(
+  pipeline: Pipeline,
+  call: Call,
+  resolution: Extract<Resolution, { kind: 'resolved' }>,
+  forwarder: Forwarder | null
+): Promise<void> {
+  const { target, announcements } = resolution;
+  for (const audioId of announcements) {
+    // eslint-disable-next-line no-await-in-loop -- one after the other, to the caller
+    if (!(await announce(pipeline, call, audioId))) {
+      return;
+    }
+  }
+  if (target.kind === 'hangup') {
+    await hangUp(pipeline, call, announcements.length > 0);
+    return;
+  }
+  await enterKind(pipeline, call, target, forwarder);
+}
+
+/** Step 1 "Entry" (§10.1): the target's decisions resolved, then reject-anonymous, OOO/hours and
+ * the target's own step. Exported for outbound dialling of an internal extension or own DID, which
+ * enters here without `runTarget`'s hop counting (§10.1 Outbound steps 3 and 5). `forwarder` is
+ * the user whose own rule forwarded here, whose call an external target is dialled as, else `null`
+ * (§10.1 step 7); `number` the tenant number whose own target this is, its hop recorded for the
+ * target the decisions resolve to. */
 export async function enterTarget(
   pipeline: Pipeline,
   call: Call,
   target: ForwardTarget,
-  forwarder: Forwarder | null
+  forwarder: Forwarder | null,
+  number?: TenantNumber
 ): Promise<void> {
-  // §10.1 step 7: the target's announcement plays first, whatever its kind.
-  const audioId = target.announcementAudioId;
-  if (audioId !== undefined && !(await announce(pipeline, call, audioId))) {
+  const resolution = await resolveOnCall(pipeline, call, target);
+  if (resolution.kind === 'loop') {
+    await endAtDecisionLoop(pipeline, call, resolution.decisionId);
     return;
   }
-  if (target.kind === 'hangup') {
-    await hangUp(pipeline, call, audioId !== undefined);
-    return;
+  if (number !== undefined) {
+    noteNumberForward(
+      await pipeline.deps.cache.get(),
+      call,
+      number,
+      resolution.target
+    );
   }
-  await enterKind(pipeline, call, target, forwarder);
+  await enterResolved(pipeline, call, resolution, forwarder);
 }
 
 /** Entry's DID lookup for an inbound call (§10.1 step 1, §11.3): the called number's DID, else
@@ -179,16 +204,15 @@ async function enterCalled(
   }
   // §10.1 step 7: a DID's or fallback's own target is dialled without a caller, the called number
   // its forward's hop.
-  const target = targetFromRow(targetRow, snapshot.forwardTargets);
-  noteNumberForward(
-    snapshot,
+  await enterTarget(
+    pipeline,
     call,
+    targetFromRow(targetRow, snapshot.forwardTargets),
+    null,
     resolved.kind === 'did'
       ? { didId: resolved.didId }
-      : { fallbackBlockId: resolved.blockId },
-    target
+      : { fallbackBlockId: resolved.blockId }
   );
-  await enterTarget(pipeline, call, target, null);
 }
 
 /** A `from-trunk` StasisStart (§9.2): both numbers normalized with the delivering trunk's

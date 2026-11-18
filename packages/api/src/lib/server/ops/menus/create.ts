@@ -5,6 +5,7 @@ import { HTTP_CONFLICT, HTTP_NOT_FOUND, newId } from '@zamfono/shared';
 import { assertAudioOfKind } from '../audio/_shared.js';
 import { recordChange } from '../audit.js';
 import { insertForwardTarget } from '../forwardTargetSpec.js';
+import { insertOwnedExtension } from '../ownedExtension.js';
 import { propagate } from '../propagate.js';
 import { defineOperation } from '../types.js';
 import {
@@ -18,7 +19,9 @@ import {
 const DEFAULT_TIMEOUT_S = 5;
 const DEFAULT_MAX_ATTEMPTS = 3;
 
-export const menuInputSchema = z.object(menuFields).strict();
+export const menuInputSchema = z
+  .object({ ...menuFields, extension: menuFields.extension.optional() })
+  .strict();
 
 export const createMenu = defineOperation({
   name: 'menus.create',
@@ -51,6 +54,8 @@ export const createMenu = defineOperation({
       })
       .execute();
     recordChange(ctx, { field: 'name', from: null, to: input.name });
+    // Omitted, none: a client that knows no menu extension never takes one.
+    await insertOwnedExtension(ctx, { menuId: id }, input.extension ?? null);
     const row = await ctx.db
       .selectFrom('menus')
       .selectAll()

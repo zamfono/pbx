@@ -48,6 +48,7 @@ describe('targetFromRow', () => {
     mailboxRingGroupId: null,
     announcementAudioId: null,
     menuId: null,
+    decisionId: null,
     ringTimeoutS: null,
     fallbackOfId: null,
     recordCalls: 0

@@ -40,8 +40,9 @@ export async function userProfile(
 }
 
 /**
- * `[{ number, title }]` for `exts`, in the caller's order: the extension's owner name, or
- * "Parking <ext>" (§10.4 BLF). An entry with no live `extensions` row is dropped.
+ * `[{ number, title }]` for `exts`, in the caller's order: the extension's owner name (a user's,
+ * ring group's, decision's or menu's), or "Parking <ext>" (§10.4 BLF). An entry with no live
+ * `extensions` row is dropped.
  */
 export async function blfEntries(
   db: Db,
@@ -52,31 +53,19 @@ export async function blfEntries(
   }
   const rows = await db
     .selectFrom('extensions')
-    .select(['ext', 'userId', 'ringGroupId'])
-    .where('ext', 'in', exts)
+    .leftJoin('users', 'users.id', 'extensions.userId')
+    .leftJoin('ringGroups', 'ringGroups.id', 'extensions.ringGroupId')
+    .leftJoin('decisions', 'decisions.id', 'extensions.decisionId')
+    .leftJoin('menus', 'menus.id', 'extensions.menuId')
+    .select([
+      'extensions.ext as ext',
+      'users.name as userName',
+      'ringGroups.name as groupName',
+      'decisions.name as decisionName',
+      'menus.name as menuName'
+    ])
+    .where('extensions.ext', 'in', exts)
     .execute();
-  const userIds = rows.flatMap(row => (row.userId ? [row.userId] : []));
-  const groupIds = rows.flatMap(row =>
-    row.ringGroupId ? [row.ringGroupId] : []
-  );
-  const users =
-    userIds.length > 0
-      ? await db
-          .selectFrom('users')
-          .select(['id', 'name'])
-          .where('id', 'in', userIds)
-          .execute()
-      : [];
-  const groups =
-    groupIds.length > 0
-      ? await db
-          .selectFrom('ringGroups')
-          .select(['id', 'name'])
-          .where('id', 'in', groupIds)
-          .execute()
-      : [];
-  const userName = new Map(users.map(row => [row.id, row.name]));
-  const groupName = new Map(groups.map(row => [row.id, row.name]));
   const rowByExt = new Map(rows.map(row => [row.ext, row]));
   return exts.flatMap(ext => {
     const row = rowByExt.get(ext);
@@ -87,8 +76,10 @@ export async function blfEntries(
       {
         number: row.ext,
         title:
-          (row.userId ? userName.get(row.userId) : undefined) ??
-          (row.ringGroupId ? groupName.get(row.ringGroupId) : undefined) ??
+          row.userName ??
+          row.groupName ??
+          row.decisionName ??
+          row.menuName ??
           `Parking ${row.ext}`
       }
     ];
@@ -146,8 +137,8 @@ export async function deviceBlfKeys(
 }
 
 /**
- * The branch's default `blfs` list (§10.4 "Colleague presence"): every user and group extension
- * in the tenant (§11.2 `device_blf_keys`). Parking slots are left out, since the branch's
+ * The branch's default `blfs` list (§10.4 "Colleague presence"): every user, group, decision and
+ * menu extension in the tenant (§11.2 `device_blf_keys`). Parking slots are left out, since the branch's
  * `callpark.slots` already shows them; a device panel may still name one (`PUT /devices/{id}/blf`).
  */
 export async function branchBlfEntries(

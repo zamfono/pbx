@@ -50,6 +50,24 @@ async function ownScopeRuleIds(
   };
 }
 
+/** The live decisions whose conditions name `userId` (§5.9): a `presence` or `callerUser`
+ * condition reads that user, so it blocks their delete. */
+async function decisionsNaming(db: Db, userId: string): Promise<Reference[]> {
+  const rows = await db
+    .selectFrom('decisionConditions')
+    .innerJoin('decisions', 'decisions.id', 'decisionConditions.decisionId')
+    .select(['decisions.id as id', 'decisions.name as name'])
+    .distinct()
+    .where('decisionConditions.userId', '=', userId)
+    .where('decisions.deletedAt', 'is', null)
+    .execute();
+  return rows.map(row => ({
+    kind: 'decision',
+    id: row.id,
+    label: `${row.name} (condition)`
+  }));
+}
+
 /**
  * The blocking references a soft delete of user `userId` must list, or `[]` when free (§5.9).
  * `findForwardTargetOwners` has no user scope to exclude, so this filters out the cases that are
@@ -61,11 +79,12 @@ export async function findUserReferences(
   userId: string
 ): Promise<Reference[]> {
   const ftIds = await ownedForwardTargetIds(db, userId);
-  const [owners, ownScope] = await Promise.all([
+  const [owners, ownScope, decisions] = await Promise.all([
     findForwardTargetOwners(db, ftIds),
-    ownScopeRuleIds(db, userId)
+    ownScopeRuleIds(db, userId),
+    decisionsNaming(db, userId)
   ]);
-  return owners.filter(ref => {
+  const targets = owners.filter(ref => {
     if (ref.kind === 'user' && ref.id === userId) {
       return false;
     }
@@ -77,4 +96,5 @@ export async function findUserReferences(
     }
     return true;
   });
+  return [...targets, ...decisions];
 }

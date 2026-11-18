@@ -6,6 +6,8 @@ export const SKIPPED_ROW_TYPES = [
   'user',
   'device',
   'ringGroup',
+  'decision',
+  'menu',
   'parkingSlot',
   'trunk',
   'audioAsset'

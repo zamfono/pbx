@@ -96,6 +96,8 @@ function buildExtensionsMap(snapshot: Snapshot): Map<string, ExtensionRow> {
       {
         userId: row.userId,
         ringGroupId: row.ringGroupId,
+        decisionId: row.decisionId,
+        menuId: row.menuId,
         isParkingSlot: row.isParkingSlot === 1
       }
     ])

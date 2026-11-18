@@ -17,7 +17,12 @@ import {
   startRig,
   type Rig
 } from '../testing/pipelineRig.js';
-import { seedExtension, seedUserWithDevice } from '../testing/seedRows.js';
+import {
+  seedDecision,
+  seedExtension,
+  seedForwardTarget,
+  seedUserWithDevice
+} from '../testing/seedRows.js';
 import { newAddedLeg } from './addedParty.js';
 import { callerChannel, newCall, type Call } from './call.js';
 import { channelOf } from './callLookup.js';
@@ -1121,5 +1126,71 @@ describe('transfers', () => {
     await eventually(async () => {
       expect(await endedAt(consultation.id)).not.toBeNull();
     });
+  });
+  it('matches a caller blind-transferred to a decision as the outside party, not the transferrer (§10.1 step 7 "Decisions")', async () => {
+    await setUp();
+    const anna = await seedUserWithDevice(rig, '101');
+    const ben = await seedUserWithDevice(rig, '102');
+    const carl = await seedUserWithDevice(rig, '103');
+    const decisionId = await seedDecision(db, {
+      cases: [
+        {
+          when: [{ type: 'callerUser', userId: anna }],
+          targetId: await seedForwardTarget(db, { userId: carl })
+        },
+        {
+          when: [{ type: 'caller', number: '+15559999', isPrefix: false }],
+          targetId: await seedForwardTarget(db, { userId: ben })
+        }
+      ],
+      defaultTargetId: await seedForwardTarget(db, {}),
+      ext: '650'
+    });
+    const { call, callerId, legId } = await answered(
+      anna,
+      'PJSIP/e101-a-00000002'
+    );
+
+    fakeAri.emit({
+      type: 'BridgeBlindTransfer',
+      timestamp: nowIso(),
+      application: 'zamfono',
+      channel: { id: legId, name: 'PJSIP/e101-a-00000002' },
+      transferee: { id: callerId, name: 'PJSIP/trunk-1-00000001' },
+      exten: '650',
+      context: 'from-users',
+      result: 'Success',
+      is_external: false
+    });
+    await transferFollowed(call);
+    fakeAri.emit({
+      type: 'StasisStart',
+      timestamp: nowIso(),
+      application: 'zamfono',
+      args: ['outbound', '650'],
+      channel: {
+        id: callerId,
+        name: 'PJSIP/trunk-1-00000001',
+        state: 'Up',
+        caller: { number: '+15559999', name: '' },
+        connected: { number: '', name: '' },
+        dialplan: { context: 'from-users', exten: '650' }
+      }
+    });
+
+    // The onward call's caller is the customer, so the second case takes Ben, not Carl.
+    await eventually(() => {
+      expect(originatedEndpoints().at(-1)).toMatchObject({
+        endpoint: contactEndpoint('e102-a')
+      });
+    });
+    const child = pipeline.callByChannel.get(callerId);
+    expect(child?.callerUserId).toBeNull();
+    expect(child?.log.finish().log).toContain(
+      `"event":"decision","decisionId":"${decisionId}","decisionCase":1`
+    );
+    if (child !== undefined) {
+      await closeCall(pipeline, child, 'answered', 'all');
+    }
   });
 });

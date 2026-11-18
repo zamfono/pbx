@@ -50,6 +50,7 @@ const input: RenderInput = {
     }
   ],
   ringGroups: [{ id: 'rg1', ext: '600' }],
+  passThrough: [],
   parkingSlots: ['701'],
   trunks: [
     {
@@ -192,6 +193,7 @@ describe('render', () => {
     users: [],
     devices: [],
     ringGroups: [],
+    passThrough: [],
     parkingSlots: [],
     trunks: [
       {
@@ -406,6 +408,21 @@ describe('render', () => {
     expect(hints).not.toContain('*95701');
   });
 
+  test('a decision or menu extension has a presence hint alone', () => {
+    const hints = render({
+      ...input,
+      passThrough: [
+        { type: 'decision', id: 'dc1', ext: '650' },
+        { type: 'menu', id: 'm1', ext: '660' }
+      ]
+    }).files['extensions_hints.conf'];
+    expect(hints).toContain('exten => 650,hint,Stasis:presence-650');
+    expect(hints).toContain('exten => 660,hint,Stasis:presence-660');
+    expect(hints).not.toContain('*95650');
+    expect(hints).not.toContain('*95660');
+    expect(hints).not.toContain('Stasis:dnd-650');
+  });
+
   test("a device's indicator counts the own mailbox and the ring groups it names, every one for null", () => {
     // Both fixture devices are Anna's, so every AOR's `mailboxes` is the same.
     const aorMailboxes = (
@@ -447,6 +464,7 @@ describe('render', () => {
       ],
       devices: [],
       ringGroups: [],
+      passThrough: [],
       parkingSlots: [],
       trunks: []
     };
@@ -462,6 +480,7 @@ describe('render', () => {
       users: [],
       devices: [],
       ringGroups: [],
+      passThrough: [],
       parkingSlots: [],
       trunks: [{ ...trunkA, outboundProxy: 'sip:sbc.provider-a.example' }]
     };
@@ -482,6 +501,7 @@ describe('render', () => {
       users: [],
       devices: [],
       ringGroups: [],
+      passThrough: [],
       parkingSlots: [],
       trunks: [{ ...trunkB, inboundAuth: false }]
     };
@@ -497,6 +517,7 @@ describe('render', () => {
       users: [],
       devices: [],
       ringGroups: [],
+      passThrough: [],
       parkingSlots: [],
       trunks: [{ ...trunkA, password: 'x\n[anonymous]\ntype=endpoint' }, trunkB]
     };
@@ -514,6 +535,7 @@ describe('render', () => {
       users: [],
       devices: [],
       ringGroups: [],
+      passThrough: [],
       parkingSlots: [],
       trunks: [
         {
@@ -538,6 +560,7 @@ describe('render', () => {
     const bad: RenderInput = {
       ...input,
       ringGroups: [],
+      passThrough: [],
       parkingSlots: [],
       trunks: [],
       devices: input.devices.map(device =>
@@ -558,6 +581,7 @@ describe('render', () => {
     const bad: RenderInput = {
       ...input,
       ringGroups: [],
+      passThrough: [],
       parkingSlots: [],
       trunks: [],
       devices: [{ ...deviceA, allowedIps: ['10.0.0.0/8\n[anonymous]'] }]
@@ -579,6 +603,7 @@ describe('render', () => {
         }
       ],
       ringGroups: [],
+      passThrough: [],
       parkingSlots: [],
       trunks: []
     };
@@ -594,6 +619,7 @@ describe('render', () => {
       users: [],
       devices: [],
       ringGroups: [],
+      passThrough: [],
       parkingSlots: [],
       trunks: [],
       moh: [{ id: 'm1]\n[anonymous', filename: 'track1.wav' }]
@@ -609,6 +635,7 @@ describe('render', () => {
       users: [],
       devices: [],
       ringGroups: [],
+      passThrough: [],
       parkingSlots: [],
       trunks: [],
       moh: [{ id: '../../etc', filename: 'track1.wav' }]
@@ -624,6 +651,7 @@ describe('render', () => {
       users: [],
       devices: [],
       ringGroups: [],
+      passThrough: [],
       parkingSlots: [],
       trunks: [{ ...trunkA, id: 't1]\n[anonymous' }]
     };

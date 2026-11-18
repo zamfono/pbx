@@ -86,6 +86,28 @@ async function loadRingGroups(db: Db): Promise<RenderInput['ringGroups']> {
     .execute();
 }
 
+/** The extensions of decisions and menus (§11.2 `extensions`), live by construction: a soft
+ * delete deletes the owner's extension. */
+async function loadPassThrough(db: Db): Promise<RenderInput['passThrough']> {
+  const rows = await db
+    .selectFrom('extensions')
+    .select(['ext', 'decisionId', 'menuId'])
+    .where(eb =>
+      eb.or([eb('decisionId', 'is not', null), eb('menuId', 'is not', null)])
+    )
+    .execute();
+  return rows.flatMap(
+    ({ ext, decisionId, menuId }): RenderInput['passThrough'] => {
+      if (decisionId !== null) {
+        return [{ type: 'decision' as const, id: decisionId, ext }];
+      }
+      return menuId === null
+        ? []
+        : [{ type: 'menu' as const, id: menuId, ext }];
+    }
+  );
+}
+
 /** Live trunks (§11.2 `trunks`, `trunk_hosts`) with their credentials decrypted and hosts attached. */
 async function loadTrunks(db: Db, kr: Keyring): Promise<RenderInput['trunks']> {
   const trunkRows = await db
@@ -164,11 +186,12 @@ export async function loadRenderInput(
 ): Promise<RenderInput> {
   const settings = await loadSettings(db);
   const featureCodes = featureCodesColumn.decode(settings.featureCodesJson);
-  const [users, devices, ringGroups, parkingSlots, trunks, moh] =
+  const [users, devices, ringGroups, passThrough, parkingSlots, trunks, moh] =
     await Promise.all([
       loadUsers(db),
       loadDevices(db, kr),
       loadRingGroups(db),
+      loadPassThrough(db),
       loadParkingSlots(db),
       loadTrunks(db, kr),
       loadMoh(db)
@@ -186,6 +209,7 @@ export async function loadRenderInput(
     users,
     devices,
     ringGroups,
+    passThrough,
     parkingSlots,
     trunks,
     moh

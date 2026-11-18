@@ -6,14 +6,14 @@ import { migrateForTest, MIGRATIONS_DIR, seedSettings } from './testDb.js';
 
 test('migrates and enforces the schema', async () => {
   const db = openDb(':memory:');
-  expect(await pendingMigrations(db, MIGRATIONS_DIR)).toHaveLength(21);
+  expect(await pendingMigrations(db, MIGRATIONS_DIR)).toHaveLength(22);
   await migrateForTest(db);
   expect(await pendingMigrations(db, MIGRATIONS_DIR)).toEqual([]);
 
   const tables = (await db.introspection.getTables())
     .map(table => table.name)
     .sort();
-  expect(tables).toHaveLength(52);
+  expect(tables).toHaveLength(55);
 
   // settings.smtp_check_interval_s: 900 by default, NULL for no periodic relay check (§11.4)
   const settings = (await db.introspection.getTables()).find(
@@ -249,4 +249,94 @@ test('the sipBanProtocol migration keeps each ban on both protocols, its row as 
       })
       .execute()
   ).rejects.toThrow(/CHECK constraint failed/u);
+});
+
+test('the decisions migration ties a condition naming a user to its type, and counts the new extension owners (§11.2)', async () => {
+  const db = openDb(':memory:');
+  await migrateForTest(db);
+  await db
+    .insertInto('users')
+    .values({ id: 'u1', name: 'A', email: 'a@x', createdAt: 't' })
+    .execute();
+  await db
+    .insertInto('forwardTargets')
+    .values([{ id: 'ft1' }, { id: 'ft2' }])
+    .execute();
+  await db
+    .insertInto('decisions')
+    .values({ id: 'd1', name: 'Main', defaultTargetId: 'ft1', createdAt: 't' })
+    .execute();
+  await db
+    .insertInto('decisionCases')
+    .values({ id: 'c1', decisionId: 'd1', position: 0, targetId: 'ft2' })
+    .execute();
+  const condition = { decisionId: 'd1', caseId: 'c1', parentId: null };
+  // presence needs its user, callerUser may name one, every other type names none.
+  await expect(
+    db
+      .insertInto('decisionConditions')
+      .values({ id: 'p', ...condition, position: 0, type: 'presence' })
+      .execute()
+  ).rejects.toThrow(/CHECK constraint failed: decision_conditions_user/u);
+  await expect(
+    db
+      .insertInto('decisionConditions')
+      .values({
+        id: 'd',
+        ...condition,
+        position: 0,
+        type: 'dates',
+        valueJson: '{"ranges":[]}',
+        userId: 'u1'
+      })
+      .execute()
+  ).rejects.toThrow(/CHECK constraint failed: decision_conditions_user/u);
+  await expect(
+    db
+      .insertInto('decisionConditions')
+      .values({
+        id: 'a',
+        ...condition,
+        position: 0,
+        type: 'any',
+        valueJson: '{}'
+      })
+      .execute()
+  ).rejects.toThrow(
+    /CHECK constraint failed: decision_conditions_operator_payload/u
+  );
+  await db
+    .insertInto('decisionConditions')
+    .values([
+      { id: 'cu', ...condition, position: 0, type: 'callerUser' },
+      { id: 'pu', ...condition, position: 1, type: 'presence', userId: 'u1' }
+    ])
+    .execute();
+  // A forward target names at most one target, a decision now among them.
+  await expect(
+    db
+      .insertInto('forwardTargets')
+      .values({ id: 'ft3', decisionId: 'd1', userId: 'u1' })
+      .execute()
+  ).rejects.toThrow(/CHECK constraint failed: forward_targets_one_kind/u);
+  await db
+    .insertInto('extensions')
+    .values({ ext: '650', decisionId: 'd1' })
+    .execute();
+  await expect(
+    db
+      .insertInto('extensions')
+      .values({ ext: '651', decisionId: 'd1' })
+      .execute()
+  ).rejects.toThrow(/UNIQUE constraint failed/u);
+  await expect(
+    db.insertInto('extensions').values({ ext: '652' }).execute()
+  ).rejects.toThrow(/CHECK constraint failed: extensions_one_owner/u);
+  // Deleting the decision takes its cases, conditions and extension with it.
+  await db.deleteFrom('decisions').where('id', '=', 'd1').execute();
+  expect(
+    await db.selectFrom('decisionConditions').selectAll().execute()
+  ).toEqual([]);
+  expect(await db.selectFrom('extensions').select('ext').execute()).toEqual([]);
+  await db.destroy();
 });

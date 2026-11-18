@@ -10,6 +10,7 @@ import { assetMedia } from '../prompts.js';
 import { groupFallback, ringable, ringPlan } from '../routing/ringGroup.js';
 import { SIP_TEMPORARILY_UNAVAILABLE } from '../sipCodes.js';
 import { type Call } from './call.js';
+import { callDecisionInputs } from './callDecisions.js';
 import { raiseLogLevel } from './callLogLevel.js';
 import { extensionOf } from './extensionOwner.js';
 import { CONDITION_REASONS, diversionFor } from './forwardContext.js';
@@ -88,7 +89,10 @@ async function applyGroupFallback(
       { ringGroupId: group.ringGroupId },
       CONDITION_REASONS[outcome]
     );
-    await runTarget(pipeline, call, action.target, null, diversion);
+    await runTarget(pipeline, call, action.target, null, {
+      diversion,
+      rule: true
+    });
     return;
   }
   if (action.kind === 'mailbox') {
@@ -190,7 +194,8 @@ export async function ringGroup(
   const members = buildMemberStates(pipeline, snapshot, groupId, {
     now: pipeline.deps.now(),
     busy,
-    hops: call.hops
+    hops: call.hops,
+    inputs: callDecisionInputs(snapshot, pipeline.deps, call)
   });
   const legs = ringable(members, group.skipBusy === 1);
 
