@@ -11,6 +11,8 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-11-20
+
 ### Upgrade notes
 
 - This release is breaking: install it with `./update.sh` on the host, or with `system.update`
@@ -1468,7 +1470,8 @@ The first 0.2 release; its `v0.2.0` tag was never published.
 
 The first tagged version, before any deployment.
 
-[Unreleased]: https://github.com/zamfono/pbx/compare/v0.10.2...HEAD
+[Unreleased]: https://github.com/zamfono/pbx/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/zamfono/pbx/compare/v0.10.2...v0.11.0
 [0.10.2]: https://github.com/zamfono/pbx/compare/v0.10.1...v0.10.2
 [0.10.1]: https://github.com/zamfono/pbx/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/zamfono/pbx/compare/v0.9.1...v0.10.0
