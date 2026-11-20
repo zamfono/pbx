@@ -11,13 +11,16 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+## [0.11.1] - 2026-11-20
+
 ### Changed
 
 - The OpenAPI document (`/api/v1/openapi.json`) groups its operations by area, a tag each
-  (`users`, `devices`, `hours`, …) with a line on what the area holds and a link to its admin guide topic, describes the API and each
-  parameter where viewers show it, names the forward target's schema `ForwardTarget` where it
-  showed an anonymous `__schema0`, and lists the feature codes of `settings` as properties, so API
-  viewers and clients generated from it show them grouped and typed.
+  (`users`, `devices`, `hours`, …) with a line on what the area holds and a link to its admin
+  guide topic, describes the API and each parameter where viewers show it, names the forward
+  target's schema `ForwardTarget` where it showed an anonymous `__schema0`, and lists the feature
+  codes of `settings` as properties, so API viewers and clients generated from it show them
+  grouped and typed.
 
 ## [0.11.0] - 2026-11-20
 
@@ -1478,7 +1481,8 @@ The first 0.2 release; its `v0.2.0` tag was never published.
 
 The first tagged version, before any deployment.
 
-[Unreleased]: https://github.com/zamfono/pbx/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/zamfono/pbx/compare/v0.11.1...HEAD
+[0.11.1]: https://github.com/zamfono/pbx/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/zamfono/pbx/compare/v0.10.2...v0.11.0
 [0.10.2]: https://github.com/zamfono/pbx/compare/v0.10.1...v0.10.2
 [0.10.1]: https://github.com/zamfono/pbx/compare/v0.10.0...v0.10.1
