@@ -11,6 +11,14 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+### Changed
+
+- The OpenAPI document (`/api/v1/openapi.json`) groups its operations by area, a tag each
+  (`users`, `devices`, `hours`, …) with a line on what the area holds and a link to its admin guide topic, describes the API and each
+  parameter where viewers show it, names the forward target's schema `ForwardTarget` where it
+  showed an anonymous `__schema0`, and lists the feature codes of `settings` as properties, so API
+  viewers and clients generated from it show them grouped and typed.
+
 ## [0.11.0] - 2026-11-20
 
 ### Upgrade notes
