@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
@@ -208,5 +209,69 @@ describe('the OpenAPI descriptions list every placeholder a template may name', 
         expect(description).toContain(`{{${name}}}`);
       }
     }
+  });
+});
+
+describe('the OpenAPI document groups and names what it holds (§10.3)', () => {
+  const document = buildOpenApiDocument({ hostControl: true });
+
+  it('tags each operation with its area and declares every tag once', () => {
+    const operation = document.paths['/users/{id}/devices']?.post;
+    expect(operation?.tags).toEqual(['devices']);
+    const used = Object.values(document.paths).flatMap(methods =>
+      Object.values(methods).flatMap(op => op.tags)
+    );
+    expect(document.tags.map(tag => tag.name)).toEqual(
+      [...new Set(used)].sort()
+    );
+  });
+
+  it('describes the API, every tag and every parameter', () => {
+    expect(document.info.description).toBeTruthy();
+    expect(document.info.license.identifier).toBe('AGPL-3.0-only');
+    expect(document.info.contact.url).toBe(
+      'https://github.com/zamfono/pbx/issues'
+    );
+    expect(
+      document.tags.find(tag => tag.name === 'webhooks')?.externalDocs?.url
+    ).toBe('https://github.com/zamfono/pbx/blob/main/docs/guide/webhooks.md');
+    expect(document.tags.filter(tag => !tag.description)).toEqual([]);
+    const undescribed = Object.entries(document.paths).flatMap(
+      ([pattern, methods]) =>
+        Object.values(methods).flatMap(op =>
+          (op.parameters ?? [])
+            .filter(parameter => !parameter.description)
+            .map(parameter => `${pattern} ${parameter.name}`)
+        )
+    );
+    expect(undescribed).toEqual([]);
+    expect(
+      document.paths['/users/{id}']?.get?.parameters?.[0]?.description
+    ).toBe('The id of the `/users` item.');
+  });
+
+  it('links each tag to a guide topic that exists', () => {
+    const guide = new URL('../../../../../docs/guide/', import.meta.url);
+    const missing = document.tags
+      .map(tag => tag.externalDocs?.url.split('/').pop())
+      .filter(file => file !== undefined && !existsSync(new URL(file, guide)));
+    expect(missing).toEqual([]);
+  });
+
+  it('names every component schema, none an anonymous `__schema`', () => {
+    expect(
+      Object.keys(document.components.schemas).filter(name =>
+        name.startsWith('__schema')
+      )
+    ).toEqual([]);
+  });
+
+  it('lists the feature codes as properties, as code generators read them', () => {
+    const settings = document.paths['/settings']?.get?.responses['200']
+      ?.content?.['application/json']?.schema as Schema;
+    const featureCodes = settings.properties?.featureCodes as Schema;
+    expect(Object.keys(featureCodes.properties ?? {})).toEqual(
+      featureCodes.required
+    );
   });
 });

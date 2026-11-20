@@ -4,7 +4,14 @@ import {
   PROBLEM_CONTENT_TYPE
 } from '@zamfono/shared';
 
-import { operationIds, pathParamNames } from './openapiRouteFields.js';
+import {
+  operationIds,
+  pathParameter,
+  pathParamNames,
+  queryParameters,
+  type Parameter
+} from './openapiRouteFields.js';
+import { API_CONTACT, API_DESCRIPTION, API_DOCS, TAGS } from './openapiTags.js';
 import { offered } from './ops/gates.js';
 import {
   outputJsonSchema,
@@ -26,18 +33,11 @@ import {
   type RouteEntry
 } from './restRoutes.js';
 
-type Parameter = {
-  name: string;
-  in: 'path' | 'query';
-  required: boolean;
-  schema: JsonSchema;
-  /** The operation input field this path parameter fills, only when it differs from `name` (`{id}` → `userId`). */
-  'x-operation-field'?: string;
-};
-
 type OpenApiOperation = {
   operationId: string;
   summary: string;
+  /** The area the operation belongs to, the first part of its registry name (`users.create` → `users`). */
+  tags: [string];
   /** The operation's registry name (§10.3); distinct routes can share one when `operationId` had to be disambiguated. */
   'x-operation-name': string;
   parameters?: Parameter[];
@@ -50,8 +50,16 @@ type OpenApiOperation = {
 
 export type OpenApiDocument = {
   openapi: '3.1.0';
-  info: { title: string; version: string };
+  info: {
+    title: string;
+    version: string;
+    description: string;
+    license: { name: string; identifier: string };
+    contact: { name: string; url: string };
+  };
+  externalDocs: { description: string; url: string };
   servers: { url: string }[];
+  tags: ({ name: string } & Partial<(typeof TAGS)[string]>)[];
   paths: Record<string, Record<string, OpenApiOperation>>;
   components: {
     schemas: Record<string, JsonSchema>;
@@ -108,24 +116,6 @@ function problemResponse(status: ProblemStatus): {
       }
     }
   };
-}
-
-/** The input schema's own top-level fields, minus `exclude`d ones (the fields the route fills from its path), as query parameters. */
-function queryParameters(
-  schema: JsonSchema,
-  exclude: Set<string>
-): Parameter[] {
-  const properties =
-    (schema.properties as Record<string, JsonSchema> | undefined) ?? {};
-  const required = new Set((schema.required as string[] | undefined) ?? []);
-  return Object.entries(properties)
-    .filter(([name]) => !exclude.has(name))
-    .map(([name, propertySchema]) => ({
-      name,
-      in: 'query' as const,
-      required: required.has(name),
-      schema: propertySchema
-    }));
 }
 
 /**
@@ -190,6 +180,11 @@ function liftDefs<T>(schemas: T, suffix: string, lifted: LiftedSchemas): T {
   return copy;
 }
 
+/** `route`'s operation's area: the first part of its registry name (`users.create` → `users`). */
+function operationTag(route: RouteEntry): string {
+  return route.op.split('.')[0] ?? route.op;
+}
+
 function operationFor(
   route: RouteEntry,
   lifted: LiftedSchemas
@@ -210,21 +205,13 @@ function operationFor(
   // OpenAPI 3.1 §4.8.12.1 / Path Templating: a path parameter's `name` is the template expression
   // itself (`{id}` → `id`), regardless of the operation field it fills; `x-operation-field` carries
   // that field name where it differs (`{id}` → `userId` on `/users/{id}/devices`).
-  const parameters: Parameter[] = captures.map(capture => {
-    const fieldName = captureField(route, capture);
-    const parameter: Parameter = {
-      name: capture,
-      in: 'path',
-      required: true,
-      schema: properties[fieldName] ?? { type: 'string' }
-    };
-    return fieldName === capture
-      ? parameter
-      : { ...parameter, 'x-operation-field': fieldName };
-  });
+  const parameters = captures.map(capture =>
+    pathParameter(route, capture, properties)
+  );
   const base: OpenApiOperation = {
     operationId: OPERATION_IDS.get(route) ?? route.op,
     summary: op.description,
+    tags: [operationTag(route)],
     'x-operation-name': route.op,
     parameters,
     responses: liftDefs(responses(route, op), '', lifted)
@@ -260,10 +247,12 @@ function operationFor(
 export function buildOpenApiDocument(stack: StackOffer): OpenApiDocument {
   const paths: OpenApiDocument['paths'] = {};
   const lifted: LiftedSchemas = {};
+  const tags = new Set<string>();
   for (const route of routes) {
     if (!offered(routeOperation(route), stack)) {
       continue;
     }
+    tags.add(operationTag(route));
     let methods = paths[route.pattern];
     if (methods === undefined) {
       methods = {};
@@ -273,8 +262,16 @@ export function buildOpenApiDocument(stack: StackOffer): OpenApiDocument {
   }
   return {
     openapi: OPENAPI_VERSION,
-    info: { title: 'Zamfono API', version: API_VERSION },
+    info: {
+      title: 'Zamfono API',
+      version: API_VERSION,
+      description: API_DESCRIPTION,
+      license: { name: 'AGPL-3.0-only', identifier: 'AGPL-3.0-only' },
+      contact: API_CONTACT
+    },
+    externalDocs: API_DOCS,
     servers: [{ url: API_PREFIX }],
+    tags: [...tags].sort().map(name => ({ name, ...TAGS[name] })),
     paths,
     components: {
       schemas: { Problem: PROBLEM_SCHEMA, ...lifted },

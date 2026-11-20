@@ -15,15 +15,19 @@ const FEATURE_CODE_KEYS = [
 ] as const;
 export type FeatureCodeKey = (typeof FEATURE_CODE_KEYS)[number];
 
+const codeSchema = z.string().regex(/^[*#]/u, 'must start with * or #');
+
 /**
  * A full set of feature codes: every key present as a string starting with `*` or `#`, and no
  * code a prefix of another, since Stasis resolves a dialled string by its longest matching code
- * (§9.3).
+ * (§9.3). An object of the keys rather than a record keyed by them, so its JSON Schema lists
+ * them under `properties`, where clients generated from the OpenAPI document find them.
  */
 export const featureCodesSchema = z
-  .record(
-    z.enum(FEATURE_CODE_KEYS),
-    z.string().regex(/^[*#]/u, 'must start with * or #')
+  .strictObject(
+    Object.fromEntries(
+      FEATURE_CODE_KEYS.map(key => [key, codeSchema])
+    ) as Record<FeatureCodeKey, typeof codeSchema>
   )
   .superRefine((codes, ctx) => {
     for (const key of FEATURE_CODE_KEYS) {

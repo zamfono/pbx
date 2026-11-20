@@ -7,6 +7,7 @@ import * as privateEnv from '$app/env/private';
 
 import { resolveVersion } from '@zamfono/shared';
 
+import { REPOSITORY_URL as WEBSITE_URL } from '../openapiTags.js';
 import type { OpError } from '../ops/types.js';
 import { extensionMembers } from '../problem.js';
 import { originFromEnv } from '../stackAddress.js';
@@ -14,7 +15,6 @@ import { originFromEnv } from '../stackAddress.js';
 // What Zamfono puts into the results the SDK frames (§10.5): the server's identity and a tool
 // call's value. Each era's own fields (`resultType`, `ttlMs`, `cacheScope`, the `serverInfo` in
 // `_meta`) are the SDK's.
-const WEBSITE_URL = 'https://github.com/zamfono/pbx';
 // The logo in `static/`, served by the stack itself and public (§10.3 "Icons"). `theme` is the
 // background an icon is drawn for: the black one for a light client, the white one for a dark.
 const ICONS: (Omit<Icon, 'src'> & { path: string })[] = [

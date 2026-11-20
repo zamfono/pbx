@@ -255,12 +255,13 @@ export const targetSpecSchema: z.ZodType<TargetSpec> = z
       ? { ...target, sampleRate: webSocketSampleRate(target) }
       : target
   )
-  // Named, since a fallback nests it: a JSON Schema export refers to it as `$defs/ForwardTarget`,
-  // which the OpenAPI document lifts into its components (`openapi.ts`).
-  .meta({ id: 'ForwardTarget' })
   .describe(
     'Where the call goes: one of twelve kinds, chosen by `kind` (see zamfono.help mental-model).'
-  );
+  )
+  // Named, since a fallback nests it: a JSON Schema export refers to it as `$defs/ForwardTarget`,
+  // which the OpenAPI document lifts into its components (`openapi.ts`). Last, since a `.describe()`
+  // after it would be a clone of its own without the id, exported as an anonymous `__schema0`.
+  .meta({ id: 'ForwardTarget' });
 /**
  * What a `user` reads in place of a target an admin set on their own forwarding rule, OOO rule or
  * opening hours (§10.3 "Forward targets"), a chain holding a `sip`, `webSocket`, `decision` or
@@ -280,10 +281,10 @@ export const managedTargetSchema = z
       'httpRequest'
     ])
   })
-  .meta({ id: 'ManagedForwardTarget' })
   .describe(
     "A target an admin set, as a user reads it: send it back unchanged in the same place to keep the admin's target, or send another target, or leave the rule out, to replace or remove it."
-  );
+  )
+  .meta({ id: 'ManagedForwardTarget' });
 export type ManagedTarget = z.infer<typeof managedTargetSchema>;
 
 /** A target a `user` may read and write in its masked form (`managedTargetSchema`): their own

@@ -1,4 +1,15 @@
-import type { RouteEntry } from './restRoutes.js';
+import type { JsonSchema } from './ops/publishedSchema.js';
+import { captureField, type RouteEntry } from './restRoutes.js';
+
+export type Parameter = {
+  name: string;
+  in: 'path' | 'query';
+  required: boolean;
+  description?: string;
+  schema: JsonSchema;
+  /** The operation input field this path parameter fills, only when it differs from `name` (`{id}` → `userId`). */
+  'x-operation-field'?: string;
+};
 
 const PATH_PARAM_PATTERN = /\{(?<name>[^}]+)\}/gu;
 
@@ -37,4 +48,53 @@ export function operationIds(allRoutes: RouteEntry[]): Map<RouteEntry, string> {
     ids.set(route, `${route.op}.${staticSegments(route.pattern).join('.')}`);
   }
   return ids;
+}
+
+/** A parameter's `description`, the one its field's schema carries, which viewers and linters
+ * read from the parameter itself. */
+function described(description: unknown): { description?: string } {
+  return typeof description === 'string' ? { description } : {};
+}
+
+/** The input schema's own top-level fields, minus `exclude`d ones (the fields the route fills from its path), as query parameters. */
+export function queryParameters(
+  schema: JsonSchema,
+  exclude: Set<string>
+): Parameter[] {
+  const properties =
+    (schema.properties as Record<string, JsonSchema> | undefined) ?? {};
+  const required = new Set((schema.required as string[] | undefined) ?? []);
+  return Object.entries(properties)
+    .filter(([name]) => !exclude.has(name))
+    .map(([name, propertySchema]) => ({
+      name,
+      in: 'query' as const,
+      required: required.has(name),
+      ...described(propertySchema.description),
+      schema: propertySchema
+    }));
+}
+
+/** The path parameter `capture` of `route`, its schema the input field it fills (`properties`). */
+export function pathParameter(
+  route: RouteEntry,
+  capture: string,
+  properties: Record<string, JsonSchema>
+): Parameter {
+  const fieldName = captureField(route, capture);
+  const schema = properties[fieldName] ?? { type: 'string' };
+  const parameter: Parameter = {
+    name: capture,
+    in: 'path',
+    required: true,
+    // A capture its field does not describe is an id: of the item under the path before it.
+    ...described(
+      schema.description ??
+        `The id of the \`${route.pattern.slice(0, route.pattern.indexOf(`/{${capture}}`))}\` item.`
+    ),
+    schema
+  };
+  return fieldName === capture
+    ? parameter
+    : { ...parameter, 'x-operation-field': fieldName };
 }

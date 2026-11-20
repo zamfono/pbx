@@ -85,7 +85,9 @@ describe('field descriptions reach tools/list and the OpenAPI document', () => {
       typeof variant.$ref === 'string'
         ? (defs[variant.$ref.replace('#/$defs/', '')] ?? variant)
         : variant;
-    const variants = (schema.properties?.target?.oneOf ?? []).map(resolve);
+    // The target is the named `ForwardTarget`, so its kinds are one reference further in.
+    const target = resolve(schema.properties?.target ?? {});
+    const variants = (target.oneOf ?? []).map(resolve);
     expect(variants).toHaveLength(12);
     for (const variant of variants) {
       expect(variant.properties?.kind?.description).toEqual(DESCRIBED);
