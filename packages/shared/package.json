@@ -112,10 +112,10 @@
     "url": "env(DB_FILE)"
   },
   "dependencies": {
-    "better-sqlite3": "^13.0.3",
+    "better-sqlite3": "^13.1.1",
     "handlebars": "^4.7.10",
-    "kysely": "^0.29.8",
-    "libphonenumber-js": "^1.13.15",
+    "kysely": "^0.29.9",
+    "libphonenumber-js": "^1.13.16",
     "uuid": "^14.0.3",
     "zod": "^4.6.7"
   },
